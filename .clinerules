@@ -1,0 +1,28 @@
+# Reglas del proyecto
+
+## Contexto
+- Motor: Godot 4.x versión .NET. Lenguaje: C#. NO uses GDScript ni crees archivos .gd.
+- Juego: proyecto de prueba. De momento solo hay una escena Main con un Sprite2D y un script Player.cs.
+- Plataforma objetivo: solo Windows (PC). No se desarrolla para móvil.
+
+## Convenciones de C# en Godot
+- Toda clase que herede de un nodo de Godot debe ser `partial` y su nombre debe coincidir exactamente con el nombre del archivo .cs.
+- Usa `[Export]` para propiedades editables desde el inspector y `[Signal]` con delegates para las señales.
+- Usa `GD.Print` para depurar.
+- No inventes nodos, señales, métodos ni propiedades de la API de Godot: si dudas, dilo y pídeme la documentación.
+
+## Estructura
+- scenes/  -> escenas .tscn
+- scripts/ -> scripts .cs (un script por escena/nodo principal)
+- assets/  -> sprites y sonidos
+
+## Forma de trabajar
+- No crees ni modifiques project.godot, el .csproj ni el .sln salvo que yo te lo pida expresamente.
+- Un cambio pequeño por vez. Una tarea = un objetivo concreto.
+- Antes de editar, explica en 3 líneas qué vas a tocar y qué archivos.
+- No toques archivos que no hagan falta para la tarea.
+- Tras cada cambio, ejecuta `dotnet build` en la carpeta del proyecto y corrige los errores de compilación antes de seguir.
+- Cuando la tarea compile, dime que la pruebe yo en Godot. No des por bueno algo que solo compila.
+- Cuando la tarea funcione, resume qué hiciste y propón el mensaje de commit. No hagas commit sin que yo lo confirme.
+- Si fallas 2 veces seguidas en lo mismo, para y dime dónde estás atascado en vez de seguir probando.
+- Antes de leer o editar un archivo, comprueba que existe listando su carpeta. Usa siempre rutas relativas a la raíz del proyecto, con barras normales (/).
