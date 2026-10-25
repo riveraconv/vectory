@@ -1,15 +1,85 @@
 using Godot;
-using System;
+using System.Collections.Generic;
 
+// Se adjunta a un nodo raíz "Main" de tipo Node3D en una escena vacía.
+// Monta WorldEnvironment (fondo oscuro + glow), una rejilla de referencia
+// de fondo, el circuito (Track) y el Player, todo por código.
 public partial class Main : Node3D
 {
-	// Called when the node enters the scene tree for the first time.
+	private const float GridStep = 10f;
+	private const float GridHalf = 500f;
+	private const float GridY = -4f;
+
+	private Player _player;
+	private Track _track;
+	private Hud _hud;
+	private MeshInstance3D _grid;
+
 	public override void _Ready()
 	{
+		var env = new Godot.Environment
+		{
+			BackgroundMode = Godot.Environment.BGMode.Color,
+			BackgroundColor = new Color("05070D"),
+			GlowEnabled = true,
+			GlowIntensity = 1.0f,
+			GlowBloom = 0.15f,
+			GlowHdrThreshold = 0.8f
+		};
+		AddChild(new WorldEnvironment { Name = "WorldEnvironment", Environment = env });
+
+		_grid = new MeshInstance3D { Name = "Grid", Mesh = BuildGridMesh() };
+		AddChild(_grid);
+
+		_track = new Track { Name = "Track" };
+		AddChild(_track);
+
+		_player = new Player { Name = "Player" };
+		AddChild(_player);
+		_player.PlaceAt(_track.StartPosition, _track.StartYaw);
+
+		_hud = new Hud { Name = "Hud" };
+		AddChild(_hud);
 	}
 
-	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double delta)
 	{
+		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita
+		_hud.SetSpeed(_player.Speed);
+
+		Vector3 p = _player.GlobalPosition;
+		_grid.GlobalPosition = new Vector3(
+			Mathf.Snapped(p.X, GridStep),
+			GridY,
+			Mathf.Snapped(p.Z, GridStep));
+	}
+
+	private static ArrayMesh BuildGridMesh()
+	{
+		var verts = new List<Vector3>();
+
+		for (float x = -GridHalf; x <= GridHalf; x += GridStep)
+		{
+			verts.Add(new Vector3(x, 0f, -GridHalf));
+			verts.Add(new Vector3(x, 0f, GridHalf));
+		}
+		for (float z = -GridHalf; z <= GridHalf; z += GridStep)
+		{
+			verts.Add(new Vector3(-GridHalf, 0f, z));
+			verts.Add(new Vector3(GridHalf, 0f, z));
+		}
+
+		var arrays = new Godot.Collections.Array();
+		arrays.Resize((int)Mesh.ArrayType.Max);
+		arrays[(int)Mesh.ArrayType.Vertex] = verts.ToArray();
+
+		var mesh = new ArrayMesh();
+		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);
+		mesh.SurfaceSetMaterial(0, new StandardMaterial3D
+		{
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			AlbedoColor = new Color(0.1f, 0.25f, 0.6f)
+		});
+		return mesh;
 	}
 }

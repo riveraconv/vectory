@@ -26,3 +26,6 @@
 - Cuando la tarea funcione, resume qué hiciste y propón el mensaje de commit. No hagas commit sin que yo lo confirme.
 - Si fallas 2 veces seguidas en lo mismo, para y dime dónde estás atascado en vez de seguir probando.
 - Antes de leer o editar un archivo, comprueba que existe listando su carpeta. Usa siempre rutas relativas a la raíz del proyecto, con barras normales (/).
+
+## Control de errores
+- Si una tarea provoca errores, analiza primero los mensajes completos y determina la causa. Corrige únicamente el problema identificado. No hagas cambios adicionales para intentar solucionar errores cuya causa no hayas comprobado. Si fallas dos veces consecutivas, detente y explica el problema.
