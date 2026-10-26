@@ -14,6 +14,8 @@ public struct LimitResult
 
 // Límites laterales simples de la pista: no es una colisión física, solo coloca la nave
 // de nuevo en el límite y anula la velocidad que la empujaba hacia fuera.
+// Solo se corrige la parte LATERAL de la posición: lo que la nave haya avanzado a lo largo
+// de la pista se respeta, así puede deslizarse por el borde sin quedarse clavada.
 // Lógica pura: no depende de Godot. Trabaja en el plano horizontal
 // (Vector2.X = eje X de Godot, Vector2.Y = eje Z de Godot).
 public static class TrackLimits
@@ -36,13 +38,15 @@ public static class TrackLimits
 
 		float limit = MathF.Max(0f, halfWidth - margin);
 		float lateral = Vector2.Dot(position - center, right);
-		if (MathF.Abs(lateral) <= limit)
+		float excess = MathF.Abs(lateral) - limit;
+		if (excess <= 0f)
 			return result;
 
 		Vector2 outward = right * MathF.Sign(lateral);
 
 		result.Hit = true;
-		result.Position = center + outward * limit;
+		// Se retira solo lo que sobra hacia fuera; la posición a lo largo de la pista no se toca
+		result.Position = position - outward * excess;
 
 		float outwardSpeed = Vector2.Dot(velocity, outward);
 		if (outwardSpeed > 0f)

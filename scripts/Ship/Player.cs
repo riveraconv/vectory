@@ -30,7 +30,8 @@ public partial class Player : CharacterBody3D
 
 	[ExportGroup("Límites de pista")]
 	[Export] public float LimitMargin = 3.4f;    // distancia que se respeta hasta el borde (media envergadura de la nave)
-	[Export] public float WallBrake = 0.5f;      // velocidad que pierde por cada m/s que golpea el límite (0 = no pierde nada)
+	[Export] public float WallBrake = 0.5f;      // velocidad que pierde por cada m/s del GOLPE inicial contra el límite (0 = no pierde nada)
+	[Export] public float WallScrape = 4f;       // m/s que pierde cada segundo mientras roza el límite (0 = sin fricción; mejor que sea menor que Acceleration)
 
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
@@ -40,6 +41,10 @@ public partial class Player : CharacterBody3D
 	[Export] public float BaseFov = 75f;
 	[Export] public float MaxFov = 95f;
 
+	// Tiempo (s) sin tocar el límite tras el cual el siguiente contacto cuenta como golpe nuevo.
+	// Mientras dura un roce continuo, el contacto se renueva y no se vuelve a contar como golpe.
+	private const float WallContactGrace = 0.15f;
+
 	private readonly ShipDynamics _dynamics = new();
 	private Spaceship _ship;
 	private ChaseCamera _chaseCam;
@@ -47,6 +52,7 @@ public partial class Player : CharacterBody3D
 
 	private bool _chaseView = true;
 	private float _bank = 0f;
+	private float _wallContactTimer = 0f;
 
 	// Velocidad real actual en m/s (la usa el HUD)
 	public float Speed => _dynamics.RealSpeed;
@@ -85,6 +91,7 @@ public partial class Player : CharacterBody3D
 		GlobalPosition = position;
 		_dynamics.Reset(yaw);
 		_bank = 0f;
+		_wallContactTimer = 0f;
 		Rotation = new Vector3(0f, yaw, 0f);
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 	}
@@ -121,7 +128,7 @@ public partial class Player : CharacterBody3D
 		_dynamics.SetVelocity(new NVec2(Velocity.X, Velocity.Z));
 
 		// 3. Límites laterales de la pista
-		ApplyTrackLimits();
+		ApplyTrackLimits(dt);
 
 		// 4. Si choca contra algo, el motor también pierde velocidad
 		if (GetSlideCollisionCount() > 0)
@@ -185,9 +192,13 @@ public partial class Player : CharacterBody3D
 		return Mathf.Clamp(_dynamics.Speed / BoostMaxSpeed, 0f, 1f);
 	}
 
-	// Si la nave sobrepasa el borde de la pista, TrackLimits la devuelve al límite
-	private void ApplyTrackLimits()
+	// Si la nave sobrepasa el borde de la pista, TrackLimits la devuelve al límite.
+	// El golpe (WallBrake) se aplica una sola vez al empezar el contacto; mientras la nave
+	// sigue rozando solo pierde la fricción suave de WallScrape y se desliza a lo largo del borde.
+	private void ApplyTrackLimits(float dt)
 	{
+		_wallContactTimer = Mathf.Max(0f, _wallContactTimer - dt);
+
 		if (_track == null)
 			return;
 
@@ -206,8 +217,15 @@ public partial class Player : CharacterBody3D
 		if (!r.Hit)
 			return;
 
+		bool newImpact = _wallContactTimer <= 0f;
+		_wallContactTimer = WallContactGrace;
+
 		GlobalPosition = new Vector3(r.Position.X, GlobalPosition.Y, r.Position.Y);
 		_dynamics.SetVelocity(r.Velocity);
-		_dynamics.ReduceSpeed(r.ImpactSpeed * WallBrake);
+
+		if (newImpact)
+			_dynamics.ReduceSpeed(r.ImpactSpeed * WallBrake);
+
+		_dynamics.ReduceSpeed(WallScrape * dt);
 	}
 }
