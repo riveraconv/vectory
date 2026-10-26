@@ -1,12 +1,13 @@
 using Godot;
 using System.Collections.Generic;
+using Vectory.Core;
+
+namespace Vectory.Ship;
 
 // Nave wireframe de VECTORY generada 100% por código.
 // Eje de avance: -Z (convención de Godot). Morro en z = -4, motores atrás en z > 0.
 public partial class Spaceship : Node3D
 {
-	private static readonly Color Cyan = new Color("36E7FF");
-	private static readonly Color Blue = new Color("245BFF");
 
 	private readonly List<Vector3> _verts = new();
 	private readonly List<Color> _colors = new();
@@ -105,17 +106,17 @@ public partial class Spaceship : Node3D
 		float[] bottom = { -0.2f, -0.3f, -0.3f, -0.3f };
 		float[] side   = {  0.05f, 0.1f, 0.1f, 0.1f };
 
-		int nose = V(new Vector3(0f, 0f, -4f), Cyan);
+		int nose = V(new Vector3(0f, 0f, -4f), Palette.Cyan);
 
 		int[][] rings = new int[zs.Length][];
 		for (int i = 0; i < zs.Length; i++)
 		{
 			rings[i] = new[]
 			{
-				V(new Vector3(0f, top[i], zs[i]), Cyan),
-				V(new Vector3(halfW[i], side[i], zs[i]), Cyan),
-				V(new Vector3(0f, bottom[i], zs[i]), Cyan),
-				V(new Vector3(-halfW[i], side[i], zs[i]), Cyan)
+				V(new Vector3(0f, top[i], zs[i]), Palette.Cyan),
+				V(new Vector3(halfW[i], side[i], zs[i]), Palette.Cyan),
+				V(new Vector3(0f, bottom[i], zs[i]), Palette.Cyan),
+				V(new Vector3(-halfW[i], side[i], zs[i]), Palette.Cyan)
 			};
 
 			for (int k = 0; k < 4; k++)
@@ -135,10 +136,10 @@ public partial class Spaceship : Node3D
 
 	private void BuildWing(float s)
 	{
-		int rootFront = V(new Vector3(s * 0.9f, 0.1f, -0.5f), Cyan);
-		int rootRear  = V(new Vector3(s * 0.8f, 0.1f, 2.0f), Cyan);
-		int tipFront  = V(new Vector3(s * 3.4f, -0.05f, 2.2f), Cyan);
-		int tipRear   = V(new Vector3(s * 3.4f, -0.05f, 2.7f), Cyan);
+		int rootFront = V(new Vector3(s * 0.9f, 0.1f, -0.5f), Palette.Cyan);
+		int rootRear  = V(new Vector3(s * 0.8f, 0.1f, 2.0f), Palette.Cyan);
+		int tipFront  = V(new Vector3(s * 3.4f, -0.05f, 2.2f), Palette.Cyan);
+		int tipRear   = V(new Vector3(s * 3.4f, -0.05f, 2.7f), Palette.Cyan);
 
 		L(rootFront, tipFront);
 		L(tipFront, tipRear);
@@ -147,7 +148,7 @@ public partial class Spaceship : Node3D
 		L(rootFront, tipRear);
 
 		// Aleta vertical en la punta del ala
-		int finTop = V(new Vector3(s * 3.4f, 0.7f, 2.7f), Cyan);
+		int finTop = V(new Vector3(s * 3.4f, 0.7f, 2.7f), Palette.Cyan);
 		L(tipFront, finTop);
 		L(finTop, tipRear);
 	}
@@ -158,15 +159,15 @@ public partial class Spaceship : Node3D
 		float cy = 0.1f;
 		const int seg = 6;
 
-		int[] front  = Ring(cx, cy, 0.8f, 0.4f, seg, Cyan);
-		int[] back   = Ring(cx, cy, 2.8f, 0.4f, seg, Cyan);
+		int[] front  = Ring(cx, cy, 0.8f, 0.4f, seg, Palette.Cyan);
+		int[] back   = Ring(cx, cy, 2.8f, 0.4f, seg, Palette.Cyan);
 		Connect(front, back);
 
 		// Tobera con brillo azul
-		int[] nozzle = Ring(cx, cy, 3.2f, 0.28f, seg, Blue);
+		int[] nozzle = Ring(cx, cy, 3.2f, 0.28f, seg, Palette.Blue);
 		Connect(back, nozzle);
 
-		int core = V(new Vector3(cx, cy, 3.0f), Blue);
+		int core = V(new Vector3(cx, cy, 3.0f), Palette.Blue);
 		for (int k = 0; k < seg; k++)
 			L(core, nozzle[k]);
 	}
@@ -187,20 +188,20 @@ public partial class Spaceship : Node3D
 		}
 
 		// Montantes del parabrisas y barra superior
-		Seg(-0.95f, -0.48f, -0.80f, 0.62f, Cyan);
-		Seg( 0.95f, -0.48f,  0.80f, 0.62f, Cyan);
-		Seg(-0.80f,  0.62f,  0.80f, 0.62f, Cyan);
+		Seg(-0.95f, -0.48f, -0.80f, 0.62f, Palette.Cyan);
+		Seg( 0.95f, -0.48f,  0.80f, 0.62f, Palette.Cyan);
+		Seg(-0.80f,  0.62f,  0.80f, 0.62f, Palette.Cyan);
 
 		// Salpicadero con un pequeño saliente central
-		Seg(-0.95f, -0.48f, -0.35f, -0.40f, Cyan);
-		Seg(-0.35f, -0.40f,  0.35f, -0.40f, Cyan);
-		Seg( 0.35f, -0.40f,  0.95f, -0.48f, Cyan);
+		Seg(-0.95f, -0.48f, -0.35f, -0.40f, Palette.Cyan);
+		Seg(-0.35f, -0.40f,  0.35f, -0.40f, Palette.Cyan);
+		Seg( 0.35f, -0.40f,  0.95f, -0.48f, Palette.Cyan);
 
 		// Laterales y techo hacia los bordes de la pantalla
-		Seg(-1.45f, -0.84f, -0.95f, -0.48f, Blue);
-		Seg( 1.45f, -0.84f,  0.95f, -0.48f, Blue);
-		Seg(-0.80f,  0.62f, -1.50f,  0.84f, Blue);
-		Seg( 0.80f,  0.62f,  1.50f,  0.84f, Blue);
+		Seg(-1.45f, -0.84f, -0.95f, -0.48f, Palette.Blue);
+		Seg( 1.45f, -0.84f,  0.95f, -0.48f, Palette.Blue);
+		Seg(-0.80f,  0.62f, -1.50f,  0.84f, Palette.Blue);
+		Seg( 0.80f,  0.62f,  1.50f,  0.84f, Palette.Blue);
 
 		var arrays = new Godot.Collections.Array();
 		arrays.Resize((int)Mesh.ArrayType.Max);

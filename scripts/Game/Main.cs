@@ -1,5 +1,11 @@
 using Godot;
 using System.Collections.Generic;
+using Vectory.Circuit;
+using Vectory.Core;
+using Vectory.Ship;
+using Vectory.UI;
+
+namespace Vectory.Game;
 
 // Se adjunta a un nodo raíz "Main" de tipo Node3D en una escena vacía.
 // Monta WorldEnvironment (fondo oscuro + glow), una rejilla de referencia
@@ -20,7 +26,7 @@ public partial class Main : Node3D
 		var env = new Godot.Environment
 		{
 			BackgroundMode = Godot.Environment.BGMode.Color,
-			BackgroundColor = new Color("05070D"),
+			BackgroundColor = Palette.Background,
 			GlowEnabled = true,
 			GlowIntensity = 1.0f,
 			GlowBloom = 0.15f,
@@ -31,11 +37,22 @@ public partial class Main : Node3D
 		_grid = new MeshInstance3D { Name = "Grid", Mesh = BuildGridMesh() };
 		AddChild(_grid);
 
-		_track = new Track { Name = "Track" };
-		AddChild(_track);
+		// Si Track y Player ya están en la escena (así se editan sus parámetros en el
+		// Inspector) se usan tal cual; si no, se crean por código.
+		_track = GetNodeOrNull<Track>("Track");
+		if (_track == null)
+		{
+			_track = new Track { Name = "Track" };
+			AddChild(_track);
+		}
 
-		_player = new Player { Name = "Player" };
-		AddChild(_player);
+		_player = GetNodeOrNull<Player>("Player");
+		if (_player == null)
+		{
+			_player = new Player { Name = "Player" };
+			AddChild(_player);
+		}
+		_player.SetTrack(_track);
 		_player.PlaceAt(_track.StartPosition, _track.StartYaw);
 
 		_hud = new Hud { Name = "Hud" };
@@ -78,7 +95,7 @@ public partial class Main : Node3D
 		mesh.SurfaceSetMaterial(0, new StandardMaterial3D
 		{
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			AlbedoColor = new Color(0.1f, 0.25f, 0.6f)
+			AlbedoColor = Palette.BlueDim
 		});
 		return mesh;
 	}

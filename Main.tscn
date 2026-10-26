@@ -1,6 +1,15 @@
 [gd_scene format=3 uid="uid://cji8kjvdg0qmb"]
 
-[ext_resource type="Script" uid="uid://dnj15rwq27lnn" path="res://Main.cs" id="1_glv2v"]
+[ext_resource type="Script" uid="uid://dnj15rwq27lnn" path="res://scripts/Game/Main.cs" id="1_glv2v"]
+[ext_resource type="Script" uid="uid://calvipcoabflp" path="res://scripts/Circuit/Track.cs" id="2_r0du0"]
+[ext_resource type="Script" uid="uid://d0sbwun4waqmi" path="res://scripts/Ship/Player.cs" id="3_cm0pq"]
 
 [node name="Main" type="Node3D" unique_id=1889765682]
 script = ExtResource("1_glv2v")
+
+[node name="Track" type="Node3D" parent="." unique_id=1902884476]
+script = ExtResource("2_r0du0")
+TrackWidth = 40.0
+
+[node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
+script = ExtResource("3_cm0pq")

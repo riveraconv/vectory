@@ -1,5 +1,8 @@
 using Godot;
 using System.Collections.Generic;
+using Vectory.Core;
+
+namespace Vectory.Circuit;
 
 // Circuito cerrado de VECTORY, generado por código.
 // El trazado sale de puntos de control medidos sobre la imagen del circuito
@@ -19,9 +22,6 @@ public partial class Track : Node3D
 	private const float SampleStep = 4f;         // metros entre muestras de la spline
 	private static readonly Vector2 ImageCenter = new Vector2(744f, 444f);
 
-	private static readonly Color Cyan = new Color("36E7FF");
-	private static readonly Color Dim = new Color(0.1f, 0.25f, 0.6f);
-	private static readonly Color Orange = new Color("FF9D32");
 
 	// Puntos de control (píxeles de la imagen), en sentido horario visto desde arriba,
 	// empezando en la línea de salida y avanzando hacia el oeste por la recta principal.
@@ -135,9 +135,29 @@ public partial class Track : Node3D
 		return (Centerline[(i + 1) % n] - Centerline[(i - 1 + n) % n]).Normalized();
 	}
 
-	private Vector3 RightAt(int i)
+	public Vector3 RightAt(int i)
 	{
 		return TangentAt(i).Cross(Vector3.Up).Normalized();
+	}
+
+	// Índice de la muestra de la línea central más cercana a una posición (en el plano XZ).
+	// Supone que el nodo Track está en el origen sin rotar ni escalar.
+	public int NearestIndex(Vector3 position)
+	{
+		int best = 0;
+		float bestDist = float.MaxValue;
+		for (int i = 0; i < Centerline.Count; i++)
+		{
+			float dx = position.X - Centerline[i].X;
+			float dz = position.Z - Centerline[i].Z;
+			float d = dx * dx + dz * dz;
+			if (d < bestDist)
+			{
+				bestDist = d;
+				best = i;
+			}
+		}
+		return best;
 	}
 
 	// ---------------------------------------------------------------
@@ -167,19 +187,19 @@ public partial class Track : Node3D
 			Vector3 cj = Centerline[j];
 
 			// Bordes brillantes
-			Line(ci - ri * hw, cj - rj * hw, Cyan);
-			Line(ci + ri * hw, cj + rj * hw, Cyan);
+			Line(ci - ri * hw, cj - rj * hw, Palette.TrackEdge);
+			Line(ci + ri * hw, cj + rj * hw, Palette.TrackEdge);
 
 			// Dos líneas interiores tenues (dan el aspecto de rejilla de la imagen)
-			Line(ci - ri * (hw / 3f), cj - rj * (hw / 3f), Dim);
-			Line(ci + ri * (hw / 3f), cj + rj * (hw / 3f), Dim);
+			Line(ci - ri * (hw / 3f), cj - rj * (hw / 3f), Palette.BlueDim);
+			Line(ci + ri * (hw / 3f), cj + rj * (hw / 3f), Palette.BlueDim);
 
 			// Líneas transversales cada RungSpacing metros
 			distSinceRung += ci.DistanceTo(cj);
 			if (distSinceRung >= RungSpacing)
 			{
 				distSinceRung = 0f;
-				Line(ci - ri * hw, ci + ri * hw, Dim);
+				Line(ci - ri * hw, ci + ri * hw, Palette.BlueDim);
 			}
 		}
 	}
@@ -195,15 +215,15 @@ public partial class Track : Node3D
 		Vector3 up = Vector3.Up * GateHeight;
 
 		// Línea de meta en el suelo
-		Line(leftBase, rightBase, Orange);
+		Line(leftBase, rightBase, Palette.Orange);
 
 		// Postes y travesaño
-		Line(leftBase, leftBase + up, Orange);
-		Line(rightBase, rightBase + up, Orange);
-		Line(leftBase + up, rightBase + up, Orange);
+		Line(leftBase, leftBase + up, Palette.Orange);
+		Line(rightBase, rightBase + up, Palette.Orange);
+		Line(leftBase + up, rightBase + up, Palette.Orange);
 
 		// Segundo travesaño un poco más abajo para que se lea como un arco
 		Vector3 lowBar = Vector3.Up * (GateHeight - 2f);
-		Line(leftBase + lowBar, rightBase + lowBar, Orange);
+		Line(leftBase + lowBar, rightBase + lowBar, Palette.Orange);
 	}
 }

@@ -1,4 +1,7 @@
 using Godot;
+using Vectory.Core;
+
+namespace Vectory.UI;
 
 // HUD mínimo de la demo: velocidad digital abajo en el centro.
 // Se crea por código desde Main. Colores según la paleta del documento maestro.
@@ -8,11 +11,11 @@ public partial class Hud : CanvasLayer
 
 	public override void _Ready()
 	{
-		_speedLabel = MakeLabel(56, new Color("36E7FF"), -135f, -65f);
+		_speedLabel = MakeLabel(56, Palette.Cyan, -135f, -65f);
 		_speedLabel.Text = "0";
 		AddChild(_speedLabel);
 
-		var unitLabel = MakeLabel(20, new Color("A6B8D8"), -65f, -30f);
+		var unitLabel = MakeLabel(20, Palette.BlueGray, -65f, -30f);
 		unitLabel.Text = "KM/H";
 		AddChild(unitLabel);
 	}
