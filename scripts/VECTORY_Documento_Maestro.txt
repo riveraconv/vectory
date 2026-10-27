@@ -1,7 +1,8 @@
 VECTORY — DOCUMENTO MAESTRO DE DISEÑO Y PRIMERA DEMO
-Versión 1.1
+Versión 1.2
+Cambios de la 1.2: el documento se pone al día con el código (commit d62ed34). Secciones 6 y 7: el alcance de la demo se amplió a un circuito cerrado con checkpoints, cronometraje de vueltas y HUD de carrera; se añaden las etapas 4 a 6 y el estado actual. Sección 18: controles actuales. Sección 20.2: estructura real de carpetas y archivos. Sección 21: instrucciones adaptadas a la etapa actual.
 Cambios de la 1.1: nueva sección 20 (#Desarrollo del software aplicando buenas prácticas de ingeniería, principios SOLID, pruebas unitarias y refactorización orientada a la mantenibilidad y calidad del código); las instrucciones directas pasan a ser la sección 21.
-Estado: diseño general recopilado; la primera demo se desarrollará por etapas.
+Estado: etapas 1 a 6 de la demo implementadas y con commit. La siguiente etapa está por decidir (ver sección 7).
 Propósito: documento de referencia para Claude. El usuario no escribirá código manualmente.
 
 ======================================================================
@@ -116,31 +117,37 @@ Módulos de pista:
 
 La demo debe integrarse en el proyecto real de VECTORY; no debe ser una maqueta desechable que haya que rehacer.
 
-Incluir:
-- Proyecto Godot ejecutable con renderizador Forward+.
-- Un tramo recto de pista wireframe, modular y configurable.
-- Carriles, bordes y líneas transversales.
-- Límites laterales simples para mantener la nave dentro del corredor.
-- Nave wireframe controlable con líneas explícitas.
-- Cabina minimalista en primera persona.
-- Cámara en primera persona con movimiento moderado.
-- Controles de teclado en Windows.
-- Aceleración, frenado, giro progresivo, desaceleración gradual e inercia lateral moderada.
-- HUD mínimo con velocidad digital.
-- Fondo oscuro y estética vectorial/cian.
-- La geometría de la pista será la fuente principal de sensación de velocidad.
+El alcance original (un tramo recto, conducción y límites; etapas 1 a 3) se amplió durante el desarrollo con un circuito cerrado, checkpoints, cronometraje de vueltas, HUD de carrera, cámara exterior y un impulso provisional. Esta sección describe el alcance vigente.
 
-No incluir todavía:
-- Impulso/turbo funcional ni sistema energético.
-- Indicador de impulso en el HUD.
-- Rivales o IA.
+Incluido (implementado):
+- Proyecto Godot ejecutable con renderizador Forward+ y C# (.NET 10).
+- Circuito cerrado plano generado por código: trazado a partir de puntos de control medidos sobre una imagen, suavizado con una spline cerrada; unos 4,2 km. Incluye la recta principal y curvas planas.
+- Parámetros del circuito en el Inspector: sentido de giro, anchura, altura, separación de líneas transversales, altura de la meta, número y altura de checkpoints.
+- Bordes, líneas interiores tenues y líneas transversales, todo en una sola malla de líneas.
+- Línea de meta (medio hexágono, naranja) y checkpoints repartidos a distancias iguales (medio rectángulo, cian atenuado).
+- Rejilla de referencia de fondo que sigue a la nave.
+- Límites laterales simples (no es colisión física): devuelven la nave al borde, con pérdida de velocidad por golpe y fricción mientras roza.
+- Nave wireframe con líneas explícitas.
+- Cabina minimalista en primera persona y cámara exterior de tercera persona, alternables con C.
+- Conducción: aceleración, frenado, giro progresivo, desaceleración gradual e inercia lateral, con parámetros en el Inspector.
+- Impulso provisional (Shift): sube la aceleración y la velocidad punta mientras se mantiene pulsado. No tiene reserva de energía ni recarga.
+- Carrera de 3 vueltas: el cronómetro arranca al moverse la nave; cuenta checkpoints en orden y la meta solo cierra la vuelta si se han pasado todos. Tiempos de vuelta y de sector, mejor vuelta y mejor sector.
+- HUD de carrera: posición (fija en 1/1, sin rivales), vuelta actual/total, tiempo de vuelta, mejor vuelta, velocidad digital en km/h con barra y barra de impulso.
+- Fondo oscuro, bloom moderado y paleta centralizada (Palette).
+- Pruebas unitarias de ShipDynamics, TrackLimits, LineCrossingDetector y RaceTracker.
+
+No incluido todavía:
+- Sistema energético: reserva limitada de impulso, consumo y recuperación (sección 12).
+- Rivales o IA; por tanto, posición real y clasificación.
+- Cuenta atrás de salida y parrilla.
 - Colisiones físicas completas con barreras.
 - Daños.
-- Vueltas, posiciones, clasificación o cronómetro de carrera.
-- Curvas, túneles, peraltes o desniveles.
-- Menús definitivos, hangar completo, campeonatos, desafíos o progresión.
-- Controles teclado y mando.
-- Personalización, desbloqueos o guardado de progreso del juego completo.
+- Túneles, peraltes o desniveles; arcos y estructuras secundarias.
+- Pantalla de resultados, récords y guardado.
+- Menús definitivos, pausa, hangar, selección de nave, campeonatos, desafíos o progresión.
+- Controles de mando.
+- Sonido y música.
+- Personalización o desbloqueos.
 - Partículas, líneas de fuga adicionales o efectos avanzados de velocidad.
 
 No implementar las funciones excluidas solo para preparar el futuro. Mantener una base ampliable sin ampliar el alcance de la demo.
@@ -194,7 +201,35 @@ ETAPA 3 — Límites y estabilidad
 - Evitar que la nave atraviese los extremos del corredor durante el uso normal.
 - Comprobar que giro y frenado siguen funcionando y no producen bloqueos u oscilaciones.
 
-Las fases posteriores (mejoras visuales, validación amplia, impulso y circuitos adicionales) se planificarán después de validar esta demo. No ampliar el alcance por iniciativa propia.
+ETAPA 4 — Circuito cerrado, meta y checkpoints
+- Sustituir el tramo recto por un circuito cerrado plano generado por código (spline cerrada).
+- Línea de meta y checkpoints repartidos a lo largo del circuito.
+- Posición de salida antes de la meta.
+- Adaptar los límites laterales a la línea central del circuito.
+
+ETAPA 5 — Cronometraje de vueltas
+- Detectar el cruce de checkpoints y meta solo hacia delante, ignorando retrocesos y recolocaciones.
+- Contar checkpoints en orden; la meta solo cierra la vuelta si se han pasado todos.
+- Carrera de 3 vueltas con tiempos de vuelta y sector, mejor vuelta y mejor sector.
+- Lógica pura y probada: LineCrossingDetector y RaceTracker.
+
+ETAPA 6 — HUD de carrera
+- Posición, vuelta actual/total, tiempo de vuelta y mejor vuelta.
+- Velocidad digital con barra y barra de impulso.
+- Pruebas unitarias de LineCrossingDetector y RaceTracker.
+
+Estado actual:
+- Etapas 1 a 6 implementadas y con commit. Último commit: d62ed34 «Race HUD added and tests for LineCrossingDetector and RaceTracker».
+- Añadidos fuera de las etapas anteriores: cámara exterior de tercera persona (C), impulso provisional sin energía (Shift) y teclas de flecha como alternativa a WASD.
+- La siguiente etapa no está decidida. La propone Claude y la confirma el usuario antes de empezar.
+
+Pendientes conocidos (pequeños, sin cambio de comportamiento):
+- Track.cs define el color de los checkpoints a mano (CheckpointColor); debe pasar a Palette según la sección 20.1.
+- El comentario de RaceSession dice que no hay HUD; ya existe.
+- Los informes de cobertura (Vectory.Test/TestResults/) están en el repositorio; conviene excluir esa carpeta en .gitignore.
+- La carpeta docs/ contiene etapa_1.md vacío.
+
+No ampliar el alcance por iniciativa propia.
 
 ======================================================================
 8. CONDUCCIÓN DEL JUEGO COMPLETO — DECISIONES FUTURAS YA ACORDADAS
@@ -432,10 +467,12 @@ Nada de lo anterior es necesario para la primera demo.
 18. CONTROLES
 ======================================================================
 
-Primera demo, Windows:
-- W: acelerar.
-- S: frenar.
-- A/D: girar.
+Primera demo, Windows (teclado):
+- W / Flecha arriba: acelerar.
+- S / Flecha abajo: frenar.
+- A, D / Flechas izquierda y derecha: girar.
+- Shift: impulso provisional (sin energía).
+- C: alternar cabina en primera persona y cámara exterior.
 - Espacio no tiene función en esta fase.
 
 
@@ -476,18 +513,33 @@ CLÁUSULA 20.2 — ESTRUCTURA DE CARPETAS Y ARQUITECTURA
 
 - El proyecto no crece de forma descontrolada ni desordenada: la estructura de carpetas y la arquitectura están definidas desde ahora y cada archivo va en su carpeta.
 - Organización por funcionalidad. Los espacios de nombres reflejan las carpetas (Vectory.Core, Vectory.Ship, etc.).
-- Estructura actual (v1):
+- Estructura actual (v2):
 
   res://
-    scenes/        Escenas (.tscn). Hoy: Main.tscn
+    Main.tscn      Escena principal (está en la raíz; scenes/ existe pero está vacía)
+    scenes/        Escenas (.tscn) nuevas
+    docs/          Documentación auxiliar
     scripts/
+      VECTORY_Documento_Maestro.txt   Este documento
       Core/        Código compartido sin dependencias: Palette
-      Game/        Arranque y composición de la escena: Main
-      Ship/        Nave del jugador. Nodos: Player, Spaceship, ChaseCamera.
+      Game/        Arranque y composición de la escena (entorno, rejilla de fondo,
+                   circuito, jugador y HUD): Main
+      Ship/        Nave del jugador.
+                   Nodos: Player (conecta las piezas), Spaceship (nave exterior),
+                   Cockpit (cámara y marco de cabina), ChaseCamera (cámara exterior).
                    Lógica pura: ShipDynamics, ShipInput, ShipTuning
-      Circuit/     Circuito. Nodo: Track. Lógica pura: TrackLimits
+      Circuit/     Circuito y carrera.
+                   Nodo: Track (geometría, línea central, meta y checkpoints).
+                   Adaptador: RaceSession (usa tipos de Godot pero no es un nodo;
+                   conecta Track con RaceTracker).
+                   Lógica pura: TrackLimits, LineCrossingDetector, RaceTracker
       UI/          HUD: Hud
-    tests/         Proyecto de pruebas unitarias, fuera del juego exportado
+    Vectory.Test/  Proyecto de pruebas unitarias (xUnit), fuera del juego exportado
+      ShipTests/     ShipDynamicTests
+      CircuitTest/   TrackLimitsTests, LineCrossingDetectorTests, RaceTrackerTests
+
+- Las pruebas se ejecutan con «dotnet test» desde la raíz del proyecto.
+- Las carpetas de tests reflejan las de scripts/ (Ship → ShipTests, Circuit → CircuitTest).
 
 - Reglas de dependencia:
   - Core no depende de ninguna otra carpeta.
@@ -505,8 +557,8 @@ CLÁUSULA 20.2 — ESTRUCTURA DE CARPETAS Y ARQUITECTURA
 
 1. Lee este documento completo antes de actuar.
 2. Implementa únicamente la etapa actual; no desarrolles el juego completo.
-3. Empieza por la ETAPA 1. No implementes conducción hasta que el usuario valide geometría y cámara.
-4. No añadas impulso, energía, rivales, daños, menús completos ni otros sistemas excluidos de la demo.
+3. Consulta el «Estado actual» de la sección 7 para saber en qué etapa está el proyecto. Propón la siguiente etapa y espera la confirmación del usuario antes de empezarla.
+4. No añadas energía, rivales, daños, menús completos ni otros sistemas excluidos de la demo (sección 6). El impulso actual es provisional: no lo amplíes sin una etapa acordada.
 5. No inventes requisitos ni amplíes el alcance por iniciativa propia.
 6. Si hay varias soluciones válidas, elige la más sencilla que cumpla los requisitos y sea razonablemente ampliable.
 7. No pidas al usuario que decida detalles técnicos secundarios que puedas resolver con criterio.
