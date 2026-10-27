@@ -4,7 +4,8 @@ using Vectory.Core;
 
 namespace Vectory.Ship;
 
-// Nave wireframe de VECTORY generada 100% por código.
+// Nave wireframe de VECTORY generada 100% por código (solo el aspecto exterior;
+// la cabina vive en Cockpit).
 // Eje de avance: -Z (convención de Godot). Morro en z = -4, motores atrás en z > 0.
 public partial class Spaceship : Node3D
 {
@@ -14,9 +15,6 @@ public partial class Spaceship : Node3D
 	private readonly List<int> _indices = new();
 
 	private MeshInstance3D _meshInstance;
-	private MeshInstance3D _cockpitFrame;
-
-	public Camera3D CockpitCam { get; private set; }
 
 	public override void _Ready()
 	{
@@ -24,28 +22,12 @@ public partial class Spaceship : Node3D
 
 		_meshInstance = new MeshInstance3D { Name = "MeshInstance3D", Mesh = BuildMesh() };
 		AddChild(_meshInstance);
-
-		// Cámara de cabina (primera persona). La de tercera persona la gestiona Player.
-		CockpitCam = new Camera3D
-		{
-			Name = "Camera3D",
-			Position = new Vector3(0f, 0.45f, -1.2f),
-			Fov = 80f
-		};
-		AddChild(CockpitCam);
-
-		// Marco minimalista de la cabina, pegado a la cámara de cabina
-		_cockpitFrame = new MeshInstance3D { Name = "CockpitFrame", Mesh = BuildCockpitMesh() };
-		CockpitCam.AddChild(_cockpitFrame);
-
-		ShowCockpit(false);
 	}
 
-	// En cabina se ve solo el marco; en tercera persona, solo la nave exterior
-	public void ShowCockpit(bool cockpit)
+	// La nave exterior solo se ve en tercera persona
+	public void SetExteriorVisible(bool visible)
 	{
-		_meshInstance.Visible = !cockpit;
-		_cockpitFrame.Visible = cockpit;
+		_meshInstance.Visible = visible;
 	}
 
 	// ---------------------------------------------------------------
@@ -170,52 +152,6 @@ public partial class Spaceship : Node3D
 		int core = V(new Vector3(cx, cy, 3.0f), Palette.Blue);
 		for (int k = 0; k < seg; k++)
 			L(core, nozzle[k]);
-	}
-
-	private ArrayMesh BuildCockpitMesh()
-	{
-		// Marco a 1 m delante de la cámara, dimensionado para pantalla 16:9 y FOV 80
-		const float z = -1f;
-		var verts = new List<Vector3>();
-		var colors = new List<Color>();
-
-		void Seg(float x1, float y1, float x2, float y2, Color c)
-		{
-			verts.Add(new Vector3(x1, y1, z));
-			verts.Add(new Vector3(x2, y2, z));
-			colors.Add(c);
-			colors.Add(c);
-		}
-
-		// Montantes del parabrisas y barra superior
-		Seg(-0.95f, -0.48f, -0.80f, 0.62f, Palette.Cyan);
-		Seg( 0.95f, -0.48f,  0.80f, 0.62f, Palette.Cyan);
-		Seg(-0.80f,  0.62f,  0.80f, 0.62f, Palette.Cyan);
-
-		// Salpicadero con un pequeño saliente central
-		Seg(-0.95f, -0.48f, -0.35f, -0.40f, Palette.Cyan);
-		Seg(-0.35f, -0.40f,  0.35f, -0.40f, Palette.Cyan);
-		Seg( 0.35f, -0.40f,  0.95f, -0.48f, Palette.Cyan);
-
-		// Laterales y techo hacia los bordes de la pantalla
-		Seg(-1.45f, -0.84f, -0.95f, -0.48f, Palette.Blue);
-		Seg( 1.45f, -0.84f,  0.95f, -0.48f, Palette.Blue);
-		Seg(-0.80f,  0.62f, -1.50f,  0.84f, Palette.Blue);
-		Seg( 0.80f,  0.62f,  1.50f,  0.84f, Palette.Blue);
-
-		var arrays = new Godot.Collections.Array();
-		arrays.Resize((int)Mesh.ArrayType.Max);
-		arrays[(int)Mesh.ArrayType.Vertex] = verts.ToArray();
-		arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
-
-		var mesh = new ArrayMesh();
-		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);
-		mesh.SurfaceSetMaterial(0, new StandardMaterial3D
-		{
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			VertexColorUseAsAlbedo = true
-		});
-		return mesh;
 	}
 
 	private ArrayMesh BuildMesh()

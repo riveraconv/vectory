@@ -47,6 +47,7 @@ public partial class Player : CharacterBody3D
 
 	private readonly ShipDynamics _dynamics = new();
 	private Spaceship _ship;
+	private Cockpit _cockpit;
 	private ChaseCamera _chaseCam;
 	private Track _track;
 
@@ -70,6 +71,9 @@ public partial class Player : CharacterBody3D
 
 		_ship = new Spaceship { Name = "Spaceship" };
 		AddChild(_ship);
+
+		_cockpit = new Cockpit { Name = "Cockpit" };
+		AddChild(_cockpit);
 
 		_chaseCam = new ChaseCamera { Name = "ChaseCamera" };
 		AddChild(_chaseCam);
@@ -107,11 +111,12 @@ public partial class Player : CharacterBody3D
 
 	private void ApplyView()
 	{
-		_ship.ShowCockpit(!_chaseView);
+		_ship.SetExteriorVisible(_chaseView);
+		_cockpit.SetFrameVisible(!_chaseView);
 		if (_chaseView)
 			_chaseCam.MakeCurrent();
 		else
-			_ship.CockpitCam.MakeCurrent();
+			_cockpit.Camera.MakeCurrent();
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -137,7 +142,9 @@ public partial class Player : CharacterBody3D
 		// 5. Inclinación visual de la nave al girar
 		float bankTarget = _dynamics.Steer * MaxBank * _dynamics.TurnFactor;
 		_bank = Mathf.Lerp(_bank, bankTarget, 1f - Mathf.Exp(-8f * dt));
-		_ship.Rotation = new Vector3(0f, 0f, _bank);
+		var roll = new Vector3(0f, 0f, _bank);
+		_ship.Rotation = roll;
+		_cockpit.Rotation = roll;
 
 		// 6. Cámara de tercera persona
 		_chaseCam.UpdateFollow(dt, GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());

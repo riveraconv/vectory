@@ -7,8 +7,8 @@ namespace Vectory.Circuit;
 // Circuito cerrado de VECTORY, generado por código.
 // El trazado sale de puntos de control medidos sobre la imagen del circuito
 // (en píxeles). Se convierten a metros, se suavizan con una spline cerrada
-// y se dibuja en estilo wireframe de neón: bordes cian, rejilla azul tenue
-// y un arco de salida/meta.
+// y se dibuja en estilo wireframe de neón: bordes cian, rejilla azul tenue,
+// una línea de meta (medio hexágono) y checkpoints (medio rectángulo).
 public partial class Track : Node3D
 {
 	// ---- Ajustes ----
@@ -16,11 +16,16 @@ public partial class Track : Node3D
 	[Export] public float TrackWidth = 28f;      // ancho de la pista en metros
 	[Export] public float TrackY = -2f;          // altura de la pista (la nave flota 2 m por encima)
 	[Export] public float RungSpacing = 8f;      // separación de las líneas transversales
-	[Export] public float GateHeight = 12f;      // altura del arco de meta
+	[Export] public float GateHeight = 12f;      // altura de la línea de meta
+	[Export] public int CheckpointCount = 5;     // número de checkpoints repartidos por el circuito
+	[Export] public float CheckpointHeight = 6f; // altura de cada checkpoint
 
 	private const float MetersPerPixel = 1.4f;   // con 1.4 sale un circuito de ~4.2 km
 	private const float SampleStep = 4f;         // metros entre muestras de la spline
 	private static readonly Vector2 ImageCenter = new Vector2(744f, 444f);
+
+	// Cian de la pista al 50 % de intensidad: más tenue que la meta
+	private static readonly Color CheckpointColor = new Color("1B737F");
 
 
 	// Puntos de control (píxeles de la imagen), en sentido horario visto desde arriba,
@@ -69,7 +74,8 @@ public partial class Track : Node3D
 		Centerline = SampleSpline(control);
 
 		BuildTrackLines();
-		BuildGate();
+		BuildFinishLine();
+		BuildCheckpoints();
 
 		var mesh = new ArrayMesh();
 		var arrays = new Godot.Collections.Array();
@@ -204,26 +210,67 @@ public partial class Track : Node3D
 		}
 	}
 
-	private void BuildGate()
+	// Línea de meta: medio hexágono (mitad superior) en la muestra 0 de la línea central.
+	private void BuildFinishLine()
 	{
-		Vector3 c = Centerline[0];
-		Vector3 r = RightAt(0);
+		BuildArch(0, GateHeight, Palette.Orange, true);
+	}
+
+	// Checkpoints: medio rectángulo, repartidos a distancias iguales a lo largo del circuito
+	// (sin contar la meta, que está en el punto 0).
+	private void BuildCheckpoints()
+	{
+		if (CheckpointCount <= 0)
+			return;
+
+		int n = Centerline.Count;
+
+		// Distancia acumulada a lo largo de la línea central
+		var cumulative = new float[n + 1];
+		for (int i = 0; i < n; i++)
+			cumulative[i + 1] = cumulative[i] + Centerline[i].DistanceTo(Centerline[(i + 1) % n]);
+		float total = cumulative[n];
+
+		int index = 0;
+		for (int k = 1; k <= CheckpointCount; k++)
+		{
+			float target = total * k / (CheckpointCount + 1);
+			while (index < n - 1 && cumulative[index + 1] < target)
+				index++;
+
+			BuildArch(index, CheckpointHeight, CheckpointColor, false);
+		}
+	}
+
+	// Arco en el plano perpendicular a la pista, apoyado en el suelo y cerrado con una línea base.
+	// hexagon = true: mitad superior de un hexágono; false: mitad superior de un rectángulo.
+	private void BuildArch(int index, float height, Color color, bool hexagon)
+	{
+		Vector3 c = Centerline[index];
+		Vector3 r = RightAt(index);
 		float hw = TrackWidth * 0.5f;
+		Vector3 up = Vector3.Up * height;
 
 		Vector3 leftBase = c - r * hw;
 		Vector3 rightBase = c + r * hw;
-		Vector3 up = Vector3.Up * GateHeight;
 
-		// Línea de meta en el suelo
-		Line(leftBase, rightBase, Palette.Orange);
+		Vector3 leftTop;
+		Vector3 rightTop;
+		if (hexagon)
+		{
+			// Los vértices superiores quedan a la mitad del ancho
+			leftTop = c - r * (hw * 0.5f) + up;
+			rightTop = c + r * (hw * 0.5f) + up;
+		}
+		else
+		{
+			leftTop = leftBase + up;
+			rightTop = rightBase + up;
+		}
 
-		// Postes y travesaño
-		Line(leftBase, leftBase + up, Palette.Orange);
-		Line(rightBase, rightBase + up, Palette.Orange);
-		Line(leftBase + up, rightBase + up, Palette.Orange);
-
-		// Segundo travesaño un poco más abajo para que se lea como un arco
-		Vector3 lowBar = Vector3.Up * (GateHeight - 2f);
-		Line(leftBase + lowBar, rightBase + lowBar, Palette.Orange);
+		Line(leftBase, leftTop, color);
+		Line(leftTop, rightTop, color);
+		Line(rightTop, rightBase, color);
+		Line(rightBase, leftBase, color);
 	}
 }
