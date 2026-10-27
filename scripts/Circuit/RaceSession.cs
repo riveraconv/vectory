@@ -7,7 +7,7 @@ namespace Vectory.Circuit;
 // Cada frame recibe la posición y la velocidad de la nave, detecta qué checkpoints
 // y meta ha cruzado y se lo comunica al RaceTracker.
 //
-// De momento no hay HUD: los resultados se escriben en la consola de Godot ([Carrera]).
+// Además del HUD, los resultados se escriben en la consola de Godot ([Race]).
 // El RaceTracker se crea al primer Update, cuando el Track ya ha generado su geometría.
 public sealed class RaceSession
 {
@@ -47,7 +47,7 @@ public sealed class RaceSession
 		{
 			_started = true;
 			_tracker.Start();
-			GD.Print("[Carrera] Cronómetro en marcha");
+			GD.Print("[Race] Timer started");
 		}
 
 		_detector.Update(_track.NearestIndex(position));
@@ -80,7 +80,7 @@ public sealed class RaceSession
 		{
 			if (!_warned)
 			{
-				GD.PushWarning("RaceSession: el circuito no tiene checkpoints; no se puede contar vueltas.");
+				GD.PushWarning("RaceSession: the track has no checkpoints; laps cannot be counted.");
 				_warned = true;
 			}
 			return false;
@@ -91,13 +91,13 @@ public sealed class RaceSession
 		_started = false;
 
 		_tracker.SectorCompleted += (lap, sector, time, isBest) =>
-			GD.Print($"[Carrera] Vuelta {lap} - Sector {sector + 1}/{_tracker.SectorCount}: {FormatTime(time)}{(isBest ? " (mejor sector)" : "")}");
+			GD.Print($"[Race] Lap {lap} - Sector {sector + 1}/{_tracker.SectorCount}: {FormatTime(time)}{(isBest ? " (best sector)" : "")}");
 
 		_tracker.LapCompleted += (lap, time, isBest) =>
-			GD.Print($"[Carrera] Vuelta {lap}/{_tracker.TotalLaps}: {FormatTime(time)}{(isBest ? " (mejor vuelta)" : "")}");
+			GD.Print($"[Race] Lap {lap}/{_tracker.TotalLaps}: {FormatTime(time)}{(isBest ? " (best lap)" : "")}");
 
 		_tracker.RaceFinished += totalTime =>
-			GD.Print($"[Carrera] Fin de carrera. Tiempo total: {FormatTime(totalTime)}");
+			GD.Print($"[Race] Race finished. Total time: {FormatTime(totalTime)}");
 
 		return true;
 	}

@@ -80,15 +80,15 @@ public partial class Hud : CanvasLayer
 
 		// Antes de arrancar CurrentLap vale 0; se muestra como vuelta 1
 		int lap = Math.Max(1, race.CurrentLap);
-		_lapLabel.Text = $"VUELTA {lap}/{race.TotalLaps}";
+		_lapLabel.Text = $"LAP {lap}/{race.TotalLaps}";
 		_lapTimeLabel.Text = FormatTime(race.CurrentLapTime);
-		_bestLapLabel.Text = $"MEJOR {(race.BestLapTime.HasValue ? FormatTime(race.BestLapTime.Value) : NoTime)}";
+		_bestLapLabel.Text = $"BEST {(race.BestLapTime.HasValue ? FormatTime(race.BestLapTime.Value) : NoTime)}";
 	}
 
 	// Posición del jugador y total de participantes
 	public void SetRacePosition(int position, int total)
 	{
-		_positionLabel.Text = $"POS {position}/{total}";
+		_positionLabel.Text = $"POSITION {position}/{total}";
 	}
 
 	// ---------------------------------------------------------------
@@ -97,14 +97,14 @@ public partial class Hud : CanvasLayer
 
 	private void BuildPositionBlock(Control root)
 	{
-		_positionLabel = AddLabel(root, "POS 1/1", 40, Palette.Cyan,
+		_positionLabel = AddLabel(root, "POSITION 1/1", 40, Palette.Cyan,
 			HorizontalAlignment.Left, VerticalAlignment.Center,
-			Corner.TopLeft, Margin, 30f, 260f, 50f);
+			Corner.TopLeft, Margin, 30f, 400f, 50f);
 	}
 
 	private void BuildLapBlock(Control root)
 	{
-		_lapLabel = AddLabel(root, "VUELTA -/-", 28, Palette.Cyan,
+		_lapLabel = AddLabel(root, "LAP -/-", 28, Palette.Cyan,
 			HorizontalAlignment.Right, VerticalAlignment.Center,
 			Corner.TopRight, Margin, 30f, 320f, 38f);
 
@@ -112,7 +112,7 @@ public partial class Hud : CanvasLayer
 			HorizontalAlignment.Right, VerticalAlignment.Center,
 			Corner.TopRight, Margin, 70f, 320f, 42f);
 
-		_bestLapLabel = AddLabel(root, $"MEJOR {NoTime}", 22, Palette.BlueGray,
+		_bestLapLabel = AddLabel(root, $"BEST {NoTime}", 22, Palette.BlueGray,
 			HorizontalAlignment.Right, VerticalAlignment.Center,
 			Corner.TopRight, Margin, 114f, 320f, 30f);
 	}
