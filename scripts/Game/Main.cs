@@ -57,13 +57,18 @@ public partial class Main : Node3D
 
 		_hud = new Hud { Name = "Hud" };
 		AddChild(_hud);
+
+		// Todavía no hay rivales: el jugador es el único participante
+		_hud.SetRacePosition(1, 1);
 	}
 
 	public override void _Process(double delta)
 	{
-		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita
-		_hud.SetSpeed(_player.Speed);
+		// HUD: velocidad, boost y estado de la carrera
+		_hud.SetSpeed(_player.Speed, _player.MaxSpeed, _player.BoostMaxSpeed);
+		_hud.SetRace(_player.Race);
 
+		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita
 		Vector3 p = _player.GlobalPosition;
 		_grid.GlobalPosition = new Vector3(
 			Mathf.Snapped(p.X, GridStep),

@@ -60,6 +60,9 @@ public partial class Player : CharacterBody3D
 	// Velocidad real actual en m/s (la usa el HUD)
 	public float Speed => _dynamics.RealSpeed;
 
+	// Estado de la carrera (vueltas, tiempos...) para el HUD. Es null hasta que la sesión lo crea.
+	public RaceTracker Race => _race?.Tracker;
+
 	public override void _Ready()
 	{
 		MotionMode = MotionModeEnum.Floating;
