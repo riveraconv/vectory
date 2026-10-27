@@ -1,6 +1,6 @@
 VECTORY — DOCUMENTO MAESTRO DE DISEÑO Y PRIMERA DEMO
 Versión 1.2
-Cambios de la 1.2: el documento se pone al día con el código (commit d62ed34). Secciones 6 y 7: el alcance de la demo se amplió a un circuito cerrado con checkpoints, cronometraje de vueltas y HUD de carrera; se añaden las etapas 4 a 6 y el estado actual. Sección 18: controles actuales. Sección 20.2: estructura real de carpetas y archivos. Sección 21: instrucciones adaptadas a la etapa actual.
+Cambios de la 1.2: el documento se pone al día con el código (commit f134f4a). Secciones 6 y 7: el alcance de la demo se amplió a un circuito cerrado con checkpoints, cronometraje de vueltas y HUD de carrera; se añaden las etapas 4 a 6 y el estado actual. Sección 18: controles actuales. Sección 20.2: estructura real de carpetas y archivos. Sección 21: instrucciones adaptadas a la etapa actual.
 Cambios de la 1.1: nueva sección 20 (#Desarrollo del software aplicando buenas prácticas de ingeniería, principios SOLID, pruebas unitarias y refactorización orientada a la mantenibilidad y calidad del código); las instrucciones directas pasan a ser la sección 21.
 Estado: etapas 1 a 6 de la demo implementadas y con commit. La siguiente etapa está por decidir (ver sección 7).
 Propósito: documento de referencia para Claude. El usuario no escribirá código manualmente.
@@ -132,7 +132,7 @@ Incluido (implementado):
 - Conducción: aceleración, frenado, giro progresivo, desaceleración gradual e inercia lateral, con parámetros en el Inspector.
 - Impulso provisional (Shift): sube la aceleración y la velocidad punta mientras se mantiene pulsado. No tiene reserva de energía ni recarga.
 - Carrera de 3 vueltas: el cronómetro arranca al moverse la nave; cuenta checkpoints en orden y la meta solo cierra la vuelta si se han pasado todos. Tiempos de vuelta y de sector, mejor vuelta y mejor sector.
-- HUD de carrera: posición (fija en 1/1, sin rivales), vuelta actual/total, tiempo de vuelta, mejor vuelta, velocidad digital en km/h con barra y barra de impulso.
+- HUD de carrera: posición (fija en 1/1, sin rivales), vuelta actual/total, tiempo de vuelta, mejor vuelta, velocidad digital en km/h con barra y barra de impulso. Los textos del HUD (POSITION, LAP, BEST, BOOST, KM/H) y los mensajes de carrera en la consola ([Race]) están en inglés.
 - Fondo oscuro, bloom moderado y paleta centralizada (Palette).
 - Pruebas unitarias de ShipDynamics, TrackLimits, LineCrossingDetector y RaceTracker.
 
@@ -219,13 +219,13 @@ ETAPA 6 — HUD de carrera
 - Pruebas unitarias de LineCrossingDetector y RaceTracker.
 
 Estado actual:
-- Etapas 1 a 6 implementadas y con commit. Último commit: d62ed34 «Race HUD added and tests for LineCrossingDetector and RaceTracker».
+- Etapas 1 a 6 implementadas y con commit. Commit de la etapa 6: d62ed34 «Race HUD added and tests for LineCrossingDetector and RaceTracker».
+- Ajuste posterior, commit f134f4a: textos del HUD y mensajes de carrera en la consola traducidos al inglés; MaxSpeed del Player subida a 80 m/s en Main.tscn (el valor por defecto del código sigue siendo 60).
 - Añadidos fuera de las etapas anteriores: cámara exterior de tercera persona (C), impulso provisional sin energía (Shift) y teclas de flecha como alternativa a WASD.
 - La siguiente etapa no está decidida. La propone Claude y la confirma el usuario antes de empezar.
 
 Pendientes conocidos (pequeños, sin cambio de comportamiento):
 - Track.cs define el color de los checkpoints a mano (CheckpointColor); debe pasar a Palette según la sección 20.1.
-- El comentario de RaceSession dice que no hay HUD; ya existe.
 - Los informes de cobertura (Vectory.Test/TestResults/) están en el repositorio; conviene excluir esa carpeta en .gitignore.
 - La carpeta docs/ contiene etapa_1.md vacío.
 
