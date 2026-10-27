@@ -6,7 +6,8 @@ namespace Vectory.Ship;
 
 // Nave del jugador. Este nodo solo CONECTA piezas: lee el teclado, pasa la entrada al modelo
 // de conducción (ShipDynamics), mueve el cuerpo en Godot, aplica los límites de la pista
-// (TrackLimits) y actualiza la nave visual y las cámaras. Las reglas viven en las clases puras.
+// (TrackLimits), actualiza la nave visual y las cámaras, y le dice a la sesión de carrera
+// (RaceSession) dónde está para contar vueltas. Las reglas viven en las clases puras.
 //
 // W / Flecha arriba: acelerar    S / Flecha abajo: frenar
 // A,D / Flechas izq.-der.: girar Shift: boost
@@ -50,6 +51,7 @@ public partial class Player : CharacterBody3D
 	private Cockpit _cockpit;
 	private ChaseCamera _chaseCam;
 	private Track _track;
+	private RaceSession _race;
 
 	private bool _chaseView = true;
 	private float _bank = 0f;
@@ -83,10 +85,11 @@ public partial class Player : CharacterBody3D
 		ApplyView();
 	}
 
-	// Le dice al jugador sobre qué circuito conducir (sin circuito no hay límites)
+	// Le dice al jugador sobre qué circuito conducir (sin circuito no hay límites ni carrera)
 	public void SetTrack(Track track)
 	{
 		_track = track;
+		_race = new RaceSession(track);
 	}
 
 	// Coloca la nave en una posición y orientación (yaw en radianes) y la deja parada
@@ -97,6 +100,7 @@ public partial class Player : CharacterBody3D
 		_bank = 0f;
 		_wallContactTimer = 0f;
 		Rotation = new Vector3(0f, yaw, 0f);
+		_race?.Reset();
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 	}
 
@@ -148,6 +152,9 @@ public partial class Player : CharacterBody3D
 
 		// 6. Cámara de tercera persona
 		_chaseCam.UpdateFollow(dt, GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
+
+		// 7. Carrera: cronómetro, checkpoints, meta y vueltas
+		_race?.Update(GlobalPosition, Speed, dt);
 	}
 
 	// Traduce el teclado a intenciones de conducción

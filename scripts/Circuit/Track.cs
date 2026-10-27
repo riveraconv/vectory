@@ -27,6 +27,8 @@ public partial class Track : Node3D
 	// Cian de la pista al 50 % de intensidad: más tenue que la meta
 	private static readonly Color CheckpointColor = new Color("1B737F");
 
+	// Índice de la línea central donde está la meta
+	public const int FinishIndex = 0;
 
 	// Puntos de control (píxeles de la imagen), en sentido horario visto desde arriba,
 	// empezando en la línea de salida y avanzando hacia el oeste por la recta principal.
@@ -45,6 +47,9 @@ public partial class Track : Node3D
 
 	// Línea central de la pista (para vueltas, checkpoints e IA de rivales más adelante)
 	public List<Vector3> Centerline { get; private set; }
+
+	// Índices de la línea central donde está cada checkpoint, en orden de carrera
+	public List<int> CheckpointIndices { get; } = new();
 
 	// Dónde y hacia dónde colocar la nave al empezar (30 m antes de la meta)
 	public Vector3 StartPosition { get; private set; }
@@ -210,16 +215,19 @@ public partial class Track : Node3D
 		}
 	}
 
-	// Línea de meta: medio hexágono (mitad superior) en la muestra 0 de la línea central.
+	// Línea de meta: medio hexágono (mitad superior) en la muestra FinishIndex de la línea central.
 	private void BuildFinishLine()
 	{
-		BuildArch(0, GateHeight, Palette.Orange, true);
+		BuildArch(FinishIndex, GateHeight, Palette.Orange, true);
 	}
 
 	// Checkpoints: medio rectángulo, repartidos a distancias iguales a lo largo del circuito
-	// (sin contar la meta, que está en el punto 0).
+	// (sin contar la meta, que está en FinishIndex). Sus índices quedan guardados, en orden
+	// de carrera, en CheckpointIndices.
 	private void BuildCheckpoints()
 	{
+		CheckpointIndices.Clear();
+
 		if (CheckpointCount <= 0)
 			return;
 
@@ -238,6 +246,7 @@ public partial class Track : Node3D
 			while (index < n - 1 && cumulative[index + 1] < target)
 				index++;
 
+			CheckpointIndices.Add(index);
 			BuildArch(index, CheckpointHeight, CheckpointColor, false);
 		}
 	}
