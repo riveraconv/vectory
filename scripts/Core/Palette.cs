@@ -20,4 +20,10 @@ public static class Palette
 	// --- Roles: qué color usa cada elemento. Para cambiar el aspecto de un elemento, se cambia aquí ---
 	public static readonly Color TrackEdge = Blue.Lightened(0.25f); // bordes de la pista: azul algo más claro, distinto del cian de la nave
 	public static readonly Color Checkpoint = Cyan.Darkened(0.5f);  // checkpoints: cian al 50 % de intensidad, más tenue que la meta
+	public static readonly Color BoostCharge = Orange;              // esfera de carga de boost disponible
+	public static readonly Color BoostChargeGlow = new Color(Orange, 0.25f); // halo de la carga disponible
+	public static readonly Color BoostCooldownFill = new Color(Orange, 0.3f);    // relleno atenuado de la carga en cooldown
+	public static readonly Color BoostCooldownBorder = new Color(Orange, 0.55f); // borde atenuado de la carga en cooldown
+	public static readonly Color BoostEmpty = Blue;                 // borde de la esfera de carga vacía
+	public static readonly Color BoostEmptyFill = new Color(Blue, 0.25f);    // relleno apagado de la carga vacía
 }

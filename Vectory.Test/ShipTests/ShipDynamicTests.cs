@@ -11,11 +11,10 @@ public class ShipDynamicsTests
     private static ShipTuning CreateTuning() => new()
     {
         MaxSpeed = 70f,
-        BoostMaxSpeed = 100f,
         Acceleration = 20f,
-        BoostAcceleration = 30f,
         BrakeDeceleration = 40f,
         Drag = 10f,
+        OverspeedDecay = 5f,
         TurnRate = 1.5f,
         SteerResponse = 5f,
         LateralGrip = 5f
@@ -105,21 +104,154 @@ public class ShipDynamicsTests
         Assert.Equal(0f, dynamics.Speed);
     }
 
+    // Deja la nave a la velocidad punta y le suma un impulso de boost
+    private static ShipDynamics AboveMaxSpeed(ShipTuning tuning, float extra)
+    {
+        var dynamics = new ShipDynamics();
+        for (int i = 0; i < 10; i++)
+            dynamics.Step(new ShipInput { Accelerate = true }, tuning, 1f);
+
+        dynamics.Step(new ShipInput { Accelerate = true }, tuning, 0.1f, extra);
+        return dynamics;
+    }
+
     [Fact]
-    public void Boost_UsesBoostSpeedAndAcceleration()
+    public void BoostGain_IsAddedOnTopOfMaxSpeed()
+    {
+        var tuning = CreateTuning();
+
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        Assert.Equal(90f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void BoostGain_WorksFromStandstill()
     {
         var dynamics = new ShipDynamics();
         var tuning = CreateTuning();
-        var boost = new ShipInput { Boost = true };
 
-        dynamics.Step(boost, tuning, 1f);
+        dynamics.Step(default, tuning, 0.1f, 15f);
+
+        Assert.Equal(15f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void AboveMaxSpeed_DuringRamp_KeepsTheExcessAndAddsTheGain()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        dynamics.Step(new ShipInput { Accelerate = true }, tuning, 1f, 5f);
+
+        Assert.Equal(95f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void Hold_AboveMaxSpeed_WithThrottle_KeepsSpeedWithoutAdding()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        dynamics.Step(new ShipInput { Accelerate = true }, tuning, 1f, 0f, boosting: true);
+
+        Assert.Equal(90f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void Hold_AboveMaxSpeed_WithoutThrottle_KeepsSpeed()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        dynamics.Step(default, tuning, 1f, 0f, boosting: true);
+
+        Assert.Equal(90f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void Hold_BelowMaxSpeed_WithoutThrottle_DoesNotApplyDrag()
+    {
+        var dynamics = new ShipDynamics();
+        var tuning = CreateTuning();
+        dynamics.Step(default, tuning, 0.1f, 30f);
+
+        dynamics.Step(default, tuning, 1f, 0f, boosting: true);
 
         Assert.Equal(30f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void Hold_BelowMaxSpeed_WithThrottle_AcceleratesUpToMaxSpeed()
+    {
+        var dynamics = new ShipDynamics();
+        var tuning = CreateTuning();
+        dynamics.Step(default, tuning, 0.1f, 30f);
+        var accelerate = new ShipInput { Accelerate = true };
+
+        dynamics.Step(accelerate, tuning, 1f, 0f, boosting: true);
+        Assert.Equal(50f, dynamics.Speed);
+
+        dynamics.Step(accelerate, tuning, 2f, 0f, boosting: true);
+        Assert.Equal(tuning.MaxSpeed, dynamics.Speed);
+    }
+
+    [Fact]
+    public void Hold_Braking_BrakesNormally()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        dynamics.Step(new ShipInput { Brake = true }, tuning, 0.5f, 0f, boosting: true);
+
+        Assert.Equal(70f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void AboveMaxSpeed_Accelerating_LosesExcessGradually()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        dynamics.Step(new ShipInput { Accelerate = true }, tuning, 1f);
+
+        // El motor no añade velocidad; pierde OverspeedDecay (5) en 1 s
+        Assert.Equal(85f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void AboveMaxSpeed_WithoutThrottle_UsesDragIfLarger()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        dynamics.Step(default, tuning, 1f);
+
+        // Drag (10) es mayor que OverspeedDecay (5)
+        Assert.Equal(80f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void AboveMaxSpeed_Braking_BrakesNormally()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
+
+        dynamics.Step(new ShipInput { Brake = true }, tuning, 0.5f);
+
+        Assert.Equal(70f, dynamics.Speed);
+    }
+
+    [Fact]
+    public void AboveMaxSpeed_DecayStopsAtMaxSpeed()
+    {
+        var tuning = CreateTuning();
+        var dynamics = AboveMaxSpeed(tuning, 20f);
 
         for (int i = 0; i < 10; i++)
-            dynamics.Step(boost, tuning, 1f);
+            dynamics.Step(new ShipInput { Accelerate = true }, tuning, 1f);
 
-        Assert.Equal(tuning.BoostMaxSpeed, dynamics.Speed);
+        Assert.Equal(tuning.MaxSpeed, dynamics.Speed);
     }
 
     [Fact]

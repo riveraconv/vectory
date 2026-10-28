@@ -10,7 +10,7 @@ namespace Vectory.UI;
 //
 //   Arriba izquierda:  posición / participantes
 //   Arriba derecha:    vuelta actual / total, tiempo de vuelta y récord de vuelta
-//   Abajo derecha:     velocidad (km/h) con su barra y boost con su barra
+//   Abajo derecha:     cargas de boost (esferas), velocidad (km/h) y su barra
 //
 // Es una capa 2D fija a la pantalla: en cabina queda pegada al marco de la cabina.
 public partial class Hud : CanvasLayer
@@ -28,7 +28,7 @@ public partial class Hud : CanvasLayer
 	private Label _bestLapLabel;
 	private Label _speedLabel;
 	private ColorRect _speedFill;
-	private ColorRect _boostFill;
+	private BoostChargesView _boostCharges;
 
 	public override void _Ready()
 	{
@@ -57,19 +57,19 @@ public partial class Hud : CanvasLayer
 	// Datos que recibe del juego
 	// ---------------------------------------------------------------
 
-	// Velocidad en m/s. Actualiza el número (km/h) y las dos barras:
-	//  - barra de velocidad: de 0 a boostMaxSpeed
-	//  - barra de boost: vacía hasta normalMaxSpeed, llena en boostMaxSpeed
-	public void SetSpeed(float metersPerSecond, float normalMaxSpeed, float boostMaxSpeed)
+	// Velocidad en m/s. Actualiza el número (km/h) y la barra, que va de 0 a barMaxSpeed.
+	public void SetSpeed(float metersPerSecond, float barMaxSpeed)
 	{
 		_speedLabel.Text = Mathf.RoundToInt(metersPerSecond * 3.6f).ToString();
 
-		float speedFraction = boostMaxSpeed > 0f ? metersPerSecond / boostMaxSpeed : 0f;
+		float speedFraction = barMaxSpeed > 0f ? metersPerSecond / barMaxSpeed : 0f;
 		SetBar(_speedFill, speedFraction);
+	}
 
-		float boostRange = boostMaxSpeed - normalMaxSpeed;
-		float boostFraction = boostRange > 0f ? (metersPerSecond - normalMaxSpeed) / boostRange : 0f;
-		SetBar(_boostFill, boostFraction);
+	// Cargas de boost disponibles y máximas, y si el cooldown está activo (las atenúa)
+	public void SetBoostCharges(int charges, int maxCharges, bool cooldownActive)
+	{
+		_boostCharges.SetCharges(charges, maxCharges, cooldownActive);
 	}
 
 	// Estado de la carrera. Si todavía no existe (null), se dejan los valores por defecto.
@@ -117,24 +117,27 @@ public partial class Hud : CanvasLayer
 			Corner.TopRight, Margin, 114f, 320f, 30f);
 	}
 
-	// De abajo hacia arriba: barra de boost, etiqueta BOOST, barra de velocidad, número y unidad
+	// De abajo hacia arriba: barra de velocidad, número y unidad, cargas de boost
 	private void BuildSpeedBlock(Control root)
 	{
-		AddBar(root, Palette.Orange, 36f, out _boostFill);
-
-		AddLabel(root, "BOOST", 18, Palette.BlueGray,
-			HorizontalAlignment.Right, VerticalAlignment.Center,
-			Corner.BottomRight, Margin, 52f, BarWidth, 24f);
-
-		AddBar(root, Palette.Cyan, 92f, out _speedFill);
+		AddBar(root, Palette.Cyan, 36f, out _speedFill);
 
 		_speedLabel = AddLabel(root, "0", 56, Palette.Cyan,
 			HorizontalAlignment.Right, VerticalAlignment.Bottom,
-			Corner.BottomRight, Margin + 80f, 108f, BarWidth - 80f, 64f);
+			Corner.BottomRight, Margin + 80f, 52f, BarWidth - 80f, 64f);
 
 		AddLabel(root, "KM/H", 20, Palette.BlueGray,
 			HorizontalAlignment.Right, VerticalAlignment.Bottom,
-			Corner.BottomRight, Margin, 108f, 76f, 64f);
+			Corner.BottomRight, Margin, 52f, 76f, 64f);
+
+		// Esferas justo encima de la velocidad, alineadas a la derecha del bloque
+		_boostCharges = new BoostChargesView
+		{
+			Name = "BoostCharges",
+			MouseFilter = Control.MouseFilterEnum.Ignore
+		};
+		Place(_boostCharges, Corner.BottomRight, Margin, 124f, BarWidth, BoostChargesView.Diameter);
+		root.AddChild(_boostCharges);
 	}
 
 	private static Label AddLabel(Control parent, string text, int fontSize, Color color,

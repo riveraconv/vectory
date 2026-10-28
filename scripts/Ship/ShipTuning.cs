@@ -6,11 +6,10 @@ namespace Vectory.Ship;
 public struct ShipTuning
 {
 	public float MaxSpeed;
-	public float BoostMaxSpeed;
 	public float Acceleration;
-	public float BoostAcceleration;
 	public float BrakeDeceleration;
 	public float Drag;
+	public float OverspeedDecay; // m/s que pierde cada segundo por encima de MaxSpeed (tras un boost)
 	public float TurnRate;       // rad/s de giro máximo
 	public float SteerResponse;  // lo rápido que llega el giro a su valor máximo
 	public float LateralGrip;    // más alto = menos inercia lateral

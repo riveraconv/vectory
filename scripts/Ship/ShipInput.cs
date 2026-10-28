@@ -8,5 +8,4 @@ public struct ShipInput
 	public bool Brake;
 	public bool SteerLeft;
 	public bool SteerRight;
-	public bool Boost;
 }

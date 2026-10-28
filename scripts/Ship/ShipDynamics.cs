@@ -39,18 +39,26 @@ public class ShipDynamics
 		Velocity = Vector2.Zero;
 	}
 
-	// Avanza el modelo un paso de dt segundos
-	public void Step(in ShipInput input, in ShipTuning t, float dt)
+	// Avanza el modelo un paso de dt segundos.
+	// boostGain: m/s que el boost suma en este paso (0 si no hay subida en curso).
+	// boosting: hay un impulso en curso (subida o mantenimiento); la nave no pierde velocidad
+	// ni por estar por encima de la punta ni por soltar el acelerador.
+	public void Step(in ShipInput input, in ShipTuning t, float dt, float boostGain = 0f, bool boosting = false)
 	{
+		boosting |= boostGain > 0f;
+
 		// Velocidad del motor
-		if (input.Boost)
-			Speed = MoveToward(Speed, t.BoostMaxSpeed, t.BoostAcceleration * dt);
+		if (Speed > t.MaxSpeed)
+			StepAboveMaxSpeed(input, t, dt, boosting);
 		else if (input.Accelerate)
 			Speed = MoveToward(Speed, t.MaxSpeed, t.Acceleration * dt);
 		else if (input.Brake)
 			Speed = MoveToward(Speed, 0f, t.BrakeDeceleration * dt);
-		else
+		else if (!boosting)
 			Speed = MoveToward(Speed, 0f, t.Drag * dt);
+
+		// El impulso del boost no lo recorta la velocidad punta
+		Speed += MathF.Max(0f, boostGain);
 
 		// Giro: izquierda = positivo. Si está casi parada, apenas gira.
 		float steerTarget = (input.SteerLeft ? 1f : 0f) - (input.SteerRight ? 1f : 0f);
@@ -80,6 +88,24 @@ public class ShipDynamics
 	public void ReduceSpeed(float amount)
 	{
 		Speed = MathF.Max(0f, Speed - amount);
+	}
+
+	// Por encima de la punta (tras un boost): el motor no acelera más y el exceso se pierde
+	// poco a poco. Frenar frena como siempre; soltar el acelerador aplica el Drag si es mayor.
+	// Mientras el impulso sigue en curso (subida o mantenimiento), el exceso no se pierde.
+	private void StepAboveMaxSpeed(in ShipInput input, in ShipTuning t, float dt, bool boosting)
+	{
+		if (input.Brake)
+		{
+			Speed = MoveToward(Speed, 0f, t.BrakeDeceleration * dt);
+			return;
+		}
+
+		if (boosting)
+			return;
+
+		float loss = input.Accelerate ? t.OverspeedDecay : MathF.Max(t.OverspeedDecay, t.Drag);
+		Speed = MoveToward(Speed, t.MaxSpeed, loss * dt);
 	}
 
 	private static float MoveToward(float from, float to, float delta)

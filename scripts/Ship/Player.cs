@@ -7,21 +7,33 @@ namespace Vectory.Ship;
 // Nave del jugador. Este nodo solo CONECTA piezas: lee el teclado, pasa la entrada al modelo
 // de conducción (ShipDynamics), mueve el cuerpo en Godot, aplica los límites de la pista
 // (TrackLimits), actualiza la nave visual y las cámaras, y le dice a la sesión de carrera
-// (RaceSession) dónde está para contar vueltas. Las reglas viven en las clases puras.
+// (RaceSession) dónde está para contar vueltas. El boost por cargas vive en ShipBoost.
+// Las reglas viven en las clases puras.
 //
-// W / Flecha arriba: acelerar    S / Flecha abajo: frenar
-// A,D / Flechas izq.-der.: girar Shift: boost
+// W / Flecha arriba: acelerar    S / Flecha abajo: frenar (también corta el impulso del boost)
+// A,D / Flechas izq.-der.: girar Espacio (acción "boost"): gastar una carga de boost
 // C: alternar cabina / tercera persona
 public partial class Player : CharacterBody3D
 {
+	// Misma conversión que usa el HUD para mostrar la velocidad
+	private const float KmhPerMs = 3.6f;
+
 	// --- Ajustes de conducción: se editan en el Inspector (agrupados) ---
 	[ExportGroup("Velocidad")]
 	[Export] public float MaxSpeed = 60f;
-	[Export] public float BoostMaxSpeed = 100f;
 	[Export] public float Acceleration = 25f;
-	[Export] public float BoostAcceleration = 60f;
 	[Export] public float BrakeDeceleration = 45f;
 	[Export] public float Drag = 8f;
+
+	[ExportGroup("Boost")]
+	[Export] public int BoostMaxCharges = 3;
+	[Export] public int BoostInitialCharges = 0;
+	[Export] public float BoostRechargeTime = 35f;   // segundos para ganar una carga
+	[Export] public float BoostSpeedGain = 100f;     // km/h que suma cada carga
+	[Export] public float BoostRampTime = 0.5f;      // segundos de subida (en los que se reparte el impulso)
+	[Export] public float BoostHoldTime = 2f;        // segundos que se mantiene la velocidad alcanzada
+	[Export] public float BoostCooldown = 10f;       // segundos entre usos
+	[Export] public float OverspeedDecay = 20f;      // km/h que pierde cada segundo por encima de MaxSpeed
 
 	[ExportGroup("Dirección")]
 	[Export] public float TurnRate = 1.6f;       // rad/s de giro máximo
@@ -47,6 +59,7 @@ public partial class Player : CharacterBody3D
 	private const float WallContactGrace = 0.15f;
 
 	private readonly ShipDynamics _dynamics = new();
+	private readonly ShipBoost _boost = new();
 	private Spaceship _ship;
 	private Cockpit _cockpit;
 	private ChaseCamera _chaseCam;
@@ -62,6 +75,13 @@ public partial class Player : CharacterBody3D
 
 	// Estado de la carrera (vueltas, tiempos...) para el HUD. Es null hasta que la sesión lo crea.
 	public RaceTracker Race => _race?.Tracker;
+
+	// Velocidad máxima con un boost desde la punta (m/s): tope de la barra de velocidad del HUD
+	public float BoostedTopSpeed => MaxSpeed + BoostSpeedGain / KmhPerMs;
+
+	// Cargas de boost disponibles y si el cooldown está activo (las lee el HUD junto con BoostMaxCharges)
+	public int BoostCharges => _boost.Charges;
+	public bool BoostCooldownActive => _boost.IsCooldownActive;
 
 	public override void _Ready()
 	{
@@ -84,6 +104,7 @@ public partial class Player : CharacterBody3D
 		AddChild(_chaseCam);
 
 		_dynamics.Reset(0f);
+		_boost.Reset(BuildBoostTuning());
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 		ApplyView();
 	}
@@ -100,6 +121,7 @@ public partial class Player : CharacterBody3D
 	{
 		GlobalPosition = position;
 		_dynamics.Reset(yaw);
+		_boost.Reset(BuildBoostTuning());
 		_bank = 0f;
 		_wallContactTimer = 0f;
 		Rotation = new Vector3(0f, yaw, 0f);
@@ -130,8 +152,16 @@ public partial class Player : CharacterBody3D
 	{
 		float dt = (float)delta;
 
-		// 1. Reglas de conducción (lógica pura)
-		_dynamics.Step(ReadInput(), BuildTuning(), dt);
+		// 1. Boost por cargas y reglas de conducción (lógica pura)
+		ShipInput input = ReadInput();
+		BoostTuning boostTuning = BuildBoostTuning();
+		if (Input.IsActionJustPressed("boost"))
+			_boost.TryActivate(boostTuning);
+		if (input.Brake)
+			_boost.CancelImpulse();
+		float boostGain = _boost.Update(boostTuning, dt);
+
+		_dynamics.Step(input, BuildTuning(), dt, boostGain, _boost.IsImpulseActive);
 		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
 
 		// 2. Mover el cuerpo en Godot con la velocidad real
@@ -168,8 +198,7 @@ public partial class Player : CharacterBody3D
 			Accelerate = Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up),
 			Brake = Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down),
 			SteerLeft = Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left),
-			SteerRight = Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right),
-			Boost = Input.IsPhysicalKeyPressed(Key.Shift)
+			SteerRight = Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right)
 		};
 	}
 
@@ -179,14 +208,28 @@ public partial class Player : CharacterBody3D
 		return new ShipTuning
 		{
 			MaxSpeed = MaxSpeed,
-			BoostMaxSpeed = BoostMaxSpeed,
 			Acceleration = Acceleration,
-			BoostAcceleration = BoostAcceleration,
 			BrakeDeceleration = BrakeDeceleration,
 			Drag = Drag,
+			OverspeedDecay = OverspeedDecay / KmhPerMs,
 			TurnRate = TurnRate,
 			SteerResponse = SteerResponse,
 			LateralGrip = LateralGrip
+		};
+	}
+
+	// Parámetros del boost del Inspector, con las velocidades pasadas de km/h a m/s
+	private BoostTuning BuildBoostTuning()
+	{
+		return new BoostTuning
+		{
+			MaxCharges = BoostMaxCharges,
+			InitialCharges = BoostInitialCharges,
+			RechargeTime = BoostRechargeTime,
+			SpeedGain = BoostSpeedGain / KmhPerMs,
+			RampDuration = BoostRampTime,
+			HoldDuration = BoostHoldTime,
+			Cooldown = BoostCooldown
 		};
 	}
 
@@ -206,7 +249,7 @@ public partial class Player : CharacterBody3D
 	// 0 parada ... 1 a velocidad máxima con boost (para alejar la cámara y abrir el FOV)
 	private float SpeedFactor()
 	{
-		return Mathf.Clamp(_dynamics.Speed / BoostMaxSpeed, 0f, 1f);
+		return Mathf.Clamp(_dynamics.Speed / BoostedTopSpeed, 0f, 1f);
 	}
 
 	// Si la nave sobrepasa el borde de la pista, TrackLimits la devuelve al límite.

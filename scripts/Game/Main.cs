@@ -65,7 +65,8 @@ public partial class Main : Node3D
 	public override void _Process(double delta)
 	{
 		// HUD: velocidad, boost y estado de la carrera
-		_hud.SetSpeed(_player.Speed, _player.MaxSpeed, _player.BoostMaxSpeed);
+		_hud.SetSpeed(_player.Speed, _player.BoostedTopSpeed);
+		_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive);
 		_hud.SetRace(_player.Race);
 
 		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita

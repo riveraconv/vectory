@@ -334,9 +334,10 @@ Cámara:
 - Recuperación gradual mediante conducción limpia, trazadas buenas y derrapes controlados; no hay recogibles ni recargas en pista.
 - Efectos naranjas, estelas y geometría más intensa durante impulso.
 - Sonido y música reaccionan moderadamente al impulso.
-- Nada de esto se implementa en la primera demo.
+- La base de la feature se implementa en la demo: impulso, cargas, recarga, representación en el hud. El resto fuera de la demo.
 - El efecto de velocidad de la demo se basa únicamente en la geometría de la pista; líneas de fuga, partículas y efectos especiales quedan para después, si las pruebas los justifican.
-
+- Funcionamiento:  Empiezas con 0 cargas, a medida que va pasando el tiempo, recibes una carga. Las representaremos con pequeñas esferas de color naranja de la paleta, en el hud. El máximo de cargas son 3, cuando gastas una carga el hud debe apagar una esfera. Si tienes las 3 cargas, el hud tiene sus 3 esferas encendidas. Si no tienes ninguna están en azul de la paleta.
+  Usar una esfera te da un impulso de unos 100km/h. Para todas las naves igual.
 ======================================================================
 13. COLISIONES Y DAÑOS DEL JUEGO COMPLETO
 ======================================================================
