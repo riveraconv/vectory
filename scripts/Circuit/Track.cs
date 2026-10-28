@@ -8,7 +8,8 @@ namespace Vectory.Circuit;
 // El trazado sale de puntos de control medidos sobre la imagen del circuito
 // (en píxeles). Se convierten a metros, se suavizan con una spline cerrada
 // y se dibuja en estilo wireframe de neón: bordes cian, rejilla azul tenue,
-// una línea de meta (medio hexágono) y checkpoints (medio rectángulo).
+// una línea de meta (medio hexágono), checkpoints (medio rectángulo) y las marcas
+// de la parrilla de salida (corchetes detrás de la meta).
 public partial class Track : Node3D
 {
 	// ---- Ajustes ----
@@ -19,6 +20,18 @@ public partial class Track : Node3D
 	[Export] public float GateHeight = 12f;      // altura de la línea de meta
 	[Export] public int CheckpointCount = 5;     // número de checkpoints repartidos por el circuito
 	[Export] public float CheckpointHeight = 6f; // altura de cada checkpoint
+
+	[ExportGroup("Parrilla")]
+	[Export] public int GridSlots = 8;               // participantes de una carrera (una marca por cada uno)
+	[Export] public float GridFirstDistance = 12f;   // metros de la meta a la marca 1 (hacia atrás)
+	[Export] public float GridRowSpacing = 16f;      // metros entre filas de una misma columna
+	[Export] public float GridEvenOffset = 8f;       // cuánto más atrás va cada marca par
+	[Export] public float GridLateralPercent = 25f;  // desplazamiento lateral de las columnas (% del ancho de pista)
+	[Export] public float GridMarkWidth = 4f;        // ancho de la línea transversal de cada marca
+	[Export] public float GridMarkLegLength = 2f;    // largo de las patas de cada marca
+
+	// La nave flota esta altura por encima de la pista
+	private const float ShipHover = 2f;
 
 	private const float MetersPerPixel = 1.4f;   // con 1.4 sale un circuito de ~4.2 km
 	private const float SampleStep = 4f;         // metros entre muestras de la spline
@@ -48,10 +61,6 @@ public partial class Track : Node3D
 	// Índices de la línea central donde está cada checkpoint, en orden de carrera
 	public List<int> CheckpointIndices { get; } = new();
 
-	// Dónde y hacia dónde colocar la nave al empezar (30 m antes de la meta)
-	public Vector3 StartPosition { get; private set; }
-	public float StartYaw { get; private set; }
-
 	private readonly List<Vector3> _verts = new();
 	private readonly List<Color> _colors = new();
 
@@ -78,6 +87,7 @@ public partial class Track : Node3D
 		BuildTrackLines();
 		BuildFinishLine();
 		BuildCheckpoints();
+		BuildGridMarks();
 
 		var mesh = new ArrayMesh();
 		var arrays = new Godot.Collections.Array();
@@ -92,12 +102,71 @@ public partial class Track : Node3D
 		});
 
 		AddChild(new MeshInstance3D { Name = "TrackMesh", Mesh = mesh });
+	}
 
-		// Posición de salida
-		Vector3 forward = TangentAt(0);
-		Vector3 start = Centerline[0] - forward * 30f;
-		StartPosition = new Vector3(start.X, TrackY + 2f, start.Z);
-		StartYaw = Mathf.Atan2(-forward.X, -forward.Z);
+	// ---------------------------------------------------------------
+	// Parrilla de salida
+	// ---------------------------------------------------------------
+
+	private GridSettings GridSettings => new()
+	{
+		FirstDistance = GridFirstDistance,
+		RowSpacing = GridRowSpacing,
+		EvenOffset = GridEvenOffset,
+		LateralFraction = GridLateralPercent / 100f
+	};
+
+	// Dónde colocar la nave en la marca de la posición 1..GridSlots: centrada en la marca,
+	// con el morro (a noseDistance del origen de la nave) justo detrás de la línea transversal,
+	// mirando en el sentido de la marcha.
+	public void GetGridStart(int position, float noseDistance, out Vector3 shipPosition, out float yaw)
+	{
+		GetGridMark(position, out Vector3 front, out Vector3 forward, out _);
+
+		const float NoseGap = 0.5f;
+		Vector3 p = front - forward * (noseDistance + NoseGap);
+		shipPosition = new Vector3(p.X, TrackY + ShipHover, p.Z);
+		yaw = Mathf.Atan2(-forward.X, -forward.Z);
+	}
+
+	// Centro de la línea transversal de una marca, y las direcciones de la marcha y derecha en ese punto
+	private void GetGridMark(int position, out Vector3 front, out Vector3 forward, out Vector3 right)
+	{
+		GridSlot slot = GridLayout.Slot(position, TrackWidth, GridSettings);
+		PointBehindFinish(slot.Distance, out Vector3 point, out forward);
+		right = forward.Cross(Vector3.Up).Normalized();
+		front = point + right * slot.Lateral;
+	}
+
+	// Punto de la línea central a "distance" metros por detrás de la meta (en sentido contrario
+	// al de la marcha) y la dirección de la marcha en ese punto. Sigue la curva del circuito.
+	private void PointBehindFinish(float distance, out Vector3 point, out Vector3 forward)
+	{
+		int n = Centerline.Count;
+		int i = FinishIndex;
+		float remaining = Mathf.Max(0f, distance);
+
+		for (int step = 0; step < n; step++)
+		{
+			int prev = (i - 1 + n) % n;
+			Vector3 a = Centerline[i];
+			Vector3 b = Centerline[prev];
+			float segment = a.DistanceTo(b);
+
+			if (remaining <= segment)
+			{
+				point = a.Lerp(b, segment > 0f ? remaining / segment : 0f);
+				forward = (a - b).Normalized();
+				return;
+			}
+
+			remaining -= segment;
+			i = prev;
+		}
+
+		// Más largo que el circuito entero: se queda en la meta
+		point = Centerline[FinishIndex];
+		forward = TangentAt(FinishIndex);
 	}
 
 	// ---------------------------------------------------------------
@@ -245,6 +314,26 @@ public partial class Track : Node3D
 
 			CheckpointIndices.Add(index);
 			BuildArch(index, CheckpointHeight, Palette.Checkpoint, false);
+		}
+	}
+
+	// Marcas de parrilla: un corchete por posición, con la línea transversal delante (donde va
+	// el morro de la nave) y dos patas cortas hacia atrás. Son parte fija del circuito.
+	private void BuildGridMarks()
+	{
+		float hw = GridMarkWidth * 0.5f;
+
+		for (int position = 1; position <= GridSlots; position++)
+		{
+			GetGridMark(position, out Vector3 front, out Vector3 forward, out Vector3 right);
+
+			Vector3 frontLeft = front - right * hw;
+			Vector3 frontRight = front + right * hw;
+			Vector3 back = forward * GridMarkLegLength;
+
+			Line(frontLeft, frontRight, Palette.GridMark);
+			Line(frontLeft, frontLeft - back, Palette.GridMark);
+			Line(frontRight, frontRight - back, Palette.GridMark);
 		}
 	}
 

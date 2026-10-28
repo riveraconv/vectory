@@ -11,6 +11,8 @@ namespace Vectory.UI;
 //   Arriba izquierda:  posición / participantes
 //   Arriba derecha:    vuelta actual / total, tiempo de vuelta y récord de vuelta
 //   Abajo derecha:     cargas de boost (esferas), velocidad (km/h) y su barra
+//   Arriba centro:     semáforo de salida y cuenta atrás (solo hasta un poco después del GO)
+//   Centro:            pantalla de resultados (al terminar la carrera)
 //
 // Es una capa 2D fija a la pantalla: en cabina queda pegada al marco de la cabina.
 public partial class Hud : CanvasLayer
@@ -19,6 +21,10 @@ public partial class Hud : CanvasLayer
 	private const float BarWidth = 260f;
 	private const float BarHeight = 10f;
 	private const string NoTime = "--:--.---";
+
+	// Semáforo: centrado en horizontal, en el tercio superior de la pantalla
+	private const float StartLightsTop = 150f;
+	private const float StartLightsWidth = 400f;
 
 	private enum Corner { TopLeft, TopRight, BottomRight }
 
@@ -29,6 +35,8 @@ public partial class Hud : CanvasLayer
 	private Label _speedLabel;
 	private ColorRect _speedFill;
 	private BoostChargesView _boostCharges;
+	private StartLightsView _startLights;
+	private ResultsView _results;
 
 	public override void _Ready()
 	{
@@ -51,6 +59,8 @@ public partial class Hud : CanvasLayer
 		BuildPositionBlock(root);
 		BuildLapBlock(root);
 		BuildSpeedBlock(root);
+		BuildStartLights(root);
+		BuildResults(root);
 	}
 
 	// ---------------------------------------------------------------
@@ -81,8 +91,27 @@ public partial class Hud : CanvasLayer
 		// Antes de arrancar CurrentLap vale 0; se muestra como vuelta 1
 		int lap = Math.Max(1, race.CurrentLap);
 		_lapLabel.Text = $"LAP {lap}/{race.TotalLaps}";
-		_lapTimeLabel.Text = FormatTime(race.CurrentLapTime);
-		_bestLapLabel.Text = $"BEST {(race.BestLapTime.HasValue ? FormatTime(race.BestLapTime.Value) : NoTime)}";
+		_lapTimeLabel.Text = TimeFormat.Format(race.CurrentLapTime);
+		_bestLapLabel.Text = $"BEST {(race.BestLapTime.HasValue ? TimeFormat.Format(race.BestLapTime.Value) : NoTime)}";
+	}
+
+	// Semáforo y cuenta atrás. Se ven hasta que la salida se ha dado y el GO ha desaparecido.
+	public void SetStartSequence(StartSequence start)
+	{
+		bool visible = start != null && (!start.HasStarted || start.ShowGo);
+		_startLights.Visible = visible;
+		if (visible)
+			_startLights.SetState(start.LightsOn, start.LightCount, start.CountdownNumber, start.ShowGo);
+	}
+
+	// Muestra la pantalla de resultados de una carrera terminada
+	public void ShowResults(RaceResult result)
+	{
+		if (_results.Visible || result == null)
+			return;
+
+		_results.SetResult(result);
+		_results.Visible = true;
 	}
 
 	// Posición del jugador y total de participantes
@@ -108,7 +137,7 @@ public partial class Hud : CanvasLayer
 			HorizontalAlignment.Right, VerticalAlignment.Center,
 			Corner.TopRight, Margin, 30f, 320f, 38f);
 
-		_lapTimeLabel = AddLabel(root, FormatTime(0), 34, Palette.Cyan,
+		_lapTimeLabel = AddLabel(root, TimeFormat.Format(0), 34, Palette.Cyan,
 			HorizontalAlignment.Right, VerticalAlignment.Center,
 			Corner.TopRight, Margin, 70f, 320f, 42f);
 
@@ -138,6 +167,45 @@ public partial class Hud : CanvasLayer
 		};
 		Place(_boostCharges, Corner.BottomRight, Margin, 124f, BarWidth, BoostChargesView.Diameter);
 		root.AddChild(_boostCharges);
+	}
+
+	private void BuildStartLights(Control root)
+	{
+		_startLights = new StartLightsView
+		{
+			Name = "StartLights",
+			Visible = false,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0f,
+			AnchorBottom = 0f,
+			OffsetLeft = -StartLightsWidth * 0.5f,
+			OffsetRight = StartLightsWidth * 0.5f,
+			OffsetTop = StartLightsTop,
+			OffsetBottom = StartLightsTop + StartLightsView.Height
+		};
+		root.AddChild(_startLights);
+	}
+
+	// Anclada al centro y creciendo hacia los dos lados: el panel queda centrado sea cual sea su tamaño
+	private void BuildResults(Control root)
+	{
+		_results = new ResultsView
+		{
+			Name = "Results",
+			Visible = false,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0.5f,
+			AnchorBottom = 0.5f,
+			OffsetLeft = 0f,
+			OffsetRight = 0f,
+			OffsetTop = 0f,
+			OffsetBottom = 0f,
+			GrowHorizontal = Control.GrowDirection.Both,
+			GrowVertical = Control.GrowDirection.Both
+		};
+		root.AddChild(_results);
 	}
 
 	private static Label AddLabel(Control parent, string text, int fontSize, Color color,
@@ -223,11 +291,5 @@ public partial class Hud : CanvasLayer
 	private static void SetBar(ColorRect fill, float fraction)
 	{
 		fill.OffsetRight = BarWidth * Mathf.Clamp(fraction, 0f, 1f);
-	}
-
-	private static string FormatTime(double seconds)
-	{
-		var t = TimeSpan.FromSeconds(seconds);
-		return $"{(int)t.TotalMinutes}:{t.Seconds:00}.{t.Milliseconds:000}";
 	}
 }

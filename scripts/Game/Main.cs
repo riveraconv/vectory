@@ -9,17 +9,34 @@ namespace Vectory.Game;
 
 // Se adjunta a un nodo raíz "Main" de tipo Node3D en una escena vacía.
 // Monta WorldEnvironment (fondo oscuro + glow), una rejilla de referencia
-// de fondo, el circuito (Track) y el Player, todo por código.
+// de fondo, el circuito (Track), el Player, la carrera (RaceSession) y el HUD.
+//
+// Ciclo de carrera: la nave sale de una posición de parrilla aleatoria, espera al semáforo
+// y, al terminar la última vuelta, se muestra la pantalla de resultados. Enter
+// (acción "restart_race") recarga la escena: nueva carrera, nueva posición de parrilla.
 public partial class Main : Node3D
 {
 	private const float GridStep = 10f;
 	private const float GridHalf = 500f;
 	private const float GridY = -4f;
 
+	[ExportGroup("Salida")]
+	[Export] public float FirstLightDelay = 1f;   // segundos antes de la primera luz
+	[Export] public float LightInterval = 1f;     // segundos entre luces
+	[Export] public int LightCount = 5;           // número de luces
+	[Export] public float GoDuration = 1f;        // segundos con el GO visible
+
+	[ExportGroup("Resultados")]
+	[Export] public float ResultsDelay = 1.5f;    // segundos desde la meta hasta la pantalla de resultados
+
 	private Player _player;
 	private Track _track;
+	private RaceSession _race;
 	private Hud _hud;
 	private MeshInstance3D _grid;
+
+	private float _finishedTime;   // segundos desde que terminó la carrera
+	private bool _resultsShown;
 
 	public override void _Ready()
 	{
@@ -53,21 +70,32 @@ public partial class Main : Node3D
 			AddChild(_player);
 		}
 		_player.SetTrack(_track);
-		_player.PlaceAt(_track.StartPosition, _track.StartYaw);
+
+		// Una marca de parrilla por participante. Las posiciones se reparten al azar sin repetir;
+		// sin rivales todavía, solo se usa la del jugador (la primera del reparto).
+		int participants = _track.GridSlots;
+		int[] gridOrder = GridLayout.RandomOrder(participants, new System.Random());
+		_track.GetGridStart(gridOrder[0], Player.NoseDistance, out Vector3 startPosition, out float startYaw);
+		_player.PlaceAt(startPosition, startYaw);
+
+		_race = new RaceSession(_track, BuildStartSettings(), participants);
+		_player.SetRaceSession(_race);
 
 		_hud = new Hud { Name = "Hud" };
 		AddChild(_hud);
 
-		// Todavía no hay rivales: el jugador es el único participante
-		_hud.SetRacePosition(1, 1);
+		// Todavía no hay rivales ni posición en vivo: el jugador va primero de todos los participantes
+		_hud.SetRacePosition(1, participants);
 	}
 
 	public override void _Process(double delta)
 	{
-		// HUD: velocidad, boost y estado de la carrera
+		// HUD: velocidad, boost, semáforo y estado de la carrera
 		_hud.SetSpeed(_player.Speed, _player.BoostedTopSpeed);
 		_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive);
-		_hud.SetRace(_player.Race);
+		_hud.SetStartSequence(_race.StartSequence);
+		_hud.SetRace(_race.Tracker);
+		UpdateResults((float)delta);
 
 		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita
 		Vector3 p = _player.GlobalPosition;
@@ -75,6 +103,38 @@ public partial class Main : Node3D
 			Mathf.Snapped(p.X, GridStep),
 			GridY,
 			Mathf.Snapped(p.Z, GridStep));
+	}
+
+	// La pantalla de resultados aparece ResultsDelay segundos después de cruzar la meta.
+	// Con ella en pantalla, Enter repite la carrera.
+	private void UpdateResults(float delta)
+	{
+		if (_race.State != RaceState.Finished)
+			return;
+
+		if (!_resultsShown)
+		{
+			_finishedTime += delta;
+			if (_finishedTime < ResultsDelay)
+				return;
+
+			_hud.ShowResults(_race.Tracker.Result);
+			_resultsShown = true;
+		}
+
+		if (Input.IsActionJustPressed("restart_race"))
+			GetTree().ReloadCurrentScene();
+	}
+
+	private StartSettings BuildStartSettings()
+	{
+		return new StartSettings
+		{
+			FirstLightDelay = FirstLightDelay,
+			LightInterval = LightInterval,
+			LightCount = LightCount,
+			GoDuration = GoDuration
+		};
 	}
 
 	private static ArrayMesh BuildGridMesh()

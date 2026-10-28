@@ -10,6 +10,9 @@ namespace Vectory.Ship;
 // (RaceSession) dónde está para contar vueltas. El boost por cargas vive en ShipBoost.
 // Las reglas viven en las clases puras.
 //
+// Solo acepta input con la carrera en marcha (RaceSession.CanDrive): en la cuenta atrás la nave
+// está quieta y el boost no recarga; al terminar se suelta todo y la nave se para sola.
+//
 // W / Flecha arriba: acelerar    S / Flecha abajo: frenar (también corta el impulso del boost)
 // A,D / Flechas izq.-der.: girar Espacio (acción "boost"): gastar una carga de boost
 // C: alternar cabina / tercera persona
@@ -17,6 +20,9 @@ public partial class Player : CharacterBody3D
 {
 	// Misma conversión que usa el HUD para mostrar la velocidad
 	private const float KmhPerMs = 3.6f;
+
+	// Distancia del origen de la nave a su morro (borde delantero de la caja de colisión)
+	public const float NoseDistance = 4f;
 
 	// --- Ajustes de conducción: se editan en el Inspector (agrupados) ---
 	[ExportGroup("Velocidad")]
@@ -73,9 +79,6 @@ public partial class Player : CharacterBody3D
 	// Velocidad real actual en m/s (la usa el HUD)
 	public float Speed => _dynamics.RealSpeed;
 
-	// Estado de la carrera (vueltas, tiempos...) para el HUD. Es null hasta que la sesión lo crea.
-	public RaceTracker Race => _race?.Tracker;
-
 	// Velocidad máxima con un boost desde la punta (m/s): tope de la barra de velocidad del HUD
 	public float BoostedTopSpeed => MaxSpeed + BoostSpeedGain / KmhPerMs;
 
@@ -109,11 +112,16 @@ public partial class Player : CharacterBody3D
 		ApplyView();
 	}
 
-	// Le dice al jugador sobre qué circuito conducir (sin circuito no hay límites ni carrera)
+	// Le dice al jugador sobre qué circuito conducir (sin circuito no hay límites)
 	public void SetTrack(Track track)
 	{
 		_track = track;
-		_race = new RaceSession(track);
+	}
+
+	// Carrera en la que participa: la nave le pasa su posición cada paso y le pregunta si puede conducir
+	public void SetRaceSession(RaceSession race)
+	{
+		_race = race;
 	}
 
 	// Coloca la nave en una posición y orientación (yaw en radianes) y la deja parada
@@ -125,7 +133,6 @@ public partial class Player : CharacterBody3D
 		_bank = 0f;
 		_wallContactTimer = 0f;
 		Rotation = new Vector3(0f, yaw, 0f);
-		_race?.Reset();
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 	}
 
@@ -152,14 +159,25 @@ public partial class Player : CharacterBody3D
 	{
 		float dt = (float)delta;
 
-		// 1. Boost por cargas y reglas de conducción (lógica pura)
-		ShipInput input = ReadInput();
-		BoostTuning boostTuning = BuildBoostTuning();
-		if (Input.IsActionJustPressed("boost"))
-			_boost.TryActivate(boostTuning);
-		if (input.Brake)
+		// 1. Boost por cargas y reglas de conducción (lógica pura).
+		// Sin carrera en marcha no hay input ni boost (ni recarga): en la previa la nave está
+		// quieta y, al terminar, se cancela el impulso y se para sola con el Drag.
+		bool canDrive = _race == null || _race.CanDrive;
+		ShipInput input = canDrive ? ReadInput() : default;
+		float boostGain = 0f;
+		if (canDrive)
+		{
+			BoostTuning boostTuning = BuildBoostTuning();
+			if (Input.IsActionJustPressed("boost"))
+				_boost.TryActivate(boostTuning);
+			if (input.Brake)
+				_boost.CancelImpulse();
+			boostGain = _boost.Update(boostTuning, dt);
+		}
+		else
+		{
 			_boost.CancelImpulse();
-		float boostGain = _boost.Update(boostTuning, dt);
+		}
 
 		_dynamics.Step(input, BuildTuning(), dt, boostGain, _boost.IsImpulseActive);
 		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
@@ -187,7 +205,7 @@ public partial class Player : CharacterBody3D
 		_chaseCam.UpdateFollow(dt, GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 
 		// 7. Carrera: cronómetro, checkpoints, meta y vueltas
-		_race?.Update(GlobalPosition, Speed, dt);
+		_race?.Update(GlobalPosition, dt);
 	}
 
 	// Traduce el teclado a intenciones de conducción

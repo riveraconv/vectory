@@ -26,4 +26,13 @@ public static class Palette
 	public static readonly Color BoostCooldownBorder = new Color(Orange, 0.55f); // borde atenuado de la carga en cooldown
 	public static readonly Color BoostEmpty = Blue;                 // borde de la esfera de carga vacía
 	public static readonly Color BoostEmptyFill = new Color(Blue, 0.25f);    // relleno apagado de la carga vacía
+	public static readonly Color GridMark = Blue;                   // marcas de la parrilla de salida
+	public static readonly Color StartLightOn = Magenta;            // luz del semáforo encendida (competición)
+	public static readonly Color StartLightGlow = new Color(Magenta, 0.25f); // halo de la luz encendida
+	public static readonly Color StartLightOff = BoostEmpty;        // borde de la luz apagada (como la carga de boost vacía)
+	public static readonly Color StartLightOffFill = BoostEmptyFill; // relleno de la luz apagada
+	public static readonly Color Countdown = Cyan;                  // número de la cuenta atrás
+	public static readonly Color Go = Orange;                       // texto GO de la salida
+	public static readonly Color ResultsBorder = Cyan;              // borde de la pantalla de resultados
+	public static readonly Color ResultsBackground = new Color(Background, 0.85f); // fondo semitransparente de los resultados
 }

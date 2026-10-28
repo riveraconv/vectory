@@ -497,4 +497,225 @@ public class RaceTrackerTests
         AssertTime(4.0, tracker.BestSectorTimes[1]);
         AssertTime(7.0, tracker.BestLapTime);
     }
+
+    // ---------------------------------------------------------------
+    // Estados de la carrera
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Constructor_WithoutParticipants_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RaceTracker(3, 3, 0));
+    }
+
+    [Fact]
+    public void BeforeStart_StateIsPreStart_AndTimerDoesNotAdvance()
+    {
+        var tracker = new RaceTracker(3);
+
+        tracker.Tick(4.0);
+
+        Assert.Equal(RaceState.PreStart, tracker.State);
+        Assert.Equal(0.0, tracker.TotalTime);
+        Assert.Equal(0.0, tracker.CurrentLapTime);
+    }
+
+    [Fact]
+    public void Start_ChangesStateToRunning()
+    {
+        var tracker = NewStarted();
+
+        Assert.Equal(RaceState.Running, tracker.State);
+    }
+
+    [Fact]
+    public void LastLap_ChangesStateToFinished_AndStopsTheTimer()
+    {
+        var tracker = NewStarted(3, 2);
+        DriveLap(tracker, 1.0, 1.0, 1.0, 1.0);
+        Assert.Equal(RaceState.Running, tracker.State);
+
+        DriveLap(tracker, 2.0, 2.0, 2.0, 2.0);
+        double totalTime = tracker.TotalTime;
+        tracker.Tick(5.0);
+
+        Assert.Equal(RaceState.Finished, tracker.State);
+        Assert.Equal(12.0, totalTime, Precision);
+        Assert.Equal(totalTime, tracker.TotalTime, Precision);
+    }
+
+    // ---------------------------------------------------------------
+    // Salida desde parrilla (detrás de la meta)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void FirstFinishCrossingAfterStart_DoesNotCompleteALap()
+    {
+        var tracker = NewStarted();
+        int laps = 0;
+        tracker.LapCompleted += (_, _, _) => laps++;
+        tracker.Tick(1.5);
+
+        tracker.FinishLineCrossed();
+
+        Assert.Equal(1, tracker.CurrentLap);
+        Assert.Equal(0, laps);
+        Assert.Equal(0, tracker.NextCheckpointIndex);
+    }
+
+    [Fact]
+    public void Lap1AndSector1_AreTimedFromTheStart()
+    {
+        var tracker = NewStarted();
+
+        // De la parrilla a la meta: 1,5 s. El cruce no cierra nada.
+        tracker.Tick(1.5);
+        tracker.FinishLineCrossed();
+
+        DriveLap(tracker, 1.0, 2.0, 3.0, 4.0);
+
+        AssertTime(11.5, tracker.LastLapTime);
+        AssertTime(2.5, tracker.BestSectorTimes[0]);
+    }
+
+    // ---------------------------------------------------------------
+    // Mejor vuelta y mejores sectores con su vuelta
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void BestLapNumber_IsTheLapOfTheFastestLap()
+    {
+        var tracker = NewStarted();
+
+        DriveLap(tracker, 1.0, 2.0, 3.0, 4.0);   // 10 s
+        DriveLap(tracker, 1.0, 2.0, 3.0, 3.0);   // 9 s, la mejor
+        DriveLap(tracker, 3.0, 3.0, 3.0, 3.0);   // 12 s
+
+        Assert.Equal(2, tracker.BestLapNumber);
+        AssertTime(9.0, tracker.BestLapTime);
+    }
+
+    [Fact]
+    public void BestLapNumber_WithTie_KeepsTheEarlierLap()
+    {
+        var tracker = NewStarted();
+
+        DriveLap(tracker, 1.0, 2.0, 3.0, 4.0);
+        DriveLap(tracker, 1.0, 2.0, 3.0, 4.0);
+
+        Assert.Equal(1, tracker.BestLapNumber);
+    }
+
+    [Fact]
+    public void BestSectorLaps_KeepTheLapOfEachBestSector_TiesKeepTheEarlier()
+    {
+        var tracker = NewStarted();
+
+        DriveLap(tracker, 2.0, 2.0, 2.0, 2.0);
+        DriveLap(tracker, 1.0, 2.0, 3.0, 2.0);   // mejora S1; empata S2 y S4
+        DriveLap(tracker, 3.0, 3.0, 1.0, 2.0);   // mejora S3; empata S4
+
+        Assert.Equal(2, tracker.BestSectorLaps[0]);
+        Assert.Equal(1, tracker.BestSectorLaps[1]);
+        Assert.Equal(3, tracker.BestSectorLaps[2]);
+        Assert.Equal(1, tracker.BestSectorLaps[3]);
+    }
+
+    [Fact]
+    public void BestSectorLaps_AreNullUntilTheSectorIsCompleted()
+    {
+        var tracker = NewStarted();
+
+        tracker.Tick(1.0);
+        tracker.CheckpointCrossed(0);
+
+        Assert.Equal(1, tracker.BestSectorLaps[0]);
+        Assert.Null(tracker.BestSectorLaps[1]);
+    }
+
+    [Fact]
+    public void Start_ClearsBestLapNumberAndSectorLaps()
+    {
+        var tracker = NewStarted(3, 1);
+        DriveLap(tracker, 1.0, 1.0, 1.0, 1.0);
+
+        tracker.Start();
+
+        Assert.Null(tracker.BestLapNumber);
+        Assert.All(tracker.BestSectorLaps, lap => Assert.Null(lap));
+        Assert.Null(tracker.FinalPosition);
+        Assert.Null(tracker.Result);
+    }
+
+    // ---------------------------------------------------------------
+    // Posición final y resultado
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void WithoutRivals_FinalPositionIsFirstOfAllParticipants()
+    {
+        var tracker = new RaceTracker(3, 1, 8);
+        tracker.Start();
+        Assert.Null(tracker.FinalPosition);
+
+        DriveLap(tracker, 1.0, 1.0, 1.0, 1.0);
+
+        Assert.Equal(1, tracker.FinalPosition);
+        Assert.Equal(8, tracker.ParticipantCount);
+    }
+
+    [Fact]
+    public void Result_IsNullUntilTheRaceIsFinished()
+    {
+        var tracker = NewStarted(3, 2);
+
+        DriveLap(tracker, 1.0, 1.0, 1.0, 1.0);
+
+        Assert.Null(tracker.Result);
+    }
+
+    [Fact]
+    public void Result_HasPositionBestLapAndBestSectorsWithTheirLaps()
+    {
+        var tracker = new RaceTracker(3, 3, 8);
+        tracker.Start();
+
+        DriveLap(tracker, 2.0, 2.0, 2.0, 2.0);   // 8 s
+        DriveLap(tracker, 1.0, 3.0, 2.0, 1.5);   // 7,5 s, la mejor
+        DriveLap(tracker, 3.0, 1.0, 3.0, 3.0);   // 10 s
+
+        RaceResult result = tracker.Result;
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result.Position);
+        Assert.Equal(8, result.ParticipantCount);
+        Assert.Equal(7.5, result.BestLapTime, Precision);
+        Assert.Equal(2, result.BestLapNumber);
+
+        Assert.Equal(4, result.BestSectors.Count);
+        Assert.Equal(1.0, result.BestSectors[0].Time, Precision);
+        Assert.Equal(2, result.BestSectors[0].Lap);
+        Assert.Equal(1.0, result.BestSectors[1].Time, Precision);
+        Assert.Equal(3, result.BestSectors[1].Lap);
+        Assert.Equal(2.0, result.BestSectors[2].Time, Precision);
+        Assert.Equal(1, result.BestSectors[2].Lap);
+        Assert.Equal(1.5, result.BestSectors[3].Time, Precision);
+        Assert.Equal(2, result.BestSectors[3].Lap);
+    }
+
+    [Fact]
+    public void AfterFinish_MoreCrossingsDoNotChangeTheResult()
+    {
+        var tracker = new RaceTracker(3, 1, 8);
+        tracker.Start();
+        DriveLap(tracker, 1.0, 1.0, 1.0, 1.0);
+        RaceResult result = tracker.Result;
+
+        DriveLap(tracker, 0.5, 0.5, 0.5, 0.5);
+
+        Assert.Same(result, tracker.Result);
+        Assert.Equal(1, tracker.CurrentLap);
+        AssertTime(4.0, tracker.BestLapTime);
+        Assert.Equal(RaceState.Finished, tracker.State);
+    }
 }

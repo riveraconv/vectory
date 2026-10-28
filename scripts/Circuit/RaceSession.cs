@@ -1,58 +1,59 @@
 using System;
 using Godot;
+using Vectory.Core;
 
 namespace Vectory.Circuit;
 
-// Conecta el circuito (Track) con la lógica de carrera (RaceTracker).
-// Cada frame recibe la posición y la velocidad de la nave, detecta qué checkpoints
-// y meta ha cruzado y se lo comunica al RaceTracker.
+// Ciclo de una carrera: secuencia de salida (semáforo y cuenta atrás) y lógica de carrera.
+// Conecta el circuito (Track) con la lógica pura (StartSequence y RaceTracker): cada frame
+// recibe la posición de la nave, avanza la secuencia de salida y, tras el GO, detecta qué
+// checkpoints y meta ha cruzado y se lo comunica al RaceTracker.
 //
+// Estados: PreStart (cuenta atrás) → Running (desde el GO) → Finished (última vuelta completada).
 // Además del HUD, los resultados se escriben en la consola de Godot ([Race]).
 // El RaceTracker se crea al primer Update, cuando el Track ya ha generado su geometría.
 public sealed class RaceSession
 {
-	// Velocidad (m/s) a partir de la cual arranca el cronómetro.
-	// Se sustituirá por Start() cuando haya cuenta atrás.
-	private const float StartSpeed = 0.5f;
-
 	private readonly Track _track;
+	private readonly int _participantCount;
 
 	private RaceTracker _tracker;
 	private LineCrossingDetector _detector;
-	private bool _started;
 	private bool _warned;
 
-	public RaceSession(Track track)
+	public RaceSession(Track track, StartSettings startSettings, int participantCount)
 	{
 		_track = track ?? throw new ArgumentNullException(nameof(track));
+		_participantCount = Math.Max(1, participantCount);
+
+		StartSequence = new StartSequence(startSettings);
+		StartSequence.Started += OnStart;
 	}
 
-	// Estado de la carrera (para el HUD más adelante). Es null hasta el primer Update.
+	// Semáforo y cuenta atrás (para el HUD)
+	public StartSequence StartSequence { get; }
+
+	// Estado de la carrera (vueltas, tiempos...) para el HUD. Es null hasta el primer Update.
 	public RaceTracker Tracker => _tracker;
 
-	// Vuelve a empezar: se descarta el estado y se recrea en el siguiente Update.
-	public void Reset()
-	{
-		_tracker = null;
-		_detector = null;
-		_started = false;
-	}
+	public int ParticipantCount => _participantCount;
 
-	public void Update(Vector3 position, float speed, float delta)
+	public RaceState State => _tracker?.State ?? RaceState.PreStart;
+
+	// La nave solo acepta input en carrera
+	public bool CanDrive => State == RaceState.Running;
+
+	public void Update(Vector3 position, float delta)
 	{
 		if (!EnsureInitialized())
 			return;
 
-		if (!_started && speed > StartSpeed)
-		{
-			_started = true;
-			_tracker.Start();
-			GD.Print("[Race] Timer started");
-		}
+		// La salida se da dentro de Update (evento Started → OnStart)
+		StartSequence.Update(delta);
 
 		_detector.Update(_track.NearestIndex(position));
 
-		if (!_started)
+		if (_tracker.State != RaceState.Running)
 			return;
 
 		_tracker.Tick(delta);
@@ -65,6 +66,15 @@ public sealed class RaceSession
 
 		if (_detector.Crossed(Track.FinishIndex))
 			_tracker.FinishLineCrossed();
+	}
+
+	private void OnStart()
+	{
+		if (_tracker == null)
+			return;
+
+		_tracker.Start();
+		GD.Print("[Race] GO");
 	}
 
 	private bool EnsureInitialized()
@@ -86,25 +96,18 @@ public sealed class RaceSession
 			return false;
 		}
 
-		_tracker = new RaceTracker(_track.CheckpointIndices.Count);
+		_tracker = new RaceTracker(_track.CheckpointIndices.Count, participantCount: _participantCount);
 		_detector = new LineCrossingDetector(_track.Centerline.Count);
-		_started = false;
 
 		_tracker.SectorCompleted += (lap, sector, time, isBest) =>
-			GD.Print($"[Race] Lap {lap} - Sector {sector + 1}/{_tracker.SectorCount}: {FormatTime(time)}{(isBest ? " (best sector)" : "")}");
+			GD.Print($"[Race] Lap {lap} - Sector {sector + 1}/{_tracker.SectorCount}: {TimeFormat.Format(time)}{(isBest ? " (best sector)" : "")}");
 
 		_tracker.LapCompleted += (lap, time, isBest) =>
-			GD.Print($"[Race] Lap {lap}/{_tracker.TotalLaps}: {FormatTime(time)}{(isBest ? " (best lap)" : "")}");
+			GD.Print($"[Race] Lap {lap}/{_tracker.TotalLaps}: {TimeFormat.Format(time)}{(isBest ? " (best lap)" : "")}");
 
 		_tracker.RaceFinished += totalTime =>
-			GD.Print($"[Race] Race finished. Total time: {FormatTime(totalTime)}");
+			GD.Print($"[Race] Race finished. Total time: {TimeFormat.Format(totalTime)}");
 
 		return true;
-	}
-
-	private static string FormatTime(double seconds)
-	{
-		var t = TimeSpan.FromSeconds(seconds);
-		return $"{(int)t.TotalMinutes}:{t.Seconds:00}.{t.Milliseconds:000}";
 	}
 }
