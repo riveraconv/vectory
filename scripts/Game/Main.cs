@@ -69,6 +69,15 @@ public partial class Main : Node3D
 			_player = new Player { Name = "Player" };
 			AddChild(_player);
 		}
+
+		// Sin circuito generado (TrackDefinition ausente o no válido; Track ya ha dado el error)
+		// no hay parrilla, límites ni carrera: no se monta nada que dependa de él.
+		if (!_track.IsBuilt)
+		{
+			GD.PushError("Main: el circuito no se ha generado; no se monta la carrera.");
+			return;
+		}
+
 		_player.SetTrack(_track);
 
 		// Una marca de parrilla por participante. Las posiciones se reparten al azar sin repetir;
@@ -90,12 +99,15 @@ public partial class Main : Node3D
 
 	public override void _Process(double delta)
 	{
-		// HUD: velocidad, boost, semáforo y estado de la carrera
-		_hud.SetSpeed(_player.Speed, _player.BoostedTopSpeed);
-		_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive);
-		_hud.SetStartSequence(_race.StartSequence);
-		_hud.SetRace(_race.Tracker);
-		UpdateResults((float)delta);
+		// HUD: velocidad, boost, semáforo y estado de la carrera (no hay si el circuito no se generó)
+		if (_race != null)
+		{
+			_hud.SetSpeed(_player.Speed, _player.BoostedTopSpeed);
+			_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive);
+			_hud.SetStartSequence(_race.StartSequence);
+			_hud.SetRace(_race.Tracker);
+			UpdateResults((float)delta);
+		}
 
 		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita
 		Vector3 p = _player.GlobalPosition;

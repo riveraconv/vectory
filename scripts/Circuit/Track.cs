@@ -5,20 +5,23 @@ using Vectory.Core;
 namespace Vectory.Circuit;
 
 // Circuito cerrado de VECTORY, generado por código.
-// El trazado sale de puntos de control medidos sobre la imagen del circuito
-// (en píxeles). Se convierten a metros, se suavizan con una spline cerrada
-// y se dibuja en estilo wireframe de neón: bordes cian, rejilla azul tenue,
-// una línea de meta (medio hexágono), checkpoints (medio rectángulo) y las marcas
-// de la parrilla de salida (corchetes detrás de la meta).
+// El trazado sale de un TrackDefinition (archivo .tres por circuito): puntos de control
+// medidos sobre la imagen del circuito (en píxeles), que se convierten a metros,
+// se suavizan con una spline cerrada y se dibujan en estilo wireframe de neón:
+// bordes cian, rejilla azul tenue, una línea de meta (medio hexágono), checkpoints
+// (medio rectángulo) y las marcas de la parrilla de salida (corchetes detrás de la meta).
 public partial class Track : Node3D
 {
-	// ---- Ajustes ----
-	[Export] public bool Clockwise = true;       // sentido de carrera (ver nota en el chat)
-	[Export] public float TrackWidth = 28f;      // ancho de la pista en metros
+	// Circuito que se usa si no se asigna ninguno en el Inspector
+	private const string DefaultDefinitionPath = "res://circuits/circuit_01.tres";
+
+	// ---- Circuito ----
+	[Export] public TrackDefinition Definition;
+
+	// ---- Ajustes comunes a todos los circuitos ----
 	[Export] public float TrackY = -2f;          // altura de la pista (la nave flota 2 m por encima)
 	[Export] public float RungSpacing = 8f;      // separación de las líneas transversales
 	[Export] public float GateHeight = 12f;      // altura de la línea de meta
-	[Export] public int CheckpointCount = 5;     // número de checkpoints repartidos por el circuito
 	[Export] public float CheckpointHeight = 6f; // altura de cada checkpoint
 
 	[ExportGroup("Parrilla")]
@@ -30,33 +33,25 @@ public partial class Track : Node3D
 	[Export] public float GridMarkWidth = 4f;        // ancho de la línea transversal de cada marca
 	[Export] public float GridMarkLegLength = 2f;    // largo de las patas de cada marca
 
+	// ---- Datos del circuito actual (salen del TrackDefinition) ----
+	public bool Clockwise => Definition.Clockwise;
+	public float TrackWidth => Definition.TrackWidth;
+	public int CheckpointCount => Definition.CheckpointCount;
+
 	// La nave flota esta altura por encima de la pista
 	private const float ShipHover = 2f;
 
-	private const float MetersPerPixel = 1.4f;   // con 1.4 sale un circuito de ~4.2 km
 	private const float SampleStep = 4f;         // metros entre muestras de la spline
-	private static readonly Vector2 ImageCenter = new Vector2(744f, 444f);
 
-	// Índice de la línea central donde está la meta
+	// Índice de la línea central donde está la meta (el primer punto de control)
 	public const int FinishIndex = 0;
-
-	// Puntos de control (píxeles de la imagen), en sentido horario visto desde arriba,
-	// empezando en la línea de salida y avanzando hacia el oeste por la recta principal.
-	private static readonly Vector2[] ControlPixels =
-	{
-		new(780, 684), new(680, 684), new(580, 684), new(480, 684), new(385, 684),
-		new(320, 672), new(270, 640), new(225, 590), new(175, 545), new(135, 500),
-		new(118, 452), new(135, 402), new(175, 368), new(235, 345), new(320, 322),
-		new(410, 298), new(490, 262), new(555, 220), new(625, 204), new(700, 215),
-		new(790, 240), new(880, 262), new(970, 274), new(1045, 282), new(1095, 305),
-		new(1118, 340), new(1095, 372), new(1058, 398), new(1048, 435), new(1068, 470),
-		new(1110, 488), new(1170, 497), new(1235, 510), new(1295, 535), new(1345, 575),
-		new(1368, 625), new(1355, 665), new(1320, 684), new(1250, 684), new(1150, 684),
-		new(1050, 684), new(950, 684), new(870, 684)
-	};
 
 	// Línea central de la pista (para vueltas, checkpoints e IA de rivales más adelante)
 	public List<Vector3> Centerline { get; private set; }
+
+	// El circuito se ha generado. Es false si no había TrackDefinition o no era válido:
+	// en ese caso no hay línea central y no se puede montar la carrera.
+	public bool IsBuilt => Centerline != null;
 
 	// Índices de la línea central donde está cada checkpoint, en orden de carrera
 	public List<int> CheckpointIndices { get; } = new();
@@ -66,10 +61,26 @@ public partial class Track : Node3D
 
 	public override void _Ready()
 	{
-		var control = new List<Vector3>();
-		foreach (Vector2 px in ControlPixels)
+		if (Definition == null)
 		{
-			Vector2 m = (px - ImageCenter) * MetersPerPixel;
+			Definition = GD.Load<TrackDefinition>(DefaultDefinitionPath);
+			if (Definition == null)
+			{
+				GD.PushError($"Track: no hay TrackDefinition asignado y no se encuentra {DefaultDefinitionPath}");
+				return;
+			}
+		}
+
+		if (!Definition.IsValid(out string error))
+		{
+			GD.PushError($"Track: el circuito '{Definition.DisplayName}' no es válido: {error}");
+			return;
+		}
+
+		var control = new List<Vector3>();
+		foreach (Vector2 px in Definition.ControlPoints)
+		{
+			Vector2 m = (px - Definition.ImageCenter) * Definition.MetersPerPixel;
 			control.Add(new Vector3(m.X, TrackY, m.Y));
 		}
 
