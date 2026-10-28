@@ -24,9 +24,6 @@ public partial class Track : Node3D
 	private const float SampleStep = 4f;         // metros entre muestras de la spline
 	private static readonly Vector2 ImageCenter = new Vector2(744f, 444f);
 
-	// Cian de la pista al 50 % de intensidad: más tenue que la meta
-	private static readonly Color CheckpointColor = new Color("1B737F");
-
 	// Índice de la línea central donde está la meta
 	public const int FinishIndex = 0;
 
@@ -247,7 +244,7 @@ public partial class Track : Node3D
 				index++;
 
 			CheckpointIndices.Add(index);
-			BuildArch(index, CheckpointHeight, CheckpointColor, false);
+			BuildArch(index, CheckpointHeight, Palette.Checkpoint, false);
 		}
 	}
 

@@ -45,14 +45,18 @@ Espacios de nombres: `Vectory.Circuit`, `Vectory.Core`, `Vectory.Ship`, `Vectory
 
 - Compilar: `dotnet build` en la raíz del proyecto.
 - Tests: `dotnet test` dentro de `Vectory.Test`.
-- Hay tests de `TrackLimits` y `ShipDynamics` ya funcionando. Los de `RaceTracker` y `LineCrossingDetector` están escritos pero **todavía no se han ejecutado**: si fallan, averigua si el fallo es del test o de la lógica.
+- 75 tests (`ShipDynamics`, `TrackLimits`, `RaceTracker`, `LineCrossingDetector`), todos pasando. Si alguno falla, averigua si el fallo es del test o de la lógica.
+- Los informes de `dotnet test` (`TestResults/`) están en `.gitignore`: no se suben.
+- Godot 4.7.2 mono: `F:\Programas\Godot\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe`. Con `--path` y un script `extends SceneTree` (`--script`) se puede arrancar el juego, leer la consola y sacar capturas sin tocar el proyecto.
 
 ## Estado actual
 
 - Hecho: nave wireframe, control arcade con boost (Shift), cámara de cabina y de tercera persona, circuito cerrado generado por código, límites laterales, cabina minimalista, meta y checkpoints (cantidad configurable con `CheckpointCount`, 5 por defecto), vueltas, cronómetro y tiempos por sector.
-- HUD escrito (velocidad, boost, vuelta, tiempo, mejor vuelta, posición); pendiente de que el usuario lo valide jugando.
+- HUD hecho (velocidad, boost, vuelta, tiempo, mejor vuelta, posición), con textos en inglés (`POSITION`, `LAP`, `BEST`). Los mensajes de carrera en consola también van en inglés (`[Race] ...`). Los comentarios del código siguen en español.
+- `MaxSpeed` del Player está a 80 m/s en `Main.tscn` (el valor por defecto del código es 60).
 - Decisiones del usuario que se salen del documento maestro y se mantienen: circuito cerrado, dos cámaras, boost con Shift, vueltas y cronómetro dentro de la demo.
 - Pendiente: cuenta atrás y salida desde parrilla (hoy el cronómetro arranca al moverse), rivales e IA, posición real en el HUD (ahora fija en 1/1), ajustar el contorno interior de la cabina, récords entre partidas.
+- Pendientes menores del HUD: la etiqueta "BOOST" queda entre las dos barras y no se ve claro a cuál pertenece; `FormatTime` está duplicado en `Hud` y `RaceSession`.
 
 ## Importante
 

@@ -4,3 +4,5 @@
 bin/
 obj/
 
+# Informes de tests y cobertura (dotnet test)
+TestResults/

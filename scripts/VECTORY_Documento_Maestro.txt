@@ -225,9 +225,10 @@ Estado actual:
 - La siguiente etapa no está decidida. La propone Claude y la confirma el usuario antes de empezar.
 
 Pendientes conocidos (pequeños, sin cambio de comportamiento):
-- Track.cs define el color de los checkpoints a mano (CheckpointColor); debe pasar a Palette según la sección 20.1.
-- Los informes de cobertura (Vectory.Test/TestResults/) están en el repositorio; conviene excluir esa carpeta en .gitignore.
-- La carpeta docs/ contiene etapa_1.md vacío.
+- HUD: la etiqueta "BOOST" queda entre las dos barras y no se ve claro a cuál pertenece.
+- FormatTime está duplicado en Hud y RaceSession.
+
+Resueltos: el color de los checkpoints ya sale de Palette (Palette.Checkpoint); Vectory.Test/TestResults/ está excluida en .gitignore; docs/ ya no contiene etapa_1.md (ahora guarda CLAUDE.md).
 
 No ampliar el alcance por iniciativa propia.
 
