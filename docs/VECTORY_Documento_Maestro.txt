@@ -228,7 +228,7 @@ Pendientes conocidos (pequeños, sin cambio de comportamiento):
 - HUD: la etiqueta "BOOST" queda entre las dos barras y no se ve claro a cuál pertenece.
 - FormatTime está duplicado en Hud y RaceSession.
 
-Resueltos: el color de los checkpoints ya sale de Palette (Palette.Checkpoint); Vectory.Test/TestResults/ está excluida en .gitignore; docs/ ya no contiene etapa_1.md (ahora guarda CLAUDE.md).
+Resueltos: el color de los checkpoints ya sale de Palette (Palette.Checkpoint); Vectory.Test/TestResults/ está excluida en .gitignore; docs/ ya no contiene etapa_1.md. CLAUDE.md está en la raíz del proyecto, para que Claude Code lo cargue en cada sesión.
 
 No ampliar el alcance por iniciativa propia.
 

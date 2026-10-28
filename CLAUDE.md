@@ -2,7 +2,7 @@
 
 Juego de carreras futuristas con estética vectorial/wireframe de los años 80. Godot .NET (C#), renderizador Forward+, para Windows/PC. Vista principal desde cabina, con cámara alternativa en tercera persona (tecla C).
 
-El diseño completo está en `docs/VECTORY_Documento_Maestro.txt`. Léelo cuando necesites decidir algo de diseño o de alcance; este archivo es solo el resumen para trabajar. Las specs de cada feature también van en `docs/` (por ejemplo `docs/boost.md`) y, donde lo indiquen, mandan sobre el documento maestro.
+El diseño completo está en `docs/VECTORY_Documento_Maestro.txt`. Léelo cuando necesites decidir algo de diseño o de alcance; este archivo es solo el resumen para trabajar. Las specs de cada feature van en `docs/` (por ejemplo `docs/boost.md`) y, donde lo indiquen, mandan sobre el documento maestro.
 
 ## Cómo trabajamos
 
