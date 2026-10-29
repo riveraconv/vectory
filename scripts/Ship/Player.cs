@@ -125,11 +125,17 @@ public partial class Player : CharacterBody3D
 		_race = race;
 	}
 
-	// Coloca la nave en una posición y orientación (yaw en radianes) y la deja parada
-	public void PlaceAt(Vector3 position, float yaw)
+	// Salida lanzada (GO! de TIME TRIAL): la nave pasa de golpe a "speed" m/s hacia donde apunta
+	public void Launch(float speed)
+	{
+		_dynamics.Reset(_dynamics.Yaw, speed);
+	}
+
+	// Coloca la nave en una posición y orientación (yaw en radianes), parada o avanzando ya a initialSpeed m/s
+	public void PlaceAt(Vector3 position, float yaw, float initialSpeed = 0f)
 	{
 		GlobalPosition = position;
-		_dynamics.Reset(yaw);
+		_dynamics.Reset(yaw, initialSpeed);
 		_boost.Reset(BuildBoostTuning());
 		_bank = 0f;
 		_wallContactTimer = 0f;

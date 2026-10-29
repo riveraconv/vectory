@@ -1,4 +1,5 @@
 using Godot;
+using Vectory.Circuit;
 using Vectory.Core;
 using Vectory.Game;
 using Vectory.UI;
@@ -7,14 +8,15 @@ namespace Vectory.Menu;
 
 // Menú principal (capa 2D sobre MenuBackground): título, opciones y versión.
 // Dibuja la lista de opciones con OptionList y traduce el teclado a llamadas al MenuModel;
-// la navegación vive en el modelo. Ejecuta la acción que devuelve Confirm(): RACE carga la carrera,
-// QUIT cierra el juego.
+// la navegación vive en el modelo. Ejecuta la acción que devuelve Confirm(): RACE y TIME TRIAL
+// cargan la escena de carrera, cada una en su modo (GameSession.Mode); QUIT cierra el juego.
 //
 // Las medidas (Inspector incluido) son las de la spec, sobre una pantalla de referencia de 1280×720,
 // multiplicadas por UiScale.Factor.
 public partial class MainMenu : CanvasLayer
 {
 	public const string RaceId = "RACE";
+	public const string TimeTrialId = "TIME_TRIAL";
 	public const string QuitId = "QUIT";
 
 	// Opciones del menú, en orden. Activar una es cambiar Enabled y conectar su acción en Execute.
@@ -22,7 +24,7 @@ public partial class MainMenu : CanvasLayer
 	{
 		new(RaceId, "RACE", true),
 		new("CHAMPIONSHIP", "CHAMPIONSHIP", false),
-		new("TIME_TRIAL", "TIME TRIAL", false),
+		new(TimeTrialId, "TIME TRIAL", true),
 		new("HANGAR", "HANGAR", false),
 		new("RECORDS", "RECORDS", false),
 		new("SETTINGS", "SETTINGS", false),
@@ -84,18 +86,30 @@ public partial class MainMenu : CanvasLayer
 		}
 	}
 
-	// Acción de cada opción activa
+	// Acción de cada opción activa. RACE y TIME TRIAL cargan la misma escena de carrera, cada una en su modo.
 	private void Execute(string id)
 	{
 		switch (id)
 		{
 			case RaceId:
-				SceneChanger.ChangeTo(this, RaceScenePath);
+				StartRace(GameMode.Race);
+				break;
+			case TimeTrialId:
+				StartRace(GameMode.TimeTrial);
 				break;
 			case QuitId:
 				SceneChanger.Quit(this);
 				break;
 		}
+	}
+
+	// Deja el modo y el circuito en la sesión y carga la carrera. Mientras solo haya un circuito,
+	// siempre el de por defecto (el futuro selector de circuito rellenará CircuitPath aquí).
+	private void StartRace(GameMode mode)
+	{
+		GameSession.Mode = mode;
+		GameSession.CircuitPath = Track.DefaultDefinitionPath;
+		SceneChanger.ChangeTo(this, RaceScenePath);
 	}
 
 	// ---------------------------------------------------------------

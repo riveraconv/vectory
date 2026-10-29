@@ -1,8 +1,10 @@
+using System;
 using Godot;
 using System.Collections.Generic;
 using Vectory.Circuit;
 using Vectory.Core;
 using Vectory.Menu;
+using Vectory.Records;
 using Vectory.Ship;
 using Vectory.UI;
 
@@ -10,11 +12,15 @@ namespace Vectory.Game;
 
 // Se adjunta a un nodo raíz "Main" de tipo Node3D en una escena vacía.
 // Monta WorldEnvironment (fondo oscuro + glow), una rejilla de referencia
-// de fondo, el circuito (Track), el Player, la carrera (RaceSession), el HUD y la pausa.
+// de fondo, el circuito (Track), el Player, la carrera (RaceSession), el HUD y la pausa,
+// según el modo que haya dejado el menú en GameSession (RACE si la escena se ejecuta sola).
 //
-// Ciclo de carrera: la nave sale de una posición de parrilla aleatoria, espera al semáforo
-// y, al terminar la última vuelta, se muestra la pantalla de resultados con RESTART RACE /
-// BACK TO MAIN MENU. ESC abre la pausa (PauseMenu) en cualquier momento de la carrera.
+// RACE: la nave sale de una posición de parrilla aleatoria, espera al semáforo y, al terminar
+// la última vuelta, se guardan los récords de RACE y se muestra la pantalla de resultados con
+// RESTART RACE / BACK TO MAIN MENU.
+// TIME TRIAL: READY? (nave quieta), en el GO! salida lanzada antes de la meta, y vueltas libres; delta por sector y franja de fin
+// de vuelta contra el récord de TIME TRIAL, que se guarda al batirlo.
+// ESC abre la pausa (PauseMenu) en cualquier momento. Las reglas de récords viven en RecordBook.
 public partial class Main : Node3D
 {
 	private const float GridStep = 10f;
@@ -34,13 +40,24 @@ public partial class Main : Node3D
 	[Export] public float FirstLightDelay = 1f;   // segundos antes de la primera luz
 	[Export] public float LightInterval = 1f;     // segundos entre luces
 	[Export] public int LightCount = 5;           // número de luces
-	[Export] public float GoDuration = 1f;        // segundos con el GO visible
+	[Export] public float GoDuration = 1f;        // segundos con el GO! visible
+	[Export] public int StartTextFontSize = 56;   // cuenta atrás, READY? y GO! (px sobre 1280×720; RACE y TIME TRIAL)
 
 	[ExportGroup("Resultados")]
 	[Export] public float ResultsDelay = 1.5f;    // segundos desde la meta hasta la pantalla de resultados
 	[Export] public float ResultsBandHeight = 340f;   // alto de la franja de resultados (px sobre 1280×720)
 	[Export] public int ResultsOptionFontSize = 24;   // opciones RESTART RACE / BACK TO MAIN MENU (máximo: se reduce si no caben)
 	[Export(PropertyHint.File, "*.tscn")] public string MainMenuScenePath = SceneChanger.MainMenuScene;
+
+	[ExportGroup("Time Trial")]
+	[Export] public float FlyingStartDistance = 150f;     // metros antes de la meta (sobre la línea central)
+	[Export(PropertyHint.Range, "0,1,0.01")] public float FlyingStartSpeed = 0.6f;   // fracción de la velocidad punta (sin boost), aplicada en el GO!
+	[Export] public float ReadyDuration = 5f;             // segundos con READY? antes de la salida
+	[Export] public float ReadyGoDuration = 1f;           // segundos con el GO! visible
+	[Export] public float DeltaVisibleTime = 2.5f;        // segundos con el delta por sector visible
+	[Export] public float LapBandVisibleTime = 2.5f;      // segundos con la franja de fin de vuelta visible
+	[Export] public float LapBandHeight = 120f;           // alto de la franja de fin de vuelta (px sobre 1280×720)
+	[Export] public int DeltaFontSize = 44;               // tamaño del delta (px sobre 1280×720)
 
 	private Player _player;
 	private Track _track;
@@ -49,6 +66,10 @@ public partial class Main : Node3D
 	private PauseMenu _pause;
 	private MenuModel _resultsMenu;
 	private MeshInstance3D _grid;
+
+	private GameMode _mode;
+	private RecordStore _records;
+	private RaceRecordResult _raceRecords;   // récords de RACE batidos por la carrera terminada
 
 	private float _finishedTime;   // segundos desde que terminó la carrera
 	private bool _resultsShown;
@@ -95,23 +116,62 @@ public partial class Main : Node3D
 		}
 
 		_player.SetTrack(_track);
+		_mode = GameSession.Mode;
 
-		// Una marca de parrilla por participante. Las posiciones se reparten al azar sin repetir;
-		// sin rivales todavía, solo se usa la del jugador (la primera del reparto).
+		_records = new RecordStore(new FileRecordStorage());
+		_records.Load();
+		if (_records.Warning != null)
+			GD.PushWarning($"Records: {_records.Warning}");
+		if (!RecordBook.IsValidCircuitId(_track.CircuitId))
+			GD.PushWarning($"Main: the circuit '{_track.DisplayName}' has no Id; records will not be saved.");
+
 		int participants = _track.GridSlots;
-		int[] gridOrder = GridLayout.RandomOrder(participants, new System.Random());
-		_track.GetGridStart(gridOrder[0], Player.NoseDistance, out Vector3 startPosition, out float startYaw);
-		_player.PlaceAt(startPosition, startYaw);
-
-		_race = new RaceSession(_track, BuildStartSettings(), participants);
+		if (_mode == GameMode.TimeTrial)
+		{
+			// Salida lanzada: centrada en la pista, antes de la meta y ya en movimiento
+			// Salida lanzada: quieta en su punto con READY?; en el GO! sale ya en movimiento
+			_track.GetFlyingStart(FlyingStartDistance, out Vector3 startPosition, out float startYaw);
+			_player.PlaceAt(startPosition, startYaw);
+			_race = RaceSession.ForTimeTrial(_track, new ReadySettings
+			{
+				ReadyDuration = ReadyDuration,
+				GoDuration = ReadyGoDuration
+			});
+			_race.ReadySequence.Started += () => _player.Launch(_player.MaxSpeed * FlyingStartSpeed);
+		}
+		else
+		{
+			// Una marca de parrilla por participante. Las posiciones se reparten al azar sin repetir;
+			// sin rivales todavía, solo se usa la del jugador (la primera del reparto).
+			int[] gridOrder = GridLayout.RandomOrder(participants, new System.Random());
+			_track.GetGridStart(gridOrder[0], Player.NoseDistance, out Vector3 startPosition, out float startYaw);
+			_player.PlaceAt(startPosition, startYaw);
+			_race = RaceSession.ForRace(_track, BuildStartSettings(), participants);
+		}
 		_player.SetRaceSession(_race);
 
-		_hud = new Hud { Name = "Hud" };
+		_race.CheckpointPassed += OnCheckpointPassed;
+		_race.LapCompleted += OnLapCompleted;
+		_race.RaceFinished += OnRaceFinished;
+
+		_hud = new Hud { Name = "Hud", StartTextFontSize = StartTextFontSize };
 		AddChild(_hud);
 		_hud.ResultsOptionChosen += ExecuteResultsOption;
 
-		// Todavía no hay rivales ni posición en vivo: el jugador va primero de todos los participantes
-		_hud.SetRacePosition(1, participants);
+		if (_mode == GameMode.TimeTrial)
+		{
+			_hud.SetTimeTrialHeader(_track.DisplayName);
+			TimeTrialView view = _hud.TimeTrial;
+			view.DeltaVisibleTime = DeltaVisibleTime;
+			view.LapBandVisibleTime = LapBandVisibleTime;
+			view.LapBandHeight = LapBandHeight;
+			view.DeltaFontSize = DeltaFontSize;
+		}
+		else
+		{
+			// Todavía no hay rivales ni posición en vivo: el jugador va primero de todos los participantes
+			_hud.SetRacePosition(1, participants);
+		}
 	}
 
 	public override void _Process(double delta)
@@ -122,7 +182,8 @@ public partial class Main : Node3D
 			_hud.SetSpeed(_player.Speed, _player.BoostedTopSpeed);
 			_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive);
 			_hud.SetStartSequence(_race.StartSequence);
-			_hud.SetRace(_race.Tracker);
+			_hud.SetReadySequence(_race.ReadySequence);
+			UpdateLapInfo();
 			_pause.RaceFinished = _race.State == RaceState.Finished;
 			UpdateResults((float)delta);
 		}
@@ -150,7 +211,8 @@ public partial class Main : Node3D
 				return;
 
 			_resultsMenu = new MenuModel(ResultsOptions);
-			_hud.ShowResults(_race.Tracker.Result, _resultsMenu, ResultsBandHeight, ResultsOptionFontSize);
+			_hud.ShowResults(_race.Tracker.Result, _resultsMenu, ResultsBandHeight, ResultsOptionFontSize,
+				_raceRecords.NewTotalTime, _raceRecords.NewBestLap);
 			_resultsShown = true;
 			return;   // el Enter de este frame no elige todavía
 		}
@@ -182,6 +244,100 @@ public partial class Main : Node3D
 				SceneChanger.ChangeTo(this, MainMenuScenePath);
 				break;
 		}
+	}
+
+	// Bloque de vuelta del HUD según el modo:
+	// RACE: LAP 2/3, tiempo de vuelta y mejor vuelta de esta carrera.
+	// TIME TRIAL: OUT LAP hasta cruzar la meta, luego LAP N; BEST es el récord de TIME TRIAL del circuito.
+	private void UpdateLapInfo()
+	{
+		RaceTracker tracker = _race.Tracker;
+
+		if (_mode == GameMode.TimeTrial)
+		{
+			bool outLap = tracker == null || tracker.State == RaceState.PreStart;
+			string lapText = outLap ? "OUT LAP" : $"LAP {tracker.CurrentLap}";
+			_hud.SetLapInfo(lapText, outLap ? 0 : tracker.CurrentLapTime, TimeTrialRecord()?.LapTime);
+			return;
+		}
+
+		if (tracker == null)
+			return;
+
+		// Antes de arrancar CurrentLap vale 0; se muestra como vuelta 1
+		int lap = Math.Max(1, tracker.CurrentLap);
+		_hud.SetLapInfo($"LAP {lap}/{tracker.TotalLaps}", tracker.CurrentLapTime, tracker.BestLapTime);
+	}
+
+	private TimeTrialRecord TimeTrialRecord() => _records.Book.GetTimeTrial(_track.CircuitId);
+
+	// TIME TRIAL: delta del checkpoint contra el tiempo de paso del récord (si hay récord con
+	// tiempos de paso válidos para los checkpoints actuales)
+	private void OnCheckpointPassed(int index, double lapTime)
+	{
+		if (_mode != GameMode.TimeTrial)
+			return;
+
+		TimeTrialRecord record = TimeTrialRecord();
+		if (record == null || !record.SplitsMatch(_track.CheckpointIndices.Count))
+			return;
+
+		double delta = DeltaFormat.Delta(lapTime, record.Splits[index]);
+		_hud.TimeTrial.ShowSectorDelta(index + 1, DeltaFormat.Format(delta), DeltaFormat.IsBetter(delta));
+	}
+
+	// TIME TRIAL: al completar una vuelta se compara con el récord, se guarda si lo bate
+	// y se muestra la franja de fin de vuelta
+	private void OnLapCompleted(int lap, double lapTime, IReadOnlyList<double> splits)
+	{
+		if (_mode != GameMode.TimeTrial)
+			return;
+
+		if (!RecordBook.IsValidCircuitId(_track.CircuitId))
+		{
+			_hud.TimeTrial.ShowLapBand(new LapBandContent(lap, lapTime, "LAP COMPLETE", LapBandTitleStyle.Record,
+				"RECORDS OFF  ·  CIRCUIT HAS NO ID"));
+			return;
+		}
+
+		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now);
+		LapBandContent content;
+		if (result.IsNewRecord)
+		{
+			string detail = result.PreviousLapTime.HasValue
+				? $"{DeltaFormat.Format(lapTime - result.PreviousLapTime.Value)}  ·  PREVIOUS {TimeFormat.Format(result.PreviousLapTime.Value)}"
+				: "FIRST RECORD";
+			content = new LapBandContent(lap, lapTime, "NEW RECORD", LapBandTitleStyle.Record, detail);
+			SaveRecords();
+		}
+		else
+		{
+			double previous = result.PreviousLapTime ?? lapTime;
+			double delta = DeltaFormat.Delta(lapTime, previous);
+			content = new LapBandContent(lap, lapTime, DeltaFormat.Format(delta),
+				DeltaFormat.IsBetter(delta) ? LapBandTitleStyle.Better : LapBandTitleStyle.Worse,
+				$"BEST {TimeFormat.Format(previous)}");
+		}
+
+		_hud.TimeTrial.ShowLapBand(content);
+	}
+
+	// RACE terminada: tiempo total y mejor vuelta contra los récords de RACE (una carrera
+	// abandonada desde la pausa no llega aquí y no guarda nada)
+	private void OnRaceFinished(RaceResult result)
+	{
+		if (_mode != GameMode.Race || result == null)
+			return;
+
+		_raceRecords = _records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now);
+		if (_raceRecords.NewTotalTime || _raceRecords.NewBestLap)
+			SaveRecords();
+	}
+
+	private void SaveRecords()
+	{
+		if (!_records.Save())
+			GD.PushWarning($"Records: {_records.Warning}");
 	}
 
 	private StartSettings BuildStartSettings()

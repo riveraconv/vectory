@@ -9,10 +9,10 @@ namespace Vectory.UI;
 // HUD de la demo. Solo MUESTRA datos: no calcula reglas de conducción ni de carrera.
 // Se crea por código desde Main, que le pasa los datos cada frame. Colores de Palette.
 //
-//   Arriba izquierda:  posición / participantes
-//   Arriba derecha:    vuelta actual / total, tiempo de vuelta y récord de vuelta
+//   Arriba izquierda:  posición / participantes (TIME TRIAL: TIME TRIAL y el circuito)
+//   Arriba derecha:    vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de vuelta y mejor tiempo
 //   Abajo derecha:     cargas de boost (esferas), velocidad (km/h) y su barra
-//   Arriba centro:     semáforo de salida y cuenta atrás (solo hasta un poco después del GO)
+//   Arriba centro:     RACE: semáforo y cuenta atrás; TIME TRIAL: delta por sector y franja de fin de vuelta
 //   Centro:            pantalla de resultados (al terminar la carrera)
 //
 // Es una capa 2D fija a la pantalla: en cabina queda pegada al marco de la cabina.
@@ -23,9 +23,14 @@ public partial class Hud : CanvasLayer
 	private const float BarHeight = 10f;
 	private const string NoTime = "--:--.---";
 
-	// Semáforo: centrado en horizontal, en el tercio superior de la pantalla
+	// Semáforo y texto de salida: centrados en horizontal, en el tercio superior de la pantalla
 	private const float StartLightsTop = 150f;
-	private const float StartLightsWidth = 400f;
+	private const float StartLightsWidth = 900f;   // ancho de sobra para READY? / GO! en grande
+	private const string ReadyText = "READY?";
+	private const string GoText = "GO!";
+
+	// Tamaño del texto de salida (cuenta atrás, READY?, GO!), px sobre 1280×720. Se fija antes de añadir el HUD.
+	public int StartTextFontSize = StartLightsView.DefaultTextFontSize;
 
 	private enum Corner { TopLeft, TopRight, BottomRight }
 
@@ -38,6 +43,9 @@ public partial class Hud : CanvasLayer
 	private BoostChargesView _boostCharges;
 	private StartLightsView _startLights;
 	private ResultsView _results;
+	private VBoxContainer _timeTrialHeader;
+	private Label _circuitLabel;
+	private TimeTrialView _timeTrial;
 
 	public override void _Ready()
 	{
@@ -61,6 +69,7 @@ public partial class Hud : CanvasLayer
 		BuildLapBlock(root);
 		BuildSpeedBlock(root);
 		BuildStartLights(root);
+		BuildTimeTrial(root);
 		BuildResults(root);
 	}
 
@@ -83,39 +92,65 @@ public partial class Hud : CanvasLayer
 		_boostCharges.SetCharges(charges, maxCharges, cooldownActive);
 	}
 
-	// Estado de la carrera. Si todavía no existe (null), se dejan los valores por defecto.
-	public void SetRace(RaceTracker race)
+	// Bloque de vuelta, ya calculado por quien gestiona la carrera:
+	// texto de vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de la vuelta actual y mejor tiempo (null = sin tiempo).
+	public void SetLapInfo(string lapText, double lapTime, double? bestTime)
 	{
-		if (race == null)
-			return;
-
-		// Antes de arrancar CurrentLap vale 0; se muestra como vuelta 1
-		int lap = Math.Max(1, race.CurrentLap);
-		_lapLabel.Text = $"LAP {lap}/{race.TotalLaps}";
-		_lapTimeLabel.Text = TimeFormat.Format(race.CurrentLapTime);
-		_bestLapLabel.Text = $"BEST {(race.BestLapTime.HasValue ? TimeFormat.Format(race.BestLapTime.Value) : NoTime)}";
+		_lapLabel.Text = lapText;
+		_lapTimeLabel.Text = TimeFormat.Format(lapTime);
+		_bestLapLabel.Text = $"BEST {(bestTime.HasValue ? TimeFormat.Format(bestTime.Value) : NoTime)}";
 	}
 
-	// Semáforo y cuenta atrás. Se ven hasta que la salida se ha dado y el GO ha desaparecido.
+	// TIME TRIAL: arriba a la izquierda, TIME TRIAL y el nombre del circuito en lugar de la posición
+	public void SetTimeTrialHeader(string circuitName)
+	{
+		_positionLabel.Visible = false;
+		_timeTrialHeader.Visible = true;
+		_circuitLabel.Text = circuitName.ToUpperInvariant();
+	}
+
+	// Delta por sector y franja de fin de vuelta de TIME TRIAL
+	public TimeTrialView TimeTrial => _timeTrial;
+
+	// RACE: semáforo y cuenta atrás. Se ven hasta que la salida se ha dado y el GO! ha desaparecido.
 	public void SetStartSequence(StartSequence start)
 	{
-		bool visible = start != null && (!start.HasStarted || start.ShowGo);
+		if (start == null)
+			return;
+
+		bool visible = !start.HasStarted || start.ShowGo;
 		_startLights.Visible = visible;
 		if (visible)
-			_startLights.SetState(start.LightsOn, start.LightCount, start.CountdownNumber, start.ShowGo);
+		{
+			string text = start.ShowGo ? GoText : start.CountdownNumber?.ToString() ?? "";
+			_startLights.SetState(start.LightsOn, start.LightCount, text, start.ShowGo);
+		}
+	}
+
+	// TIME TRIAL: READY? hasta la salida y GO! justo después, sin semáforo, en el mismo sitio
+	public void SetReadySequence(ReadySequence ready)
+	{
+		if (ready == null)
+			return;
+
+		bool visible = ready.ShowReady || ready.ShowGo;
+		_startLights.Visible = visible;
+		if (visible)
+			_startLights.SetState(0, 0, ready.ShowGo ? GoText : ReadyText, ready.ShowGo);
 	}
 
 	// Se lanza al hacer clic en una opción de la pantalla de resultados, con su identificador
 	public event Action<string> ResultsOptionChosen;
 
-	// Muestra la pantalla de resultados de una carrera terminada, con su lista de opciones.
-	// bandHeight y optionFontSize en px sobre 1280×720 (ver ResultsView).
-	public void ShowResults(RaceResult result, MenuModel options, float bandHeight, int optionFontSize)
+	// Muestra la pantalla de resultados de una carrera terminada, con su lista de opciones y qué
+	// récords de RACE ha batido. bandHeight y optionFontSize en px sobre 1280×720 (ver ResultsView).
+	public void ShowResults(RaceResult result, MenuModel options, float bandHeight, int optionFontSize,
+		bool newTotalRecord, bool newLapRecord)
 	{
 		if (_results.Visible || result == null)
 			return;
 
-		_results.SetResult(result, options, bandHeight, optionFontSize);
+		_results.SetResult(result, options, bandHeight, optionFontSize, newTotalRecord, newLapRecord);
 		_results.Visible = true;
 	}
 
@@ -140,6 +175,44 @@ public partial class Hud : CanvasLayer
 		_positionLabel = AddLabel(root, "POSITION 1/1", 40, Palette.Cyan,
 			HorizontalAlignment.Left, VerticalAlignment.Center,
 			Corner.TopLeft, Margin, 30f, 400f, 50f);
+
+		// TIME TRIAL: en el mismo sitio, oculto en RACE (Share Tech Mono, medidas sobre 1280×720)
+		float scale = UiScale.Factor;
+		_timeTrialHeader = new VBoxContainer
+		{
+			Name = "TimeTrialHeader",
+			Visible = false,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			Position = new Vector2(Margin, 30f)
+		};
+		_timeTrialHeader.AddThemeConstantOverride("separation", Mathf.RoundToInt(4f * scale));
+		root.AddChild(_timeTrialHeader);
+
+		int titleSize = Mathf.RoundToInt(22f * scale);
+		_timeTrialHeader.AddChild(new Label
+		{
+			Text = "TIME TRIAL",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			LabelSettings = MenuFonts.Settings(MenuFonts.Make(MenuFonts.Mono, 400, titleSize, 0.16f), titleSize,
+				Palette.Cyan, Colors.Transparent, 0f)
+		});
+
+		int nameSize = Mathf.RoundToInt(14f * scale);
+		_circuitLabel = new Label
+		{
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			LabelSettings = MenuFonts.Settings(MenuFonts.Make(MenuFonts.Mono, 400, nameSize, 0.16f), nameSize,
+				Palette.BlueGray, Colors.Transparent, 0f)
+		};
+		_timeTrialHeader.AddChild(_circuitLabel);
+	}
+
+	// Delta y franja de fin de vuelta de TIME TRIAL, a pantalla completa (solo dibuja arriba en el centro)
+	private void BuildTimeTrial(Control root)
+	{
+		_timeTrial = new TimeTrialView { Name = "TimeTrial" };
+		_timeTrial.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		root.AddChild(_timeTrial);
 	}
 
 	private void BuildLapBlock(Control root)
@@ -193,7 +266,8 @@ public partial class Hud : CanvasLayer
 			OffsetLeft = -StartLightsWidth * 0.5f,
 			OffsetRight = StartLightsWidth * 0.5f,
 			OffsetTop = StartLightsTop,
-			OffsetBottom = StartLightsTop + StartLightsView.Height
+			OffsetBottom = StartLightsTop + StartLightsView.HeightFor(StartTextFontSize),
+			TextFontSize = StartTextFontSize
 		};
 		root.AddChild(_startLights);
 	}

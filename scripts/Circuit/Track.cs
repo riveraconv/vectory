@@ -1,6 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 using Vectory.Core;
+using Vectory.Game;
 
 namespace Vectory.Circuit;
 
@@ -13,7 +14,8 @@ namespace Vectory.Circuit;
 public partial class Track : Node3D
 {
 	// Circuito que se usa si no se asigna ninguno en el Inspector
-	private const string DefaultDefinitionPath = "res://circuits/circuit_01.tres";
+	// Circuito por defecto. Es la única constante con su ruta: el menú la usa para la sesión.
+	public const string DefaultDefinitionPath = "res://circuits/circuit_01.tres";
 
 	// ---- Circuito ----
 	[Export] public TrackDefinition Definition;
@@ -34,6 +36,8 @@ public partial class Track : Node3D
 	[Export] public float GridMarkLegLength = 2f;    // largo de las patas de cada marca
 
 	// ---- Datos del circuito actual (salen del TrackDefinition) ----
+	public string CircuitId => Definition?.Id ?? "";
+	public string DisplayName => Definition?.DisplayName ?? "";
 	public bool Clockwise => Definition.Clockwise;
 	public float TrackWidth => Definition.TrackWidth;
 	public int CheckpointCount => Definition.CheckpointCount;
@@ -61,6 +65,17 @@ public partial class Track : Node3D
 
 	public override void _Ready()
 	{
+		// Prioridad: el circuito de la sesión (lo deja el menú), luego el del Inspector y luego el de por defecto
+		string sessionPath = GameSession.CircuitPath;
+		if (!string.IsNullOrEmpty(sessionPath))
+		{
+			var sessionDefinition = ResourceLoader.Exists(sessionPath) ? GD.Load<TrackDefinition>(sessionPath) : null;
+			if (sessionDefinition != null)
+				Definition = sessionDefinition;
+			else
+				GD.PushError($"Track: no se encuentra el circuito de la sesión '{sessionPath}'; se usa el del Inspector.");
+		}
+
 		if (Definition == null)
 		{
 			Definition = GD.Load<TrackDefinition>(DefaultDefinitionPath);
@@ -137,6 +152,15 @@ public partial class Track : Node3D
 		const float NoseGap = 0.5f;
 		Vector3 p = front - forward * (noseDistance + NoseGap);
 		shipPosition = new Vector3(p.X, TrackY + ShipHover, p.Z);
+		yaw = Mathf.Atan2(-forward.X, -forward.Z);
+	}
+
+	// Salida lanzada (TIME TRIAL): sobre el eje del circuito, centrada en la pista, "distance" metros
+	// antes de la meta (medidos sobre la línea central) y mirando en el sentido de la marcha.
+	public void GetFlyingStart(float distance, out Vector3 shipPosition, out float yaw)
+	{
+		PointBehindFinish(distance, out Vector3 point, out Vector3 forward);
+		shipPosition = new Vector3(point.X, TrackY + ShipHover, point.Z);
 		yaw = Mathf.Atan2(-forward.X, -forward.Z);
 	}
 

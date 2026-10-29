@@ -8,7 +8,8 @@ namespace Vectory.UI;
 
 // Pantalla de resultados: franja horizontal como la de la pausa (MenuBand), con tres columnas:
 //   izquierda: RACE FINISHED y la posición final (1st / 8)
-//   centro:    mejor vuelta y mejor tiempo de cada sector, con la vuelta en que se hizo
+//   centro:    tiempo total, mejor vuelta (NEW RECORD si baten el récord de RACE) y mejor tiempo
+//              de cada sector, con la vuelta en que se hizo
 //   derecha:   opciones RESTART RACE / BACK TO MAIN MENU (OptionList)
 // Solo MUESTRA el RaceResult y el MenuModel que le pasan: la acción elegida la ejecuta Main.
 //
@@ -43,7 +44,9 @@ public partial class ResultsView : Control
 
 	// bandHeight: alto de la franja (px sobre 1280×720). optionFontSize: tamaño máximo de las opciones;
 	// si BACK TO MAIN MENU no cabe antes del borde derecho, se reduce.
-	public void SetResult(RaceResult result, MenuModel options, float bandHeight, int optionFontSize)
+	// newTotalRecord / newLapRecord: el tiempo total o la mejor vuelta baten el récord de RACE del circuito
+	public void SetResult(RaceResult result, MenuModel options, float bandHeight, int optionFontSize,
+		bool newTotalRecord = false, bool newLapRecord = false)
 	{
 		foreach (Node child in GetChildren())
 		{
@@ -58,7 +61,7 @@ public partial class ResultsView : Control
 		_band.AddSeparator(860f, SeparatorHeight);
 
 		BuildResultColumn(result);
-		BuildTimesColumn(result);
+		BuildTimesColumn(result, newTotalRecord, newLapRecord);
 		BuildOptionsColumn(options, optionFontSize);
 
 		// El tamaño mínimo de las columnas se conoce cuando ya están montadas
@@ -91,11 +94,17 @@ public partial class ResultsView : Control
 		column.AddChild(position);
 	}
 
-	private void BuildTimesColumn(RaceResult result)
+	private void BuildTimesColumn(RaceResult result, bool newTotalRecord, bool newLapRecord)
 	{
 		VBoxContainer column = _band.AddColumn("Times", TimesLeft, 8f);
 
-		column.AddChild(Caption("BEST LAP"));
+		// NEW RECORD va en la línea de la etiqueta: junto al tiempo de la mejor vuelta (con "lap N")
+		// no cabe en la columna y pisaría las opciones
+		column.AddChild(CaptionRow("TOTAL TIME", newTotalRecord));
+		column.AddChild(MakeLabel(TimeFormat.Format(result.TotalTime), MenuFonts.Orbitron, 500, 30f, 0.06f, Palette.Cyan));
+
+		column.AddChild(new Control { CustomMinimumSize = new Vector2(0f, S(6f)), MouseFilter = MouseFilterEnum.Ignore });
+		column.AddChild(CaptionRow("BEST LAP", newLapRecord));
 
 		var bestLap = Row(14f);
 		bestLap.AddChild(MakeLabel(TimeFormat.Format(result.BestLapTime), MenuFonts.Orbitron, 500, 30f, 0.06f, Palette.Cyan));
@@ -181,7 +190,19 @@ public partial class ResultsView : Control
 	// Piezas
 	// ---------------------------------------------------------------
 
-	// Etiqueta pequeña de sección (BEST LAP, BEST SECTORS)
+	// Etiqueta de sección con, si toca, NEW RECORD a su derecha
+	private Control CaptionRow(string text, bool newRecord)
+	{
+		if (!newRecord)
+			return Caption(text);
+
+		var row = Row(14f);
+		row.AddChild(Caption(text));
+		row.AddChild(MakeLabel("NEW RECORD", MenuFonts.Orbitron, 900, 16f, 0.14f, Palette.NewRecord, Palette.NewRecordGlow, 10f));
+		return row;
+	}
+
+	// Etiqueta pequeña de sección (TOTAL TIME, BEST LAP, BEST SECTORS)
 	private Label Caption(string text)
 	{
 		return MakeLabel(text, MenuFonts.Mono, 400, 14f, 0.22f, Palette.BlueGray);
