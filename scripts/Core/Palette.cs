@@ -35,4 +35,21 @@ public static class Palette
 	public static readonly Color Go = Orange;                       // texto GO de la salida
 	public static readonly Color ResultsBorder = Cyan;              // borde de la pantalla de resultados
 	public static readonly Color ResultsBackground = new Color(Background, 0.85f); // fondo semitransparente de los resultados
+
+	// --- Menú principal ---
+	public static readonly Color MenuTitle = Cyan;                  // VECTORY
+	public static readonly Color MenuTitleGlow = new Color(Cyan, 0.55f);    // halo de VECTORY
+	public static readonly Color MenuRacing = Orange;               // RACING
+	public static readonly Color MenuRacingGlow = new Color(Orange, 0.45f); // halo de RACING
+	public static readonly Color MenuSpeedLine = Cyan;              // líneas de velocidad del título (la central usa Blue)
+	public static readonly Color MenuSpeedLineDim = new Color(Cyan, 0.6f);  // línea de velocidad tenue
+	public static readonly Color MenuSelected = Cyan;               // opción seleccionada y su barra
+	public static readonly Color MenuSelectedGlow = new Color(Cyan, 0.55f); // halo de la opción seleccionada
+	public static readonly Color MenuIdle = BlueGray;               // opción activa sin seleccionar
+	public static readonly Color MenuDisabled = new Color(Blue, 0.55f);     // opción desactivada
+	public static readonly Color MenuHint = new Color(BlueGray, 0.6f);      // COMING SOON
+	public static readonly Color Version = new Color(BlueGray, 0.7f);       // número de versión
+	public static readonly Color MenuGrid = Blue;                   // rejilla de horizonte del fondo
+	public static readonly Color MenuHorizon = Cyan;                // línea del horizonte
+	public static readonly Color MenuShade = Background;            // sombra izquierda, detrás del texto
 }

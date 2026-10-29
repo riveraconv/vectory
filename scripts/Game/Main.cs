@@ -40,16 +40,7 @@ public partial class Main : Node3D
 
 	public override void _Ready()
 	{
-		var env = new Godot.Environment
-		{
-			BackgroundMode = Godot.Environment.BGMode.Color,
-			BackgroundColor = Palette.Background,
-			GlowEnabled = true,
-			GlowIntensity = 1.0f,
-			GlowBloom = 0.15f,
-			GlowHdrThreshold = 0.8f
-		};
-		AddChild(new WorldEnvironment { Name = "WorldEnvironment", Environment = env });
+		AddChild(WorldStyle.CreateWorldEnvironment());
 
 		_grid = new MeshInstance3D { Name = "Grid", Mesh = BuildGridMesh() };
 		AddChild(_grid);
@@ -135,7 +126,7 @@ public partial class Main : Node3D
 		}
 
 		if (Input.IsActionJustPressed("restart_race"))
-			GetTree().ReloadCurrentScene();
+			SceneChanger.Reload(this);
 	}
 
 	private StartSettings BuildStartSettings()
