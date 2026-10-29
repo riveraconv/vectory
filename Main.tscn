@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dnj15rwq27lnn" path="res://scripts/Game/Main.cs" id="1_glv2v"]
 [ext_resource type="Script" uid="uid://calvipcoabflp" path="res://scripts/Circuit/Track.cs" id="2_r0du0"]
 [ext_resource type="Script" uid="uid://d0sbwun4waqmi" path="res://scripts/Ship/Player.cs" id="3_cm0pq"]
+[ext_resource type="Script" path="res://scripts/Menu/PauseMenu.cs" id="4_pause"]
 
 [node name="Main" type="Node3D" unique_id=1889765682]
 script = ExtResource("1_glv2v")
@@ -16,3 +17,6 @@ script = ExtResource("3_cm0pq")
 MaxSpeed = 80.0
 WallBrake = 0.75
 WallScrape = 8.0
+
+[node name="PauseMenu" type="CanvasLayer" parent="."]
+script = ExtResource("4_pause")
