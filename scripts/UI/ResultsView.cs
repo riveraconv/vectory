@@ -148,27 +148,13 @@ public partial class ResultsView : Control
 		_options.Chosen += id => OptionChosen?.Invoke(id);
 	}
 
-	// Mayor tamaño (como mucho maxSize) con el que la opción más larga, seleccionada (en negrita,
-	// con la barra y el desplazamiento), cabe antes del borde derecho de la pantalla
+	// Mayor tamaño (como mucho maxSize) con el que las opciones caben antes del borde derecho de la pantalla
 	private int FitOptionFontSize(MenuModel options, int maxSize)
 	{
-		float maxWidth = S(1280f - OptionsLeft - RightMargin);
-		for (int size = maxSize; size > 8; size--)
-		{
-			int px = Px(size);
-			Font font = MenuFonts.Make(MenuFonts.Orbitron, 700, px, 0.12f);
-			float widest = 0f;
-			foreach (MenuOption option in options.Options)
-				widest = Mathf.Max(widest, font.GetStringSize(option.Label, HorizontalAlignment.Left, -1, px).X);
-
-			if (S(4f) + S(16f) + widest <= maxWidth)
-			{
-				if (size < maxSize)
-					GD.Print($"ResultsView: opciones reducidas a {size} px para que quepan en pantalla.");
-				return size;
-			}
-		}
-		return 8;
+		int size = OptionList.FitFontSize(options, maxSize, _scale, S(1280f - OptionsLeft - RightMargin));
+		if (size < maxSize)
+			GD.Print($"ResultsView: opciones reducidas a {size} px para que quepan en pantalla.");
+		return size;
 	}
 
 	// Si alguna columna no cabe en la franja (circuitos con muchos sectores), la franja crece centrada

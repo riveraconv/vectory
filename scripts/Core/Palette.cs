@@ -71,6 +71,11 @@ public static class Palette
 	public static readonly Color PauseHint = BlueGray;              // ESC · CONTINUE / CURRENT RACE PROGRESS WILL BE LOST
 	public static readonly Color MenuSeparator = new Color(Blue, 0.7f);     // separadores (pausa y resultados)
 
+	// --- Pantalla RECORDS ---
+	public static readonly Color RecordsHeader = Cyan;              // cabeceras TIME TRIAL / RACE
+	public static readonly Color RecordsEmptyTime = new Color(BlueGray, 0.6f);  // --:--.--- sin récord
+	public static readonly Color RecordsArrow = Cyan;               // flechas del selector de circuito (activas)
+
 	// --- TIME TRIAL y récords ---
 	public static readonly Color DeltaBetter = Green;               // delta: mejor (o igual) que el récord
 	public static readonly Color DeltaBetterGlow = new Color(Green, 0.5f);
