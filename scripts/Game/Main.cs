@@ -2,6 +2,7 @@ using Godot;
 using System.Collections.Generic;
 using Vectory.Circuit;
 using Vectory.Core;
+using Vectory.Menu;
 using Vectory.Ship;
 using Vectory.UI;
 
@@ -9,16 +10,25 @@ namespace Vectory.Game;
 
 // Se adjunta a un nodo raíz "Main" de tipo Node3D en una escena vacía.
 // Monta WorldEnvironment (fondo oscuro + glow), una rejilla de referencia
-// de fondo, el circuito (Track), el Player, la carrera (RaceSession) y el HUD.
+// de fondo, el circuito (Track), el Player, la carrera (RaceSession), el HUD y la pausa.
 //
 // Ciclo de carrera: la nave sale de una posición de parrilla aleatoria, espera al semáforo
-// y, al terminar la última vuelta, se muestra la pantalla de resultados. Enter
-// (acción "restart_race") recarga la escena: nueva carrera, nueva posición de parrilla.
+// y, al terminar la última vuelta, se muestra la pantalla de resultados con RESTART RACE /
+// BACK TO MAIN MENU. ESC abre la pausa (PauseMenu) en cualquier momento de la carrera.
 public partial class Main : Node3D
 {
 	private const float GridStep = 10f;
 	private const float GridHalf = 500f;
 	private const float GridY = -4f;
+
+	private const string RestartRaceId = "RESTART_RACE";
+	private const string BackToMenuId = "BACK_TO_MENU";
+
+	private static readonly MenuOption[] ResultsOptions =
+	{
+		new(RestartRaceId, "RESTART RACE", true),
+		new(BackToMenuId, "BACK TO MAIN MENU", true)
+	};
 
 	[ExportGroup("Salida")]
 	[Export] public float FirstLightDelay = 1f;   // segundos antes de la primera luz
@@ -28,11 +38,16 @@ public partial class Main : Node3D
 
 	[ExportGroup("Resultados")]
 	[Export] public float ResultsDelay = 1.5f;    // segundos desde la meta hasta la pantalla de resultados
+	[Export] public float ResultsBandHeight = 340f;   // alto de la franja de resultados (px sobre 1280×720)
+	[Export] public int ResultsOptionFontSize = 24;   // opciones RESTART RACE / BACK TO MAIN MENU (máximo: se reduce si no caben)
+	[Export(PropertyHint.File, "*.tscn")] public string MainMenuScenePath = SceneChanger.MainMenuScene;
 
 	private Player _player;
 	private Track _track;
 	private RaceSession _race;
 	private Hud _hud;
+	private PauseMenu _pause;
+	private MenuModel _resultsMenu;
 	private MeshInstance3D _grid;
 
 	private float _finishedTime;   // segundos desde que terminó la carrera
@@ -40,16 +55,7 @@ public partial class Main : Node3D
 
 	public override void _Ready()
 	{
-		var env = new Godot.Environment
-		{
-			BackgroundMode = Godot.Environment.BGMode.Color,
-			BackgroundColor = Palette.Background,
-			GlowEnabled = true,
-			GlowIntensity = 1.0f,
-			GlowBloom = 0.15f,
-			GlowHdrThreshold = 0.8f
-		};
-		AddChild(new WorldEnvironment { Name = "WorldEnvironment", Environment = env });
+		AddChild(WorldStyle.CreateWorldEnvironment());
 
 		_grid = new MeshInstance3D { Name = "Grid", Mesh = BuildGridMesh() };
 		AddChild(_grid);
@@ -69,6 +75,16 @@ public partial class Main : Node3D
 			_player = new Player { Name = "Player" };
 			AddChild(_player);
 		}
+
+		// Pausa (ESC): igual que Track y Player, se usa la de la escena si existe
+		_pause = GetNodeOrNull<PauseMenu>("PauseMenu");
+		if (_pause == null)
+		{
+			_pause = new PauseMenu { Name = "PauseMenu", MainMenuScenePath = MainMenuScenePath };
+			AddChild(_pause);
+		}
+		// Al continuar, las teclas pulsadas durante la pausa no deben llegar a la nave
+		_pause.Resumed += _player.BlockInputUntilReleased;
 
 		// Sin circuito generado (TrackDefinition ausente o no válido; Track ya ha dado el error)
 		// no hay parrilla, límites ni carrera: no se monta nada que dependa de él.
@@ -92,6 +108,7 @@ public partial class Main : Node3D
 
 		_hud = new Hud { Name = "Hud" };
 		AddChild(_hud);
+		_hud.ResultsOptionChosen += ExecuteResultsOption;
 
 		// Todavía no hay rivales ni posición en vivo: el jugador va primero de todos los participantes
 		_hud.SetRacePosition(1, participants);
@@ -106,6 +123,7 @@ public partial class Main : Node3D
 			_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive);
 			_hud.SetStartSequence(_race.StartSequence);
 			_hud.SetRace(_race.Tracker);
+			_pause.RaceFinished = _race.State == RaceState.Finished;
 			UpdateResults((float)delta);
 		}
 
@@ -117,8 +135,9 @@ public partial class Main : Node3D
 			Mathf.Snapped(p.Z, GridStep));
 	}
 
-	// La pantalla de resultados aparece ResultsDelay segundos después de cruzar la meta.
-	// Con ella en pantalla, Enter repite la carrera.
+	// La pantalla de resultados aparece ResultsDelay segundos después de cruzar la meta, con
+	// RESTART RACE (seleccionada) y BACK TO MAIN MENU. Con la pausa abierta no se llega aquí
+	// (Main está congelado), así que la lista de resultados no responde.
 	private void UpdateResults(float delta)
 	{
 		if (_race.State != RaceState.Finished)
@@ -130,12 +149,39 @@ public partial class Main : Node3D
 			if (_finishedTime < ResultsDelay)
 				return;
 
-			_hud.ShowResults(_race.Tracker.Result);
+			_resultsMenu = new MenuModel(ResultsOptions);
+			_hud.ShowResults(_race.Tracker.Result, _resultsMenu, ResultsBandHeight, ResultsOptionFontSize);
 			_resultsShown = true;
+			return;   // el Enter de este frame no elige todavía
 		}
 
-		if (Input.IsActionJustPressed("restart_race"))
-			GetTree().ReloadCurrentScene();
+		if (Input.IsActionJustPressed("menu_down"))
+		{
+			_resultsMenu.MoveNext();
+			_hud.RefreshResultsOptions();
+		}
+		else if (Input.IsActionJustPressed("menu_up"))
+		{
+			_resultsMenu.MovePrevious();
+			_hud.RefreshResultsOptions();
+		}
+		else if (Input.IsActionJustPressed("menu_accept"))
+		{
+			ExecuteResultsOption(_resultsMenu.Confirm());
+		}
+	}
+
+	private void ExecuteResultsOption(string id)
+	{
+		switch (id)
+		{
+			case RestartRaceId:
+				SceneChanger.Reload(this);
+				break;
+			case BackToMenuId:
+				SceneChanger.ChangeTo(this, MainMenuScenePath);
+				break;
+		}
 	}
 
 	private StartSettings BuildStartSettings()

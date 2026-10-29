@@ -10,4 +10,4 @@ MetersPerPixel = 1.4
 ImageCenter = Vector2(744, 444)
 Clockwise = true
 TrackWidth = 40.0
-CheckpointCount = 5
+CheckpointCount = 3

@@ -2,6 +2,7 @@ using System;
 using Godot;
 using Vectory.Circuit;
 using Vectory.Core;
+using Vectory.Menu;
 
 namespace Vectory.UI;
 
@@ -104,14 +105,24 @@ public partial class Hud : CanvasLayer
 			_startLights.SetState(start.LightsOn, start.LightCount, start.CountdownNumber, start.ShowGo);
 	}
 
-	// Muestra la pantalla de resultados de una carrera terminada
-	public void ShowResults(RaceResult result)
+	// Se lanza al hacer clic en una opción de la pantalla de resultados, con su identificador
+	public event Action<string> ResultsOptionChosen;
+
+	// Muestra la pantalla de resultados de una carrera terminada, con su lista de opciones.
+	// bandHeight y optionFontSize en px sobre 1280×720 (ver ResultsView).
+	public void ShowResults(RaceResult result, MenuModel options, float bandHeight, int optionFontSize)
 	{
 		if (_results.Visible || result == null)
 			return;
 
-		_results.SetResult(result);
+		_results.SetResult(result, options, bandHeight, optionFontSize);
 		_results.Visible = true;
+	}
+
+	// Vuelve a dibujar la selección de las opciones de resultados (tras moverla con el teclado)
+	public void RefreshResultsOptions()
+	{
+		_results.RefreshOptions();
 	}
 
 	// Posición del jugador y total de participantes
@@ -187,25 +198,14 @@ public partial class Hud : CanvasLayer
 		root.AddChild(_startLights);
 	}
 
-	// Anclada al centro y creciendo hacia los dos lados: el panel queda centrado sea cual sea su tamaño
+	// A pantalla completa: la franja de resultados atenúa toda la carrera y va centrada en vertical.
+	// Se añade la última, así queda por encima del resto del HUD.
 	private void BuildResults(Control root)
 	{
-		_results = new ResultsView
-		{
-			Name = "Results",
-			Visible = false,
-			AnchorLeft = 0.5f,
-			AnchorRight = 0.5f,
-			AnchorTop = 0.5f,
-			AnchorBottom = 0.5f,
-			OffsetLeft = 0f,
-			OffsetRight = 0f,
-			OffsetTop = 0f,
-			OffsetBottom = 0f,
-			GrowHorizontal = Control.GrowDirection.Both,
-			GrowVertical = Control.GrowDirection.Both
-		};
+		_results = new ResultsView { Name = "Results", Visible = false };
+		_results.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		root.AddChild(_results);
+		_results.OptionChosen += id => ResultsOptionChosen?.Invoke(id);
 	}
 
 	private static Label AddLabel(Control parent, string text, int fontSize, Color color,
