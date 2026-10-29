@@ -14,6 +14,10 @@ public static class Palette
 	public static readonly Color Background = new Color("05070D");  // fondo
 	public static readonly Color BlueGray = new Color("A6B8D8");    // información secundaria del HUD
 
+	// --- Ampliación de la paleta del documento maestro, SOLO para el delta de TIME TRIAL (spec docs/time-trial.md) ---
+	public static readonly Color Green = new Color("3DFF8A");       // delta mejor que el récord
+	public static readonly Color Red = new Color("FF4D5E");         // delta peor que el récord
+
 	// --- Derivados (siempre calculados a partir de los de arriba) ---
 	public static readonly Color BlueDim = Blue.Darkened(0.4f);     // líneas tenues (rejilla, transversales); por debajo del umbral de glow
 
@@ -31,8 +35,10 @@ public static class Palette
 	public static readonly Color StartLightGlow = new Color(Magenta, 0.25f); // halo de la luz encendida
 	public static readonly Color StartLightOff = BoostEmpty;        // borde de la luz apagada (como la carga de boost vacía)
 	public static readonly Color StartLightOffFill = BoostEmptyFill; // relleno de la luz apagada
-	public static readonly Color Countdown = Cyan;                  // número de la cuenta atrás
-	public static readonly Color Go = Orange;                       // texto GO de la salida
+	public static readonly Color Countdown = Cyan;                  // número de la cuenta atrás y READY?
+	public static readonly Color CountdownGlow = new Color(Cyan, 0.55f);   // halo de la cuenta atrás y READY?
+	public static readonly Color Go = Orange;                       // texto GO! de la salida
+	public static readonly Color GoGlow = new Color(Orange, 0.55f); // halo del GO!
 	public static readonly Color ResultsBorder = Cyan;              // borde de la pantalla de resultados
 	public static readonly Color ResultsBackground = new Color(Background, 0.85f); // fondo semitransparente de los resultados
 
@@ -64,4 +70,12 @@ public static class Palette
 	public static readonly Color ConfirmTitleGlow = new Color(Orange, 0.45f); // halo del título de confirmación
 	public static readonly Color PauseHint = BlueGray;              // ESC · CONTINUE / CURRENT RACE PROGRESS WILL BE LOST
 	public static readonly Color MenuSeparator = new Color(Blue, 0.7f);     // separadores (pausa y resultados)
+
+	// --- TIME TRIAL y récords ---
+	public static readonly Color DeltaBetter = Green;               // delta: mejor (o igual) que el récord
+	public static readonly Color DeltaBetterGlow = new Color(Green, 0.5f);
+	public static readonly Color DeltaWorse = Red;                  // delta: peor que el récord
+	public static readonly Color DeltaWorseGlow = new Color(Red, 0.5f);
+	public static readonly Color NewRecord = Orange;                // NEW RECORD (franja de fin de vuelta y resultados)
+	public static readonly Color NewRecordGlow = new Color(Orange, 0.5f);
 }

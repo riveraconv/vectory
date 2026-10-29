@@ -29,14 +29,29 @@ namespace Vectory.Circuit
     /// Salida desde parrilla: la parrilla está detrás de la meta, así que la nave cruza
     /// la meta poco después de salir. Ese primer cruce no completa ninguna vuelta (aún no
     /// se han pasado los checkpoints) y la vuelta 1 y su sector 0 se cronometran desde Start().
+    ///
+    /// Vueltas libres (TIME TRIAL): con totalLaps = UnlimitedLaps no hay última vuelta y nunca
+    /// se pasa a Finished.
+    ///
+    /// Tiempos de paso: tiempo de vuelta en el momento de cruzar cada checkpoint de la vuelta en curso
+    /// (CurrentLapSplits); al completar la vuelta pasan a LastLapSplits.
     /// </summary>
     public sealed class RaceTracker
     {
+        /// <summary>Valor de totalLaps para vueltas libres (sin última vuelta).</summary>
+        public const int UnlimitedLaps = -1;
+
         private readonly double?[] _bestSectorTimes;
         private readonly int?[] _bestSectorLaps;
+        private readonly List<double> _currentLapSplits = new();
+        private double[] _lastLapSplits = Array.Empty<double>();
 
         public int CheckpointCount { get; }
+
+        /// <summary>Vueltas de la carrera (UnlimitedLaps = vueltas libres).</summary>
         public int TotalLaps { get; }
+
+        public bool HasLapLimit => TotalLaps != UnlimitedLaps;
         public int ParticipantCount { get; }
 
         /// <summary>Sectores por vuelta (checkpoints + 1, porque la meta también limita sectores).</summary>
@@ -66,6 +81,12 @@ namespace Vectory.Circuit
 
         /// <summary>Vuelta en la que se hizo el mejor tiempo de cada sector (con empate, la anterior).</summary>
         public IReadOnlyList<int?> BestSectorLaps { get; }
+
+        /// <summary>Tiempos de paso de la vuelta en curso: tiempo de vuelta al cruzar cada checkpoint ya pasado.</summary>
+        public IReadOnlyList<double> CurrentLapSplits => _currentLapSplits;
+
+        /// <summary>Tiempos de paso de la última vuelta completada (uno por checkpoint; vacío si aún no hay).</summary>
+        public IReadOnlyList<double> LastLapSplits => _lastLapSplits;
 
         public bool IsRunning { get; private set; }
         public bool IsFinished { get; private set; }
@@ -97,8 +118,8 @@ namespace Vectory.Circuit
         {
             if (checkpointCount < 1)
                 throw new ArgumentOutOfRangeException(nameof(checkpointCount), "Debe haber al menos 1 checkpoint.");
-            if (totalLaps < 1)
-                throw new ArgumentOutOfRangeException(nameof(totalLaps), "Debe haber al menos 1 vuelta.");
+            if (totalLaps < 1 && totalLaps != UnlimitedLaps)
+                throw new ArgumentOutOfRangeException(nameof(totalLaps), "Debe haber al menos 1 vuelta (o UnlimitedLaps).");
             if (participantCount < 1)
                 throw new ArgumentOutOfRangeException(nameof(participantCount), "Debe haber al menos 1 participante.");
 
@@ -126,6 +147,8 @@ namespace Vectory.Circuit
             LastSectorTime = null;
             Array.Clear(_bestSectorTimes, 0, _bestSectorTimes.Length);
             Array.Clear(_bestSectorLaps, 0, _bestSectorLaps.Length);
+            _currentLapSplits.Clear();
+            _lastLapSplits = Array.Empty<double>();
             FinalPosition = null;
             Result = null;
             IsFinished = false;
@@ -155,6 +178,7 @@ namespace Vectory.Circuit
             int lap = CurrentLap;
             bool sectorIsBest = RegisterSector(index, lap, out double sectorTime);
 
+            _currentLapSplits.Add(CurrentLapTime);
             NextCheckpointIndex++;
 
             CheckpointPassed?.Invoke(index);
@@ -184,7 +208,10 @@ namespace Vectory.Circuit
                 BestLapNumber = completedLap;
             }
 
-            bool raceOver = completedLap >= TotalLaps;
+            _lastLapSplits = _currentLapSplits.ToArray();
+            _currentLapSplits.Clear();
+
+            bool raceOver = HasLapLimit && completedLap >= TotalLaps;
             if (raceOver)
             {
                 IsRunning = false;
@@ -232,7 +259,7 @@ namespace Vectory.Circuit
             for (int i = 0; i < SectorCount; i++)
                 sectors[i] = new SectorBest(_bestSectorTimes[i] ?? 0, _bestSectorLaps[i] ?? 0);
 
-            return new RaceResult(FinalPosition ?? 1, ParticipantCount,
+            return new RaceResult(FinalPosition ?? 1, ParticipantCount, TotalTime,
                 BestLapTime ?? 0, BestLapNumber ?? 0, Array.AsReadOnly(sectors));
         }
     }
