@@ -52,4 +52,16 @@ public static class Palette
 	public static readonly Color MenuGrid = Blue;                   // rejilla de horizonte del fondo
 	public static readonly Color MenuHorizon = Cyan;                // línea del horizonte
 	public static readonly Color MenuShade = Background;            // sombra izquierda, detrás del texto
+
+	// --- Pausa ---
+	public static readonly Color PauseDim = Background;             // atenuado de toda la pantalla (opacidad en el Inspector)
+	public static readonly Color PauseBand = Background;            // fondo de la franja (opacidad en el Inspector)
+	public static readonly Color PauseLine = Cyan;                  // líneas de arriba y abajo de la franja
+	public static readonly Color PauseLineGlow = new Color(Cyan, 0.25f);    // halo de esas líneas
+	public static readonly Color PauseTitle = Cyan;                 // PAUSED
+	public static readonly Color PauseTitleGlow = new Color(Cyan, 0.5f);    // halo de PAUSED
+	public static readonly Color ConfirmTitle = Orange;             // RESTART RACE? / BACK TO MAIN MENU? (alerta)
+	public static readonly Color ConfirmTitleGlow = new Color(Orange, 0.45f); // halo del título de confirmación
+	public static readonly Color PauseHint = BlueGray;              // ESC · CONTINUE / CURRENT RACE PROGRESS WILL BE LOST
+	public static readonly Color MenuSeparator = new Color(Blue, 0.7f);     // separadores (pausa y resultados)
 }

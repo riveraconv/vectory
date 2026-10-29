@@ -75,6 +75,7 @@ public partial class Player : CharacterBody3D
 	private bool _chaseView = true;
 	private float _bank = 0f;
 	private float _wallContactTimer = 0f;
+	private bool _inputBlocked;
 
 	// Velocidad real actual en m/s (la usa el HUD)
 	public float Speed => _dynamics.RealSpeed;
@@ -136,6 +137,13 @@ public partial class Player : CharacterBody3D
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 	}
 
+	// Ignora el input de conducción (y el boost) hasta que se suelten todas sus teclas.
+	// Se usa al salir de la pausa: las teclas pulsadas en ella no deben llegar a la nave.
+	public void BlockInputUntilReleased()
+	{
+		_inputBlocked = true;
+	}
+
 	public override void _UnhandledKeyInput(InputEvent @event)
 	{
 		if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.C })
@@ -164,11 +172,21 @@ public partial class Player : CharacterBody3D
 		// quieta y, al terminar, se cancela el impulso y se para sola con el Drag.
 		bool canDrive = _race == null || _race.CanDrive;
 		ShipInput input = canDrive ? ReadInput() : default;
+
+		// Tras la pausa, nada cuenta hasta que se suelten las teclas que siguieran pulsadas
+		if (_inputBlocked)
+		{
+			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || Input.IsActionPressed("boost"))
+				input = default;
+			else
+				_inputBlocked = false;
+		}
+
 		float boostGain = 0f;
 		if (canDrive)
 		{
 			BoostTuning boostTuning = BuildBoostTuning();
-			if (Input.IsActionJustPressed("boost"))
+			if (!_inputBlocked && Input.IsActionJustPressed("boost"))
 				_boost.TryActivate(boostTuning);
 			if (input.Brake)
 				_boost.CancelImpulse();

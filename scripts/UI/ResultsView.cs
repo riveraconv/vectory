@@ -1,98 +1,214 @@
+using System;
 using Godot;
 using Vectory.Circuit;
 using Vectory.Core;
+using Vectory.Menu;
 
 namespace Vectory.UI;
 
-// Pantalla de resultados: panel centrado con borde wireframe cian y fondo oscuro
-// semitransparente (la pista se sigue viendo detrás). Muestra la posición final,
-// la mejor vuelta y el mejor tiempo de cada sector con la vuelta en que se hizo.
-// Solo MUESTRA el RaceResult que le pasan; no calcula nada de la carrera.
+// Pantalla de resultados: franja horizontal como la de la pausa (MenuBand), con tres columnas:
+//   izquierda: RACE FINISHED y la posición final (1st / 8)
+//   centro:    mejor vuelta y mejor tiempo de cada sector, con la vuelta en que se hizo
+//   derecha:   opciones RESTART RACE / BACK TO MAIN MENU (OptionList)
+// Solo MUESTRA el RaceResult y el MenuModel que le pasan: la acción elegida la ejecuta Main.
 //
-// Es un MarginContainer: el panel toma el tamaño de su contenido. Anclado al centro de
-// la pantalla y creciendo hacia los dos lados, queda siempre centrado.
-public partial class ResultsView : MarginContainer
+// Medidas sobre 1280×720, multiplicadas por UiScale.Factor. Ocupa toda la pantalla.
+// Si los sectores no caben en el alto de la franja, la franja crece (centrada) en vez de recortar.
+public partial class ResultsView : Control
 {
-	private const float PanelWidth = 560f;
-	private const int Padding = 32;
-	private const float BorderWidth = 2f;
+	// Posiciones del lienzo de diseño (px sobre 1280×720)
+	private const float DimOpacity = 0.45f;
+	private const float BandOpacity = 0.9f;
+	private const float ResultLeft = 96f;
+	private const float TimesLeft = 520f;
+	private const float OptionsLeft = 900f;
+	private const float RightMargin = 40f;         // hueco mínimo entre las opciones y el borde derecho
+	private const float SeparatorHeight = 244f;
+	private const float VerticalPadding = 20f;     // hueco mínimo arriba y abajo del contenido antes de que la franja crezca
+	private const float SectorNameWidth = 44f;
+	private const float SectorTimeWidth = 130f;
 
-	private VBoxContainer _rows;
+	// Se lanza al hacer clic en una opción, con su identificador
+	public event Action<string> OptionChosen;
+
+	private float _scale = 1f;
+	private MenuBand _band;
+	private OptionList _options;
 
 	public override void _Ready()
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
-		CustomMinimumSize = new Vector2(PanelWidth, 0f);
-		AddThemeConstantOverride("margin_left", Padding);
-		AddThemeConstantOverride("margin_top", Padding);
-		AddThemeConstantOverride("margin_right", Padding);
-		AddThemeConstantOverride("margin_bottom", Padding);
-
-		_rows = new VBoxContainer
-		{
-			MouseFilter = MouseFilterEnum.Ignore,
-			Alignment = BoxContainer.AlignmentMode.Center
-		};
-		_rows.AddThemeConstantOverride("separation", 10);
-		AddChild(_rows);
+		_scale = UiScale.Factor;
 	}
 
-	public void SetResult(RaceResult result)
+	// bandHeight: alto de la franja (px sobre 1280×720). optionFontSize: tamaño máximo de las opciones;
+	// si BACK TO MAIN MENU no cabe antes del borde derecho, se reduce.
+	public void SetResult(RaceResult result, MenuModel options, float bandHeight, int optionFontSize)
 	{
-		foreach (Node child in _rows.GetChildren())
+		foreach (Node child in GetChildren())
 		{
-			_rows.RemoveChild(child);
+			RemoveChild(child);
 			child.QueueFree();
 		}
 
-		AddRow(("RACE FINISHED", 40, Palette.Cyan));
-		AddRow(($"{Ordinal(result.Position)} / {result.ParticipantCount}", 60, Palette.Cyan));
+		_band = new MenuBand { Name = "MenuBand" };
+		AddChild(_band);
+		_band.Setup(bandHeight, DimOpacity, BandOpacity);
+		_band.AddSeparator(470f, SeparatorHeight);
+		_band.AddSeparator(860f, SeparatorHeight);
 
-		AddRow(
-			($"BEST LAP  {TimeFormat.Format(result.BestLapTime)}", 28, Palette.Cyan),
-			($"  ·  lap {result.BestLapNumber}", 22, Palette.BlueGray));
+		BuildResultColumn(result);
+		BuildTimesColumn(result);
+		BuildOptionsColumn(options, optionFontSize);
 
-		AddRow(("BEST SECTORS", 20, Palette.BlueGray));
+		// El tamaño mínimo de las columnas se conoce cuando ya están montadas
+		CallDeferred(MethodName.FitBandHeight);
+	}
+
+	// Vuelve a dibujar la selección de las opciones (tras moverla con el teclado)
+	public void RefreshOptions()
+	{
+		_options?.Refresh();
+	}
+
+	private float S(float referencePx) => referencePx * _scale;
+
+	private int Px(float referencePx) => Mathf.RoundToInt(S(referencePx));
+
+	// ---------------------------------------------------------------
+	// Columnas
+	// ---------------------------------------------------------------
+
+	private void BuildResultColumn(RaceResult result)
+	{
+		VBoxContainer column = _band.AddColumn("Result", ResultLeft, 18f);
+
+		column.AddChild(MakeLabel("RACE FINISHED", MenuFonts.Orbitron, 900, 34f, 0.08f, Palette.Cyan, Palette.MenuTitleGlow, 14f));
+
+		var position = Row(0f);
+		position.AddChild(MakeLabel(Ordinal(result.Position), MenuFonts.Orbitron, 700, 80f, 0.04f, Palette.Cyan, Palette.PauseTitleGlow, 16f));
+		position.AddChild(MakeLabel($" / {result.ParticipantCount}", MenuFonts.Orbitron, 500, 36f, 0.04f, Palette.BlueGray));
+		column.AddChild(position);
+	}
+
+	private void BuildTimesColumn(RaceResult result)
+	{
+		VBoxContainer column = _band.AddColumn("Times", TimesLeft, 8f);
+
+		column.AddChild(Caption("BEST LAP"));
+
+		var bestLap = Row(14f);
+		bestLap.AddChild(MakeLabel(TimeFormat.Format(result.BestLapTime), MenuFonts.Orbitron, 500, 30f, 0.06f, Palette.Cyan));
+		bestLap.AddChild(MakeLabel($"lap {result.BestLapNumber}", MenuFonts.Mono, 400, 16f, 0.08f, Palette.BlueGray));
+		column.AddChild(bestLap);
+
+		column.AddChild(new Control { CustomMinimumSize = new Vector2(0f, S(14f)), MouseFilter = MouseFilterEnum.Ignore });
+		column.AddChild(Caption("BEST SECTORS"));
+
+		// Una fila por sector, con sus tres columnas alineadas entre filas (anchos fijos)
+		var sectors = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		sectors.AddThemeConstantOverride("separation", Px(4f));
 		for (int i = 0; i < result.BestSectors.Count; i++)
 		{
 			SectorBest sector = result.BestSectors[i];
-			AddRow(
-				($"S{i + 1}  ·  {TimeFormat.Format(sector.Time)}", 24, Palette.Cyan),
-				($"  ·  lap {sector.Lap}", 20, Palette.BlueGray));
+			var row = Row(0f);
+
+			Label name = MakeLabel($"S{i + 1}", MenuFonts.Mono, 400, 15f, 0.22f, Palette.BlueGray);
+			name.CustomMinimumSize = new Vector2(S(SectorNameWidth), 0f);
+			row.AddChild(name);
+
+			Label time = MakeLabel(TimeFormat.Format(sector.Time), MenuFonts.Orbitron, 500, 20f, 0.06f, Palette.Cyan);
+			time.CustomMinimumSize = new Vector2(S(SectorTimeWidth), 0f);
+			row.AddChild(time);
+
+			row.AddChild(MakeLabel($"lap {sector.Lap}", MenuFonts.Mono, 400, 15f, 0.08f, Palette.BlueGray));
+			sectors.AddChild(row);
 		}
-
-		AddRow(("ENTER  ·  Restart race", 20, Palette.BlueGray));
+		column.AddChild(sectors);
 	}
 
-	public override void _Draw()
+	private void BuildOptionsColumn(MenuModel options, int optionFontSize)
 	{
-		var rect = new Rect2(Vector2.Zero, Size);
-		DrawRect(rect, Palette.ResultsBackground);
-		DrawRect(rect, Palette.ResultsBorder, false, BorderWidth);
+		VBoxContainer column = _band.AddColumn("Options", OptionsLeft, 0f);
+
+		_options = new OptionList { Name = "OptionList" };
+		_options.Setup(OptionListStyle.Scaled(_scale, FitOptionFontSize(options, optionFontSize),
+			46f, 4f, new Vector2(4f, 32f), 16f));
+		column.AddChild(_options);
+		_options.SetModel(options);
+		_options.Chosen += id => OptionChosen?.Invoke(id);
 	}
 
-	// Una fila centrada con uno o varios textos seguidos (cada uno con su tamaño y color)
-	private void AddRow(params (string Text, int FontSize, Color Color)[] parts)
+	// Mayor tamaño (como mucho maxSize) con el que la opción más larga, seleccionada (en negrita,
+	// con la barra y el desplazamiento), cabe antes del borde derecho de la pantalla
+	private int FitOptionFontSize(MenuModel options, int maxSize)
 	{
-		var row = new HBoxContainer
+		float maxWidth = S(1280f - OptionsLeft - RightMargin);
+		for (int size = maxSize; size > 8; size--)
 		{
-			MouseFilter = MouseFilterEnum.Ignore,
-			Alignment = BoxContainer.AlignmentMode.Center
-		};
-		row.AddThemeConstantOverride("separation", 0);
+			int px = Px(size);
+			Font font = MenuFonts.Make(MenuFonts.Orbitron, 700, px, 0.12f);
+			float widest = 0f;
+			foreach (MenuOption option in options.Options)
+				widest = Mathf.Max(widest, font.GetStringSize(option.Label, HorizontalAlignment.Left, -1, px).X);
 
-		foreach (var part in parts)
-		{
-			row.AddChild(new Label
+			if (S(4f) + S(16f) + widest <= maxWidth)
 			{
-				Text = part.Text,
-				VerticalAlignment = VerticalAlignment.Bottom,
-				MouseFilter = MouseFilterEnum.Ignore,
-				LabelSettings = new LabelSettings { FontSize = part.FontSize, FontColor = part.Color }
-			});
+				if (size < maxSize)
+					GD.Print($"ResultsView: opciones reducidas a {size} px para que quepan en pantalla.");
+				return size;
+			}
+		}
+		return 8;
+	}
+
+	// Si alguna columna no cabe en la franja (circuitos con muchos sectores), la franja crece centrada
+	private void FitBandHeight()
+	{
+		float needed = 0f;
+		foreach (Node child in _band.Band.GetChildren())
+		{
+			if (child is VBoxContainer column)
+				needed = Mathf.Max(needed, column.GetCombinedMinimumSize().Y);
 		}
 
-		_rows.AddChild(row);
+		needed += 2f * S(VerticalPadding);
+		if (needed > _band.BandHeight)
+			_band.SetHeight(needed);
+	}
+
+	// ---------------------------------------------------------------
+	// Piezas
+	// ---------------------------------------------------------------
+
+	// Etiqueta pequeña de sección (BEST LAP, BEST SECTORS)
+	private Label Caption(string text)
+	{
+		return MakeLabel(text, MenuFonts.Mono, 400, 14f, 0.22f, Palette.BlueGray);
+	}
+
+	// Fila de textos alineados por abajo, con un hueco (px sobre 1280×720) entre ellos
+	private HBoxContainer Row(float gap)
+	{
+		var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		row.AddThemeConstantOverride("separation", Px(gap));
+		return row;
+	}
+
+	// Texto con su fuente (peso y espaciado en em), tamaño (px sobre 1280×720), color y halo opcional
+	private Label MakeLabel(string text, FontFile file, int weight, float size, float letterSpacingEm,
+		Color color, Color? glow = null, float glowSize = 0f)
+	{
+		int px = Px(size);
+		return new Label
+		{
+			Text = text,
+			SizeFlagsVertical = SizeFlags.ShrinkEnd,
+			VerticalAlignment = VerticalAlignment.Bottom,
+			MouseFilter = MouseFilterEnum.Ignore,
+			LabelSettings = MenuFonts.Settings(MenuFonts.Make(file, weight, px, letterSpacingEm), px,
+				color, glow ?? Colors.Transparent, S(glowSize))
+		};
 	}
 
 	private static string Ordinal(int n)
