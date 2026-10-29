@@ -3,19 +3,21 @@ using Vectory.Core;
 
 namespace Vectory.UI;
 
-// Semáforo de salida tipo F1 del HUD: una fila de luces y, debajo, el número de la
-// cuenta atrás o el GO. Encendida = magenta con halo; apagada = azul atenuado (como
-// las cargas de boost vacías). Solo MUESTRA el estado; la lógica vive en StartSequence.
+// Salida del HUD: una fila de luces tipo F1 (solo en RACE) y, debajo, el texto de salida:
+// el número de la cuenta atrás o READY? en cian, y GO! en naranja.
+// Luces: encendida = magenta con halo; apagada = azul atenuado (como las cargas de boost vacías).
+// Texto: Orbitron Black con halo de su color, como los títulos de los menús (TextFontSize sobre 1280×720).
+// Sin luces (TIME TRIAL) el texto queda en el mismo sitio en vertical.
+// Solo MUESTRA el estado; la lógica vive en StartSequence / ReadySequence.
 public partial class StartLightsView : Control
 {
 	public const float Diameter = 28f;
 	public const float Gap = 14f;
-	public const float LabelHeight = 96f;   // alto reservado para el número / GO bajo las luces
+	public const int DefaultTextFontSize = 56;   // px sobre 1280×720
 
 	private const float GlowSize = 8f;      // cuánto sobresale el halo de la luz encendida
 	private const float BorderWidth = 1.5f;
-	private const float LabelGap = 12f;     // separación entre las luces y el número
-	private const int FontSize = 72;
+	private const float LabelGap = 12f;     // separación entre las luces y el texto
 
 	private int _lightsOn;
 	private int _lightCount = 5;
@@ -23,14 +25,23 @@ public partial class StartLightsView : Control
 	private LabelSettings _countdownSettings;
 	private LabelSettings _goSettings;
 
-	public static float Height => Diameter + LabelGap + LabelHeight;
+	// Alto total (luces + texto) para un tamaño de texto (px sobre 1280×720)
+	public static float HeightFor(int textFontSize) => Diameter + LabelGap + LabelHeightFor(textFontSize);
+
+	private static float LabelHeightFor(int textFontSize) => textFontSize * UiScale.Factor * 1.5f;
+
+	// Tamaño del texto de salida (px sobre 1280×720). Se fija antes de añadir la vista al árbol.
+	public int TextFontSize = DefaultTextFontSize;
 
 	public override void _Ready()
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
 
-		_countdownSettings = new LabelSettings { FontSize = FontSize, FontColor = Palette.Countdown };
-		_goSettings = new LabelSettings { FontSize = FontSize, FontColor = Palette.Go };
+		int px = Mathf.RoundToInt(TextFontSize * UiScale.Factor);
+		Font font = MenuFonts.Make(MenuFonts.Orbitron, 900, px, 0.1f);
+		float glow = 18f * UiScale.Factor;
+		_countdownSettings = MenuFonts.Settings(font, px, Palette.Countdown, Palette.CountdownGlow, glow);
+		_goSettings = MenuFonts.Settings(font, px, Palette.Go, Palette.GoGlow, glow);
 
 		_label = new Label
 		{
@@ -45,13 +56,14 @@ public partial class StartLightsView : Control
 			OffsetLeft = 0f,
 			OffsetRight = 0f,
 			OffsetTop = Diameter + LabelGap,
-			OffsetBottom = Diameter + LabelGap + LabelHeight
+			OffsetBottom = Diameter + LabelGap + LabelHeightFor(TextFontSize)
 		};
 		AddChild(_label);
 	}
 
-	// number: número de la cuenta atrás (null = ninguno). showGo: mostrar GO en su lugar.
-	public void SetState(int lightsOn, int lightCount, int? number, bool showGo)
+	// lightsOn / lightCount: luces del semáforo (0 luces = sin semáforo).
+	// text: número, READY? o GO! ("" = nada). go: pintarlo como el GO! (naranja).
+	public void SetState(int lightsOn, int lightCount, string text, bool go)
 	{
 		if (lightsOn != _lightsOn || lightCount != _lightCount)
 		{
@@ -60,16 +72,8 @@ public partial class StartLightsView : Control
 			QueueRedraw();
 		}
 
-		if (showGo)
-		{
-			_label.Text = "GO";
-			_label.LabelSettings = _goSettings;
-		}
-		else
-		{
-			_label.Text = number.HasValue ? number.Value.ToString() : "";
-			_label.LabelSettings = _countdownSettings;
-		}
+		_label.Text = text;
+		_label.LabelSettings = go ? _goSettings : _countdownSettings;
 	}
 
 	public override void _Draw()

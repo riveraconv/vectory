@@ -29,14 +29,14 @@ public class ShipDynamics
 	// Dirección hacia la que apunta la nave
 	public Vector2 Forward => new Vector2(-MathF.Sin(Yaw), -MathF.Cos(Yaw));
 
-	// Deja la nave parada y orientada según yaw
-	public void Reset(float yaw)
+	// Deja la nave orientada según yaw, parada o (salida lanzada) avanzando a "speed" m/s hacia delante
+	public void Reset(float yaw, float speed = 0f)
 	{
-		Speed = 0f;
+		Speed = MathF.Max(0f, speed);
 		Steer = 0f;
 		Yaw = yaw;
-		TurnFactor = 0f;
-		Velocity = Vector2.Zero;
+		TurnFactor = Math.Clamp(Speed / 10f, 0f, 1f);
+		Velocity = Forward * Speed;
 	}
 
 	// Avanza el modelo un paso de dt segundos.

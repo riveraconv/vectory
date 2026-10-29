@@ -7,8 +7,9 @@ namespace Vectory.UI;
 // franja de lado a lado centrada en vertical con fondo oscuro, líneas cian arriba y abajo con halo,
 // y separadores verticales. El contenido se añade a Band, en coordenadas de la franja.
 //
-// Medidas sobre 1280×720 (centro de la pantalla en y = 360), multiplicadas por UiScale.Factor.
-// Se coloca a pantalla completa (ocupa todo su padre).
+// Medidas sobre 1280×720 (por defecto centrada en y = 360, el centro de la pantalla), multiplicadas
+// por UiScale.Factor. Se coloca a pantalla completa (ocupa todo su padre).
+// La usan la pausa, los resultados y la franja de fin de vuelta de TIME TRIAL (sin atenuado).
 public partial class MenuBand : Control
 {
 	private const float ScreenCenterY = 360f;
@@ -16,6 +17,7 @@ public partial class MenuBand : Control
 
 	private float _scale = 1f;
 	private float _height;
+	private float _centerY = ScreenCenterY;
 	private readonly System.Collections.Generic.List<(ColorRect Rect, float Height)> _separators = new();
 
 	// Contenedor de la franja: lo que se añada aquí va en coordenadas de la franja (0 = borde de arriba)
@@ -24,17 +26,22 @@ public partial class MenuBand : Control
 	// Alto actual de la franja, en píxeles finales
 	public float BandHeight => _height;
 
-	// height: alto de la franja (px sobre 1280×720). Opacidades del atenuado y del fondo de la franja.
-	public void Setup(float height, float dimOpacity, float bandOpacity)
+	// height: alto de la franja (px sobre 1280×720). Opacidades del atenuado (0 = sin atenuado) y del
+	// fondo de la franja. centerY: centro vertical de la franja (por defecto, el de la pantalla).
+	public void Setup(float height, float dimOpacity, float bandOpacity, float centerY = ScreenCenterY)
 	{
 		_scale = UiScale.Factor;
+		_centerY = centerY;
 		MouseFilter = MouseFilterEnum.Ignore;
 		// Ya está en el árbol: hay que fijar también los offsets, o conservaría su tamaño anterior (0)
 		SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
-		var dim = new ColorRect { Name = "Dim", Color = new Color(Palette.PauseDim, dimOpacity), MouseFilter = MouseFilterEnum.Ignore };
-		dim.SetAnchorsPreset(LayoutPreset.FullRect);
-		AddChild(dim);
+		if (dimOpacity > 0f)
+		{
+			var dim = new ColorRect { Name = "Dim", Color = new Color(Palette.PauseDim, dimOpacity), MouseFilter = MouseFilterEnum.Ignore };
+			dim.SetAnchorsPreset(LayoutPreset.FullRect);
+			AddChild(dim);
+		}
 
 		Band = new Control
 		{
@@ -57,12 +64,12 @@ public partial class MenuBand : Control
 		SetHeight(height * _scale);
 	}
 
-	// Cambia el alto de la franja (px finales) manteniéndola centrada en vertical.
+	// Cambia el alto de la franja (px finales) manteniéndola centrada en su centro vertical.
 	// Los separadores siguen centrados.
 	public void SetHeight(float heightPx)
 	{
 		_height = heightPx;
-		float center = ScreenCenterY * _scale;
+		float center = _centerY * _scale;
 		Band.OffsetTop = center - heightPx * 0.5f;
 		Band.OffsetBottom = center + heightPx * 0.5f;
 

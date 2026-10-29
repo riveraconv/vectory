@@ -14,6 +14,10 @@ namespace Vectory.Circuit;
 [GlobalClass]
 public partial class TrackDefinition : Resource
 {
+	// Identificador estable del circuito (p. ej. "circuit_01"): con él se guardan los récords,
+	// así renombrar el archivo o el nombre visible no los pierde. Sin Id no se guardan récords.
+	[Export] public string Id = "";
+
 	[Export] public string DisplayName = "Circuito";
 
 	// Puntos de control en píxeles de la imagen, en sentido horario visto desde arriba,
