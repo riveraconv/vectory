@@ -14,7 +14,7 @@ El diseño completo está en `docs/VECTORY_Documento_Maestro.txt`. Léelo cuando
 - No declares algo terminado solo porque compile. Di qué has probado, qué queda pendiente y qué limitaciones conoces.
 - No refactorices ni reformatees archivos ajenos a la tarea. Conserva lo que ya funciona.
 - **El usuario prueba el juego a mano** (conducción, cámara, HUD). Los tests automáticos no sustituyen eso.
-- **Commit solo cuando el usuario valide**, un commit claro por etapa validada, con mensaje descriptivo.
+- **Los commits los hace el usuario, siempre.** Cuando una etapa está validada, avisa de que toca commit, di qué entra y sugiere el mensaje (en inglés, descriptivo, un commit por etapa). No hagas `git commit` tú.
 - El usuario habla en español, de forma informal y directa. Responde en español.
 
 ## Arquitectura

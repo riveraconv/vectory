@@ -18,7 +18,7 @@ public class VersionFormatTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Format_MissingVersion_ShowsZero(string version)
+    public void Format_MissingVersion_ShowsZero(string? version)
     {
         Assert.Equal("v0.0.0", VersionFormat.Format(version));
     }
