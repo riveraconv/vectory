@@ -14,8 +14,8 @@ namespace Vectory.Circuit;
 public partial class Track : Node3D
 {
 	// Circuito que se usa si no se asigna ninguno en el Inspector
-	// Circuito por defecto. Es la única constante con su ruta: el menú la usa para la sesión.
-	public const string DefaultDefinitionPath = "res://circuits/circuit_01.tres";
+	// Circuito por defecto: el primero de la lista de circuitos
+	private static string DefaultDefinitionPath => CircuitCatalog.Default;
 
 	// ---- Circuito ----
 	[Export] public TrackDefinition Definition;

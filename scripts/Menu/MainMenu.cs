@@ -9,7 +9,8 @@ namespace Vectory.Menu;
 // Menú principal (capa 2D sobre MenuBackground): título, opciones y versión.
 // Dibuja la lista de opciones con OptionList y traduce el teclado a llamadas al MenuModel;
 // la navegación vive en el modelo. Ejecuta la acción que devuelve Confirm(): RACE y TIME TRIAL
-// cargan la escena de carrera, cada una en su modo (GameSession.Mode); QUIT cierra el juego.
+// cargan la escena de carrera, cada una en su modo (GameSession.Mode); RECORDS abre la pantalla de
+// récords (RecordsScreen) en esta misma escena; QUIT cierra el juego.
 //
 // Las medidas (Inspector incluido) son las de la spec, sobre una pantalla de referencia de 1280×720,
 // multiplicadas por UiScale.Factor.
@@ -17,6 +18,7 @@ public partial class MainMenu : CanvasLayer
 {
 	public const string RaceId = "RACE";
 	public const string TimeTrialId = "TIME_TRIAL";
+	public const string RecordsId = "RECORDS";
 	public const string QuitId = "QUIT";
 
 	// Opciones del menú, en orden. Activar una es cambiar Enabled y conectar su acción en Execute.
@@ -26,7 +28,7 @@ public partial class MainMenu : CanvasLayer
 		new("CHAMPIONSHIP", "CHAMPIONSHIP", false),
 		new(TimeTrialId, "TIME TRIAL", true),
 		new("HANGAR", "HANGAR", false),
-		new("RECORDS", "RECORDS", false),
+		new(RecordsId, "RECORDS", true),
 		new("SETTINGS", "SETTINGS", false),
 		new(QuitId, "QUIT", true)
 	};
@@ -46,6 +48,8 @@ public partial class MainMenu : CanvasLayer
 
 	private MenuModel _model;
 	private OptionList _options;
+	private Control _content;         // título y opciones: se ocultan con RECORDS abierta (la versión no)
+	private RecordsScreen _records;
 	private float _scale = 1f;
 
 	public override void _Ready()
@@ -63,13 +67,26 @@ public partial class MainMenu : CanvasLayer
 		root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(root);
 
-		BuildTitle(root);
-		BuildOptions(root);
+		_content = new Control { Name = "Content", MouseFilter = Control.MouseFilterEnum.Ignore };
+		_content.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		root.AddChild(_content);
+
+		BuildTitle(_content);
+		BuildOptions(_content);
 		BuildVersion(root);
+
+		// Pantalla RECORDS: en esta misma escena, encima del menú
+		_records = new RecordsScreen { Name = "Records" };
+		AddChild(_records);
+		_records.Closed += OnRecordsClosed;
 	}
 
 	public override void _Process(double delta)
 	{
+		// Con RECORDS abierta, el input es suyo
+		if (_records.IsOpen)
+			return;
+
 		if (Input.IsActionJustPressed("menu_down"))
 		{
 			_model.MoveNext();
@@ -97,10 +114,26 @@ public partial class MainMenu : CanvasLayer
 			case TimeTrialId:
 				StartRace(GameMode.TimeTrial);
 				break;
+			case RecordsId:
+				_content.Visible = false;
+				_records.Open();
+				break;
 			case QuitId:
 				SceneChanger.Quit(this);
 				break;
 		}
+	}
+
+	// Al volver de RECORDS, el menú reaparece con RECORDS seleccionada
+	private void OnRecordsClosed()
+	{
+		for (int i = 0; i < _model.Options.Count; i++)
+		{
+			if (_model.Options[i].Id == RecordsId)
+				_model.Select(i);
+		}
+		_options.Refresh();
+		_content.Visible = true;
 	}
 
 	// Deja el modo y el circuito en la sesión y carga la carrera. Mientras solo haya un circuito,
@@ -108,7 +141,7 @@ public partial class MainMenu : CanvasLayer
 	private void StartRace(GameMode mode)
 	{
 		GameSession.Mode = mode;
-		GameSession.CircuitPath = Track.DefaultDefinitionPath;
+		GameSession.CircuitPath = CircuitCatalog.Default;
 		SceneChanger.ChangeTo(this, RaceScenePath);
 	}
 

@@ -28,6 +28,13 @@ public sealed class RecordBook
 
 	public static bool IsValidCircuitId(string circuitId) => !string.IsNullOrWhiteSpace(circuitId);
 
+	// Hay al menos un récord guardado, de cualquier circuito y modo
+	public bool HasAnyRecord => _circuits.Values.Any(c =>
+		c.TimeTrial != null || c.Race?.TotalTime != null || c.Race?.BestLap != null);
+
+	// Borra todos los récords (todos los circuitos y los dos modos)
+	public void Clear() => _circuits.Clear();
+
 	public TimeTrialRecord GetTimeTrial(string circuitId)
 	{
 		return IsValidCircuitId(circuitId) && _circuits.TryGetValue(circuitId, out var c) ? c.TimeTrial : null;
@@ -128,5 +135,6 @@ public sealed class RecordBook
 		return c;
 	}
 
-	private static string Stamp(DateTime when) => when.ToString("o", CultureInfo.InvariantCulture);
+	// Fecha local yyyy-MM-dd, independiente del idioma del sistema
+	private static string Stamp(DateTime when) => when.ToString(RecordFormat.DateFormat, CultureInfo.InvariantCulture);
 }
