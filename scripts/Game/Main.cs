@@ -65,6 +65,11 @@ public partial class Main : Node3D
 	[ExportGroup("Fantasma")]
 	[Export] public int GhostSampleRate = GhostRecorder.DefaultSampleRate;   // muestras por segundo de la grabación
 
+	[ExportGroup("Recolocación")]
+	[Export] public float StuckSpeed = 10f;          // km/h: por debajo, y tocando la barrera, la nave está atascada
+	[Export] public float StuckTime = 3f;            // segundos seguidos atascada antes de recolocarla
+	[Export] public float OutsideTrackMargin = 2f;   // metros más allá de la barrera para considerarla fuera de la pista
+
 	private Player _player;
 	private Track _track;
 	private RaceSession _race;
@@ -79,6 +84,10 @@ public partial class Main : Node3D
 
 	private float _finishedTime;   // segundos desde que terminó la carrera
 	private bool _resultsShown;
+
+	// Barreras: destello en el punto de contacto y recolocación automática
+	private BarrierFlash _barrierFlash;
+	private RespawnDetector _respawn;
 
 	// Fantasma (solo TIME TRIAL; null en RACE)
 	private GhostShip _ghostShip;
@@ -168,6 +177,15 @@ public partial class Main : Node3D
 		}
 		_player.SetRaceSession(_race);
 
+		_barrierFlash = new BarrierFlash(_track.LapLength, _track.BarrierFlashSettings);
+		_respawn = new RespawnDetector(new RespawnSettings
+		{
+			BarrierOffset = _track.BarrierOffset,
+			StuckSpeed = StuckSpeed / 3.6f,
+			StuckTime = StuckTime,
+			OutsideMargin = OutsideTrackMargin
+		});
+
 		_race.CheckpointPassed += OnCheckpointPassed;
 		_race.LapCompleted += OnLapCompleted;
 		_race.RaceFinished += OnRaceFinished;
@@ -215,11 +233,54 @@ public partial class Main : Node3D
 			Mathf.Snapped(p.Z, GridStep));
 	}
 
-	// TIME TRIAL: muestras de la vuelta en curso para el fantasma (después de mover la nave)
+	// Después de mover la nave: barreras (destello, sacudida y recolocación) y, en TIME TRIAL,
+	// muestras de la vuelta en curso para el fantasma
 	public override void _PhysicsProcess(double delta)
 	{
+		if (_race == null)
+			return;
+
+		UpdateBarrierContact((float)delta);
+
 		if (_recorder != null && _recorder.IsRecording && _race.State == RaceState.Running)
 			SampleGhost();
+	}
+
+	// Contacto de la nave con la barrera en este paso: destello en el lado tocado, sacudida en los
+	// impactos medios y fuertes, y recolocación si se atasca o sale de la pista. Solo se recoloca con
+	// la nave bajo control (en carrera, y en TIME TRIAL desde el GO!), no en la previa ni al terminar.
+	private void UpdateBarrierContact(float delta)
+	{
+		BarrierTouch touch = _player.LastBarrierTouch;
+
+		_barrierFlash.Update(delta);
+		if (touch.Contact)
+		{
+			if (touch.IsNewImpact)
+			{
+				_barrierFlash.Impact(touch.Side, touch.AxisDistance, touch.Level);
+				_player.ShakeCamera(touch.Level);
+			}
+			else
+			{
+				_barrierFlash.Graze(touch.Side, touch.AxisDistance);
+			}
+		}
+		_track.SetBarrierFlash(_barrierFlash);
+
+		bool canRespawn = _race.CanDrive && _race.State != RaceState.Finished;
+		if (!canRespawn)
+		{
+			_respawn.Reset();
+			return;
+		}
+
+		if (_respawn.Update(delta, touch.Contact, _player.Speed, touch.Lateral))
+		{
+			_track.GetRespawn(_player.GlobalPosition, out Vector3 position, out float yaw);
+			_player.Respawn(position, yaw);
+			GD.Print("[Race] Ship repositioned on the track");
+		}
 	}
 
 	// La pantalla de resultados aparece ResultsDelay segundos después de cruzar la meta, con

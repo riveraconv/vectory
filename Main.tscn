@@ -16,8 +16,6 @@ TrackWidth = 40.0
 [node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
 script = ExtResource("3_cm0pq")
 MaxSpeed = 80.0
-WallBrake = 0.75
-WallScrape = 8.0
 
 [node name="PauseMenu" type="CanvasLayer" parent="."]
 script = ExtResource("4_pause")

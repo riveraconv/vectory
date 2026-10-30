@@ -12,13 +12,15 @@ public partial class Cockpit : Node3D
 
 	public Camera3D Camera { get; private set; }
 
+	private static readonly Vector3 CameraPosition = new(0f, 0.45f, -1.2f);
+
 	public override void _Ready()
 	{
 		// Cámara de cabina (primera persona). La de tercera persona la gestiona Player.
 		Camera = new Camera3D
 		{
 			Name = "Camera3D",
-			Position = new Vector3(0f, 0.45f, -1.2f),
+			Position = CameraPosition,
 			Fov = 80f
 		};
 		AddChild(Camera);
@@ -28,6 +30,14 @@ public partial class Cockpit : Node3D
 		Camera.AddChild(_frame);
 
 		SetFrameVisible(false);
+	}
+
+	// Sacudida de la cámara de cabina (desplazamiento en el plano de la vista, en m, y giro sobre la vista, en rad).
+	// El marco va pegado a la cámara y se mueve con ella.
+	public void SetShake(Vector2 offset, float roll)
+	{
+		Camera.Position = CameraPosition + new Vector3(offset.X, offset.Y, 0f);
+		Camera.Rotation = new Vector3(0f, 0f, roll);
 	}
 
 	// El marco solo se ve en primera persona

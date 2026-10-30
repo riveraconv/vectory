@@ -35,12 +35,47 @@ public partial class Track : Node3D
 	[Export] public float GridMarkWidth = 4f;        // ancho de la línea transversal de cada marca
 	[Export] public float GridMarkLegLength = 2f;    // largo de las patas de cada marca
 
+	[ExportGroup("Barrera")]
+	[Export] public float BarrierGap = 0.5f;          // separación de la barrera respecto al borde de la pista
+	[Export] public float BarrierHeight = 3f;         // altura de la barrera (remate)
+	[Export] public float BarrierBottomBand = 0.4f;   // alto de la franja inferior
+	[Export] public float BarrierTopBand = 0.6f;      // alto de la franja superior
+	[Export] public float BarrierMiddleLine = 1.4f;   // altura de la línea media del relleno
+	[Export] public float BarrierPostSpacing = 4f;    // separación entre verticales y travesaños, sobre el eje (se ajusta a la vuelta)
+	[Export] public float BarrierThickGap = 0.04f;    // separación vertical de las dos líneas que forman cada borde grueso (base y remate)
+
+	[ExportGroup("Destello de la barrera")]
+	[Export] public float GrazeFlashRadius = 3f;      // metros sobre el eje
+	[Export(PropertyHint.Range, "0,1,0.01")] public float GrazeFlashIntensity = 0.4f;
+	[Export] public float GrazeFlashFade = 0.2f;      // segundos en apagarse al dejar de rozar
+	[Export] public float MediumFlashRadius = 7f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float MediumFlashIntensity = 1f;
+	[Export] public float MediumFlashDuration = 0.4f;
+	[Export] public float StrongFlashRadius = 10f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float StrongFlashIntensity = 1f;
+	[Export] public float StrongFlashDuration = 0.6f;
+	[Export] public float FlashGlow = 1.5f;           // brillo extra del naranja en el punto de impacto (halo más fuerte)
+
 	// ---- Datos del circuito actual (salen del TrackDefinition) ----
 	public string CircuitId => Definition?.Id ?? "";
 	public string DisplayName => Definition?.DisplayName ?? "";
 	public bool Clockwise => Definition.Clockwise;
 	public float TrackWidth => Definition.TrackWidth;
 	public int CheckpointCount => Definition.CheckpointCount;
+
+	// Desplazamiento lateral de las barreras respecto al eje (igual a los dos lados)
+	public float BarrierOffset => BarrierGeometry.Offset(TrackWidth, BarrierGap);
+
+	// Longitud de la vuelta medida sobre el eje (m)
+	public float LapLength { get; private set; }
+
+	// Destello de cada nivel, con los valores del Inspector
+	public BarrierFlashSettings BarrierFlashSettings => new()
+	{
+		Graze = new FlashLevelSettings { Radius = GrazeFlashRadius, Intensity = GrazeFlashIntensity, Duration = GrazeFlashFade },
+		Medium = new FlashLevelSettings { Radius = MediumFlashRadius, Intensity = MediumFlashIntensity, Duration = MediumFlashDuration },
+		Strong = new FlashLevelSettings { Radius = StrongFlashRadius, Intensity = StrongFlashIntensity, Duration = StrongFlashDuration }
+	};
 
 	// La nave flota esta altura por encima de la pista
 	private const float ShipHover = 2f;
@@ -62,6 +97,39 @@ public partial class Track : Node3D
 
 	private readonly List<Vector3> _verts = new();
 	private readonly List<Color> _colors = new();
+
+	// Distancia acumulada sobre el eje hasta cada muestra (la última entrada es la vuelta completa)
+	private float[] _cumulative;
+
+	private ShaderMaterial _barrierMaterial;
+
+	// Barreras: las líneas llevan en UV la distancia sobre el eje (x) y el lado (y: 0 izquierda, 1 derecha),
+	// para que el shader pinte el destello sin rehacer la malla. Los colores de los vértices se usan
+	// tal cual, como en el resto de la pista.
+	private const string BarrierShaderCode = @"
+shader_type spatial;
+render_mode unshaded, cull_disabled, blend_mix;
+
+uniform float lap_length = 1.0;
+uniform vec3 flash_color = vec3(1.0, 0.6, 0.2);
+uniform float flash_glow = 1.5;
+uniform vec3 left_flash = vec3(0.0);   // x: punto de impacto, y: radio, z: intensidad
+uniform vec3 right_flash = vec3(0.0);
+
+float flash_at(float d, vec3 f) {
+	if (f.z <= 0.0 || f.y <= 0.0)
+		return 0.0;
+	float dd = abs(d - f.x);
+	dd = min(dd, lap_length - dd);
+	return f.z * clamp(1.0 - dd / f.y, 0.0, 1.0);
+}
+
+void fragment() {
+	float k = UV.y < 0.5 ? flash_at(UV.x, left_flash) : flash_at(UV.x, right_flash);
+	ALBEDO = mix(COLOR.rgb, flash_color * (1.0 + flash_glow * k), k);
+	ALPHA = mix(COLOR.a, 1.0, k);
+}
+";
 
 	public override void _Ready()
 	{
@@ -110,6 +178,12 @@ public partial class Track : Node3D
 
 		Centerline = SampleSpline(control);
 
+		int count = Centerline.Count;
+		_cumulative = new float[count + 1];
+		for (int i = 0; i < count; i++)
+			_cumulative[i + 1] = _cumulative[i] + Centerline[i].DistanceTo(Centerline[(i + 1) % count]);
+		LapLength = _cumulative[count];
+
 		BuildTrackLines();
 		BuildFinishLine();
 		BuildCheckpoints();
@@ -128,6 +202,97 @@ public partial class Track : Node3D
 		});
 
 		AddChild(new MeshInstance3D { Name = "TrackMesh", Mesh = mesh });
+
+		AddChild(new MeshInstance3D { Name = "BarrierMesh", Mesh = BuildBarrierMesh() });
+	}
+
+	// ---------------------------------------------------------------
+	// Eje del circuito: punto más cercano, recolocación y barreras
+	// ---------------------------------------------------------------
+
+	// Punto del eje más cercano a una posición (en el plano XZ), con su tangente (sentido de la marcha),
+	// su vector derecho, el desplazamiento lateral de la posición (positivo = derecha) y la distancia
+	// sobre el eje desde la meta. Supone que el nodo Track está en el origen sin rotar ni escalar.
+	public AxisPoint ProjectOnAxis(Vector3 position)
+	{
+		int n = Centerline.Count;
+		int nearest = NearestIndex(position);
+
+		// El punto más cercano está en uno de los dos tramos que tocan la muestra más cercana
+		AxisPoint best = ProjectOnSegment(position, (nearest - 1 + n) % n);
+		AxisPoint next = ProjectOnSegment(position, nearest);
+		if (DistanceXZ(position, next.Center) < DistanceXZ(position, best.Center))
+			best = next;
+		return best;
+	}
+
+	// Recolocación: en el punto del eje más cercano, centrada, a la altura de vuelo y mirando en el sentido de la marcha
+	public void GetRespawn(Vector3 position, out Vector3 shipPosition, out float yaw)
+	{
+		AxisPoint axis = ProjectOnAxis(position);
+		shipPosition = new Vector3(axis.Center.X, TrackY + ShipHover, axis.Center.Z);
+		yaw = Mathf.Atan2(-axis.Tangent.X, -axis.Tangent.Z);
+	}
+
+	// Pasa el destello actual al shader de la barrera (no rehace la malla)
+	public void SetBarrierFlash(BarrierFlash flash)
+	{
+		if (_barrierMaterial == null)
+			return;
+
+		_barrierMaterial.SetShaderParameter("left_flash", FlashUniform(flash, BarrierSide.Left));
+		_barrierMaterial.SetShaderParameter("right_flash", FlashUniform(flash, BarrierSide.Right));
+	}
+
+	private static Vector3 FlashUniform(BarrierFlash flash, BarrierSide side)
+	{
+		if (flash == null || !flash.IsActive(side))
+			return Vector3.Zero;
+		return new Vector3(flash.Center(side), flash.Radius(side), flash.Peak(side));
+	}
+
+	private AxisPoint ProjectOnSegment(Vector3 position, int i)
+	{
+		int n = Centerline.Count;
+		int j = (i + 1) % n;
+		Vector3 a = Centerline[i];
+		Vector3 b = Centerline[j];
+
+		var ab = new Vector2(b.X - a.X, b.Z - a.Z);
+		var ap = new Vector2(position.X - a.X, position.Z - a.Z);
+		float lengthSq = ab.LengthSquared();
+		float t = lengthSq > 0f ? Mathf.Clamp(ap.Dot(ab) / lengthSq, 0f, 1f) : 0f;
+
+		Vector3 center = a.Lerp(b, t);
+		Vector3 tangent = TangentAt(i).Lerp(TangentAt(j), t).Normalized();
+		Vector3 right = tangent.Cross(Vector3.Up).Normalized();
+		var offset = new Vector3(position.X - center.X, 0f, position.Z - center.Z);
+
+		return new AxisPoint(center, tangent, right, offset.Dot(right), _cumulative[i] + t * (_cumulative[i + 1] - _cumulative[i]));
+	}
+
+	private static float DistanceXZ(Vector3 a, Vector3 b)
+	{
+		float dx = a.X - b.X;
+		float dz = a.Z - b.Z;
+		return dx * dx + dz * dz;
+	}
+
+	// Punto del eje y vector derecho a "distance" metros de la meta, en el sentido de la marcha
+	private void AxisAtDistance(float distance, out Vector3 center, out Vector3 right)
+	{
+		int n = Centerline.Count;
+		float d = Mathf.PosMod(distance, LapLength);
+
+		int i = 0;
+		while (i < n - 1 && _cumulative[i + 1] <= d)
+			i++;
+
+		int j = (i + 1) % n;
+		float segment = _cumulative[i + 1] - _cumulative[i];
+		float t = segment > 0f ? (d - _cumulative[i]) / segment : 0f;
+		center = Centerline[i].Lerp(Centerline[j], t);
+		right = RightAt(i).Lerp(RightAt(j), t);
 	}
 
 	// ---------------------------------------------------------------
@@ -316,6 +481,95 @@ public partial class Track : Node3D
 		}
 	}
 
+	// Barreras: un muro a cada lado, a BarrierOffset del eje, con una franja cian arriba y otra abajo y un
+	// relleno ligero entre ellas (línea media y verticales azules). Las horizontales siguen el eje con la
+	// misma resolución que el borde; la base y el remate son gruesos (dos líneas a BarrierThickGap, hacia
+	// dentro de la franja). Verticales y travesaños, repartidos por igual en la vuelta (BarrierGeometry).
+	// Malla aparte con su shader para el destello.
+	private ArrayMesh BuildBarrierMesh()
+	{
+		var verts = new List<Vector3>();
+		var colors = new List<Color>();
+		var uvs = new List<Vector2>();
+
+		void Add(Vector3 a, float da, Vector3 b, float db, float side, Color c)
+		{
+			verts.Add(a);
+			verts.Add(b);
+			colors.Add(c);
+			colors.Add(c);
+			uvs.Add(new Vector2(da, side));
+			uvs.Add(new Vector2(db, side));
+		}
+
+		int n = Centerline.Count;
+		float offset = BarrierOffset;
+		BarrierLineHeights h = BarrierGeometry.LineHeights(BarrierHeight, BarrierBottomBand, BarrierTopBand, BarrierMiddleLine);
+		float[] posts = BarrierGeometry.PostDistances(LapLength, BarrierPostSpacing);
+
+		var horizontals = new (float Height, Color Color)[]
+		{
+			(h.Base, Palette.BarrierBand),
+			(h.Base + BarrierThickGap, Palette.BarrierBand),
+			(h.BottomBandTop, Palette.BarrierBandInner),
+			(h.Middle, Palette.BarrierFill),
+			(h.TopBandBottom, Palette.BarrierBandInner),
+			(h.Top - BarrierThickGap, Palette.BarrierBand),
+			(h.Top, Palette.BarrierBand)
+		};
+		var verticals = new (float From, float To, Color Color)[]
+		{
+			(h.Base, h.BottomBandTop, Palette.BarrierBandTie),
+			(h.BottomBandTop, h.TopBandBottom, Palette.BarrierPost),
+			(h.TopBandBottom, h.Top, Palette.BarrierBandTie)
+		};
+
+		foreach (float sign in new[] { -1f, 1f })
+		{
+			float side = sign > 0f ? 1f : 0f;
+
+			for (int i = 0; i < n; i++)
+			{
+				int j = (i + 1) % n;
+				Vector3 a = Centerline[i] + RightAt(i) * (sign * offset);
+				Vector3 b = Centerline[j] + RightAt(j) * (sign * offset);
+				// El tramo del cierre llega a la vuelta completa (no a 0) para que la distancia sea continua
+				float da = _cumulative[i];
+				float db = _cumulative[i + 1];
+
+				foreach (var line in horizontals)
+				{
+					Vector3 up = Vector3.Up * line.Height;
+					Add(a + up, da, b + up, db, side, line.Color);
+				}
+			}
+
+			foreach (float d in posts)
+			{
+				AxisAtDistance(d, out Vector3 center, out Vector3 right);
+				Vector3 foot = center + right * (sign * offset);
+				foreach (var line in verticals)
+					Add(foot + Vector3.Up * line.From, d, foot + Vector3.Up * line.To, d, side, line.Color);
+			}
+		}
+
+		var arrays = new Godot.Collections.Array();
+		arrays.Resize((int)Mesh.ArrayType.Max);
+		arrays[(int)Mesh.ArrayType.Vertex] = verts.ToArray();
+		arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
+		arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+
+		var mesh = new ArrayMesh();
+		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);
+
+		_barrierMaterial = new ShaderMaterial { Shader = new Shader { Code = BarrierShaderCode } };
+		_barrierMaterial.SetShaderParameter("lap_length", LapLength);
+		_barrierMaterial.SetShaderParameter("flash_color", new Vector3(Palette.BarrierFlash.R, Palette.BarrierFlash.G, Palette.BarrierFlash.B));
+		_barrierMaterial.SetShaderParameter("flash_glow", FlashGlow);
+		mesh.SurfaceSetMaterial(0, _barrierMaterial);
+		return mesh;
+	}
+
 	// Línea de meta: medio hexágono (mitad superior) en la muestra FinishIndex de la línea central.
 	private void BuildFinishLine()
 	{
@@ -402,5 +656,24 @@ public partial class Track : Node3D
 		Line(leftTop, rightTop, color);
 		Line(rightTop, rightBase, color);
 		Line(rightBase, leftBase, color);
+	}
+}
+
+// Punto del eje del circuito más cercano a una posición (ver Track.ProjectOnAxis)
+public readonly struct AxisPoint
+{
+	public readonly Vector3 Center;    // punto del eje (a la altura de la pista)
+	public readonly Vector3 Tangent;   // sentido de la marcha (unitario, horizontal)
+	public readonly Vector3 Right;     // hacia la derecha de la marcha (unitario, horizontal)
+	public readonly float Lateral;     // desplazamiento lateral de la posición: positivo = derecha
+	public readonly float Distance;    // metros sobre el eje desde la meta
+
+	public AxisPoint(Vector3 center, Vector3 tangent, Vector3 right, float lateral, float distance)
+	{
+		Center = center;
+		Tangent = tangent;
+		Right = right;
+		Lateral = lateral;
+		Distance = distance;
 	}
 }
