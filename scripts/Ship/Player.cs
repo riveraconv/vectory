@@ -87,6 +87,9 @@ public partial class Player : CharacterBody3D
 	public int BoostCharges => _boost.Charges;
 	public bool BoostCooldownActive => _boost.IsCooldownActive;
 
+	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
+	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();
+
 	public override void _Ready()
 	{
 		MotionMode = MotionModeEnum.Floating;

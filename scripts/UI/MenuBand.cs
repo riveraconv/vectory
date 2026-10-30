@@ -93,6 +93,16 @@ public partial class MenuBand : Control
 		_separators.Add((rect, h));
 	}
 
+	// Cambia el alto de un separador (por orden de creación; px sobre 1280×720), que sigue centrado
+	public void SetSeparatorHeight(int index, float height)
+	{
+		float h = height * _scale;
+		ColorRect rect = _separators[index].Rect;
+		rect.Size = new Vector2(rect.Size.X, h);
+		rect.Position = new Vector2(rect.Position.X, (_height - h) * 0.5f);
+		_separators[index] = (rect, h);
+	}
+
 	// Columna de contenido centrada en vertical en la franja, empezando en x (px sobre 1280×720)
 	public VBoxContainer AddColumn(string name, float x, float separation)
 	{

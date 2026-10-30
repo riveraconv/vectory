@@ -3,6 +3,7 @@ using Godot;
 using System.Collections.Generic;
 using Vectory.Circuit;
 using Vectory.Core;
+using Vectory.Ghost;
 using Vectory.Menu;
 using Vectory.Records;
 using Vectory.Ship;
@@ -19,7 +20,9 @@ namespace Vectory.Game;
 // la última vuelta, se guardan los récords de RACE y se muestra la pantalla de resultados con
 // RESTART RACE / BACK TO MAIN MENU.
 // TIME TRIAL: READY? (nave quieta), en el GO! salida lanzada antes de la meta, y vueltas libres; delta por sector y franja de fin
-// de vuelta contra el récord de TIME TRIAL, que se guarda al batirlo.
+// de vuelta contra el récord de TIME TRIAL, que se guarda al batirlo. Nave fantasma con la vuelta récord:
+// se graba cada vuelta (GhostRecorder) y, si es récord, pasa a ser el fantasma (user://ghosts/); GHOST: ON / OFF
+// en la pausa (user://settings.json).
 // ESC abre la pausa (PauseMenu) en cualquier momento. Las reglas de récords viven en RecordBook.
 public partial class Main : Node3D
 {
@@ -59,6 +62,9 @@ public partial class Main : Node3D
 	[Export] public float LapBandHeight = 120f;           // alto de la franja de fin de vuelta (px sobre 1280×720)
 	[Export] public int DeltaFontSize = 44;               // tamaño del delta (px sobre 1280×720)
 
+	[ExportGroup("Fantasma")]
+	[Export] public int GhostSampleRate = GhostRecorder.DefaultSampleRate;   // muestras por segundo de la grabación
+
 	private Player _player;
 	private Track _track;
 	private RaceSession _race;
@@ -74,8 +80,19 @@ public partial class Main : Node3D
 	private float _finishedTime;   // segundos desde que terminó la carrera
 	private bool _resultsShown;
 
+	// Fantasma (solo TIME TRIAL; null en RACE)
+	private GhostShip _ghostShip;
+	private GhostRecorder _recorder;
+	private GhostStore _ghosts;
+	private SettingsStore _settings;
+	private GhostRecording _ghost;   // fantasma válido del circuito (null si no hay)
+	private string _trackSignature;
+
 	public override void _Ready()
 	{
+		// El fantasma graba la nave después de que se mueva en cada paso de física (Player tiene prioridad 0)
+		ProcessPhysicsPriority = 1;
+
 		AddChild(WorldStyle.CreateWorldEnvironment());
 
 		_grid = new MeshInstance3D { Name = "Grid", Mesh = BuildGridMesh() };
@@ -138,6 +155,7 @@ public partial class Main : Node3D
 				GoDuration = ReadyGoDuration
 			});
 			_race.ReadySequence.Started += () => _player.Launch(_player.MaxSpeed * FlyingStartSpeed);
+			SetupGhost();
 		}
 		else
 		{
@@ -184,6 +202,7 @@ public partial class Main : Node3D
 			_hud.SetStartSequence(_race.StartSequence);
 			_hud.SetReadySequence(_race.ReadySequence);
 			UpdateLapInfo();
+			UpdateGhost();
 			_pause.RaceFinished = _race.State == RaceState.Finished;
 			UpdateResults((float)delta);
 		}
@@ -194,6 +213,13 @@ public partial class Main : Node3D
 			Mathf.Snapped(p.X, GridStep),
 			GridY,
 			Mathf.Snapped(p.Z, GridStep));
+	}
+
+	// TIME TRIAL: muestras de la vuelta en curso para el fantasma (después de mover la nave)
+	public override void _PhysicsProcess(double delta)
+	{
+		if (_recorder != null && _recorder.IsRecording && _race.State == RaceState.Running)
+			SampleGhost();
 	}
 
 	// La pantalla de resultados aparece ResultsDelay segundos después de cruzar la meta, con
@@ -293,6 +319,8 @@ public partial class Main : Node3D
 		if (_mode != GameMode.TimeTrial)
 			return;
 
+		GhostRecording lapGhost = _recorder.Finish(lapTime, ToNumerics(_player.GlobalPosition), ToNumerics(_player.ShipRotation));
+
 		if (!RecordBook.IsValidCircuitId(_track.CircuitId))
 		{
 			_hud.TimeTrial.ShowLapBand(new LapBandContent(lap, lapTime, "LAP COMPLETE", LapBandTitleStyle.Record,
@@ -309,6 +337,7 @@ public partial class Main : Node3D
 				: "FIRST RECORD";
 			content = new LapBandContent(lap, lapTime, "NEW RECORD", LapBandTitleStyle.Record, detail);
 			SaveRecords();
+			SaveGhost(lapGhost);
 		}
 		else
 		{
@@ -333,6 +362,107 @@ public partial class Main : Node3D
 		if (_raceRecords.NewTotalTime || _raceRecords.NewBestLap)
 			SaveRecords();
 	}
+
+	// ---------------------------------------------------------------
+	// Fantasma (TIME TRIAL)
+	// ---------------------------------------------------------------
+
+	// Ajustes, grabador, nave fantasma y fantasma guardado del circuito (si sigue siendo válido)
+	private void SetupGhost()
+	{
+		_settings = new SettingsStore(new FileRecordStorage(SettingsStore.DefaultPath));
+		_settings.Load();
+		if (_settings.Warning != null)
+			GD.PushWarning($"Settings: {_settings.Warning}");
+
+		_ghosts = new GhostStore(new FileGhostStorage());
+		_recorder = new GhostRecorder(Math.Max(1, GhostSampleRate));
+		_trackSignature = TrackSignature.Compute(_track.Centerline.ConvertAll(ToNumerics), _track.TrackWidth);
+
+		GhostRecording saved = _ghosts.Load(_track.CircuitId);
+		if (_ghosts.Warning != null)
+			GD.PushWarning($"Ghost: {_ghosts.Warning}");
+		if (saved != null)
+		{
+			if (GhostValidity.IsValid(saved, _track.CircuitId, _track.CheckpointIndices.Count, _trackSignature, TimeTrialRecord()?.LapTime))
+				_ghost = saved;
+			else
+				GD.Print("[Ghost] The saved ghost does not match this circuit or its record; no ghost until a new record.");
+		}
+		if (_ghost != null && !ShipCatalog.Contains(_ghost.ShipDesignId))
+			GD.PushWarning($"Ghost: unknown ship design '{_ghost.ShipDesignId}'; using '{ShipCatalog.Default}'.");
+
+		// Igual que Track y Player, se usa el de la escena si existe (así se ajusta en el Inspector)
+		_ghostShip = GetNodeOrNull<GhostShip>("GhostShip");
+		if (_ghostShip == null)
+		{
+			_ghostShip = new GhostShip { Name = "GhostShip" };
+			AddChild(_ghostShip);
+		}
+
+		_pause.EnableGhostOption(_settings.Settings.GhostEnabled, () => _ghost != null);
+		_pause.GhostToggled += OnGhostToggled;
+		_race.LapStarted += OnLapStarted;
+	}
+
+	// Cada vuelta se graba desde cero, aunque el fantasma esté en OFF
+	private void OnLapStarted(int lap)
+	{
+		_recorder.Begin();
+		SampleGhost();
+	}
+
+	private void SampleGhost()
+	{
+		_recorder.Sample(_race.Tracker.CurrentLapTime, ToNumerics(_player.GlobalPosition), ToNumerics(_player.ShipRotation));
+	}
+
+	// Vuelta récord: su grabación pasa a ser el fantasma del circuito y se guarda ya
+	private void SaveGhost(GhostRecording lapGhost)
+	{
+		if (lapGhost == null)
+			return;
+
+		_ghost = lapGhost with
+		{
+			CircuitId = _track.CircuitId,
+			TrackSignature = _trackSignature,
+			CheckpointCount = _track.CheckpointIndices.Count,
+			ShipDesignId = GameSession.ShipDesignId
+		};
+		if (_ghosts.Save(_ghost))
+			GD.Print($"[Ghost] New ghost saved ({_ghost.Samples.Count} samples)");
+		else
+			GD.PushWarning($"Ghost: {_ghosts.Warning}");
+	}
+
+	private void OnGhostToggled(bool enabled)
+	{
+		_settings.Settings.GhostEnabled = enabled;
+		if (!_settings.Save())
+			GD.PushWarning($"Settings: {_settings.Warning}");
+	}
+
+	// El fantasma se ve con el ajuste en ON, con fantasma válido y durante una vuelta cronometrada;
+	// su pose sale del tiempo de vuelta actual (así sigue sincronizado tras la pausa)
+	private void UpdateGhost()
+	{
+		if (_ghostShip == null)
+			return;
+
+		RaceTracker tracker = _race.Tracker;
+		if (!_settings.Settings.GhostEnabled || _ghost == null || tracker == null || tracker.State != RaceState.Running)
+		{
+			_ghostShip.HideGhost();
+			return;
+		}
+
+		_ghostShip.ShowAt(_ghost, tracker.CurrentLapTime, _player.GlobalPosition);
+	}
+
+	private static System.Numerics.Vector3 ToNumerics(Vector3 v) => new(v.X, v.Y, v.Z);
+
+	private static System.Numerics.Quaternion ToNumerics(Quaternion q) => new(q.X, q.Y, q.Z, q.W);
 
 	private void SaveRecords()
 	{
