@@ -1,7 +1,9 @@
+using Vectory.Ship;
+
 namespace Vectory.Game;
 
 // Lo que el menú decide antes de cargar la escena de carrera y la escena lee al arrancar:
-// el modo y el circuito. Es el único sitio por el que pasan de una escena a otra; sin lógica de juego.
+// el modo, el circuito y el diseño de nave. Es el único sitio por el que pasan de una escena a otra; sin lógica de juego.
 // Si la escena de carrera se ejecuta sola desde el editor, el modo es Race y no hay circuito
 // (Track usa el de su Inspector o el de por defecto).
 public static class GameSession
@@ -10,4 +12,7 @@ public static class GameSession
 
 	// Ruta del TrackDefinition elegido (p. ej. "res://circuits/circuit_01.tres"); null = ninguno
 	public static string CircuitPath { get; set; }
+
+	// Diseño de nave en uso (ShipCatalog). Hoy siempre el de por defecto; lo cambiará HANGAR.
+	public static string ShipDesignId { get; set; } = ShipCatalog.Default;
 }

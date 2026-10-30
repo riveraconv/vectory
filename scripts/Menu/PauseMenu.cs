@@ -9,6 +9,7 @@ namespace Vectory.Menu;
 // Pausa de la carrera (ESC): franja horizontal con PAUSED y CONTINUE / RESTART / BACK TO MAIN MENU,
 // y la confirmación (NO / YES) en la misma franja. Las reglas viven en PauseLogic; este nodo
 // traduce el input, dibuja el estado, congela el árbol (GetTree().Paused) y cambia de escena.
+// En TIME TRIAL (EnableGhostOption) añade GHOST: ON / OFF; el cambio se avisa con GhostToggled.
 //
 // ProcessMode = Always: sigue funcionando con el árbol en pausa. Todo lo demás de la carrera
 // (nave, carrera, HUD, cámara, resultados) se para.
@@ -25,6 +26,7 @@ public partial class PauseMenu : CanvasLayer
 	private const float TextLeft = 96f;
 	private const float SeparatorX = 500f;
 	private const float SeparatorHeight = 156f;
+	private const float GhostSeparatorHeight = 204f;   // con cuatro opciones (TIME TRIAL)
 	private const float OptionsLeft = 560f;
 	private const float TitleGap = 12f;           // entre el título y el texto secundario
 	private const float TitleMargin = 24f;        // hueco mínimo entre el título y el separador
@@ -43,6 +45,9 @@ public partial class PauseMenu : CanvasLayer
 	// Se lanza al cerrar la pausa para seguir con la carrera
 	public event Action Resumed;
 
+	// Se lanza al cambiar GHOST: ON / OFF (nuevo valor del ajuste); la pausa sigue abierta
+	public event Action<bool> GhostToggled;
+
 	// La carrera ya ha terminado: RESTART y BACK TO MAIN MENU no piden confirmación
 	public bool RaceFinished
 	{
@@ -52,10 +57,12 @@ public partial class PauseMenu : CanvasLayer
 
 	public bool IsOpen => _logic.State != PauseState.Closed;
 
-	private readonly PauseLogic _logic = new();
+	private PauseLogic _logic = new();
+	private Func<bool> _ghostAvailable;
 	private float _scale = 1f;
 
 	private Control _root;
+	private MenuBand _band;
 	private Label _title;
 	private Label _hint;
 	private OptionList _options;
@@ -72,10 +79,21 @@ public partial class PauseMenu : CanvasLayer
 		UpdateView();
 	}
 
+	// TIME TRIAL: añade GHOST: ON / OFF con el valor guardado. ghostAvailable dice, cada vez que se abre
+	// la pausa, si hay fantasma válido (si no, la opción sale desactivada).
+	public void EnableGhostOption(bool ghostEnabled, Func<bool> ghostAvailable)
+	{
+		_logic = new PauseLogic(hasGhostOption: true) { GhostEnabled = ghostEnabled, RaceFinished = _logic.RaceFinished };
+		_ghostAvailable = ghostAvailable;
+		_band.SetSeparatorHeight(0, GhostSeparatorHeight);
+	}
+
 	public override void _Process(double delta)
 	{
 		if (Input.IsActionJustPressed("pause"))
 		{
+			if (_logic.State == PauseState.Closed)
+				_logic.GhostAvailable = _ghostAvailable?.Invoke() ?? false;
 			Apply(_logic.TogglePause());
 			return;
 		}
@@ -118,6 +136,8 @@ public partial class PauseMenu : CanvasLayer
 
 		if (action == PauseAction.Close)
 			Resumed?.Invoke();
+		else if (action == PauseAction.ToggleGhost)
+			GhostToggled?.Invoke(_logic.GhostEnabled);
 	}
 
 	// ---------------------------------------------------------------
@@ -182,6 +202,7 @@ public partial class PauseMenu : CanvasLayer
 		var band = new MenuBand { Name = "MenuBand" };
 		_root.AddChild(band);
 		band.Setup(BandHeight, DimOpacity, BandOpacity);
+		_band = band;
 
 		// Bloque izquierdo: título y texto secundario, centrados en vertical
 		VBoxContainer left = band.AddColumn("Text", TextLeft, TitleGap);
@@ -207,7 +228,9 @@ public partial class PauseMenu : CanvasLayer
 		// Opciones, centradas en vertical en la franja (mismo aspecto que el menú principal)
 		VBoxContainer column = band.AddColumn("OptionsColumn", OptionsLeft, 0f);
 		_options = new OptionList { Name = "Options" };
-		_options.Setup(OptionListStyle.Scaled(_scale, OptionFontSize, 48f, 6f, new Vector2(4f, 36f), 20f));
+		OptionListStyle style = OptionListStyle.Scaled(_scale, OptionFontSize, 48f, 6f, new Vector2(4f, 36f), 20f);
+		style.HideDisabledHint = true;   // GHOST sin fantasma: desactivada, sin COMING SOON
+		_options.Setup(style);
 		_options.Chosen += id => Apply(_logic.Choose(id));
 		column.AddChild(_options);
 	}

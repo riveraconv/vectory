@@ -35,6 +35,9 @@ public sealed class RaceSession
 	// Al completar una vuelta: número de vuelta, tiempo y tiempos de paso de esa vuelta
 	public event Action<int, double, IReadOnlyList<double>> LapCompleted;
 
+	// Al empezar una vuelta (tiempo de vuelta = 0): número de vuelta. Va después de LapCompleted.
+	public event Action<int> LapStarted;
+
 	// Al terminar la carrera (solo con vueltas limitadas): resultado
 	public event Action<RaceResult> RaceFinished;
 
@@ -132,6 +135,7 @@ public sealed class RaceSession
 
 		_tracker.Start();
 		GD.Print(_flyingStart ? "[Race] Lap 1 started" : "[Race] GO");
+		LapStarted?.Invoke(_tracker.CurrentLap);
 	}
 
 	private bool EnsureInitialized()
@@ -167,6 +171,8 @@ public sealed class RaceSession
 			string total = _tracker.HasLapLimit ? $"/{_tracker.TotalLaps}" : "";
 			GD.Print($"[Race] Lap {lap}{total}: {TimeFormat.Format(time)}{(isBest ? " (best lap)" : "")}");
 			LapCompleted?.Invoke(lap, time, _tracker.LastLapSplits);
+			if (_tracker.State == RaceState.Running)
+				LapStarted?.Invoke(_tracker.CurrentLap);
 		};
 
 		_tracker.RaceFinished += totalTime =>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Godot;
 using Vectory.Circuit;
 using Vectory.Core;
+using Vectory.Ghost;
 using Vectory.Records;
 using Vectory.UI;
 
@@ -12,7 +13,7 @@ namespace Vectory.Menu;
 // franja de tres columnas con el circuito y su selector, los récords de TIME TRIAL y RACE de ese
 // circuito, y las opciones BACK / RESET RECORDS (con confirmación NO / YES en la misma franja).
 // Las reglas viven en RecordsLogic y RecordFormat; este nodo traduce el input, lee y borra los
-// récords con el RecordStore de siempre y lo dibuja. Al cerrarse lanza Closed (MainMenu reaparece).
+// récords con el RecordStore de siempre (RESET borra también los fantasmas) y lo dibuja. Al cerrarse lanza Closed (MainMenu reaparece).
 // Medidas sobre 1280×720, multiplicadas por UiScale.Factor.
 public partial class RecordsScreen : CanvasLayer
 {
@@ -53,6 +54,7 @@ public partial class RecordsScreen : CanvasLayer
 
 	private readonly List<CircuitInfo> _circuits = new();
 	private RecordStore _store;
+	private GhostStore _ghosts;
 	private RecordsLogic _logic;
 	private float _scale = 1f;
 	private ulong _openedFrame;
@@ -88,6 +90,7 @@ public partial class RecordsScreen : CanvasLayer
 		}
 
 		_store = new RecordStore(new FileRecordStorage());
+		_ghosts = new GhostStore(new FileGhostStorage());
 		Build();
 		_root.Visible = false;
 	}
@@ -155,6 +158,8 @@ public partial class RecordsScreen : CanvasLayer
 				_store.Book.Clear();
 				if (!_store.Save())
 					GD.PushWarning($"Records: {_store.Warning}");
+				if (!_ghosts.DeleteAll())
+					GD.PushWarning($"Ghost: {_ghosts.Warning}");
 				break;
 		}
 
