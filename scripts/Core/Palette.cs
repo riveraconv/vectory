@@ -31,6 +31,12 @@ public static class Palette
 	public static readonly Color BoostEmpty = Blue;                 // borde de la esfera de carga vacía
 	public static readonly Color BoostEmptyFill = new Color(Blue, 0.25f);    // relleno apagado de la carga vacía
 	public static readonly Color GridMark = Blue;                   // marcas de la parrilla de salida
+	public static readonly Color BarrierBand = Cyan;                // bordes exteriores (gruesos) de las franjas de la barrera: base y remate
+	public static readonly Color BarrierBandInner = new Color(Cyan, 0.85f); // bordes interiores de las franjas
+	public static readonly Color BarrierBandTie = new Color(Cyan, 0.6f);    // travesaños de las franjas
+	public static readonly Color BarrierFill = new Color(Blue, 0.5f);   // línea media del relleno de la barrera
+	public static readonly Color BarrierPost = new Color(Blue, 0.4f);   // verticales del relleno de la barrera
+	public static readonly Color BarrierFlash = Orange;             // destello de impacto en la barrera
 	public static readonly Color StartLightOn = Magenta;            // luz del semáforo encendida (competición)
 	public static readonly Color StartLightGlow = new Color(Magenta, 0.25f); // halo de la luz encendida
 	public static readonly Color StartLightOff = BoostEmpty;        // borde de la luz apagada (como la carga de boost vacía)

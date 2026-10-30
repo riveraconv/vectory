@@ -43,7 +43,8 @@ public class ShipDynamics
 	// boostGain: m/s que el boost suma en este paso (0 si no hay subida en curso).
 	// boosting: hay un impulso en curso (subida o mantenimiento); la nave no pierde velocidad
 	// ni por estar por encima de la punta ni por soltar el acelerador.
-	public void Step(in ShipInput input, in ShipTuning t, float dt, float boostGain = 0f, bool boosting = false)
+	// control: factor de 0 a 1 para la aceleración y el giro (corrección tras un impacto fuerte); el freno no cambia.
+	public void Step(in ShipInput input, in ShipTuning t, float dt, float boostGain = 0f, bool boosting = false, float control = 1f)
 	{
 		boosting |= boostGain > 0f;
 
@@ -51,7 +52,7 @@ public class ShipDynamics
 		if (Speed > t.MaxSpeed)
 			StepAboveMaxSpeed(input, t, dt, boosting);
 		else if (input.Accelerate)
-			Speed = MoveToward(Speed, t.MaxSpeed, t.Acceleration * dt);
+			Speed = MoveToward(Speed, t.MaxSpeed, t.Acceleration * control * dt);
 		else if (input.Brake)
 			Speed = MoveToward(Speed, 0f, t.BrakeDeceleration * dt);
 		else if (!boosting)
@@ -64,7 +65,7 @@ public class ShipDynamics
 		float steerTarget = (input.SteerLeft ? 1f : 0f) - (input.SteerRight ? 1f : 0f);
 		Steer = MoveToward(Steer, steerTarget, t.SteerResponse * dt);
 		TurnFactor = Math.Clamp(Speed / 10f, 0f, 1f);
-		Yaw += Steer * t.TurnRate * TurnFactor * dt;
+		Yaw += Steer * t.TurnRate * TurnFactor * control * dt;
 
 		// Inercia lateral: la velocidad real se acerca poco a poco a "hacia donde apunta la nave"
 		float k = 1f - MathF.Exp(-t.LateralGrip * dt);
@@ -88,6 +89,21 @@ public class ShipDynamics
 	public void ReduceSpeed(float amount)
 	{
 		Speed = MathF.Max(0f, Speed - amount);
+	}
+
+	// Resultado de un contacto con la barrera: velocidad real y orientación nuevas, y la velocidad
+	// del motor multiplicada por speedScale y reducida en speedLoss (sin bajar de 0).
+	// El yaw se aplica como el giro más corto desde el actual, para que no salte de vuelta.
+	public void ApplyImpact(Vector2 velocity, float yaw, float speedScale, float speedLoss)
+	{
+		Velocity = velocity;
+		float turn = (yaw - Yaw) % (2f * MathF.PI);
+		if (turn > MathF.PI)
+			turn -= 2f * MathF.PI;
+		else if (turn < -MathF.PI)
+			turn += 2f * MathF.PI;
+		Yaw += turn;
+		Speed = MathF.Max(0f, Speed * speedScale - speedLoss);
 	}
 
 	// Por encima de la punta (tras un boost): el motor no acelera más y el exceso se pierde

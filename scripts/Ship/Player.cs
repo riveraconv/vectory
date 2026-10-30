@@ -5,10 +5,10 @@ using NVec2 = System.Numerics.Vector2;
 namespace Vectory.Ship;
 
 // Nave del jugador. Este nodo solo CONECTA piezas: lee el teclado, pasa la entrada al modelo
-// de conducción (ShipDynamics), mueve el cuerpo en Godot, aplica los límites de la pista
-// (TrackLimits), actualiza la nave visual y las cámaras, y le dice a la sesión de carrera
-// (RaceSession) dónde está para contar vueltas. El boost por cargas vive en ShipBoost.
-// Las reglas viven en las clases puras.
+// de conducción (ShipDynamics), mueve el cuerpo en Godot, aplica las barreras (BarrierCollision,
+// con la corrección tras un impacto fuerte en ImpactRecovery), actualiza la nave visual y las cámaras
+// (con la sacudida de CameraShake), y le dice a la sesión de carrera (RaceSession) dónde está para
+// contar vueltas. El boost por cargas vive en ShipBoost. Las reglas viven en las clases puras.
 //
 // Solo acepta input con la carrera en marcha (RaceSession.CanDrive): en la cuenta atrás la nave
 // está quieta y el boost no recarga; al terminar se suelta todo y la nave se para sola.
@@ -47,10 +47,30 @@ public partial class Player : CharacterBody3D
 	[Export] public float MaxBank = 0.6f;        // inclinación visual (rad) al girar
 	[Export] public float LateralGrip = 5f;      // más alto = menos inercia lateral (la nave se "agarra" antes)
 
-	[ExportGroup("Límites de pista")]
-	[Export] public float LimitMargin = 3.4f;    // distancia que se respeta hasta el borde (media envergadura de la nave)
-	[Export] public float WallBrake = 0.5f;      // velocidad que pierde por cada m/s del GOLPE inicial contra el límite (0 = no pierde nada)
-	[Export] public float WallScrape = 4f;       // m/s que pierde cada segundo mientras roza el límite (0 = sin fricción; mejor que sea menor que Acceleration)
+	[ExportGroup("Colisiones")]
+	[Export] public float CollisionHalfWidth = 3.4f;   // semiancho de colisión con la barrera (m; las puntas de las alas)
+	[Export] public float ImpactMediumSpeed = 30f;     // km/h contra la barrera desde los que el impacto es medio
+	[Export] public float ImpactStrongSpeed = 90f;     // km/h contra la barrera desde los que el impacto es fuerte
+	[Export(PropertyHint.Range, "0,1,0.01")] public float GrazeStraighten = 0.3f;   // fracción del ángulo que se quita al empezar un roce
+	[Export(PropertyHint.Range, "0,1,0.01")] public float GrazeEntryLoss = 0.04f;   // fracción de velocidad que se pierde al empezar un roce
+	[Export] public float GrazeFriction = 20f;         // km/h que se pierden cada segundo mientras roza
+	[Export(PropertyHint.Range, "0,1,0.01")] public float MediumRestitution = 0.4f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float StrongRestitution = 0.5f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float MediumSpeedLoss = 0.2f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float StrongSpeedLoss = 0.45f;
+	[Export] public float RecoveryDuration = 1f;       // segundos de control reducido tras un impacto fuerte
+	[Export(PropertyHint.Range, "0,1,0.01")] public float RecoveryControl = 0.5f;   // giro y aceleración al empezar la corrección
+	[Export] public float ImpactCooldown = 0.3f;       // segundos sin contar otro impacto medio o fuerte en el mismo lado
+
+	[ExportGroup("Sacudida de cámara")]
+	[Export] public float MediumShakeAmplitude = 0.06f;   // m (cámara exterior)
+	[Export] public float MediumShakeRoll = 0.8f;         // grados
+	[Export] public float MediumShakeDuration = 0.25f;
+	[Export] public float StrongShakeAmplitude = 0.15f;
+	[Export] public float StrongShakeRoll = 2f;
+	[Export] public float StrongShakeDuration = 0.4f;
+	[Export] public float ShakeFrequency = 25f;           // Hz de la vibración
+	[Export(PropertyHint.Range, "0,1,0.01")] public float CockpitShakeFactor = 0.5f;   // en cabina, todo a este factor
 
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
@@ -60,12 +80,11 @@ public partial class Player : CharacterBody3D
 	[Export] public float BaseFov = 75f;
 	[Export] public float MaxFov = 95f;
 
-	// Tiempo (s) sin tocar el límite tras el cual el siguiente contacto cuenta como golpe nuevo.
-	// Mientras dura un roce continuo, el contacto se renueva y no se vuelve a contar como golpe.
-	private const float WallContactGrace = 0.15f;
-
 	private readonly ShipDynamics _dynamics = new();
 	private readonly ShipBoost _boost = new();
+	private readonly BarrierCollision _collision = new();
+	private readonly ImpactRecovery _recovery = new();
+	private CameraShake _shake;
 	private Spaceship _ship;
 	private Cockpit _cockpit;
 	private ChaseCamera _chaseCam;
@@ -74,11 +93,13 @@ public partial class Player : CharacterBody3D
 
 	private bool _chaseView = true;
 	private float _bank = 0f;
-	private float _wallContactTimer = 0f;
 	private bool _inputBlocked;
 
 	// Velocidad real actual en m/s (la usa el HUD)
 	public float Speed => _dynamics.RealSpeed;
+
+	// Contacto con la barrera en el último paso de física (lo leen Main para el destello y la recolocación)
+	public BarrierTouch LastBarrierTouch { get; private set; }
 
 	// Velocidad máxima con un boost desde la punta (m/s): tope de la barra de velocidad del HUD
 	public float BoostedTopSpeed => MaxSpeed + BoostSpeedGain / KmhPerMs;
@@ -112,6 +133,7 @@ public partial class Player : CharacterBody3D
 
 		_dynamics.Reset(0f);
 		_boost.Reset(BuildBoostTuning());
+		_shake = new CameraShake(BuildShakeSettings());
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 		ApplyView();
 	}
@@ -141,9 +163,31 @@ public partial class Player : CharacterBody3D
 		_dynamics.Reset(yaw, initialSpeed);
 		_boost.Reset(BuildBoostTuning());
 		_bank = 0f;
-		_wallContactTimer = 0f;
+		_collision.Reset();
+		_recovery.Cancel();
 		Rotation = new Vector3(0f, yaw, 0f);
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
+	}
+
+	// Recolocación automática (atasco o fuera de pista): al instante en la posición dada, parada y
+	// mirando según yaw. El boost no cambia; se cancela la corrección de un impacto fuerte.
+	public void Respawn(Vector3 position, float yaw)
+	{
+		GlobalPosition = position;
+		_dynamics.Reset(yaw, 0f);
+		_bank = 0f;
+		_collision.Reset();
+		_recovery.Cancel();
+		LastBarrierTouch = default;
+		Rotation = new Vector3(0f, yaw, 0f);
+		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
+	}
+
+	// Sacude la cámara por un impacto (el roce no sacude; uno más débil que el que esté en curso se ignora)
+	public void ShakeCamera(ImpactLevel level)
+	{
+		_shake.Settings = BuildShakeSettings();
+		_shake.Trigger(level);
 	}
 
 	// Ignora el input de conducción (y el boost) hasta que se suelten todas sus teclas.
@@ -206,7 +250,9 @@ public partial class Player : CharacterBody3D
 			_boost.CancelImpulse();
 		}
 
-		_dynamics.Step(input, BuildTuning(), dt, boostGain, _boost.IsImpulseActive);
+		// Tras un impacto fuerte, el giro y la aceleración van reducidos un momento
+		_recovery.Update(dt);
+		_dynamics.Step(input, BuildTuning(), dt, boostGain, _boost.IsImpulseActive, _recovery.Factor);
 		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
 
 		// 2. Mover el cuerpo en Godot con la velocidad real
@@ -214,8 +260,8 @@ public partial class Player : CharacterBody3D
 		MoveAndSlide();
 		_dynamics.SetVelocity(new NVec2(Velocity.X, Velocity.Z));
 
-		// 3. Límites laterales de la pista
-		ApplyTrackLimits(dt);
+		// 3. Barreras: contacto, roce o rebote
+		ApplyBarriers(dt);
 
 		// 4. Si choca contra algo, el motor también pierde velocidad
 		if (GetSlideCollisionCount() > 0)
@@ -228,7 +274,8 @@ public partial class Player : CharacterBody3D
 		_ship.Rotation = roll;
 		_cockpit.Rotation = roll;
 
-		// 6. Cámara de tercera persona
+		// 6. Sacudida (más suave en cabina) y cámara de tercera persona
+		UpdateShake(dt);
 		_chaseCam.UpdateFollow(dt, GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 
 		// 7. Carrera: cronómetro, checkpoints, meta y vueltas
@@ -297,40 +344,106 @@ public partial class Player : CharacterBody3D
 		return Mathf.Clamp(_dynamics.Speed / BoostedTopSpeed, 0f, 1f);
 	}
 
-	// Si la nave sobrepasa el borde de la pista, TrackLimits la devuelve al límite.
-	// El golpe (WallBrake) se aplica una sola vez al empezar el contacto; mientras la nave
-	// sigue rozando solo pierde la fricción suave de WallScrape y se desliza a lo largo del borde.
-	private void ApplyTrackLimits(float dt)
+	private BarrierCollisionSettings BuildCollisionSettings()
 	{
-		_wallContactTimer = Mathf.Max(0f, _wallContactTimer - dt);
+		return new BarrierCollisionSettings
+		{
+			MediumSpeed = ImpactMediumSpeed / KmhPerMs,
+			StrongSpeed = ImpactStrongSpeed / KmhPerMs,
+			GrazeStraighten = GrazeStraighten,
+			GrazeEntryLoss = GrazeEntryLoss,
+			GrazeFriction = GrazeFriction / KmhPerMs,
+			MediumRestitution = MediumRestitution,
+			StrongRestitution = StrongRestitution,
+			MediumSpeedLoss = MediumSpeedLoss,
+			StrongSpeedLoss = StrongSpeedLoss,
+			ImpactCooldown = ImpactCooldown
+		};
+	}
 
-		if (_track == null)
+	private CameraShakeSettings BuildShakeSettings()
+	{
+		return new CameraShakeSettings
+		{
+			Medium = new ShakeLevelSettings
+			{
+				Amplitude = MediumShakeAmplitude,
+				Roll = Mathf.DegToRad(MediumShakeRoll),
+				Duration = MediumShakeDuration
+			},
+			Strong = new ShakeLevelSettings
+			{
+				Amplitude = StrongShakeAmplitude,
+				Roll = Mathf.DegToRad(StrongShakeRoll),
+				Duration = StrongShakeDuration
+			},
+			Frequency = ShakeFrequency
+		};
+	}
+
+	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos
+	// cámaras, así cambiar de vista (C) durante la sacudida sigue con la amplitud de la nueva.
+	private void UpdateShake(float dt)
+	{
+		_shake.Update(dt);
+		var offset = new Vector2(_shake.Offset.X, _shake.Offset.Y);
+		_chaseCam.SetShake(offset, _shake.Roll);
+		_cockpit.SetShake(offset * CockpitShakeFactor, _shake.Roll * CockpitShakeFactor);
+	}
+
+	// Barreras (BarrierCollision): con la posición ya movida, se mira el desplazamiento lateral respecto
+	// al punto más cercano del eje. Si toca, la nave vuelve justo al límite (solo la parte lateral de la
+	// posición) y se aplican el roce o el rebote a la velocidad, la dirección y la velocidad del motor.
+	// El boost no se toca: las pérdidas se aplican sobre la velocidad que lleve, también con impulso.
+	private void ApplyBarriers(float dt)
+	{
+		if (_track == null || !_track.IsBuilt)
+		{
+			LastBarrierTouch = default;
+			return;
+		}
+
+		AxisPoint axis = _track.ProjectOnAxis(GlobalPosition);
+		var tangent = new NVec2(axis.Tangent.X, axis.Tangent.Z);
+		var right = new NVec2(axis.Right.X, axis.Right.Z);
+		NVec2 velocity = _dynamics.Velocity;
+		NVec2 forward = _dynamics.Forward;
+
+		var input = new BarrierContactInput
+		{
+			Lateral = axis.Lateral,
+			HalfWidth = CollisionHalfWidth,
+			BarrierOffset = _track.BarrierOffset,
+			VelocityAlong = NVec2.Dot(velocity, tangent),
+			VelocityLateral = NVec2.Dot(velocity, right),
+			HeadingAlong = NVec2.Dot(forward, tangent),
+			HeadingLateral = NVec2.Dot(forward, right)
+		};
+
+		BarrierContactResult r = _collision.Resolve(input, BuildCollisionSettings(), dt);
+		LastBarrierTouch = new BarrierTouch(r.Contact, r.Side, r.Level, r.IsNewImpact, axis.Distance, axis.Lateral);
+
+		if (!r.Contact)
 			return;
 
-		int i = _track.NearestIndex(GlobalPosition);
-		Vector3 center = _track.Centerline[i];
-		Vector3 right = _track.RightAt(i);
+		GlobalPosition += axis.Right * (r.Lateral - axis.Lateral);
 
-		LimitResult r = TrackLimits.Apply(
-			new NVec2(GlobalPosition.X, GlobalPosition.Z),
-			_dynamics.Velocity,
-			new NVec2(center.X, center.Z),
-			new NVec2(right.X, right.Z),
-			_track.TrackWidth * 0.5f,
-			LimitMargin);
+		NVec2 newVelocity = tangent * r.VelocityAlong + right * r.VelocityLateral;
+		NVec2 newForward = tangent * r.HeadingAlong + right * r.HeadingLateral;
+		float yaw = Mathf.Atan2(-newForward.X, -newForward.Y);
+		_dynamics.ApplyImpact(newVelocity, yaw, r.SpeedScale, r.SpeedLoss);
+		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
 
-		if (!r.Hit)
-			return;
-
-		bool newImpact = _wallContactTimer <= 0f;
-		_wallContactTimer = WallContactGrace;
-
-		GlobalPosition = new Vector3(r.Position.X, GlobalPosition.Y, r.Position.Y);
-		_dynamics.SetVelocity(r.Velocity);
-
-		if (newImpact)
-			_dynamics.ReduceSpeed(r.ImpactSpeed * WallBrake);
-
-		_dynamics.ReduceSpeed(WallScrape * dt);
+		if (r.IsNewImpact && r.Level == ImpactLevel.Strong)
+		{
+			_recovery.Duration = RecoveryDuration;
+			_recovery.MinFactor = RecoveryControl;
+			_recovery.Start();
+		}
 	}
 }
+
+// Contacto de la nave con la barrera en un paso de física: lado, nivel, si es un impacto medio o fuerte
+// que cuenta, punto del eje (m desde la meta) y desplazamiento lateral antes de corregirlo
+public readonly record struct BarrierTouch(
+	bool Contact, BarrierSide Side, ImpactLevel Level, bool IsNewImpact, float AxisDistance, float Lateral);
