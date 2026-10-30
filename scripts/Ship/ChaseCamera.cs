@@ -19,6 +19,16 @@ public struct ChaseCameraSettings
 public partial class ChaseCamera : Camera3D
 {
 	private float _camYaw;
+	private Vector2 _shakeOffset;
+	private float _shakeRoll;
+
+	// Sacudida (desplazamiento en el plano de la vista, en m, y giro sobre la vista, en rad).
+	// Solo mueve la cámara; se aplica la próxima vez que se coloque.
+	public void SetShake(Vector2 offset, float roll)
+	{
+		_shakeOffset = offset;
+		_shakeRoll = roll;
+	}
 
 	public override void _Ready()
 	{
@@ -51,5 +61,11 @@ public partial class ChaseCamera : Camera3D
 
 		GlobalPosition = targetPosition + camBasis * offset;
 		LookAt(targetPosition + camBasis * new Vector3(0f, 0.3f, -10f), Vector3.Up);
+
+		if (_shakeOffset != Vector2.Zero || _shakeRoll != 0f)
+		{
+			GlobalPosition += GlobalBasis * new Vector3(_shakeOffset.X, _shakeOffset.Y, 0f);
+			RotateObjectLocal(Vector3.Back, _shakeRoll);
+		}
 	}
 }
