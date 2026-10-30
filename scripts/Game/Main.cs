@@ -18,7 +18,8 @@ namespace Vectory.Game;
 //
 // RACE: la nave sale de una posición de parrilla aleatoria, espera al semáforo y, al terminar
 // la última vuelta, se guardan los récords de RACE y se muestra la pantalla de resultados con
-// RESTART RACE / BACK TO MAIN MENU.
+// RESTART RACE / BACK TO MAIN MENU. Daños acumulativos (DamageModel): los impactos medios y fuertes contra la
+// barrera suben el nivel, que baja la punta y el giro, bloquea el boost, hace parpadear la nave y se ve en el HUD.
 // TIME TRIAL: READY? (nave quieta), en el GO! salida lanzada antes de la meta, y vueltas libres; delta por sector y franja de fin
 // de vuelta contra el récord de TIME TRIAL, que se guarda al batirlo. Nave fantasma con la vuelta récord:
 // se graba cada vuelta (GhostRecorder) y, si es récord, pasa a ser el fantasma (user://ghosts/); GHOST: ON / OFF
@@ -65,6 +66,21 @@ public partial class Main : Node3D
 	[ExportGroup("Fantasma")]
 	[Export] public int GhostSampleRate = GhostRecorder.DefaultSampleRate;   // muestras por segundo de la grabación
 
+	[ExportGroup("Daños")]
+	[Export] public int DamageMediumPoints = 1;      // puntos por impacto medio
+	[Export] public int DamageStrongPoints = 3;      // puntos por impacto fuerte
+	[Export] public int DamageLevel1Points = 3;      // puntos para cada nivel
+	[Export] public int DamageLevel2Points = 6;
+	[Export] public int DamageLevel3Points = 9;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel2TopSpeed = 0.92f;   // factor de la velocidad punta
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel3TopSpeed = 0.85f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel3Turn = 0.85f;       // factor del giro
+	[Export] public float DamageSegmentWidth = 22f;    // indicador del HUD (px sobre 1280×720)
+	[Export] public float DamageSegmentHeight = 8f;
+	[Export] public float DamageSegmentGap = 4f;
+	[Export] public float DamageIndicatorGap = 24f;    // separación entre el indicador y las esferas de boost
+	[Export] public float DamageBlinkFrequency = 2f;   // Hz del parpadeo del indicador con nivel 3
+
 	[ExportGroup("Recolocación")]
 	[Export] public float StuckSpeed = 10f;          // km/h: por debajo, y tocando la barrera, la nave está atascada
 	[Export] public float StuckTime = 3f;            // segundos seguidos atascada antes de recolocarla
@@ -88,6 +104,9 @@ public partial class Main : Node3D
 	// Barreras: destello en el punto de contacto y recolocación automática
 	private BarrierFlash _barrierFlash;
 	private RespawnDetector _respawn;
+
+	// Daños (solo RACE; null en TIME TRIAL)
+	private DamageModel _damage;
 
 	// Fantasma (solo TIME TRIAL; null en RACE)
 	private GhostShip _ghostShip;
@@ -190,7 +209,16 @@ public partial class Main : Node3D
 		_race.LapCompleted += OnLapCompleted;
 		_race.RaceFinished += OnRaceFinished;
 
-		_hud = new Hud { Name = "Hud", StartTextFontSize = StartTextFontSize };
+		_hud = new Hud
+		{
+			Name = "Hud",
+			StartTextFontSize = StartTextFontSize,
+			DamageSegmentWidth = DamageSegmentWidth,
+			DamageSegmentHeight = DamageSegmentHeight,
+			DamageSegmentGap = DamageSegmentGap,
+			DamageIndicatorGap = DamageIndicatorGap,
+			DamageBlinkFrequency = DamageBlinkFrequency
+		};
 		AddChild(_hud);
 		_hud.ResultsOptionChosen += ExecuteResultsOption;
 
@@ -207,6 +235,7 @@ public partial class Main : Node3D
 		{
 			// Todavía no hay rivales ni posición en vivo: el jugador va primero de todos los participantes
 			_hud.SetRacePosition(1, participants);
+			SetupDamage();
 		}
 	}
 
@@ -216,7 +245,7 @@ public partial class Main : Node3D
 		if (_race != null)
 		{
 			_hud.SetSpeed(_player.Speed, _player.BoostedTopSpeed);
-			_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive);
+			_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive, _player.BoostBlocked);
 			_hud.SetStartSequence(_race.StartSequence);
 			_hud.SetReadySequence(_race.ReadySequence);
 			UpdateLapInfo();
@@ -260,6 +289,9 @@ public partial class Main : Node3D
 			{
 				_barrierFlash.Impact(touch.Side, touch.AxisDistance, touch.Level);
 				_player.ShakeCamera(touch.Level);
+				// Daños: solo cuentan los impactos en carrera (ni en la previa ni con la carrera terminada)
+				if (_race.State == RaceState.Running)
+					_damage?.AddImpact(touch.Level);
 			}
 			else
 			{
@@ -419,9 +451,44 @@ public partial class Main : Node3D
 		if (_mode != GameMode.Race || result == null)
 			return;
 
+		_damage?.Stop();
+
 		_raceRecords = _records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now);
 		if (_raceRecords.NewTotalTime || _raceRecords.NewBestLap)
 			SaveRecords();
+	}
+
+	// ---------------------------------------------------------------
+	// Daños (RACE)
+	// ---------------------------------------------------------------
+
+	// Cada carrera empieza sin daño (RESTART recarga la escena y crea un modelo nuevo)
+	private void SetupDamage()
+	{
+		_damage = new DamageModel(new DamageSettings
+		{
+			MediumPoints = DamageMediumPoints,
+			StrongPoints = DamageStrongPoints,
+			Level1Points = DamageLevel1Points,
+			Level2Points = DamageLevel2Points,
+			Level3Points = DamageLevel3Points,
+			Level2TopSpeedFactor = DamageLevel2TopSpeed,
+			Level3TopSpeedFactor = DamageLevel3TopSpeed,
+			Level3TurnFactor = DamageLevel3Turn
+		});
+		_damage.LevelChanged += OnDamageLevelChanged;
+		_hud.ShowDamageIndicator();
+	}
+
+	// Reparte el nivel nuevo: factores y boost a la nave, parpadeo de sus aristas e indicador del HUD
+	private void OnDamageLevelChanged(int level)
+	{
+		_player.TopSpeedFactor = _damage.TopSpeedFactor;
+		_player.TurnRateFactor = _damage.TurnFactor;
+		_player.BoostAllowed = _damage.BoostAllowed;
+		_player.SetFlickerLevel(level);
+		_hud.SetDamageLevel(level);
+		GD.Print($"[Race] Damage level {level} ({_damage.Points} points)");
 	}
 
 	// ---------------------------------------------------------------

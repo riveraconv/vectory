@@ -14,9 +14,11 @@ public static class Palette
 	public static readonly Color Background = new Color("05070D");  // fondo
 	public static readonly Color BlueGray = new Color("A6B8D8");    // información secundaria del HUD
 
-	// --- Ampliación de la paleta del documento maestro, SOLO para el delta de TIME TRIAL (spec docs/time-trial.md) ---
-	public static readonly Color Green = new Color("3DFF8A");       // delta mejor que el récord
-	public static readonly Color Red = new Color("FF4D5E");         // delta peor que el récord
+	// --- Ampliación de la paleta del documento maestro, SOLO para el delta de TIME TRIAL (spec docs/time-trial.md)
+	// y el indicador de daño (spec docs/danos.md) ---
+	public static readonly Color Green = new Color("3DFF8A");       // delta mejor que el récord; nave sin daño
+	public static readonly Color Red = new Color("FF4D5E");         // delta peor que el récord; daño grave y boost bloqueado
+	public static readonly Color Yellow = new Color("FFE04A");      // SOLO para el indicador de daño: daño leve
 
 	// --- Derivados (siempre calculados a partir de los de arriba) ---
 	public static readonly Color BlueDim = Blue.Darkened(0.4f);     // líneas tenues (rejilla, transversales); por debajo del umbral de glow
@@ -30,6 +32,8 @@ public static class Palette
 	public static readonly Color BoostCooldownBorder = new Color(Orange, 0.55f); // borde atenuado de la carga en cooldown
 	public static readonly Color BoostEmpty = Blue;                 // borde de la esfera de carga vacía
 	public static readonly Color BoostEmptyFill = new Color(Blue, 0.25f);    // relleno apagado de la carga vacía
+	public static readonly Color BoostBlockedFill = new Color(Red, 0.3f);    // relleno de la carga bloqueada por daños (nivel 3)
+	public static readonly Color BoostBlockedBorder = new Color(Red, 0.55f); // borde de la carga bloqueada por daños
 	public static readonly Color GridMark = Blue;                   // marcas de la parrilla de salida
 	public static readonly Color BarrierBand = Cyan;                // bordes exteriores (gruesos) de las franjas de la barrera: base y remate
 	public static readonly Color BarrierBandInner = new Color(Cyan, 0.85f); // bordes interiores de las franjas
@@ -90,4 +94,14 @@ public static class Palette
 	public static readonly Color NewRecord = Orange;                // NEW RECORD (franja de fin de vuelta y resultados)
 	public static readonly Color NewRecordGlow = new Color(Orange, 0.5f);
 	public static readonly Color GhostLine = new Color(BlueGray, 0.35f);    // nave fantasma: azul grisáceo translúcido, sin brillo
+
+	// --- Daños (indicador de tres segmentos del HUD) ---
+	public static readonly Color DamageNone = Green;                // nivel 0
+	public static readonly Color DamageLight = Yellow;              // nivel 1
+	public static readonly Color DamageHeavy = Red;                 // niveles 2 y 3
+	public static readonly Color DamageLightGlow = new Color(Yellow, 0.5f); // halo de los segmentos encendidos
+	public static readonly Color DamageHeavyGlow = new Color(Red, 0.5f);
+	public static readonly Color DamageNoneOff = new Color(Green, 0.6f);    // borde de un segmento apagado, según el nivel
+	public static readonly Color DamageLightOff = new Color(Yellow, 0.6f);
+	public static readonly Color DamageHeavyOff = new Color(Red, 0.6f);
 }

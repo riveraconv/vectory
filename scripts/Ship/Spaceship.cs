@@ -15,6 +15,10 @@ public partial class Spaceship : Node3D
 	private readonly List<int> _indices = new();
 
 	private MeshInstance3D _meshInstance;
+	private EdgeFlickerMaterial _flickerMaterial;
+
+	// Número de aristas (líneas) de la nave: cada una puede parpadear por su cuenta con los daños
+	public int EdgeCount => _indices.Count / 2;
 
 	public override void _Ready()
 	{
@@ -35,6 +39,19 @@ public partial class Spaceship : Node3D
 	public void SetMaterialOverride(Material material)
 	{
 		_meshInstance.MaterialOverride = material;
+	}
+
+	// Daños: las aristas apagadas del parpadeo bajan a dimOpacity. La primera llamada cambia el material
+	// de la nave por el de parpadeo; sin llamarla (menú, fantasma) la nave conserva su material de siempre.
+	public void ShowEdgeFlicker(EdgeFlicker flicker, float dimOpacity)
+	{
+		if (_flickerMaterial == null)
+		{
+			_flickerMaterial = new EdgeFlickerMaterial(EdgeCount);
+			_meshInstance.SetSurfaceOverrideMaterial(0, _flickerMaterial.Material);
+		}
+		_flickerMaterial.SetDimOpacity(dimOpacity);
+		_flickerMaterial.Apply(flicker);
 	}
 
 	// ---------------------------------------------------------------
@@ -161,13 +178,26 @@ public partial class Spaceship : Node3D
 			L(core, nozzle[k]);
 	}
 
+	// Cada línea lleva sus propios dos vértices (sin compartirlos con otras) y en UV.x el número de su
+	// arista, para que el material de los daños pueda apagar aristas sueltas. El aspecto no cambia.
 	private ArrayMesh BuildMesh()
 	{
+		int count = _indices.Count;
+		var verts = new Vector3[count];
+		var colors = new Color[count];
+		var uvs = new Vector2[count];
+		for (int i = 0; i < count; i++)
+		{
+			verts[i] = _verts[_indices[i]];
+			colors[i] = _colors[_indices[i]];
+			uvs[i] = new Vector2(i / 2, 0f);
+		}
+
 		var arrays = new Godot.Collections.Array();
 		arrays.Resize((int)Mesh.ArrayType.Max);
-		arrays[(int)Mesh.ArrayType.Vertex] = _verts.ToArray();
-		arrays[(int)Mesh.ArrayType.Color] = _colors.ToArray();
-		arrays[(int)Mesh.ArrayType.Index] = _indices.ToArray();
+		arrays[(int)Mesh.ArrayType.Vertex] = verts;
+		arrays[(int)Mesh.ArrayType.Color] = colors;
+		arrays[(int)Mesh.ArrayType.TexUV] = uvs;
 
 		var mesh = new ArrayMesh();
 		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);

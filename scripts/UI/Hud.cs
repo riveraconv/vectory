@@ -11,7 +11,7 @@ namespace Vectory.UI;
 //
 //   Arriba izquierda:  posición / participantes (TIME TRIAL: TIME TRIAL y el circuito)
 //   Arriba derecha:    vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de vuelta y mejor tiempo
-//   Abajo derecha:     cargas de boost (esferas), velocidad (km/h) y su barra
+//   Abajo derecha:     indicador de daño (solo RACE) y cargas de boost (esferas), velocidad (km/h) y su barra
 //   Arriba centro:     RACE: semáforo y cuenta atrás; TIME TRIAL: delta por sector y franja de fin de vuelta
 //   Centro:            pantalla de resultados (al terminar la carrera)
 //
@@ -32,6 +32,13 @@ public partial class Hud : CanvasLayer
 	// Tamaño del texto de salida (cuenta atrás, READY?, GO!), px sobre 1280×720. Se fija antes de añadir el HUD.
 	public int StartTextFontSize = StartLightsView.DefaultTextFontSize;
 
+	// Indicador de daño (px sobre 1280×720 y Hz). Se fijan antes de añadir el HUD.
+	public float DamageSegmentWidth = 22f;
+	public float DamageSegmentHeight = 8f;
+	public float DamageSegmentGap = 4f;
+	public float DamageIndicatorGap = 24f;   // separación entre el indicador y las esferas de boost
+	public float DamageBlinkFrequency = 2f;
+
 	private enum Corner { TopLeft, TopRight, BottomRight }
 
 	private Label _positionLabel;
@@ -41,6 +48,7 @@ public partial class Hud : CanvasLayer
 	private Label _speedLabel;
 	private ColorRect _speedFill;
 	private BoostChargesView _boostCharges;
+	private DamageIndicatorView _damage;
 	private StartLightsView _startLights;
 	private ResultsView _results;
 	private VBoxContainer _timeTrialHeader;
@@ -86,10 +94,24 @@ public partial class Hud : CanvasLayer
 		SetBar(_speedFill, speedFraction);
 	}
 
-	// Cargas de boost disponibles y máximas, y si el cooldown está activo (las atenúa)
-	public void SetBoostCharges(int charges, int maxCharges, bool cooldownActive)
+	// Cargas de boost disponibles y máximas, si el cooldown está activo (las atenúa) y si los daños
+	// las bloquean (en rojo atenuado)
+	public void SetBoostCharges(int charges, int maxCharges, bool cooldownActive, bool blocked = false)
 	{
-		_boostCharges.SetCharges(charges, maxCharges, cooldownActive);
+		_boostCharges.SetCharges(charges, maxCharges, cooldownActive, blocked);
+		_damage.SetRightInset(BoostChargesView.WidthFor(maxCharges) + DamageIndicatorGap * UiScale.Factor);
+	}
+
+	// RACE: muestra el indicador de daño (en TIME TRIAL no se llama y no se ve)
+	public void ShowDamageIndicator()
+	{
+		_damage.Visible = true;
+	}
+
+	// Nivel de daño (0–3) del indicador
+	public void SetDamageLevel(int level)
+	{
+		_damage.SetLevel(level);
 	}
 
 	// Bloque de vuelta, ya calculado por quien gestiona la carrera:
@@ -251,6 +273,25 @@ public partial class Hud : CanvasLayer
 		};
 		Place(_boostCharges, Corner.BottomRight, Margin, 124f, BarWidth, BoostChargesView.Diameter);
 		root.AddChild(_boostCharges);
+
+		// Indicador de daño en la misma fila, a la izquierda de las esferas y centrado en vertical con ellas
+		float scale = UiScale.Factor;
+		_damage = new DamageIndicatorView
+		{
+			Name = "DamageIndicator",
+			Visible = false,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			SegmentWidth = DamageSegmentWidth * scale,
+			SegmentHeight = DamageSegmentHeight * scale,
+			SegmentGap = DamageSegmentGap * scale,
+			BorderWidth = scale,
+			BlinkFrequency = DamageBlinkFrequency
+		};
+		float height = _damage.RequiredHeight;
+		float rowCenter = 124f + BoostChargesView.Diameter * 0.5f;
+		Place(_damage, Corner.BottomRight, Margin, rowCenter - height * 0.5f, BarWidth, height);
+		_damage.SetRightInset(BoostChargesView.WidthFor(3) + DamageIndicatorGap * scale);
+		root.AddChild(_damage);
 	}
 
 	private void BuildStartLights(Control root)
