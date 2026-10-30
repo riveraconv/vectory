@@ -40,7 +40,11 @@ public class ShipBoost
 
 	public bool IsCooldownActive => CooldownRemaining > 0f;
 
-	public bool CanActivate => Charges >= 1 && !IsCooldownActive;
+	// Si se puede gastar una carga (los daños de nivel 3 lo bloquean). No lo toca Reset: lo decide
+	// quien usa el boost. Bloquearlo no cancela el impulso en curso ni para la recarga.
+	public bool ActivationAllowed { get; set; } = true;
+
+	public bool CanActivate => ActivationAllowed && Charges >= 1 && !IsCooldownActive;
 
 	// Velocidad (m/s) que se suma por segundo durante la subida
 	private float _impulseRate;

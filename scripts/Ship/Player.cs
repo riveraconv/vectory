@@ -9,6 +9,8 @@ namespace Vectory.Ship;
 // con la corrección tras un impacto fuerte en ImpactRecovery), actualiza la nave visual y las cámaras
 // (con la sacudida de CameraShake), y le dice a la sesión de carrera (RaceSession) dónde está para
 // contar vueltas. El boost por cargas vive en ShipBoost. Las reglas viven en las clases puras.
+// Los daños (solo RACE) le llegan desde Main como factores de punta y giro, boost permitido o no y
+// nivel de parpadeo de las aristas (EdgeFlicker); la nave no conoce los puntos ni las reglas del daño.
 //
 // Solo acepta input con la carrera en marcha (RaceSession.CanDrive): en la cuenta atrás la nave
 // está quieta y el boost no recarga; al terminar se suelta todo y la nave se para sola.
@@ -72,6 +74,20 @@ public partial class Player : CharacterBody3D
 	[Export] public float ShakeFrequency = 25f;           // Hz de la vibración
 	[Export(PropertyHint.Range, "0,1,0.01")] public float CockpitShakeFactor = 0.5f;   // en cabina, todo a este factor
 
+	[ExportGroup("Daños (parpadeo)")]
+	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel1 = 0.10f;   // proporción de aristas que parpadean
+	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel2 = 0.20f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel3 = 0.35f;
+	[Export] public float FlickerMinIntervalLevel1 = 1.5f;   // segundos entre parpadeos de una arista (aleatorio entre mínimo y máximo)
+	[Export] public float FlickerMaxIntervalLevel1 = 3f;
+	[Export] public float FlickerMinIntervalLevel2 = 0.8f;
+	[Export] public float FlickerMaxIntervalLevel2 = 1.6f;
+	[Export] public float FlickerMinIntervalLevel3 = 0.3f;
+	[Export] public float FlickerMaxIntervalLevel3 = 0.8f;
+	[Export] public float FlickerMinDuration = 0.06f;        // segundos que dura un parpadeo
+	[Export] public float FlickerMaxDuration = 0.12f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerOpacity = 0.2f;   // opacidad de la arista apagada
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float CameraHeight = 1.8f;
@@ -95,6 +111,23 @@ public partial class Player : CharacterBody3D
 	private float _bank = 0f;
 	private bool _inputBlocked;
 
+	// Parpadeo de las aristas dañadas de la nave y de la cabina (null hasta que hay daño)
+	private EdgeFlicker _shipFlicker;
+	private EdgeFlicker _cockpitFlicker;
+
+	// Factores de la velocidad punta y del giro (los daños los bajan; 1 = sin efecto).
+	// Se aplican sobre MaxSpeed y TurnRate al pasar los parámetros al modelo, sin cambiarlos.
+	public float TopSpeedFactor { get; set; } = 1f;
+	public float TurnRateFactor { get; set; } = 1f;
+
+	// Si se puede activar el boost (los daños de nivel 3 lo bloquean): las cargas se siguen ganando
+	// y un impulso en curso no se corta
+	public bool BoostAllowed
+	{
+		get => _boost.ActivationAllowed;
+		set => _boost.ActivationAllowed = value;
+	}
+
 	// Velocidad real actual en m/s (la usa el HUD)
 	public float Speed => _dynamics.RealSpeed;
 
@@ -107,6 +140,7 @@ public partial class Player : CharacterBody3D
 	// Cargas de boost disponibles y si el cooldown está activo (las lee el HUD junto con BoostMaxCharges)
 	public int BoostCharges => _boost.Charges;
 	public bool BoostCooldownActive => _boost.IsCooldownActive;
+	public bool BoostBlocked => !_boost.ActivationAllowed;
 
 	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
 	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();
@@ -190,6 +224,24 @@ public partial class Player : CharacterBody3D
 		_shake.Trigger(level);
 	}
 
+	// Nivel de daño visible (0–3): algunas aristas de la nave y de la cabina parpadean. Solo sube.
+	public void SetFlickerLevel(int level)
+	{
+		if (level <= 0 && _shipFlicker == null)
+			return;
+
+		if (_shipFlicker == null)
+		{
+			var random = new System.Random();
+			_shipFlicker = new EdgeFlicker(_ship.EdgeCount, BuildFlickerSettings(), random);
+			_cockpitFlicker = new EdgeFlicker(_cockpit.EdgeCount, BuildFlickerSettings(), random);
+		}
+		_shipFlicker.SetLevel(level);
+		_cockpitFlicker.SetLevel(level);
+		_ship.ShowEdgeFlicker(_shipFlicker, FlickerOpacity);
+		_cockpit.ShowEdgeFlicker(_cockpitFlicker, FlickerOpacity);
+	}
+
 	// Ignora el input de conducción (y el boost) hasta que se suelten todas sus teclas.
 	// Se usa al salir de la pausa: las teclas pulsadas en ella no deben llegar a la nave.
 	public void BlockInputUntilReleased()
@@ -214,6 +266,22 @@ public partial class Player : CharacterBody3D
 			_chaseCam.MakeCurrent();
 		else
 			_cockpit.Camera.MakeCurrent();
+	}
+
+	// Parpadeo de las aristas dañadas (con la pausa no avanza: queda congelado)
+	public override void _Process(double delta)
+	{
+		if (_shipFlicker == null)
+			return;
+
+		float dt = (float)delta;
+		EdgeFlickerSettings settings = BuildFlickerSettings();
+		_shipFlicker.Settings = settings;
+		_cockpitFlicker.Settings = settings;
+		if (_shipFlicker.Update(dt))
+			_ship.ShowEdgeFlicker(_shipFlicker, FlickerOpacity);
+		if (_cockpitFlicker.Update(dt))
+			_cockpit.ShowEdgeFlicker(_cockpitFlicker, FlickerOpacity);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -299,12 +367,12 @@ public partial class Player : CharacterBody3D
 	{
 		return new ShipTuning
 		{
-			MaxSpeed = MaxSpeed,
+			MaxSpeed = MaxSpeed * TopSpeedFactor,
 			Acceleration = Acceleration,
 			BrakeDeceleration = BrakeDeceleration,
 			Drag = Drag,
 			OverspeedDecay = OverspeedDecay / KmhPerMs,
-			TurnRate = TurnRate,
+			TurnRate = TurnRate * TurnRateFactor,
 			SteerResponse = SteerResponse,
 			LateralGrip = LateralGrip
 		};
@@ -322,6 +390,18 @@ public partial class Player : CharacterBody3D
 			RampDuration = BoostRampTime,
 			HoldDuration = BoostHoldTime,
 			Cooldown = BoostCooldown
+		};
+	}
+
+	private EdgeFlickerSettings BuildFlickerSettings()
+	{
+		return new EdgeFlickerSettings
+		{
+			Level1 = new FlickerLevelSettings { Fraction = FlickerFractionLevel1, MinInterval = FlickerMinIntervalLevel1, MaxInterval = FlickerMaxIntervalLevel1 },
+			Level2 = new FlickerLevelSettings { Fraction = FlickerFractionLevel2, MinInterval = FlickerMinIntervalLevel2, MaxInterval = FlickerMaxIntervalLevel2 },
+			Level3 = new FlickerLevelSettings { Fraction = FlickerFractionLevel3, MinInterval = FlickerMinIntervalLevel3, MaxInterval = FlickerMaxIntervalLevel3 },
+			MinDuration = FlickerMinDuration,
+			MaxDuration = FlickerMaxDuration
 		};
 	}
 

@@ -9,6 +9,10 @@ namespace Vectory.Ship;
 public partial class Cockpit : Node3D
 {
 	private MeshInstance3D _frame;
+	private EdgeFlickerMaterial _flickerMaterial;
+
+	// Número de aristas del marco: cada una puede parpadear por su cuenta con los daños
+	public int EdgeCount { get; private set; }
 
 	public Camera3D Camera { get; private set; }
 
@@ -26,7 +30,8 @@ public partial class Cockpit : Node3D
 		AddChild(Camera);
 
 		// Marco minimalista de la cabina, pegado a la cámara
-		_frame = new MeshInstance3D { Name = "CockpitFrame", Mesh = BuildFrameMesh() };
+		_frame = new MeshInstance3D { Name = "CockpitFrame", Mesh = BuildFrameMesh(out int edgeCount) };
+		EdgeCount = edgeCount;
 		Camera.AddChild(_frame);
 
 		SetFrameVisible(false);
@@ -46,36 +51,60 @@ public partial class Cockpit : Node3D
 		_frame.Visible = visible;
 	}
 
+	// Daños: las aristas apagadas del parpadeo bajan a dimOpacity. La primera llamada cambia el material
+	// del marco por el de parpadeo; sin llamarla el marco conserva su material de siempre.
+	public void ShowEdgeFlicker(EdgeFlicker flicker, float dimOpacity)
+	{
+		if (_flickerMaterial == null)
+		{
+			_flickerMaterial = new EdgeFlickerMaterial(EdgeCount);
+			_frame.SetSurfaceOverrideMaterial(0, _flickerMaterial.Material);
+		}
+		_flickerMaterial.SetDimOpacity(dimOpacity);
+		_flickerMaterial.Apply(flicker);
+	}
+
 	// Marco en forma de capó/salpicadero central con dos alas hacia los lados.
 	// Se dibuja en un plano a 1 m delante de la cámara; con FOV 80 y pantalla 16:9 ese plano
 	// cubre x de -1,49 a 1,49 e y de -0,84 a 0,84. El lado izquierdo es el espejo del derecho.
-	private static ArrayMesh BuildFrameMesh()
+	// Cada vértice lleva en UV.x el número de su arista (los dos trazos de una línea gruesa son la misma arista).
+	private static ArrayMesh BuildFrameMesh(out int edgeCount)
 	{
 		const float z = -1f;
 		const float Edge = 0.012f;   // separación del segundo trazo, para dar grosor a las líneas principales
 		var verts = new List<Vector3>();
 		var colors = new List<Color>();
+		var uvs = new List<Vector2>();
+		int edges = 0;
 
-		void Seg(float x1, float y1, float x2, float y2, Color c)
+		void Trace(float x1, float y1, float x2, float y2, Color c, int edge)
 		{
 			verts.Add(new Vector3(x1, y1, z));
 			verts.Add(new Vector3(x2, y2, z));
 			colors.Add(c);
 			colors.Add(c);
+			uvs.Add(new Vector2(edge, 0f));
+			uvs.Add(new Vector2(edge, 0f));
+		}
+
+		void Seg(float x1, float y1, float x2, float y2, Color c)
+		{
+			Trace(x1, y1, x2, y2, c, edges++);
 		}
 
 		// Línea gruesa: la línea y una copia desplazada un poco hacia dentro
 		void Thick(float x1, float y1, float x2, float y2, Color c)
 		{
-			Seg(x1, y1, x2, y2, c);
+			int edge = edges++;
+			Trace(x1, y1, x2, y2, c, edge);
 			if (Mathf.Abs(x2 - x1) >= Mathf.Abs(y2 - y1))
 			{
-				Seg(x1, y1 - Edge, x2, y2 - Edge, c);
+				Trace(x1, y1 - Edge, x2, y2 - Edge, c, edge);
 			}
 			else
 			{
 				float dx = (x1 + x2) > 0f ? -Edge : Edge;
-				Seg(x1 + dx, y1, x2 + dx, y2, c);
+				Trace(x1 + dx, y1, x2 + dx, y2, c, edge);
 			}
 		}
 
@@ -112,6 +141,8 @@ public partial class Cockpit : Node3D
 		arrays.Resize((int)Mesh.ArrayType.Max);
 		arrays[(int)Mesh.ArrayType.Vertex] = verts.ToArray();
 		arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
+		arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+		edgeCount = edges;
 
 		var mesh = new ArrayMesh();
 		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);

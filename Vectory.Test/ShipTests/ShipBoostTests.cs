@@ -370,4 +370,53 @@ public class ShipBoostTests
         Assert.Equal(BoostPhase.None, boost.Phase);
         Assert.Equal(0f, boost.HoldRemaining);
     }
+
+    // ---------------------------------------------------------------
+    // Boost bloqueado (daños de nivel 3)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void NotAllowed_DoesNotActivate_ButKeepsRecharging()
+    {
+        var tuning = CreateTuning();
+        var boost = NewBoost(tuning);
+        Advance(boost, tuning, 35);
+        boost.ActivationAllowed = false;
+
+        Assert.False(boost.CanActivate);
+        Assert.False(boost.TryActivate(tuning));
+        Assert.Equal(1, boost.Charges);
+        Assert.Equal(BoostPhase.None, boost.Phase);
+
+        Advance(boost, tuning, 35);
+        Assert.Equal(2, boost.Charges);
+    }
+
+    [Fact]
+    public void NotAllowed_DoesNotCancelImpulseInProgress()
+    {
+        var tuning = CreateTuning();
+        var boost = Activated(tuning);
+        float gained = boost.Update(tuning, 0.25f);
+
+        boost.ActivationAllowed = false;
+        gained += boost.Update(tuning, 0.25f);
+
+        Assert.Equal(100f, gained, Precision);
+        Assert.Equal(BoostPhase.Hold, boost.Phase);
+        boost.Update(tuning, 2f);
+        Assert.Equal(BoostPhase.None, boost.Phase);
+    }
+
+    [Fact]
+    public void AllowedAgain_CanActivate()
+    {
+        var tuning = CreateTuning();
+        var boost = NewBoost(tuning);
+        Advance(boost, tuning, 35);
+        boost.ActivationAllowed = false;
+        boost.ActivationAllowed = true;
+
+        Assert.True(boost.TryActivate(tuning));
+    }
 }
