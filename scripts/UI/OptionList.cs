@@ -17,6 +17,7 @@ public struct OptionListStyle
 	public float GlowSize;          // halo del texto seleccionado
 	public int HintFontSize;        // COMING SOON
 	public float HintGap;           // hueco entre la opción y COMING SOON
+	public bool HideDisabledHint;   // las desactivadas sin COMING SOON (p. ej. RESET RECORDS sin récords)
 
 	// Medidas de una spec (px sobre 1280×720) multiplicadas por la escala
 	public static OptionListStyle Scaled(float scale, float fontSize, float rowHeight, float spacing,
@@ -67,6 +68,25 @@ public partial class OptionList : VBoxContainer
 	private LabelSettings _hintSettings;
 
 	public MenuModel Model => _model;
+
+	// Mayor tamaño de fuente (px sobre 1280×720, como mucho maxSize) con el que la opción más larga,
+	// seleccionada (en negrita, con la barra y el desplazamiento), cabe en maxWidth px finales.
+	public static int FitFontSize(MenuModel options, int maxSize, float scale, float maxWidth,
+		float barWidth = 4f, float selectedOffset = 16f)
+	{
+		for (int size = maxSize; size > 8; size--)
+		{
+			int px = Mathf.RoundToInt(size * scale);
+			Font font = MenuFonts.Make(MenuFonts.Orbitron, 700, px, 0.12f);
+			float widest = 0f;
+			foreach (MenuOption option in options.Options)
+				widest = Mathf.Max(widest, font.GetStringSize(option.Label, HorizontalAlignment.Left, -1, px).X);
+
+			if ((barWidth + selectedOffset) * scale + widest <= maxWidth)
+				return size;
+		}
+		return 8;
+	}
 
 	// Prepara los estilos. Llamar una vez antes de SetModel.
 	public void Setup(OptionListStyle style)
@@ -159,7 +179,7 @@ public partial class OptionList : VBoxContainer
 		};
 		row.AddChild(text);
 
-		if (!option.Enabled)
+		if (!option.Enabled && !_style.HideDisabledHint)
 		{
 			row.AddChild(new Control { CustomMinimumSize = new Vector2(_style.HintGap, 0f), MouseFilter = MouseFilterEnum.Ignore });
 			row.AddChild(new Label
@@ -170,7 +190,7 @@ public partial class OptionList : VBoxContainer
 				MouseFilter = MouseFilterEnum.Ignore
 			});
 		}
-		else
+		if (option.Enabled)
 		{
 			row.MouseEntered += () => OnHover(index);
 			row.GuiInput += e => OnRowInput(index, e);

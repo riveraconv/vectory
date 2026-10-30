@@ -1,12 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Vectory.Records;
 
-// Un tiempo récord y cuándo se hizo (fecha en formato ISO 8601)
+// Lectura tolerante del archivo (para poder ampliar el formato sin romper archivos existentes):
+// los campos desconocidos se ignoran y los opcionales (fecha, tiempos de paso...) pueden faltar.
+// Solo lo marcado con [JsonRequired] es imprescindible: si falta, el archivo se trata como corrupto.
+
+// Un tiempo récord y cuándo se hizo (fecha local yyyy-MM-dd; los récords antiguos pueden traer
+// la fecha ISO completa o no traer ninguna)
 public sealed class TimedRecord
 {
-	public double Time { get; set; }
+	[JsonRequired] public double Time { get; set; }
 	public string Date { get; set; } = "";
 }
 
@@ -14,7 +20,7 @@ public sealed class TimedRecord
 // (tiempo de vuelta acumulado desde la meta al cruzar cada uno).
 public sealed class TimeTrialRecord
 {
-	public double LapTime { get; set; }
+	[JsonRequired] public double LapTime { get; set; }
 	public double[] Splits { get; set; } = Array.Empty<double>();
 	public string Date { get; set; } = "";
 
@@ -45,6 +51,6 @@ public readonly record struct TimeTrialLapResult(bool IsNewRecord, double? Previ
 // Formato del archivo: versión y récords por Id de circuito
 public sealed class RecordFile
 {
-	public int Version { get; set; }
+	[JsonRequired] public int Version { get; set; }
 	public Dictionary<string, CircuitRecords> Circuits { get; set; } = new();
 }
