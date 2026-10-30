@@ -83,4 +83,5 @@ public static class Palette
 	public static readonly Color DeltaWorseGlow = new Color(Red, 0.5f);
 	public static readonly Color NewRecord = Orange;                // NEW RECORD (franja de fin de vuelta y resultados)
 	public static readonly Color NewRecordGlow = new Color(Orange, 0.5f);
+	public static readonly Color GhostLine = new Color(BlueGray, 0.35f);    // nave fantasma: azul grisáceo translúcido, sin brillo
 }

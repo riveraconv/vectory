@@ -30,6 +30,13 @@ public partial class Spaceship : Node3D
 		_meshInstance.Visible = visible;
 	}
 
+	// Sustituye el material de todas las líneas (la nave fantasma lo pinta de un solo color translúcido).
+	// null vuelve a los colores normales. Solo después de _Ready (al estar ya en el árbol).
+	public void SetMaterialOverride(Material material)
+	{
+		_meshInstance.MaterialOverride = material;
+	}
+
 	// ---------------------------------------------------------------
 	// Helpers de geometría
 	// ---------------------------------------------------------------
