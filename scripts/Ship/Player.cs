@@ -15,8 +15,11 @@ namespace Vectory.Ship;
 // Solo acepta input con la carrera en marcha (RaceSession.CanDrive): en la cuenta atrás la nave
 // está quieta y el boost no recarga; al terminar se suelta todo y la nave se para sola.
 //
+// El derrape (spec docs/conduccion-avanzada.md) vive en ShipDynamics; la inclinación visual en ShipBank.
+//
 // W / Flecha arriba: acelerar    S / Flecha abajo: frenar (también corta el impulso del boost)
-// A,D / Flechas izq.-der.: girar Espacio (acción "boost"): gastar una carga de boost
+// A,D / Flechas izq.-der.: girar
+// Espacio (acción "drift") + girar: derrapar    Shift (acción "boost"): gastar una carga de boost
 // C: alternar cabina / tercera persona
 public partial class Player : CharacterBody3D
 {
@@ -46,8 +49,24 @@ public partial class Player : CharacterBody3D
 	[ExportGroup("Dirección")]
 	[Export] public float TurnRate = 1.6f;       // rad/s de giro máximo
 	[Export] public float SteerResponse = 6f;    // lo rápido que llega el giro a su valor máximo
-	[Export] public float MaxBank = 0.6f;        // inclinación visual (rad) al girar
 	[Export] public float LateralGrip = 5f;      // más alto = menos inercia lateral (la nave se "agarra" antes)
+
+	[ExportGroup("Derrape")]
+	[Export] public float DriftEnterSpeed = 120f;      // km/h mínimos para entrar en derrape
+	[Export] public float DriftExitSpeed = 60f;        // km/h por debajo de los que se sale
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftGrip = 0f;                 // agarre lateral en derrape
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftCountersteerGrip = 0.5f;   // agarre contravolanteando
+	[Export] public float DriftTurnMultiplier = 1.4f;  // giro del rumbo en derrape
+	[Export] public float DriftFixedLoss = 5f;         // km/h que se pierden cada segundo derrapando
+	[Export] public float DriftSlipLoss = 10f;         // km/h por segundo extra al ángulo máximo
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftAcceleration = 0.5f;       // aceleración con W en derrape
+	[Export] public float DriftMaxSlipAngle = 60f;     // grados de deslizamiento máximo
+	[Export] public float DriftGripRecoveryTime = 3f;  // segundos para volver al agarre normal al salir
+
+	[ExportGroup("Inclinación")]
+	[Export] public float BankMaxNormal = 25f;   // grados a giro máximo y velocidad punta
+	[Export] public float BankMaxDrift = 20f;    // grados en derrape
+	[Export] public float BankSmoothing = 0.15f; // constante de tiempo del suavizado (s)
 
 	[ExportGroup("Colisiones")]
 	[Export] public float CollisionHalfWidth = 3.4f;   // semiancho de colisión con la barrera (m; las puntas de las alas)
@@ -78,15 +97,15 @@ public partial class Player : CharacterBody3D
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel1 = 0.10f;   // proporción de aristas que parpadean
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel2 = 0.20f;
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel3 = 0.35f;
-	[Export] public float FlickerMinIntervalLevel1 = 1.5f;   // segundos entre parpadeos de una arista (aleatorio entre mínimo y máximo)
-	[Export] public float FlickerMaxIntervalLevel1 = 3f;
-	[Export] public float FlickerMinIntervalLevel2 = 0.8f;
-	[Export] public float FlickerMaxIntervalLevel2 = 1.6f;
-	[Export] public float FlickerMinIntervalLevel3 = 0.3f;
-	[Export] public float FlickerMaxIntervalLevel3 = 0.8f;
-	[Export] public float FlickerMinDuration = 0.06f;        // segundos que dura un parpadeo
-	[Export] public float FlickerMaxDuration = 0.12f;
-	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerOpacity = 0.2f;   // opacidad de la arista apagada
+	[Export] public float FlickerMinIntervalLevel1 = 0.5f;   // segundos entre parpadeos de una arista (aleatorio entre mínimo y máximo)
+	[Export] public float FlickerMaxIntervalLevel1 = 1f;
+	[Export] public float FlickerMinIntervalLevel2 = 0.5f;
+	[Export] public float FlickerMaxIntervalLevel2 = 1f;
+	[Export] public float FlickerMinIntervalLevel3 = 0.5f;
+	[Export] public float FlickerMaxIntervalLevel3 = 1f;
+	[Export] public float FlickerMinDuration = 6f;           // segundos que dura un parpadeo
+	[Export] public float FlickerMaxDuration = 15f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerOpacity = 0.1f;   // opacidad de la arista apagada
 
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
@@ -100,6 +119,7 @@ public partial class Player : CharacterBody3D
 	private readonly ShipBoost _boost = new();
 	private readonly BarrierCollision _collision = new();
 	private readonly ImpactRecovery _recovery = new();
+	private readonly ShipBank _bank = new();
 	private CameraShake _shake;
 	private Spaceship _ship;
 	private Cockpit _cockpit;
@@ -108,7 +128,6 @@ public partial class Player : CharacterBody3D
 	private RaceSession _race;
 
 	private bool _chaseView = true;
-	private float _bank = 0f;
 	private bool _inputBlocked;
 
 	// Parpadeo de las aristas dañadas de la nave y de la cabina (null hasta que hay daño)
@@ -196,7 +215,7 @@ public partial class Player : CharacterBody3D
 		GlobalPosition = position;
 		_dynamics.Reset(yaw, initialSpeed);
 		_boost.Reset(BuildBoostTuning());
-		_bank = 0f;
+		_bank.Reset();
 		_collision.Reset();
 		_recovery.Cancel();
 		Rotation = new Vector3(0f, yaw, 0f);
@@ -209,7 +228,7 @@ public partial class Player : CharacterBody3D
 	{
 		GlobalPosition = position;
 		_dynamics.Reset(yaw, 0f);
-		_bank = 0f;
+		_bank.Reset();
 		_collision.Reset();
 		_recovery.Cancel();
 		LastBarrierTouch = default;
@@ -297,7 +316,7 @@ public partial class Player : CharacterBody3D
 		// Tras la pausa, nada cuenta hasta que se suelten las teclas que siguieran pulsadas
 		if (_inputBlocked)
 		{
-			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || Input.IsActionPressed("boost"))
+			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || input.Drift || Input.IsActionPressed("boost"))
 				input = default;
 			else
 				_inputBlocked = false;
@@ -320,7 +339,8 @@ public partial class Player : CharacterBody3D
 
 		// Tras un impacto fuerte, el giro y la aceleración van reducidos un momento
 		_recovery.Update(dt);
-		_dynamics.Step(input, BuildTuning(), dt, boostGain, _boost.IsImpulseActive, _recovery.Factor);
+		ShipTuning tuning = BuildTuning();
+		_dynamics.Step(input, tuning, BuildDriftTuning(), dt, boostGain, _boost.IsImpulseActive, _recovery.Factor);
 		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
 
 		// 2. Mover el cuerpo en Godot con la velocidad real
@@ -335,12 +355,10 @@ public partial class Player : CharacterBody3D
 		if (GetSlideCollisionCount() > 0)
 			_dynamics.AbsorbCollision();
 
-		// 5. Inclinación visual de la nave al girar
-		float bankTarget = _dynamics.Steer * MaxBank * _dynamics.TurnFactor;
-		_bank = Mathf.Lerp(_bank, bankTarget, 1f - Mathf.Exp(-8f * dt));
-		var roll = new Vector3(0f, 0f, _bank);
-		_ship.Rotation = roll;
-		_cockpit.Rotation = roll;
+		// 5. Inclinación visual de la nave al girar (solo la geometría exterior; la cabina no se inclina)
+		float speedRatio = tuning.MaxSpeed > 0f ? _dynamics.RealSpeed / tuning.MaxSpeed : 0f;
+		_bank.Update(_dynamics.Steer, speedRatio, _dynamics.Drifting, BuildBankSettings(), dt);
+		_ship.Rotation = new Vector3(0f, 0f, _bank.Angle);
 
 		// 6. Sacudida (más suave en cabina) y cámara de tercera persona
 		UpdateShake(dt);
@@ -358,7 +376,8 @@ public partial class Player : CharacterBody3D
 			Accelerate = Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up),
 			Brake = Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down),
 			SteerLeft = Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left),
-			SteerRight = Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right)
+			SteerRight = Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right),
+			Drift = Input.IsActionPressed("drift")
 		};
 	}
 
@@ -375,6 +394,35 @@ public partial class Player : CharacterBody3D
 			TurnRate = TurnRate * TurnRateFactor,
 			SteerResponse = SteerResponse,
 			LateralGrip = LateralGrip
+		};
+	}
+
+	// Parámetros del derrape del Inspector, con las velocidades en m/s y los ángulos en radianes
+	private DriftTuning BuildDriftTuning()
+	{
+		return new DriftTuning
+		{
+			Enabled = true,
+			EnterSpeed = DriftEnterSpeed / KmhPerMs,
+			ExitSpeed = DriftExitSpeed / KmhPerMs,
+			Grip = DriftGrip,
+			CountersteerGrip = DriftCountersteerGrip,
+			TurnMultiplier = DriftTurnMultiplier,
+			FixedLoss = DriftFixedLoss / KmhPerMs,
+			SlipLoss = DriftSlipLoss / KmhPerMs,
+			AccelerationFactor = DriftAcceleration,
+			MaxSlipAngle = Mathf.DegToRad(DriftMaxSlipAngle),
+			GripRecoveryTime = DriftGripRecoveryTime
+		};
+	}
+
+	private BankSettings BuildBankSettings()
+	{
+		return new BankSettings
+		{
+			MaxNormal = Mathf.DegToRad(BankMaxNormal),
+			MaxDrift = Mathf.DegToRad(BankMaxDrift),
+			SmoothTime = BankSmoothing
 		};
 	}
 
@@ -513,6 +561,10 @@ public partial class Player : CharacterBody3D
 		float yaw = Mathf.Atan2(-newForward.X, -newForward.Y);
 		_dynamics.ApplyImpact(newVelocity, yaw, r.SpeedScale, r.SpeedLoss);
 		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
+
+		// Un impacto medio o fuerte corta el derrape (el roce no)
+		if (r.IsNewImpact && r.Level != ImpactLevel.Graze)
+			_dynamics.EndDrift();
 
 		if (r.IsNewImpact && r.Level == ImpactLevel.Strong)
 		{

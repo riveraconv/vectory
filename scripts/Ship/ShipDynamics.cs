@@ -3,7 +3,8 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-// Modelo de conducción arcade de la nave: velocidad del motor, giro suavizado e inercia lateral.
+// Modelo de conducción arcade de la nave: velocidad del motor, giro suavizado, inercia lateral
+// y derrape (spec docs/conduccion-avanzada.md). Sin derrape, la conducción es la de siempre.
 // Lógica pura: no depende de Godot, así que se puede probar sin ejecutar el juego.
 // Trabaja en el plano horizontal: Vector2.X = eje X de Godot, Vector2.Y = eje Z de Godot.
 // Convenciones: yaw positivo = girar a la izquierda; "adelante" para yaw = 0 es -Z.
@@ -29,6 +30,32 @@ public class ShipDynamics
 	// Dirección hacia la que apunta la nave
 	public Vector2 Forward => new Vector2(-MathF.Sin(Yaw), -MathF.Cos(Yaw));
 
+	// Perpendicular a la derecha del morro
+	public Vector2 Right => new Vector2(MathF.Cos(Yaw), -MathF.Sin(Yaw));
+
+	// Por debajo de esta velocidad real (20 km/h) el ángulo de deslizamiento se considera 0
+	public const float MinSlipSpeed = 20f / 3.6f;
+
+	// Si la nave está derrapando
+	public bool Drifting { get; private set; }
+
+	// Fracción del agarre lateral normal que se aplica (1 sin derrape; baja al derrapar y se recupera al salir)
+	public float GripFactor { get; private set; } = 1f;
+
+	// Ángulo entre el morro y la dirección de movimiento (radianes; positivo = desliza hacia la derecha)
+	public float SlipAngle
+	{
+		get
+		{
+			if (RealSpeed < MinSlipSpeed)
+				return 0f;
+			return MathF.Atan2(Vector2.Dot(Velocity, Right), Vector2.Dot(Velocity, Forward));
+		}
+	}
+
+	// Tras un impacto que corta el derrape, no se vuelve a entrar hasta soltar la tecla de derrape o el giro
+	private bool _driftNeedsRelease;
+
 	// Deja la nave orientada según yaw, parada o (salida lanzada) avanzando a "speed" m/s hacia delante
 	public void Reset(float yaw, float speed = 0f)
 	{
@@ -37,6 +64,19 @@ public class ShipDynamics
 		Yaw = yaw;
 		TurnFactor = Math.Clamp(Speed / 10f, 0f, 1f);
 		Velocity = Forward * Speed;
+		Drifting = false;
+		GripFactor = 1f;
+		_driftNeedsRelease = false;
+	}
+
+	// Termina el derrape al momento (impacto medio o fuerte): el agarre empieza a recuperarse
+	// y no se vuelve a entrar hasta soltar la tecla de derrape o el giro
+	public void EndDrift()
+	{
+		if (!Drifting)
+			return;
+		Drifting = false;
+		_driftNeedsRelease = true;
 	}
 
 	// Avanza el modelo un paso de dt segundos.
@@ -46,9 +86,27 @@ public class ShipDynamics
 	// control: factor de 0 a 1 para la aceleración y el giro (corrección tras un impacto fuerte); el freno no cambia.
 	public void Step(in ShipInput input, in ShipTuning t, float dt, float boostGain = 0f, bool boosting = false, float control = 1f)
 	{
+		Step(input, t, default, dt, boostGain, boosting, control);
+	}
+
+	// Igual, con derrape (drift.Enabled). En derrape cambian la aceleración, el giro del rumbo y el agarre lateral, y la nave pierde velocidad según el ángulo de deslizamiento.
+	public void Step(in ShipInput input, in ShipTuning baseTuning, in DriftTuning drift, float dt, float boostGain = 0f, bool boosting = false, float control = 1f)
+	{
 		boosting |= boostGain > 0f;
 
+		// Derrape: entrar, seguir o salir, y agarre de este paso
+		float steerInput = (input.SteerLeft ? 1f : 0f) - (input.SteerRight ? 1f : 0f);
+		UpdateDrift(input, drift, steerInput, dt);
+
+		ShipTuning t = baseTuning;
+		if (Drifting)
+		{
+			t.Acceleration *= drift.AccelerationFactor;
+			t.TurnRate *= drift.TurnMultiplier;
+		}
+
 		// Velocidad del motor
+		float speedBefore = Speed;
 		if (Speed > t.MaxSpeed)
 			StepAboveMaxSpeed(input, t, dt, boosting);
 		else if (input.Accelerate)
@@ -61,15 +119,83 @@ public class ShipDynamics
 		// El impulso del boost no lo recorta la velocidad punta
 		Speed += MathF.Max(0f, boostGain);
 
+		// Pérdida por derrapar: fija más una parte proporcional al ángulo de deslizamiento
+		if (Drifting)
+		{
+			float slip = drift.MaxSlipAngle > 0f ? Math.Clamp(MathF.Abs(SlipAngle) / drift.MaxSlipAngle, 0f, 1f) : 0f;
+			Speed = MathF.Max(0f, Speed - (drift.FixedLoss + drift.SlipLoss * slip) * dt);
+		}
+
+		// En derrape (y mientras se recupera el agarre) lo que cambia el motor —W, S, boost y pérdidas—
+		// se aplica también a la velocidad real hacia el morro: con poco agarre, si no, no se notaría hasta salir
+		if (Drifting || GripFactor < 1f)
+			PushAlongNose(Speed - speedBefore);
+
 		// Giro: izquierda = positivo. Si está casi parada, apenas gira.
-		float steerTarget = (input.SteerLeft ? 1f : 0f) - (input.SteerRight ? 1f : 0f);
-		Steer = MoveToward(Steer, steerTarget, t.SteerResponse * dt);
+		Steer = MoveToward(Steer, steerInput, t.SteerResponse * dt);
 		TurnFactor = Math.Clamp(Speed / 10f, 0f, 1f);
 		Yaw += Steer * t.TurnRate * TurnFactor * control * dt;
 
-		// Inercia lateral: la velocidad real se acerca poco a poco a "hacia donde apunta la nave"
-		float k = 1f - MathF.Exp(-t.LateralGrip * dt);
+		// Inercia lateral: la velocidad real se acerca poco a poco a "hacia donde apunta la nave".
+		// En derrape (y mientras se recupera el agarre) lo hace más despacio y el ángulo tiene tope.
+		float k = 1f - MathF.Exp(-t.LateralGrip * GripFactor * dt);
 		Velocity = Vector2.Lerp(Velocity, Forward * Speed, k);
+		if (Drifting || GripFactor < 1f)
+			LimitSlip(drift.MaxSlipAngle);
+
+		// En derrape el motor no va más rápido que la nave: lo que se pierde deslizando (y con el tope
+		// del ángulo) no se recupera solo al salir
+		if (Drifting)
+			Speed = MathF.Min(Speed, RealSpeed);
+	}
+
+	// Suma "delta" m/s a la velocidad real en la dirección del morro, sin que la parte hacia delante baje de 0
+	private void PushAlongNose(float delta)
+	{
+		if (delta < 0f)
+			delta = MathF.Max(delta, -MathF.Max(0f, Vector2.Dot(Velocity, Forward)));
+		Velocity += Forward * delta;
+	}
+
+	// Decide si la nave derrapa en este paso y con qué agarre
+	private void UpdateDrift(in ShipInput input, in DriftTuning drift, float steerInput, float dt)
+	{
+		bool held = input.Drift && steerInput != 0f;
+		if (!held)
+			_driftNeedsRelease = false;
+
+		Drifting = DriftRule.ShouldDrift(Drifting, held && !_driftNeedsRelease, RealSpeed, drift);
+
+		if (Drifting)
+		{
+			// Contravolante: girar hacia el lado al que desliza la nave
+			bool countersteer = steerInput * Vector2.Dot(Velocity, Right) < 0f;
+			GripFactor = countersteer ? drift.CountersteerGrip : drift.Grip;
+		}
+		else if (GripFactor < 1f)
+		{
+			// Al salir, el agarre vuelve al 100 % de forma lineal en GripRecoveryTime
+			if (drift.GripRecoveryTime > 0f && drift.Grip < 1f)
+				GripFactor = MoveToward(GripFactor, 1f, (1f - drift.Grip) / drift.GripRecoveryTime * dt);
+			else
+				GripFactor = 1f;
+		}
+	}
+
+	// Recorta la velocidad lateral para que el ángulo de deslizamiento no pase de maxAngle
+	private void LimitSlip(float maxAngle)
+	{
+		if (maxAngle <= 0f || RealSpeed < MinSlipSpeed)
+			return;
+
+		float along = Vector2.Dot(Velocity, Forward);
+		if (along <= 0f)
+			return;
+
+		float lateral = Vector2.Dot(Velocity, Right);
+		float maxLateral = along * MathF.Tan(maxAngle);
+		if (MathF.Abs(lateral) > maxLateral)
+			Velocity = Forward * along + Right * (MathF.Sign(lateral) * maxLateral);
 	}
 
 	// El motor mueve la nave y devuelve la velocidad real resultante (por ejemplo, tras deslizar contra algo)
