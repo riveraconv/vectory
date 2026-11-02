@@ -3,22 +3,30 @@
 [ext_resource type="Script" uid="uid://dnj15rwq27lnn" path="res://scripts/Game/Main.cs" id="1_glv2v"]
 [ext_resource type="Script" uid="uid://calvipcoabflp" path="res://scripts/Circuit/Track.cs" id="2_r0du0"]
 [ext_resource type="Script" uid="uid://d0sbwun4waqmi" path="res://scripts/Ship/Player.cs" id="3_cm0pq"]
-[ext_resource type="Script" path="res://scripts/Menu/PauseMenu.cs" id="4_pause"]
-[ext_resource type="Script" path="res://scripts/Ghost/GhostShip.cs" id="5_ghost"]
+[ext_resource type="Script" uid="uid://fcs6rwnsb3wm" path="res://scripts/Menu/PauseMenu.cs" id="4_pause"]
+[ext_resource type="Script" uid="uid://cmtsv456hvquy" path="res://scripts/Ghost/GhostShip.cs" id="5_ghost"]
 
 [node name="Main" type="Node3D" unique_id=1889765682]
 script = ExtResource("1_glv2v")
 
 [node name="Track" type="Node3D" parent="." unique_id=1902884476]
 script = ExtResource("2_r0du0")
-TrackWidth = 40.0
 
 [node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
 script = ExtResource("3_cm0pq")
 MaxSpeed = 80.0
+FlickerMinIntervalLevel1 = 0.5
+FlickerMaxIntervalLevel1 = 1.0
+FlickerMinIntervalLevel2 = 0.5
+FlickerMaxIntervalLevel2 = 1.0
+FlickerMinIntervalLevel3 = 0.5
+FlickerMaxIntervalLevel3 = 1.0
+FlickerMinDuration = 6.0
+FlickerMaxDuration = 15.0
+FlickerOpacity = 0.1
 
-[node name="PauseMenu" type="CanvasLayer" parent="."]
+[node name="PauseMenu" type="CanvasLayer" parent="." unique_id=1844954761]
 script = ExtResource("4_pause")
 
-[node name="GhostShip" type="Node3D" parent="."]
+[node name="GhostShip" type="Node3D" parent="." unique_id=369708414]
 script = ExtResource("5_ghost")
