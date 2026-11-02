@@ -1,6 +1,8 @@
 # VECTORY — Spec: Daños
 
-Versión 1.0 · 2026-10-30 · Estado: **definido, listo para implementar**
+Versión 1.1 · 2026-11-02 · Estado: **implementado y validado**
+
+**Cambios en v1.1**: valores del parpadeo de aristas ajustados por el usuario (intervalo 0,5–1 s en los tres niveles, duración 6–15 s, opacidad 0,1; secciones de parpadeo y parámetros). La tecla de boost es ahora Shift (spec de conducción avanzada).
 
 Añade **daños acumulativos** a la nave en **RACE**: los impactos medios y fuertes contra la barrera suman puntos, los puntos suben el **nivel de daño (0–3)** y cada nivel tiene consecuencias. Un **indicador de tres segmentos** en el HUD muestra el nivel y la nave **parpadea** en algunas aristas según el daño.
 
@@ -73,16 +75,16 @@ Todo lo demás del documento maestro (principios, flujo por etapa, SOLID, prueba
 
 ## 4. Daño visible en la nave
 
-- A partir del nivel 1, algunas aristas de la **nave** (vista exterior) y de la **cabina** (vista de cabina) **parpadean**: bajan al ~20 % de su opacidad durante un instante y vuelven.
+- A partir del nivel 1, algunas aristas de la **nave** (vista exterior) y de la **cabina** (vista de cabina) **parpadean**: bajan al ~10 % de su opacidad durante un rato y vuelven.
 
 | Nivel | Aristas afectadas | Frecuencia de cada parpadeo |
 |---|---|---|
 | 0 | Ninguna | — |
-| 1 | ~10 % | Cada 1,5–3 s (aleatorio) |
-| 2 | ~20 % | Cada 0,8–1,6 s |
-| 3 | ~35 % | Cada 0,3–0,8 s |
+| 1 | ~10 % | Cada 0,5–1 s (aleatorio) |
+| 2 | ~20 % | Cada 0,5–1 s |
+| 3 | ~35 % | Cada 0,5–1 s |
 
-- Cada parpadeo dura entre **60 y 120 ms**.
+- Cada parpadeo dura entre **6 y 15 s**.
 - Las aristas afectadas se eligen al subir de nivel y se **mantienen** (las del nivel anterior siguen y se añaden más). Generador aleatorio inyectado, para poder fijar semilla en pruebas.
 - No cambia el color de las líneas, solo su opacidad. El glow baja con ellas.
 - **No** afecta al HUD, al fantasma (no hay en RACE) ni a la nave del menú principal.
@@ -130,9 +132,9 @@ Todo lo demás del documento maestro (principios, flujo por etapa, SOLID, prueba
 | Factor de punta nivel 2 / 3 | 0,92 / 0,85 | daños |
 | Factor de giro nivel 3 | 0,85 | daños |
 | Proporción de aristas que parpadean por nivel | 0,10 / 0,20 / 0,35 | nave |
-| Intervalo entre parpadeos por nivel | 1,5–3 / 0,8–1,6 / 0,3–0,8 s | nave |
-| Duración de un parpadeo | 60–120 ms | nave |
-| Opacidad en el parpadeo | 0,2 | nave |
+| Intervalo entre parpadeos por nivel | 0,5–1 s en los tres niveles | nave |
+| Duración de un parpadeo | 6–15 s | nave |
+| Opacidad en el parpadeo | 0,1 | nave |
 | Tamaño de segmento / separación | 22 × 8 px / 4 px | HUD |
 | Separación entre indicador y esferas | 24 px | HUD |
 | Frecuencia de parpadeo del indicador | 2 Hz | HUD |
@@ -176,7 +178,7 @@ Las pruebas actuales siguen pasando.
 2. Rozar la barrera un buen rato: el indicador no cambia.
 3. Tres impactos medios: un segmento amarillo y algunas aristas de la cabina titilan de vez en cuando. Mirar también en exterior (C).
 4. Más impactos hasta nivel 2: dos segmentos rojos, más parpadeo, y la punta máxima en recta baja un poco (≈ −8 %). Si iba a tope, baja poco a poco, no de golpe.
-5. Hasta nivel 3: tres segmentos rojos parpadeando, punta ≈ −15 %, el giro se nota algo más lento, las esferas con carga en rojo atenuado y Espacio no hace nada. Esperar 35 s: aparece otra carga, también bloqueada.
+5. Hasta nivel 3: tres segmentos rojos parpadeando, punta ≈ −15 %, el giro se nota algo más lento, las esferas con carga en rojo atenuado y la tecla de boost (Shift) no hace nada. Esperar 35 s: aparece otra carga, también bloqueada.
 6. Llegar a nivel 3 con un boost en curso: el boost termina normalmente.
 7. Pausar: indicador y parpadeo de la nave congelados.
 8. Terminar la carrera y chocar después de la meta: el nivel no sube.

@@ -97,15 +97,15 @@ public partial class Player : CharacterBody3D
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel1 = 0.10f;   // proporción de aristas que parpadean
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel2 = 0.20f;
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel3 = 0.35f;
-	[Export] public float FlickerMinIntervalLevel1 = 1.5f;   // segundos entre parpadeos de una arista (aleatorio entre mínimo y máximo)
-	[Export] public float FlickerMaxIntervalLevel1 = 3f;
-	[Export] public float FlickerMinIntervalLevel2 = 0.8f;
-	[Export] public float FlickerMaxIntervalLevel2 = 1.6f;
-	[Export] public float FlickerMinIntervalLevel3 = 0.3f;
-	[Export] public float FlickerMaxIntervalLevel3 = 0.8f;
-	[Export] public float FlickerMinDuration = 0.06f;        // segundos que dura un parpadeo
-	[Export] public float FlickerMaxDuration = 0.12f;
-	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerOpacity = 0.2f;   // opacidad de la arista apagada
+	[Export] public float FlickerMinIntervalLevel1 = 0.5f;   // segundos entre parpadeos de una arista (aleatorio entre mínimo y máximo)
+	[Export] public float FlickerMaxIntervalLevel1 = 1f;
+	[Export] public float FlickerMinIntervalLevel2 = 0.5f;
+	[Export] public float FlickerMaxIntervalLevel2 = 1f;
+	[Export] public float FlickerMinIntervalLevel3 = 0.5f;
+	[Export] public float FlickerMaxIntervalLevel3 = 1f;
+	[Export] public float FlickerMinDuration = 6f;           // segundos que dura un parpadeo
+	[Export] public float FlickerMaxDuration = 15f;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerOpacity = 0.1f;   // opacidad de la arista apagada
 
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron

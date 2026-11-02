@@ -16,15 +16,6 @@ script = ExtResource("2_r0du0")
 script = ExtResource("3_cm0pq")
 MaxSpeed = 110.0
 Drag = 5.0
-FlickerMinIntervalLevel1 = 0.5
-FlickerMaxIntervalLevel1 = 1.0
-FlickerMinIntervalLevel2 = 0.5
-FlickerMaxIntervalLevel2 = 1.0
-FlickerMinIntervalLevel3 = 0.5
-FlickerMaxIntervalLevel3 = 1.0
-FlickerMinDuration = 6.0
-FlickerMaxDuration = 15.0
-FlickerOpacity = 0.1
 
 [node name="PauseMenu" type="CanvasLayer" parent="." unique_id=1844954761]
 script = ExtResource("4_pause")
