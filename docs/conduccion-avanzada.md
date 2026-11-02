@@ -1,6 +1,8 @@
 # VECTORY — Spec: Conducción avanzada (física)
 
-Versión 1.1 · 2026-11-02 · Estado: **definido; prueba de controles hecha (se queda el modo B)**
+Versión 1.2 · 2026-11-02 · Estado: **implementado, con tests; pendiente de volver a probar el derrape**
+
+**Cambios en v1.2** (al hacer los tests): con el agarre de derrape a 0, W, S, el boost y las pérdidas no movían la nave mientras se derrapaba (solo el motor) y, al salir, la nave recuperaba sola la velocidad que había perdido. Ahora, en derrape y mientras vuelve el agarre, lo que cambia el motor se aplica también a la velocidad real hacia el morro, y en derrape el motor no va más rápido que la nave (ver 2.1).
 
 Añade a la conducción la **inclinación de la nave en curva** y el **derrape**, sin ayudas automáticas. Es la primera de dos specs: esta cubre solo la **física** (y la inclinación visual de la nave). La **cámara** (inclinación en curvas, vibración a alta velocidad, reacción al boost) va en una spec aparte, después.
 
@@ -42,6 +44,7 @@ Todo lo demás del documento maestro (principios, flujo por etapa, SOLID, prueba
   - **Lateral**: la perpendicular al morro (lo que la nave desliza).
 - El **agarre** reduce la velocidad lateral cada frame, pasando una parte a longitudinal y perdiendo el resto (de forma independiente del framerate, con decaimiento exponencial).
 - **Agarre normal**: el que ya da la inercia lateral actual. La conducción normal debe sentirse **igual que ahora**: si se nota distinta sin derrapar, es un fallo.
+- **Implementación**: la nave tiene una velocidad del motor (la que suben W y el boost y bajan S, la desaceleración y las pérdidas) y la velocidad real se acerca a "morro × velocidad del motor" con el agarre (el de la inercia lateral de siempre, multiplicado por el factor de agarre del derrape). Como con poco agarre eso apenas mueve la nave, **en derrape y mientras vuelve el agarre** el cambio de la velocidad del motor en cada paso se suma también a la velocidad real en la dirección del morro (sin que la parte hacia delante baje de 0). Y **en derrape** la velocidad del motor no puede ser mayor que la real: lo perdido deslizando, también al recortar con el tope del ángulo, no se recupera solo al salir.
 
 ### 2.2 Ángulo de deslizamiento
 
@@ -177,7 +180,9 @@ Inclinación:
 16. Sin girar → objetivo 0. Giro máximo a velocidad punta → 25°; en derrape → 20°.
 17. Tras un cambio de objetivo, la inclinación se acerca de forma suave (no llega en un frame).
 
-Las pruebas actuales siguen pasando.
+Además (v1.2): la pérdida y la frenada bajan la velocidad real en derrape, el motor no supera la velocidad real en derrape y, al salir sin acelerar, la velocidad real no sube sola.
+
+Las pruebas actuales siguen pasando. Implementadas en `Vectory.Test/ShipTests/DriftTests.cs`.
 
 ## 10. Prueba manual
 

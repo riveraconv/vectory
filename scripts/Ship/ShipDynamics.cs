@@ -106,6 +106,7 @@ public class ShipDynamics
 		}
 
 		// Velocidad del motor
+		float speedBefore = Speed;
 		if (Speed > t.MaxSpeed)
 			StepAboveMaxSpeed(input, t, dt, boosting);
 		else if (input.Accelerate)
@@ -125,6 +126,11 @@ public class ShipDynamics
 			Speed = MathF.Max(0f, Speed - (drift.FixedLoss + drift.SlipLoss * slip) * dt);
 		}
 
+		// En derrape (y mientras se recupera el agarre) lo que cambia el motor —W, S, boost y pérdidas—
+		// se aplica también a la velocidad real hacia el morro: con poco agarre, si no, no se notaría hasta salir
+		if (Drifting || GripFactor < 1f)
+			PushAlongNose(Speed - speedBefore);
+
 		// Giro: izquierda = positivo. Si está casi parada, apenas gira.
 		Steer = MoveToward(Steer, steerInput, t.SteerResponse * dt);
 		TurnFactor = Math.Clamp(Speed / 10f, 0f, 1f);
@@ -136,6 +142,19 @@ public class ShipDynamics
 		Velocity = Vector2.Lerp(Velocity, Forward * Speed, k);
 		if (Drifting || GripFactor < 1f)
 			LimitSlip(drift.MaxSlipAngle);
+
+		// En derrape el motor no va más rápido que la nave: lo que se pierde deslizando (y con el tope
+		// del ángulo) no se recupera solo al salir
+		if (Drifting)
+			Speed = MathF.Min(Speed, RealSpeed);
+	}
+
+	// Suma "delta" m/s a la velocidad real en la dirección del morro, sin que la parte hacia delante baje de 0
+	private void PushAlongNose(float delta)
+	{
+		if (delta < 0f)
+			delta = MathF.Max(delta, -MathF.Max(0f, Vector2.Dot(Velocity, Forward)));
+		Velocity += Forward * delta;
 	}
 
 	// Decide si la nave derrapa en este paso y con qué agarre
