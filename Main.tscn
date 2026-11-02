@@ -14,7 +14,19 @@ script = ExtResource("2_r0du0")
 
 [node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
 script = ExtResource("3_cm0pq")
-MaxSpeed = 80.0
+MaxSpeed = 110.0
+Drag = 5.0
+DriftMode = 1
+DriftExitSpeed = 60.0
+DriftGrip = 0.0
+DriftCountersteerGrip = 0.5
+DriftFixedLoss = 5.0
+DriftSlipLoss = 10.0
+DriftAcceleration = 0.5
+DriftBrake = 0.05
+DriftMaxSlipAngle = 60.0
+DriftGripRecoveryTime = 3.0
+BankMaxNormal = 25.0
 FlickerMinIntervalLevel1 = 0.5
 FlickerMaxIntervalLevel1 = 1.0
 FlickerMinIntervalLevel2 = 0.5
