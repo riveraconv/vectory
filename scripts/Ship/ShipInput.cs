@@ -8,5 +8,5 @@ public struct ShipInput
 	public bool Brake;
 	public bool SteerLeft;
 	public bool SteerRight;
-	public bool Drift;   // tecla de derrape (solo cuenta en el modo de derrape B)
+	public bool Drift;   // tecla de derrape mantenida
 }

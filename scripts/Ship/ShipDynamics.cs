@@ -89,8 +89,7 @@ public class ShipDynamics
 		Step(input, t, default, dt, boostGain, boosting, control);
 	}
 
-	// Igual, con derrape (drift.Enabled). En derrape cambian la aceleración, la frenada (modo A),
-	// el giro del rumbo y el agarre lateral, y la nave pierde velocidad según el ángulo de deslizamiento.
+	// Igual, con derrape (drift.Enabled). En derrape cambian la aceleración, el giro del rumbo y el agarre lateral, y la nave pierde velocidad según el ángulo de deslizamiento.
 	public void Step(in ShipInput input, in ShipTuning baseTuning, in DriftTuning drift, float dt, float boostGain = 0f, bool boosting = false, float control = 1f)
 	{
 		boosting |= boostGain > 0f;
@@ -104,8 +103,6 @@ public class ShipDynamics
 		{
 			t.Acceleration *= drift.AccelerationFactor;
 			t.TurnRate *= drift.TurnMultiplier;
-			if (drift.Mode == DriftMode.BrakeTurn)
-				t.BrakeDeceleration *= drift.BrakeFactor;
 		}
 
 		// Velocidad del motor
@@ -144,7 +141,7 @@ public class ShipDynamics
 	// Decide si la nave derrapa en este paso y con qué agarre
 	private void UpdateDrift(in ShipInput input, in DriftTuning drift, float steerInput, float dt)
 	{
-		bool held = DriftRule.TriggerHeld(input, drift.Mode) && steerInput != 0f;
+		bool held = input.Drift && steerInput != 0f;
 		if (!held)
 			_driftNeedsRelease = false;
 

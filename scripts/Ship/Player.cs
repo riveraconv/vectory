@@ -16,12 +16,10 @@ namespace Vectory.Ship;
 // está quieta y el boost no recarga; al terminar se suelta todo y la nave se para sola.
 //
 // El derrape (spec docs/conduccion-avanzada.md) vive en ShipDynamics; la inclinación visual en ShipBank.
-// Las teclas de boost y derrape según el modo de derrape las decide DriftKeyMap.
 //
 // W / Flecha arriba: acelerar    S / Flecha abajo: frenar (también corta el impulso del boost)
 // A,D / Flechas izq.-der.: girar
-// Modo de derrape A (BrakeTurn): S + girar = derrape; Espacio (acción "boost") = boost
-// Modo de derrape B (DedicatedKey): Espacio (acción "drift") + girar = derrape; Shift (acción "boost_mode_b") = boost
+// Espacio (acción "drift") + girar: derrapar    Shift (acción "boost"): gastar una carga de boost
 // C: alternar cabina / tercera persona
 public partial class Player : CharacterBody3D
 {
@@ -54,21 +52,19 @@ public partial class Player : CharacterBody3D
 	[Export] public float LateralGrip = 5f;      // más alto = menos inercia lateral (la nave se "agarra" antes)
 
 	[ExportGroup("Derrape")]
-	[Export] public DriftMode DriftMode = DriftMode.BrakeTurn;   // se lee al cargar la escena
 	[Export] public float DriftEnterSpeed = 120f;      // km/h mínimos para entrar en derrape
-	[Export] public float DriftExitSpeed = 80f;        // km/h por debajo de los que se sale
-	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftGrip = 0.35f;              // agarre lateral en derrape
-	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftCountersteerGrip = 0.7f;   // agarre contravolanteando
+	[Export] public float DriftExitSpeed = 60f;        // km/h por debajo de los que se sale
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftGrip = 0f;                 // agarre lateral en derrape
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftCountersteerGrip = 0.5f;   // agarre contravolanteando
 	[Export] public float DriftTurnMultiplier = 1.4f;  // giro del rumbo en derrape
-	[Export] public float DriftFixedLoss = 15f;        // km/h que se pierden cada segundo derrapando
-	[Export] public float DriftSlipLoss = 30f;         // km/h por segundo extra al ángulo máximo
-	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftAcceleration = 0.7f;       // aceleración con W en derrape
-	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftBrake = 0.5f;              // frenada en derrape (modo A)
-	[Export] public float DriftMaxSlipAngle = 35f;     // grados de deslizamiento máximo
-	[Export] public float DriftGripRecoveryTime = 0.4f;   // segundos para volver al agarre normal al salir
+	[Export] public float DriftFixedLoss = 5f;         // km/h que se pierden cada segundo derrapando
+	[Export] public float DriftSlipLoss = 10f;         // km/h por segundo extra al ángulo máximo
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DriftAcceleration = 0.5f;       // aceleración con W en derrape
+	[Export] public float DriftMaxSlipAngle = 60f;     // grados de deslizamiento máximo
+	[Export] public float DriftGripRecoveryTime = 3f;  // segundos para volver al agarre normal al salir
 
 	[ExportGroup("Inclinación")]
-	[Export] public float BankMaxNormal = 12f;   // grados a giro máximo y velocidad punta
+	[Export] public float BankMaxNormal = 25f;   // grados a giro máximo y velocidad punta
 	[Export] public float BankMaxDrift = 20f;    // grados en derrape
 	[Export] public float BankSmoothing = 0.15f; // constante de tiempo del suavizado (s)
 
@@ -134,11 +130,6 @@ public partial class Player : CharacterBody3D
 	private bool _chaseView = true;
 	private bool _inputBlocked;
 
-	// Modo de derrape y acciones de boost y derrape, fijados al cargar la escena
-	private DriftMode _driftMode;
-	private string _boostAction;
-	private string _driftAction;
-
 	// Parpadeo de las aristas dañadas de la nave y de la cabina (null hasta que hay daño)
 	private EdgeFlicker _shipFlicker;
 	private EdgeFlicker _cockpitFlicker;
@@ -192,10 +183,6 @@ public partial class Player : CharacterBody3D
 
 		_chaseCam = new ChaseCamera { Name = "ChaseCamera" };
 		AddChild(_chaseCam);
-
-		_driftMode = DriftMode;
-		_boostAction = DriftKeyMap.BoostAction(_driftMode);
-		_driftAction = DriftKeyMap.DriftAction(_driftMode);
 
 		_dynamics.Reset(0f);
 		_boost.Reset(BuildBoostTuning());
@@ -329,7 +316,7 @@ public partial class Player : CharacterBody3D
 		// Tras la pausa, nada cuenta hasta que se suelten las teclas que siguieran pulsadas
 		if (_inputBlocked)
 		{
-			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || input.Drift || Input.IsActionPressed(_boostAction))
+			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || input.Drift || Input.IsActionPressed("boost"))
 				input = default;
 			else
 				_inputBlocked = false;
@@ -339,7 +326,7 @@ public partial class Player : CharacterBody3D
 		if (canDrive)
 		{
 			BoostTuning boostTuning = BuildBoostTuning();
-			if (!_inputBlocked && Input.IsActionJustPressed(_boostAction))
+			if (!_inputBlocked && Input.IsActionJustPressed("boost"))
 				_boost.TryActivate(boostTuning);
 			if (input.Brake)
 				_boost.CancelImpulse();
@@ -382,7 +369,7 @@ public partial class Player : CharacterBody3D
 	}
 
 	// Traduce el teclado a intenciones de conducción
-	private ShipInput ReadInput()
+	private static ShipInput ReadInput()
 	{
 		return new ShipInput
 		{
@@ -390,7 +377,7 @@ public partial class Player : CharacterBody3D
 			Brake = Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down),
 			SteerLeft = Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left),
 			SteerRight = Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right),
-			Drift = _driftAction != null && Input.IsActionPressed(_driftAction)
+			Drift = Input.IsActionPressed("drift")
 		};
 	}
 
@@ -416,7 +403,6 @@ public partial class Player : CharacterBody3D
 		return new DriftTuning
 		{
 			Enabled = true,
-			Mode = _driftMode,
 			EnterSpeed = DriftEnterSpeed / KmhPerMs,
 			ExitSpeed = DriftExitSpeed / KmhPerMs,
 			Grip = DriftGrip,
@@ -425,7 +411,6 @@ public partial class Player : CharacterBody3D
 			FixedLoss = DriftFixedLoss / KmhPerMs,
 			SlipLoss = DriftSlipLoss / KmhPerMs,
 			AccelerationFactor = DriftAcceleration,
-			BrakeFactor = DriftBrake,
 			MaxSlipAngle = Mathf.DegToRad(DriftMaxSlipAngle),
 			GripRecoveryTime = DriftGripRecoveryTime
 		};
