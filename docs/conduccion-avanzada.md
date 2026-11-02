@@ -1,6 +1,6 @@
 # VECTORY — Spec: Conducción avanzada (física)
 
-Versión 1.2 · 2026-11-02 · Estado: **implementado, con tests; pendiente de volver a probar el derrape**
+Versión 1.2 · 2026-11-02 · Estado: **implementado, con tests y validado**
 
 **Cambios en v1.2** (al hacer los tests): con el agarre de derrape a 0, W, S, el boost y las pérdidas no movían la nave mientras se derrapaba (solo el motor) y, al salir, la nave recuperaba sola la velocidad que había perdido. Ahora, en derrape y mientras vuelve el agarre, lo que cambia el motor se aplica también a la velocidad real hacia el morro, y en derrape el motor no va más rápido que la nave (ver 2.1).
 
