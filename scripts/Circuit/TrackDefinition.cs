@@ -20,6 +20,9 @@ public partial class TrackDefinition : Resource
 
 	[Export] public string DisplayName = "Circuito";
 
+	// Circuito de pruebas (etiqueta TEST en SELECT CIRCUIT). CircuitCatalog.IncludeTestCircuits los oculta todos.
+	[Export] public bool IsTest = false;
+
 	// Puntos de control en píxeles de la imagen, en sentido horario visto desde arriba,
 	// empezando en la línea de salida/meta.
 	[Export] public Vector2[] ControlPoints = System.Array.Empty<Vector2>();

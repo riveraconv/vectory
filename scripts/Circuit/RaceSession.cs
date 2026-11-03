@@ -63,10 +63,13 @@ public sealed class RaceSession
 		ReadySequence.Started += () => GD.Print("[Race] GO! (flying start)");
 	}
 
+	// Vueltas de una carrera de RACE (también las muestra SELECT CIRCUIT)
+	public const int RaceLaps = 3;
+
 	// Carrera desde parrilla, con semáforo y el número de vueltas por defecto
 	public static RaceSession ForRace(Track track, StartSettings startSettings, int participantCount)
 	{
-		return new RaceSession(track, startSettings, participantCount, 3);
+		return new RaceSession(track, startSettings, participantCount, RaceLaps);
 	}
 
 	// Contrarreloj: READY? / GO!, salida lanzada, vueltas libres y un solo participante

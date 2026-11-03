@@ -8,6 +8,7 @@ namespace Vectory.Menu;
 // Fondo del menú principal: escena 3D real con la nave del juego vista de frente,
 // la rejilla de horizonte, la línea del horizonte y la sombra izquierda para que el menú se lea.
 // Todo estático. La nave es la misma clase Spaceship de la carrera, sin copiar su geometría.
+// SELECT CIRCUIT oculta la nave, la rejilla y la sombra (SetSceneryVisible) y usa su propia cámara.
 //
 // La nave está en el origen con el morro hacia -Z; la cámara está delante (Z negativa)
 // mirando hacia +Z, así que la izquierda de la pantalla es +X del mundo.
@@ -37,6 +38,10 @@ public partial class MenuBackground : Node3D
 	[Export] public float ShadeWidth = 0.594f;      // fracción del ancho de pantalla (760 de 1280)
 
 	private Camera3D _camera;
+	private Node3D _ship;
+	private MeshInstance3D _grid;
+	private MeshInstance3D _horizon;
+	private CanvasLayer _shade;
 
 	public override void _Ready()
 	{
@@ -49,7 +54,8 @@ public partial class MenuBackground : Node3D
 		ApplyLensShift();
 		GetViewport().SizeChanged += ApplyLensShift;
 
-		AddChild(new Spaceship { Name = "Spaceship" });
+		_ship = new Spaceship { Name = "Spaceship" };
+		AddChild(_ship);
 
 		var grid = new HorizonGridSettings
 		{
@@ -62,7 +68,8 @@ public partial class MenuBackground : Node3D
 			FadeLength = GridFadeLength,
 			Opacity = GridOpacity
 		};
-		AddChild(new MeshInstance3D { Name = "HorizonGrid", Mesh = HorizonGrid.BuildMesh(grid, Palette.MenuGrid) });
+		_grid = new MeshInstance3D { Name = "HorizonGrid", Mesh = HorizonGrid.BuildMesh(grid, Palette.MenuGrid) };
+		AddChild(_grid);
 
 		// Línea del horizonte: tenue a la izquierda de la pantalla (+X), más visible a la derecha.
 		var horizon = HorizonGrid.BuildHorizonLine(
@@ -70,9 +77,23 @@ public partial class MenuBackground : Node3D
 			new Vector3(-HorizonHalfLength, FloorY, HorizonZ),
 			Palette.MenuHorizon,
 			new[] { (0f, 0f), (0.55f, 0.7f), (1f, 0.25f) });
-		AddChild(new MeshInstance3D { Name = "HorizonLine", Mesh = horizon });
+		_horizon = new MeshInstance3D { Name = "HorizonLine", Mesh = horizon };
+		AddChild(_horizon);
 
-		AddChild(BuildLeftShade());
+		_shade = BuildLeftShade();
+		AddChild(_shade);
+	}
+
+	// Muestra u oculta la nave, la rejilla, el horizonte y la sombra izquierda. Al mostrarlos vuelve su cámara
+	// (SELECT CIRCUIT pone la de su miniatura mientras está abierta).
+	public void SetSceneryVisible(bool visible)
+	{
+		_ship.Visible = visible;
+		_grid.Visible = visible;
+		_horizon.Visible = visible;
+		_shade.Visible = visible;
+		if (visible)
+			_camera.MakeCurrent();
 	}
 
 	public override void _ExitTree()
