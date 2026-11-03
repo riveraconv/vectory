@@ -1,5 +1,6 @@
 VECTORY — DOCUMENTO MAESTRO DE DISEÑO Y PRIMERA DEMO
-Versión 1.2
+Versión 1.3
+Cambios de la 1.3: nueva dirección visual decidida sobre maquetas (2026-11-03). Sección 2: los circuitos van suspendidos sobre una megaciudad en neblina ámbar, la pista tiene superficie opaca lisa, se añade el ámbar de ambiente y se definen los efectos de velocidad. Sección 9: entorno del circuito y señalización (chevrons y balizas en lugar de arcos de aviso). Sección 12: efectos de velocidad. Sección 16: qué pueden reducir los ajustes gráficos. Nueva sección 22: specs de referencia.
 Cambios de la 1.2: el documento se pone al día con el código (commit f134f4a). Secciones 6 y 7: el alcance de la demo se amplió a un circuito cerrado con checkpoints, cronometraje de vueltas y HUD de carrera; se añaden las etapas 4 a 6 y el estado actual. Sección 18: controles actuales. Sección 20.2: estructura real de carpetas y archivos. Sección 21: instrucciones adaptadas a la etapa actual.
 Cambios de la 1.1: nueva sección 20 (#Desarrollo del software aplicando buenas prácticas de ingeniería, principios SOLID, pruebas unitarias y refactorización orientada a la mantenibilidad y calidad del código); las instrucciones directas pasan a ser la sección 21.
 Estado: etapas 1 a 6 de la demo implementadas y con commit. La siguiente etapa está por decidir (ver sección 7).
@@ -30,8 +31,10 @@ Nombre: VECTORY. “Racing” puede usarse como subtítulo opcional, no como par
 Universo y estética:
 - Carreras futuristas originales; no copiar diseños, marcas, naves, circuitos ni otros elementos protegidos de franquicias existentes.
 - Inspiración general en el género de carreras futuristas y su sensación de velocidad.
-- Mundo 3D suspendido en el vacío, sin ciudades ni paisajes convencionales.
+- Circuitos suspendidos en el vacío, muy por encima de una megaciudad hundida en neblina ámbar. La ciudad es solo fondo: rascacielos en líneas y puntos luminosos (ventanas y neones), sin superficies, quieta y lejana. Debajo, una rejilla del abismo; de la pista cuelgan haces de anclaje que se desvanecen. Sin paisajes naturales.
 - Geometría representada mediante líneas y aristas luminosas; evitar superficies sólidas texturizadas y modelos low-poly rellenos.
+- Excepción: la pista tiene una superficie opaca oscura y lisa (#070B16), sin textura ni iluminación, para que no se vea lo que hay debajo. Las líneas de la pista van encima.
+- En la pista no se pinta ningún elemento (meta, checkpoints, avisos…): todos son estructuras que se alzan sobre ella o junto a ella. Única excepción: las marcas de parrilla, que se apagan al dar la salida.
 - Fondo oscuro, composición limpia, wireframe nítido y bloom moderado.
 - La pista, la nave y los rivales deben seguir siendo legibles a alta velocidad.
 
@@ -42,11 +45,14 @@ Paleta acordada:
 - Naranja para impulso, energía y alertas: #FF9D32
 - Fondo negro azulado: #05070D
 - Azul grisáceo para información secundaria del HUD: #A6B8D8
+- Ámbar de ambiente para la neblina y el resplandor del cielo: #1D120A (niebla) y degradado del cielo hasta #5A3414 en el horizonte. Solo para el fondo, nunca para la interfaz ni los avisos.
+- El magenta de los neones de la ciudad es solo de ambiente: siempre lejos y apagado, para no confundirse con los rivales.
 
 Intensidad visual prevista para el juego completo:
 - Velocidad normal: geometría clara.
-- Alta velocidad: líneas de fuga moderadas, si se añaden más adelante.
-- Impulso: estelas y geometría más intensa, sin perder legibilidad.
+- Alta velocidad: visión túnel (los bordes de la pantalla se estiran y oscurecen, el centro sigue nítido), líneas de velocidad alrededor de la cámara, FOV más abierto, tobera larga y estela de partículas.
+- Impulso: todo lo anterior más intenso y en ámbar/naranja, con chispas, sin perder legibilidad.
+- Los efectos que pueden marear (visión túnel, FOV) tendrán intensidad ajustable.
 - Evitar bloom excesivo, destellos de pantalla completa o efectos que oculten la pista.
 
 ======================================================================
@@ -259,9 +265,9 @@ No ampliar el alcance por iniciativa propia.
   1. Recta principal muy larga para velocidad punta, impulso y adelantamientos.
   2. Sector técnico con curvas enlazadas, peraltes y cambios de dirección.
   3. Sector espectacular con túnel geométrico y cambios de elevación.
-- Circuito suspendido sobre el vacío, sin paisajes convencionales.
+- Circuito suspendido sobre el vacío, por encima de la megaciudad (sección 2). El trazado debe buscar momentos espectaculares: tramos que pasan por encima de otros, grandes caídas que se ven venir, túneles en curva peraltada y vistas del resto del circuito.
 - Barreras wireframe luminosas a lo largo de la pista. Roce: pequeño desvío/pérdida; impacto fuerte: rebote, pérdida de velocidad y corrección temporal. Salida grave por huecos: recolocación automática.
-- Arcos, puertas geométricas y líneas transversales anunciarán las curvas exigentes con antelación. Son señalización, no puntos de recarga.
+- Las curvas exigentes se anuncian con chevrons naranjas en la barrera exterior, y las crestas donde se despega con balizas y barrera iluminada en naranja. Son señalización, no puntos de recarga.
 - Curvas normales se leen directamente en la pista; solo curvas técnicas o cambios exigentes muestran un aviso breve en HUD. Sin recomendaciones automáticas de frenada.
 - Las tres vueltas de una carrera usan exactamente la misma geometría.
 - Sistema híbrido: segmentos modulares y generación automática de aristas para arcos, túneles y estructuras secundarias.
@@ -335,7 +341,7 @@ Cámara:
 - Efectos naranjas, estelas y geometría más intensa durante impulso.
 - Sonido y música reaccionan moderadamente al impulso.
 - La base de la feature se implementa en la demo: impulso, cargas, recarga, representación en el hud. El resto fuera de la demo.
-- El efecto de velocidad de la demo se basa únicamente en la geometría de la pista; líneas de fuga, partículas y efectos especiales quedan para después, si las pruebas los justifican.
+- Efectos de velocidad definidos (specs/efectos-velocidad.md): visión túnel, líneas de velocidad, FOV según la velocidad, tobera y estela (partículas y estelas de las alas), que crecen con la velocidad y se vuelven ámbar con el impulso. Se implementan como una etapa propia, después de la cámara.
 - Funcionamiento:  Empiezas con 0 cargas, a medida que va pasando el tiempo, recibes una carga. Las representaremos con pequeñas esferas de color naranja de la paleta, en el hud. El máximo de cargas son 3, cuando gastas una carga el hud debe apagar una esfera. Si tienes las 3 cargas, el hud tiene sus 3 esferas encendidas. Si no tienes ninguna están en azul de la paleta.
   Usar una esfera te da un impulso de unos 100km/h. Para todas las naves igual.
 ======================================================================
@@ -442,7 +448,8 @@ Guardado:
 
 Ajustes gráficos:
 - Calidad gráfica general, intensidad de resplandor y límite de FPS.
-- El estilo wireframe y la geometría no deben cambiar según el ajuste.
+- El estilo wireframe y la geometría de la pista y las naves no deben cambiar según el ajuste.
+- Sí pueden reducirse la escenografía de fondo (densidad de la ciudad, ventanas, polvo) y los efectos de velocidad (partículas, calidad de la visión túnel), sobre todo pensando en Android.
 
 Gestión de errores:
 - Mensajes comprensibles, logs locales, recuperación segura y protección del progreso.
@@ -575,5 +582,17 @@ CLÁUSULA 20.2 — ESTRUCTURA DE CARPETAS Y ARQUITECTURA
 16. Tras validar una etapa, resume resultado, commit y siguiente etapa propuesta; espera confirmación antes de avanzar.
 17. Aplica la sección 20: SOLID sin sobreingeniería, lógica pura separada de Godot, pruebas unitarias solo donde aporten valor y refactorizaciones como entregas propias sin cambio de comportamiento.
 18. Respeta la estructura de carpetas y las reglas de dependencia de la sección 20; si un cambio las afecta, actualiza esa sección.
+
+======================================================================
+22. SPECS DE REFERENCIA
+======================================================================
+
+Las decisiones detalladas de cada sistema están en las specs del proyecto (carpeta specs/ del Project de Claude). Si una spec contradice este documento en un detalle, manda la spec más reciente; si contradice un principio, se consulta al usuario.
+
+- Visual del circuito: specs/elementos-circuito.md (suelo, meta, checkpoints, parrilla, semáforo, túneles, chevrons, señal de cresta).
+- Entorno: specs/escenografia.md (superficie de pista, rejilla del abismo, haces de anclaje, megaciudad, neblina ámbar, polvo de luz).
+- Efectos: specs/efectos-velocidad.md.
+- Pista 3D: specs/pista-3d.md (desniveles, peraltes y saltos).
+- Resto: carrera, boost, cámara, conducción avanzada, daños, barreras y colisiones, fantasma, récords, contrarreloj, pausa y resultados, menú principal, selector de circuito.
 
 FIN DEL DOCUMENTO MAESTRO
