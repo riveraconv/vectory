@@ -17,7 +17,8 @@ public static class CircuitCatalog
 	public static readonly IReadOnlyList<string> AllPaths = new[]
 	{
 		"res://circuits/circuit_01.tres",
-		"res://circuits/test_oval.tres"
+		"res://circuits/test_oval.tres",
+		"res://circuits/test_hills.tres"
 	};
 
 	private static IReadOnlyList<string> _paths;

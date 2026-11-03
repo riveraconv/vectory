@@ -234,15 +234,18 @@ public partial class CircuitSelectScreen : CanvasLayer
 			return;
 		}
 
-		// El mismo eje que la carrera (a la altura de la pista de Track), sin montar la escena
-		circuit.Centerline = Track.BuildCenterline(definition, Track.DefaultTrackY);
+		// El mismo eje que la carrera (a la altura de la pista de Track, con la altura del circuito), sin montar
+		// la escena. Los checkpoints van por el eje en planta, como en la carrera.
+		TrackFrame frame = Track.BuildFrame(definition, Track.DefaultTrackY);
+		circuit.Centerline = new List<System.Numerics.Vector3>(frame.Points);
 		float[] cumulative = CenterlineBuilder.CumulativeDistances(circuit.Centerline);
-		List<int> checkpoints = CenterlineBuilder.CheckpointIndices(circuit.Centerline, definition.CheckpointCount);
+		List<int> checkpoints = CenterlineBuilder.CheckpointIndices(Track.BuildCenterline(definition, Track.DefaultTrackY),
+			definition.CheckpointCount);
 		circuit.CheckpointCount = checkpoints.Count;
-		circuit.Signature = TrackSignature.Compute(circuit.Centerline, definition.TrackWidth);
+		circuit.Signature = Track.ComputeSignature(frame, definition.TrackWidth);
 		circuit.Data = TrackAnalysis.Analyze(circuit.Centerline, definition.TrackWidth,
 			checkpoints.Select(i => cumulative[i]).ToArray(), Track.DefaultGridSlots,
-			ProfileSamples, ProfileMinScale);
+			ProfileSamples, ProfileMinScale, frame.MaxAbsBank);
 	}
 
 	// Mismas reglas que la pausa de TIME TRIAL: fantasma guardado válido para el circuito y su récord

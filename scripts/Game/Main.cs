@@ -254,11 +254,13 @@ public partial class Main : Node3D
 			UpdateResults((float)delta);
 		}
 
-		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita
+		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita. Va 2 m por debajo del
+		// punto más bajo de la pista (en las planas, a GridY de siempre), así no corta las hondonadas.
 		Vector3 p = _player.GlobalPosition;
+		float gridY = _track.IsBuilt ? Mathf.Min(GridY, _track.LowestSurfaceY - 2f) : GridY;
 		_grid.GlobalPosition = new Vector3(
 			Mathf.Snapped(p.X, GridStep),
-			GridY,
+			gridY,
 			Mathf.Snapped(p.Z, GridStep));
 	}
 
@@ -307,7 +309,7 @@ public partial class Main : Node3D
 			return;
 		}
 
-		if (_respawn.Update(delta, touch.Contact, _player.Speed, touch.Lateral))
+		if (_respawn.Update(delta, touch.Contact, _player.Speed, touch.Lateral, _player.IsAirborne))
 		{
 			_track.GetRespawn(_player.GlobalPosition, out Vector3 position, out float yaw);
 			_player.Respawn(position, yaw);
@@ -505,7 +507,7 @@ public partial class Main : Node3D
 
 		_ghosts = new GhostStore(new FileGhostStorage());
 		_recorder = new GhostRecorder(Math.Max(1, GhostSampleRate));
-		_trackSignature = TrackSignature.Compute(_track.Centerline.ConvertAll(ToNumerics), _track.TrackWidth);
+		_trackSignature = _track.Signature;
 
 		GhostRecording saved = _ghosts.Load(_track.CircuitId);
 		if (_ghosts.Warning != null)

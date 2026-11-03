@@ -19,6 +19,12 @@ namespace Vectory.Ship;
 // Los efectos de cámara (spec docs/camara.md: inclinación de la cabina, vibración y reacción al boost)
 // viven en CockpitBank, CameraVibration y BoostCameraEffect; aquí solo se aplican a las dos cámaras.
 //
+// Pista 3D (spec docs/pista-3d.md): la dinámica sigue en planta, sin cambiar sus reglas; encima va la capa
+// vertical (ShipVertical: en el suelo pegada a la superficie, despegue en crestas, vuelo y aterrizaje), la
+// orientación con la pista (ShipAttitude: cabeceo y ladeo sobre el rumbo, en el nodo Player, así la cabina
+// va con ella), el efecto de la pendiente (SlopeEffect) y el agarre por peralte (BankGrip). En el aire se
+// usa ShipDynamics.StepAirborne. En pista plana todo da exactamente lo mismo que antes.
+//
 // W / Flecha arriba: acelerar    S / Flecha abajo: frenar (también corta el impulso del boost)
 // A,D / Flechas izq.-der.: girar
 // Espacio (acción "drift") + girar: derrapar    Shift (acción "boost"): gastar una carga de boost
@@ -85,6 +91,26 @@ public partial class Player : CharacterBody3D
 	[Export] public float BoostPushChase = 0.6f;                // m hacia atrás
 	[Export] public float BoostEffectEnterTime = 0.25f;         // s
 	[Export] public float BoostEffectExitTime = 0.5f;           // s
+	[Export(PropertyHint.Range, "0,1,0.01")] public float CockpitTrackBankFactor = 1f;   // peralte de la pista que se ve en cabina (1 = completo)
+
+	[ExportGroup("Vuelo")]
+	[Export] public float Gravity = 14f;                 // m/s², hacia abajo en el mundo (ajustado en pista; la spec proponía 6)
+	[Export(PropertyHint.Range, "0,1,0.01")] public float AirTurn = 0.3f;   // giro en el aire respecto al normal
+	[Export] public float AirMaxPitch = 20f;             // grados de inclinación máxima del morro en el aire
+	[Export] public float AirAttitudeSmoothing = 0.3f;   // s: suavizado de la orientación en el aire
+	[Export] public float LandingAlignTime = 0.15f;      // s: suavizado para volver a la superficie al aterrizar
+	[Export(PropertyHint.Range, "0,1,0.01")] public float LandingSpeedLoss = 0.1f;   // fracción de velocidad que se pierde al aterrizar
+	[Export] public float LandingMediumSpeed = 3f;       // m/s de caída desde los que hay sacudida media
+	[Export] public float LandingStrongSpeed = 8f;       // m/s de caída desde los que es fuerte
+	[Export] public float LandingCompression = 0.3f;     // m que baja la nave al aterrizar (a intensidad máxima)
+	[Export] public float LandingCompressionTime = 0.2f; // s en bajar y volver
+
+	[ExportGroup("Pendiente y peralte")]
+	[Export] public float GroundAttitudeSmoothing = 0.1f;   // s: suavizado de la orientación en el suelo
+	[Export] public float SlopeReference = 10f;             // grados: pendiente a la que el efecto es completo
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SlopeEffectAmount = 0.3f;   // punta y aceleración: −30 % subiendo, +30 % bajando
+	[Export(PropertyHint.Range, "0,1,0.01")] public float BankGripBonus = 0.4f;       // agarre extra con 25° de peralte a favor
+	[Export(PropertyHint.Range, "0,1,0.01")] public float BankTurnBonus = 0.15f;      // giro extra con 25° de peralte a favor
 
 	[ExportGroup("Colisiones")]
 	[Export] public float CollisionHalfWidth = 3.4f;   // semiancho de colisión con la barrera (m; las puntas de las alas)
@@ -132,6 +158,11 @@ public partial class Player : CharacterBody3D
 	[Export] public float CameraExtraDistance = 3f; // distancia extra a máxima velocidad
 	[Export] public float BaseFov = 75f;
 	[Export] public float MaxFov = 95f;
+	[Export] public float CameraUpSmoothing = 0.3f;   // s: el "arriba" de la cámara sigue al de la superficie (y al del mundo en el aire)
+
+	// Pista 3D: peralte de referencia y tope del agarre por peralte (spec 5.2)
+	private const float BankReferenceDegrees = 25f;
+	private const float BankMaxDegrees = 35f;
 
 	private readonly ShipDynamics _dynamics = new();
 	private readonly ShipBoost _boost = new();
@@ -142,6 +173,9 @@ public partial class Player : CharacterBody3D
 	private readonly CameraVibration _vibration = new();
 	private readonly BoostCameraEffect _boostCamera = new();
 	private readonly CameraEffectSettings _cameraEffects = new();
+	private readonly ShipVertical _vertical = new();
+	private readonly ShipAttitude _attitude = new();
+	private readonly LandingCompression _compression = new();
 	private CameraShake _shake;
 	private Spaceship _ship;
 	private Cockpit _cockpit;
@@ -151,6 +185,10 @@ public partial class Player : CharacterBody3D
 
 	private bool _chaseView = true;
 	private bool _inputBlocked;
+
+	// Superficie de la pista bajo la nave en el último paso (sin circuito: ninguna, la nave no sube ni baja)
+	private AxisPoint _axis;
+	private bool _hasAxis;
 
 	// Parpadeo de las aristas dañadas de la nave y de la cabina (null hasta que hay daño)
 	private EdgeFlicker _shipFlicker;
@@ -183,6 +221,9 @@ public partial class Player : CharacterBody3D
 	public bool BoostCooldownActive => _boost.IsCooldownActive;
 	public bool BoostBlocked => !_boost.ActivationAllowed;
 
+	// La nave va por el aire (tras despegar en una cresta): el atasco no cuenta
+	public bool IsAirborne => _vertical.Airborne;
+
 	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
 	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();
 
@@ -209,7 +250,8 @@ public partial class Player : CharacterBody3D
 		_dynamics.Reset(0f);
 		_boost.Reset(BuildBoostTuning());
 		_shake = new CameraShake(BuildShakeSettings());
-		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
+		_vertical.Reset(GlobalPosition.Y);
+		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings(), Vector3.Up);
 		ApplyView();
 	}
 
@@ -226,12 +268,14 @@ public partial class Player : CharacterBody3D
 	}
 
 	// Salida lanzada (GO! de TIME TRIAL): la nave pasa de golpe a "speed" m/s hacia donde apunta
+	// (a lo largo de la superficie: sigue en el suelo)
 	public void Launch(float speed)
 	{
 		_dynamics.Reset(_dynamics.Yaw, speed);
 	}
 
-	// Coloca la nave en una posición y orientación (yaw en radianes), parada o avanzando ya a initialSpeed m/s
+	// Coloca la nave en una posición y orientación (yaw en radianes), parada o avanzando ya a initialSpeed m/s.
+	// Queda en el suelo, alineada con la superficie.
 	public void PlaceAt(Vector3 position, float yaw, float initialSpeed = 0f)
 	{
 		GlobalPosition = position;
@@ -241,12 +285,13 @@ public partial class Player : CharacterBody3D
 		_collision.Reset();
 		_recovery.Cancel();
 		ResetCameraEffects();
-		Rotation = new Vector3(0f, yaw, 0f);
-		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
+		SettleOnSurface();
+		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
 	}
 
-	// Recolocación automática (atasco o fuera de pista): al instante en la posición dada, parada y
-	// mirando según yaw. El boost no cambia; se cancela la corrección de un impacto fuerte.
+	// Recolocación automática (atasco o fuera de pista): al instante en la posición dada, parada,
+	// mirando según yaw, en el suelo y alineada con la superficie (si estaba en el aire, se cancela el vuelo).
+	// El boost no cambia; se cancela la corrección de un impacto fuerte.
 	public void Respawn(Vector3 position, float yaw)
 	{
 		GlobalPosition = position;
@@ -256,8 +301,28 @@ public partial class Player : CharacterBody3D
 		_recovery.Cancel();
 		ResetCameraEffects();
 		LastBarrierTouch = default;
-		Rotation = new Vector3(0f, yaw, 0f);
-		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
+		SettleOnSurface();
+		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
+	}
+
+	// En el suelo a la altura actual, sin velocidad vertical, con la orientación de la superficie al momento
+	private void SettleOnSurface()
+	{
+		_vertical.Reset(GlobalPosition.Y);
+		_compression.Reset();
+		_hasAxis = _track != null && _track.IsBuilt;
+		if (_hasAxis)
+		{
+			_axis = _track.ProjectOnAxis(GlobalPosition);
+			ShipAttitude.SurfaceAngles(ToNumerics(_axis.Normal), _dynamics.Yaw, out float pitch, out float roll);
+			_attitude.Reset(pitch, roll);
+		}
+		else
+		{
+			_attitude.Reset();
+		}
+		ApplyBodyRotation();
+		ApplyShipVisual(_bank.Angle);
 	}
 
 	// Sacude la cámara por un impacto (el roce no sacude; uno más débil que el que esté en curso se ignora)
@@ -346,6 +411,14 @@ public partial class Player : CharacterBody3D
 				_inputBlocked = false;
 		}
 
+		// En el aire, W y S no hacen nada (tampoco cortan el boost)
+		bool airborne = _vertical.Airborne;
+		if (airborne)
+		{
+			input.Accelerate = false;
+			input.Brake = false;
+		}
+
 		float boostGain = 0f;
 		if (canDrive)
 		{
@@ -361,39 +434,179 @@ public partial class Player : CharacterBody3D
 			_boost.CancelImpulse();
 		}
 
-		// Tras un impacto fuerte, el giro y la aceleración van reducidos un momento
+		// Tras un impacto fuerte, el giro y la aceleración van reducidos un momento.
+		// En el suelo, la pendiente cambia la punta y la aceleración, y el peralte el agarre y el giro
+		// (en llano los factores son 1); en el aire, sin W/S ni agarre y con el giro reducido.
 		_recovery.Update(dt);
-		ShipTuning tuning = BuildTuning();
-		_dynamics.Step(input, tuning, BuildDriftTuning(), dt, boostGain, _boost.IsImpulseActive, _recovery.Factor);
-		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
+		ShipTuning baseTuning = BuildTuning();
+		ShipTuning tuning = airborne ? baseTuning : ApplyTrackSurface(baseTuning);
+		if (airborne)
+			_dynamics.StepAirborne(input, tuning, dt, boostGain, AirTurn, _recovery.Factor);
+		else
+			_dynamics.Step(input, tuning, BuildDriftTuning(), dt, boostGain, _boost.IsImpulseActive, _recovery.Factor);
+		ApplyBodyRotation();
 
-		// 2. Mover el cuerpo en Godot con la velocidad real
+		// 2. Mover el cuerpo en Godot con la velocidad real (en planta; la altura la pone la capa vertical)
 		Velocity = new Vector3(_dynamics.Velocity.X, 0f, _dynamics.Velocity.Y);
 		MoveAndSlide();
 		_dynamics.SetVelocity(new NVec2(Velocity.X, Velocity.Z));
 
-		// 3. Barreras: contacto, roce o rebote
+		// 3. Barreras: contacto, roce o rebote (también en el aire: la barrera es infinitamente alta)
+		UpdateSurface();
 		ApplyBarriers(dt);
 
 		// 4. Si choca contra algo, el motor también pierde velocidad
 		if (GetSlideCollisionCount() > 0)
 			_dynamics.AbsorbCollision();
 
-		// 5. Inclinación visual de la nave al girar (solo la geometría exterior)
-		float speedRatio = tuning.MaxSpeed > 0f ? _dynamics.RealSpeed / tuning.MaxSpeed : 0f;
+		// 5. Capa vertical: pegada a la superficie, despegue en crestas, vuelo y aterrizaje
+		UpdateVertical(dt);
+
+		// 6. Orientación con la pista e inclinación visual de la nave al girar (solo la geometría exterior)
+		float speedRatio = baseTuning.MaxSpeed > 0f ? _dynamics.RealSpeed / baseTuning.MaxSpeed : 0f;
 		BankSettings bankSettings = BuildBankSettings();
 		_bank.Update(_dynamics.Steer, speedRatio, _dynamics.Drifting, bankSettings, dt);
-		_ship.Rotation = new Vector3(0f, 0f, _bank.Angle);
+		UpdateAttitude(dt);
+		_compression.Update(dt);
+		ApplyShipVisual(_bank.Angle);
 
-		// 6. Efectos de cámara, sacudida (más suave en cabina) y cámara de tercera persona
+		// 7. Efectos de cámara, sacudida (más suave en cabina) y cámara de tercera persona
 		float shipBankTarget = ShipBank.Target(_dynamics.Steer, speedRatio, _dynamics.Drifting, bankSettings);
-		UpdateCameraEffects(shipBankTarget, tuning.MaxSpeed, dt);
+		UpdateCameraEffects(shipBankTarget, baseTuning.MaxSpeed, dt);
 		UpdateShake(dt);
-		_chaseCam.UpdateFollow(dt, GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
+		_chaseCam.UpdateFollow(dt, GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
 
-		// 7. Carrera: cronómetro, checkpoints, meta y vueltas
+		// 8. Carrera: cronómetro, checkpoints, meta y vueltas
 		_race?.Update(GlobalPosition, dt);
 	}
+
+	// ---------------------------------------------------------------
+	// Pista 3D
+	// ---------------------------------------------------------------
+
+	// Superficie bajo la nave en su posición actual (en planta)
+	private void UpdateSurface()
+	{
+		_hasAxis = _track != null && _track.IsBuilt;
+		if (_hasAxis)
+			_axis = _track.ProjectOnAxis(GlobalPosition);
+	}
+
+	// Pendiente (punta y aceleración) y peralte (agarre y giro) de la superficie bajo la nave, sobre los
+	// parámetros que ya llevan el daño. La pendiente es la del eje en el sentido de la marcha (según hacia
+	// dónde apunta la nave respecto al eje); el peralte cuenta según el giro actual.
+	private ShipTuning ApplyTrackSurface(ShipTuning t)
+	{
+		if (!_hasAxis)
+			return t;
+
+		var tangent = new NVec2(_axis.Tangent.X, _axis.Tangent.Z);
+		float direction = NVec2.Dot(_dynamics.Forward, tangent) >= 0f ? 1f : -1f;
+		float slope = direction * Mathf.Atan(_axis.Slope);
+		float slopeFactor = SlopeEffect.Factor(slope, new SlopeSettings
+		{
+			ReferenceAngle = Mathf.DegToRad(SlopeReference),
+			Effect = SlopeEffectAmount
+		});
+		t.MaxSpeed *= slopeFactor;
+		t.Acceleration *= slopeFactor;
+
+		var bankSettings = new BankGripSettings
+		{
+			GripBonus = BankGripBonus,
+			TurnBonus = BankTurnBonus,
+			ReferenceBank = Mathf.DegToRad(BankReferenceDegrees),
+			MaxBank = Mathf.DegToRad(BankMaxDegrees)
+		};
+		t.LateralGrip *= BankGrip.GripFactor(_axis.Bank, _dynamics.Steer, true, bankSettings);
+		t.TurnRate *= BankGrip.TurnFactor(_axis.Bank, _dynamics.Steer, true, bankSettings);
+		return t;
+	}
+
+	// Altura de la nave: en el suelo, a la altura de vuelo sobre la superficie; en el aire, con la gravedad.
+	// Al aterrizar: velocidad contra la superficie fuera (y la pérdida, si la hay), sacudida y compresión
+	// según la velocidad de caída. Sin daño ni impacto contra la barrera.
+	private void UpdateVertical(float dt)
+	{
+		if (!_hasAxis)
+			return;
+
+		var surface = new SurfaceSample(_axis.SurfaceY, ToNumerics(_axis.Normal),
+			new NVec2(_axis.Tangent.X, _axis.Tangent.Z), _axis.Curvature);
+		NVec2 velocity = _vertical.Update(dt, surface, _dynamics.Velocity, new VerticalSettings
+		{
+			Gravity = Gravity,
+			Hover = Track.ShipHover
+		});
+
+		if (_vertical.Landed)
+		{
+			float keep = 1f - Mathf.Clamp(LandingSpeedLoss, 0f, 1f);
+			_dynamics.SetVelocity(velocity * keep);
+			if (keep < 1f)
+				_dynamics.ReduceSpeed(_dynamics.Speed * (1f - keep));
+
+			LandingSettings landing = BuildLandingSettings();
+			LandingLevel level = LandingImpact.Level(_vertical.LandingSpeed, landing);
+			if (level != LandingLevel.None)
+				ShakeCamera(level == LandingLevel.Strong ? ImpactLevel.Strong : ImpactLevel.Medium);
+			_compression.Trigger(LandingImpact.Intensity(_vertical.LandingSpeed, landing));
+		}
+
+		Vector3 p = GlobalPosition;
+		GlobalPosition = new Vector3(p.X, _vertical.Height, p.Z);
+	}
+
+	// Cabeceo y ladeo con la superficie (en el suelo) o hacia el movimiento (en el aire), suavizados
+	private void UpdateAttitude(float dt)
+	{
+		if (!_hasAxis)
+			return;
+
+		_attitude.Update(_vertical.Grounded, _vertical.Landed, ToNumerics(_axis.Normal), _dynamics.Yaw,
+			_vertical.VerticalSpeed, _dynamics.RealSpeed, new AttitudeSettings
+			{
+				GroundSmoothTime = GroundAttitudeSmoothing,
+				AirSmoothTime = AirAttitudeSmoothing,
+				LandingSmoothTime = LandingAlignTime,
+				AirMaxPitch = Mathf.DegToRad(AirMaxPitch)
+			}, dt);
+		ApplyBodyRotation();
+	}
+
+	// Rumbo, cabeceo y ladeo del cuerpo (orden YXZ de Godot): la nave visible y la cabina van con él
+	private void ApplyBodyRotation()
+	{
+		Rotation = new Vector3(_attitude.Pitch, _dynamics.Yaw, _attitude.Roll);
+	}
+
+	// Inclinación visual por giro y compresión del aterrizaje (solo visual; la cabina también baja)
+	private void ApplyShipVisual(float bank)
+	{
+		float drop = _compression.Offset(BuildLandingSettings());
+		_ship.Rotation = new Vector3(0f, 0f, bank);
+		_ship.Position = new Vector3(0f, -drop, 0f);
+		_cockpit.Position = new Vector3(0f, -drop, 0f);
+	}
+
+	// "Arriba" para la cámara exterior: el de la superficie en el suelo, el del mundo en el aire
+	private Vector3 SurfaceUp()
+	{
+		return _hasAxis && _vertical.Grounded ? _axis.Normal : Vector3.Up;
+	}
+
+	private LandingSettings BuildLandingSettings()
+	{
+		return new LandingSettings
+		{
+			MediumSpeed = LandingMediumSpeed,
+			StrongSpeed = LandingStrongSpeed,
+			CompressionDepth = LandingCompression,
+			CompressionTime = LandingCompressionTime
+		};
+	}
+
+	private static System.Numerics.Vector3 ToNumerics(Vector3 v) => new(v.X, v.Y, v.Z);
 
 	// Traduce el teclado a intenciones de conducción
 	private static ShipInput ReadInput()
@@ -489,7 +702,8 @@ public partial class Player : CharacterBody3D
 			Distance = CameraDistance,
 			ExtraDistance = CameraExtraDistance,
 			BaseFov = BaseFov,
-			MaxFov = MaxFov
+			MaxFov = MaxFov,
+			UpSmoothTime = CameraUpSmoothing
 		};
 	}
 
@@ -554,6 +768,7 @@ public partial class Player : CharacterBody3D
 		s.BoostPushChase = BoostPushChase;
 		s.BoostEnterTime = BoostEffectEnterTime;
 		s.BoostExitTime = BoostEffectExitTime;
+		s.CockpitTrackBankFactor = CockpitTrackBankFactor;
 		return s;
 	}
 
@@ -584,7 +799,9 @@ public partial class Player : CharacterBody3D
 		System.Numerics.Vector2 chase = _vibration.Offset(CameraView.Chase, s);
 		System.Numerics.Vector2 cockpit = _vibration.Offset(CameraView.Cockpit, s);
 		_chaseCam.SetEffects(new Vector2(chase.X, chase.Y), _boostCamera.Push(CameraView.Chase, s), fovExtra);
-		_cockpit.SetEffects(_cockpitBank.Angle, new Vector2(cockpit.X, cockpit.Y), _boostCamera.Push(CameraView.Cockpit, s), fovExtra);
+		// La cabina hereda el ladeo de la pista del cuerpo; con un factor menor que 1 se quita esa parte
+		float trackBank = (1f - s.CockpitTrackBankFactor) * _attitude.Roll;
+		_cockpit.SetEffects(_cockpitBank.Angle - trackBank, new Vector2(cockpit.X, cockpit.Y), _boostCamera.Push(CameraView.Cockpit, s), fovExtra);
 	}
 
 	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos
@@ -597,19 +814,20 @@ public partial class Player : CharacterBody3D
 		_cockpit.SetShake(offset * CockpitShakeFactor, _shake.Roll * CockpitShakeFactor);
 	}
 
-	// Barreras (BarrierCollision): con la posición ya movida, se mira el desplazamiento lateral respecto
-	// al punto más cercano del eje. Si toca, la nave vuelve justo al límite (solo la parte lateral de la
-	// posición) y se aplican el roce o el rebote a la velocidad, la dirección y la velocidad del motor.
+	// Barreras (BarrierCollision): con la posición ya movida, se mira el desplazamiento lateral sobre la
+	// superficie respecto al punto del eje bajo la nave. Si toca, la nave vuelve justo al límite (solo la
+	// parte lateral de la posición, a lo largo del lado de la superficie) y se aplican el roce o el rebote
+	// a la velocidad, la dirección y la velocidad del motor. Igual en el aire.
 	// El boost no se toca: las pérdidas se aplican sobre la velocidad que lleve, también con impulso.
 	private void ApplyBarriers(float dt)
 	{
-		if (_track == null || !_track.IsBuilt)
+		if (!_hasAxis)
 		{
 			LastBarrierTouch = default;
 			return;
 		}
 
-		AxisPoint axis = _track.ProjectOnAxis(GlobalPosition);
+		AxisPoint axis = _axis;
 		var tangent = new NVec2(axis.Tangent.X, axis.Tangent.Z);
 		var right = new NVec2(axis.Right.X, axis.Right.Z);
 		NVec2 velocity = _dynamics.Velocity;
@@ -632,13 +850,16 @@ public partial class Player : CharacterBody3D
 		if (!r.Contact)
 			return;
 
-		GlobalPosition += axis.Right * (r.Lateral - axis.Lateral);
+		// En planta, el lateral sobre la superficie avanza a lo largo de la parte horizontal de su lado (en llano, Right)
+		var side = new Vector3(axis.SurfaceRight.X, 0f, axis.SurfaceRight.Z);
+		GlobalPosition += side * (r.Lateral - axis.Lateral);
+		UpdateSurface();
 
 		NVec2 newVelocity = tangent * r.VelocityAlong + right * r.VelocityLateral;
 		NVec2 newForward = tangent * r.HeadingAlong + right * r.HeadingLateral;
 		float yaw = Mathf.Atan2(-newForward.X, -newForward.Y);
 		_dynamics.ApplyImpact(newVelocity, yaw, r.SpeedScale, r.SpeedLoss);
-		Rotation = new Vector3(0f, _dynamics.Yaw, 0f);
+		ApplyBodyRotation();
 
 		// Un impacto medio o fuerte corta el derrape (el roce no)
 		if (r.IsNewImpact && r.Level != ImpactLevel.Graze)

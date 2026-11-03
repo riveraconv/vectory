@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Numerics;
 using System.Text;
 using Vectory.Records;
@@ -37,7 +38,9 @@ public static class TrackSignature
 	private const ulong FnvOffset = 14695981039346656037UL;
 	private const ulong FnvPrime = 1099511628211UL;
 
-	public static string Compute(IEnumerable<Vector3> centerline, float trackWidth)
+	// banks: peralte de cada punto del eje (spec pista-3d 2.4). Solo entra en la firma si alguno no es 0,
+	// así la de los circuitos planos no cambia. La altura ya va en la Y de los puntos.
+	public static string Compute(IEnumerable<Vector3> centerline, float trackWidth, IEnumerable<float> banks = null)
 	{
 		var text = new StringBuilder();
 		if (centerline != null)
@@ -46,6 +49,13 @@ public static class TrackSignature
 				text.Append(Round(p.X)).Append(',').Append(Round(p.Y)).Append(',').Append(Round(p.Z)).Append(';');
 		}
 		text.Append('|').Append(Round(trackWidth));
+
+		if (banks != null && banks.Any(b => b != 0f))
+		{
+			text.Append("|bank:");
+			foreach (float b in banks)
+				text.Append(Round(b)).Append(';');
+		}
 
 		ulong hash = FnvOffset;
 		foreach (byte b in Encoding.UTF8.GetBytes(text.ToString()))

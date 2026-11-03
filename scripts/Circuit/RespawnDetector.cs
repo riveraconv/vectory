@@ -40,7 +40,8 @@ public sealed class RespawnDetector
 		_wasOutside = false;
 	}
 
-	public bool Update(float dt, bool contact, float speed, float lateral)
+	// airborne: la nave va por el aire (pista 3D); mientras tanto el atasco no cuenta tiempo
+	public bool Update(float dt, bool contact, float speed, float lateral, bool airborne = false)
 	{
 		bool outside = MathF.Abs(lateral) > _settings.BarrierOffset + _settings.OutsideMargin;
 		bool justWentOutside = outside && !_wasOutside;
@@ -51,7 +52,7 @@ public sealed class RespawnDetector
 			return true;
 		}
 
-		if (!contact || speed >= _settings.StuckSpeed)
+		if (airborne || !contact || speed >= _settings.StuckSpeed)
 		{
 			_stuckTimer = 0f;
 			return false;

@@ -35,6 +35,9 @@ public sealed class CameraEffectSettings
 	public float BoostEnterTime = 0.25f;
 	public float BoostExitTime = 0.5f;
 
+	// Peralte de la pista en la cabina (spec docs/pista-3d.md, 5.1): 1 = la vista se ladea el peralte completo
+	public float CockpitTrackBankFactor = 1f;
+
 	public float VibrationAmplitude(CameraView view) =>
 		view == CameraView.Cockpit ? VibrationAmplitudeCockpit : VibrationAmplitudeChase;
 
