@@ -50,6 +50,16 @@ public partial class TrackDefinition : Resource
 	// Peralte en grados: positivo = el borde derecho más alto que el izquierdo, en el sentido de la marcha
 	[Export] public Vector2[] BankKeys = System.Array.Empty<Vector2>();
 
+	// Elementos del circuito (spec docs/elementos-circuito.md). Distancias en m sobre el eje en planta desde la meta.
+	// Túneles: (inicio, fin) de cada uno. Vacío = sin túneles.
+	[Export] public Vector2[] Tunnels = System.Array.Empty<Vector2>();
+
+	// Avisos de curva (chevrons): (inicio, fin) de cada curva técnica. El lado sale solo de la curvatura del eje.
+	[Export] public Vector2[] CurveWarnings = System.Array.Empty<Vector2>();
+
+	// Señales de cresta: la distancia de lo alto de cada cresta que se quiera señalizar
+	[Export] public float[] CrestWarnings = System.Array.Empty<float>();
+
 	// Comprueba que los datos permiten generar un circuito
 	public bool IsValid(out string error)
 	{

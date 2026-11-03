@@ -10,9 +10,10 @@ namespace Vectory.Circuit;
 // Circuito cerrado de VECTORY, generado por código.
 // El trazado sale de un TrackDefinition (archivo .tres por circuito): puntos de control
 // medidos sobre la imagen del circuito (en píxeles), que se convierten a metros,
-// se suavizan con una spline cerrada y se dibujan en estilo wireframe de neón:
-// bordes cian, rejilla azul tenue, una línea de meta (medio hexágono), checkpoints
-// (medio rectángulo) y las marcas de la parrilla de salida (corchetes detrás de la meta).
+// se suavizan con una spline cerrada y se dibujan en estilo wireframe de neón: bordes, carriles,
+// línea central y transversales cada 10 m en el suelo, y las barreras. Meta, checkpoints, semáforo, parrilla, túneles,
+// avisos de curva y señales de cresta (spec docs/elementos-circuito.md) los monta TrackElements, un hijo
+// de este nodo, con los parámetros de abajo.
 // Pista 3D (spec docs/pista-3d.md): con las claves de altura y peralte del TrackDefinition, todo se construye
 // sobre el marco local de la pista (TrackFrame: adelante, arriba y lado), así que sube, baja y se ladea con ella.
 public partial class Track : Node3D
@@ -26,9 +27,27 @@ public partial class Track : Node3D
 
 	// ---- Ajustes comunes a todos los circuitos ----
 	[Export] public float TrackY = DefaultTrackY; // altura de la pista (la nave flota 2 m por encima)
-	[Export] public float RungSpacing = 8f;      // separación de las líneas transversales
-	[Export] public float GateHeight = 12f;      // altura de la línea de meta
-	[Export] public float CheckpointHeight = 6f; // altura de cada checkpoint
+
+	[ExportGroup("Suelo")]
+	[Export] public float RungSpacing = 10f;      // separación de las transversales, sobre el eje
+	[Export(PropertyHint.Range, "0,1,0.01")] public float RungOpacity = 0.65f;
+	[Export] public float LaneDashLength = 5f;    // trazos de los carriles discontinuos
+	[Export] public float LaneDashPeriod = 10f;   // un trazo cada tantos metros, sobre el eje
+	[Export(PropertyHint.Range, "0,1,0.01")] public float LaneOpacity = 0.85f;   // carriles y línea central
+
+	[ExportGroup("Meta")]
+	[Export] public float FinishHeight = 12f;         // altura de los medios hexágonos
+	[Export] public float FinishSpacing = 4f;         // separación entre los dos arcos, sobre el eje
+	[Export] public float FinishClearance = 2f;       // holgura de los pilares por fuera del borde de la pista
+	[Export] public float FinishFlashDuration = 0.6f; // segundos del destello al cruzar
+
+	[ExportGroup("Checkpoints")]
+	[Export] public float CheckpointHeight = 9f;
+	[Export] public float CheckpointSpacing = 3f;
+	[Export] public float CheckpointClearance = 2f;
+	[Export(PropertyHint.Range, "0,2,0.01")] public float CheckpointIdleBrightness = 0.5f;
+	[Export] public float CheckpointFlashDuration = 0.45f;
+	[Export] public float CheckpointPanelTime = 2f;    // segundos con el tiempo del sector visible en el panel
 
 	[ExportGroup("Parrilla")]
 	[Export] public int GridSlots = DefaultGridSlots;   // participantes de una carrera (una marca por cada uno)
@@ -36,8 +55,28 @@ public partial class Track : Node3D
 	[Export] public float GridRowSpacing = 16f;      // metros entre filas de una misma columna
 	[Export] public float GridEvenOffset = 8f;       // cuánto más atrás va cada marca par
 	[Export] public float GridLateralPercent = 25f;  // desplazamiento lateral de las columnas (% del ancho de pista)
-	[Export] public float GridMarkWidth = 4f;        // ancho de la línea transversal de cada marca
-	[Export] public float GridMarkLegLength = 2f;    // largo de las patas de cada marca
+	[Export] public float GridFrameWidth = 3.6f;     // marco de luz de cada puesto (m)
+	[Export] public float GridFrameLength = 6.4f;
+	[Export] public float GridFadeTime = 0.5f;       // segundos en apagarse desde el GO
+
+	[ExportGroup("Semáforo")]
+	[Export] public float StartLightsFlashDuration = 0.7f;   // destello cian de la salida
+
+	[ExportGroup("Túneles")]
+	[Export] public float TunnelHeight = 11f;
+	[Export] public float TunnelClearance = 2f;
+	[Export] public float TunnelRingSpacing = 8f;
+	[Export] public float TunnelPulseSpeed = 120f;   // m/s
+	[Export] public int TunnelPulseCount = 2;
+
+	[ExportGroup("Avisos de curva")]
+	[Export] public float ChevronSpacing = 9f;
+	[Export] public float ChevronWaveFrequency = 2.2f;   // Hz
+
+	[ExportGroup("Cresta")]
+	[Export] public float[] CrestBeaconDistances = { 150f, 100f, 50f };   // m antes de la cresta
+	[Export] public float CrestBarrierHalfLength = 45f;                   // barrera naranja: m antes y después
+	[Export] public float CrestBarrierRaise = 0.35f;                      // segunda línea de remate, por encima de la barrera
 
 	[ExportGroup("Barrera")]
 	[Export] public float BarrierGap = 0.5f;          // separación de la barrera respecto al borde de la pista
@@ -115,6 +154,23 @@ public partial class Track : Node3D
 	// Firma del trazado para los fantasmas (con la altura y, si lo hay, el peralte)
 	public string Signature => ComputeSignature(Frame, TrackWidth);
 
+	// Elementos del circuito ya validados (spec docs/elementos-circuito.md, 7.1, 8.1 y 9.1)
+	public IReadOnlyList<TrackSpan> Tunnels { get; private set; } = new List<TrackSpan>();
+	public IReadOnlyList<TrackSpan> CurveWarnings { get; private set; } = new List<TrackSpan>();
+	public IReadOnlyList<float> CrestWarnings { get; private set; } = new List<float>();
+
+	// Distancia sobre el eje de cada checkpoint, en orden de carrera
+	public List<float> CheckpointDistances { get; } = new();
+
+	// Meta, checkpoints, semáforo, parrilla, túneles y avisos (null si el circuito no se ha generado)
+	public TrackElements Elements { get; private set; }
+
+	// Una cresta dentro de un túnel o a menos de estos metros de su entrada da aviso
+	private const float CrestTunnelMargin = 50f;
+
+	// Un túnel más corto da aviso
+	private const float MinTunnelLength = 40f;
+
 	private readonly List<Vector3> _verts = new();
 	private readonly List<Color> _colors = new();
 
@@ -138,6 +194,7 @@ uniform vec3 flash_color = vec3(1.0, 0.6, 0.2);
 uniform float flash_glow = 1.5;
 uniform vec3 left_flash = vec3(0.0);   // x: punto de impacto, y: radio, z: intensidad
 uniform vec3 right_flash = vec3(0.0);
+uniform float crest_beat = 1.0;        // brillo del tramo naranja de las crestas (UV2.x = 1)
 
 float flash_at(float d, vec3 f) {
 	if (f.z <= 0.0 || f.y <= 0.0)
@@ -149,7 +206,8 @@ float flash_at(float d, vec3 f) {
 
 void fragment() {
 	float k = UV.y < 0.5 ? flash_at(UV.x, left_flash) : flash_at(UV.x, right_flash);
-	ALBEDO = mix(COLOR.rgb, flash_color * (1.0 + flash_glow * k), k);
+	vec3 base = UV2.x > 0.5 ? COLOR.rgb * crest_beat : COLOR.rgb;
+	ALBEDO = mix(base, flash_color * (1.0 + flash_glow * k), k);
 	ALPHA = mix(COLOR.a, 1.0, k);
 }
 ";
@@ -203,10 +261,9 @@ void fragment() {
 		for (int i = 0; i < count; i++)
 			_samples[i] = Frame.At(_cumulative[i]);
 
+		ValidateElements();
 		BuildTrackLines();
-		BuildFinishLine();
-		BuildCheckpoints();
-		BuildGridMarks();
+		FindCheckpoints();
 
 		var mesh = new ArrayMesh();
 		var arrays = new Godot.Collections.Array();
@@ -223,6 +280,22 @@ void fragment() {
 		AddChild(new MeshInstance3D { Name = "TrackMesh", Mesh = mesh });
 
 		AddChild(new MeshInstance3D { Name = "BarrierMesh", Mesh = BuildBarrierMesh() });
+
+		Elements = new TrackElements { Name = "Elements" };
+		AddChild(Elements);
+		Elements.Build(this);
+	}
+
+	// Túneles, avisos de curva y crestas del TrackDefinition: lo que no vale se ignora con aviso en consola
+	private void ValidateElements()
+	{
+		var warnings = new List<string>();
+		Tunnels = TrackElementValidation.ValidateSpans(ToNumerics(Definition.Tunnels), LapLength, "Tunnels", MinTunnelLength, warnings);
+		CurveWarnings = TrackElementValidation.ValidateSpans(ToNumerics(Definition.CurveWarnings), LapLength, "CurveWarnings", 0f, warnings);
+		CrestWarnings = TrackElementValidation.ValidateCrests(Definition.CrestWarnings ?? System.Array.Empty<float>(), LapLength, warnings);
+		TrackElementValidation.CheckCrestsNearTunnels(CrestWarnings, Tunnels, CrestTunnelMargin, warnings);
+		foreach (string warning in warnings)
+			GD.PushWarning($"Track: '{Definition.DisplayName}': {warning}");
 	}
 
 	// ---------------------------------------------------------------
@@ -248,6 +321,12 @@ void fragment() {
 		AxisPoint axis = ProjectOnAxis(position);
 		shipPosition = new Vector3(axis.Center.X, axis.Center.Y + ShipHover, axis.Center.Z);
 		yaw = Mathf.Atan2(-axis.Tangent.X, -axis.Tangent.Z);
+	}
+
+	// Brillo del tramo de barrera naranja de las crestas (latido; lo pasa TrackElements cada frame)
+	public void SetCrestBarrierBrightness(float brightness)
+	{
+		_barrierMaterial?.SetShaderParameter("crest_beat", brightness);
 	}
 
 	// Pasa el destello actual al shader de la barrera (no rehace la malla)
@@ -306,6 +385,16 @@ void fragment() {
 		PointBehindFinish(distance, out Vector3 point, out Vector3 forward);
 		shipPosition = new Vector3(point.X, SurfaceY(LapLength - Mathf.Max(0f, distance), 0f) + ShipHover, point.Z);
 		yaw = Mathf.Atan2(-forward.X, -forward.Z);
+	}
+
+	// Centro de la nave colocada en la marca de la posición 1..GridSlots (como GetGridStart): distancia sobre
+	// el eje desde la meta y lateral sobre la superficie. Para el marco de luz de cada puesto.
+	public void GetGridSlotCenter(int position, float noseDistance, out float distance, out float lateral)
+	{
+		const float NoseGap = 0.5f;
+		GridSlot slot = GridLayout.Slot(position, TrackWidth, GridSettings);
+		distance = LapLength - slot.Distance - (noseDistance + NoseGap);
+		lateral = slot.Lateral;
 	}
 
 	// Centro de la línea transversal de una marca (sobre la superficie), y las direcciones de la marcha
@@ -423,36 +512,52 @@ void fragment() {
 	// Punto de la superficie a "lateral" m del eje (y "height" m por encima, a lo largo de N)
 	private static Vector3 Surface(in FramePoint f, float lateral, float height = 0f) => ToGodot(f.PointAt(lateral, height));
 
-	// Bordes, líneas interiores y transversales sobre la superficie: siguen la altura y se ladean con el peralte
+	// Suelo (spec docs/elementos-circuito.md, 2, diseño 0): bordes cian continuos, dos carriles azules discontinuos
+	// a ±1/3 del medio ancho (LaneDashLength m cada LaneDashPeriod m), línea central azul continua y una transversal
+	// de borde a borde cada RungSpacing m, azul más tenue. Siguen la altura y se ladean con el peralte.
+	// Solo visual: la firma no cambia.
 	private void BuildTrackLines()
 	{
 		int n = Centerline.Count;
 		float hw = TrackWidth * 0.5f;
-		float distSinceRung = 0f;
+		Color lane = Dim(Palette.TrackLane, LaneOpacity);
 
 		for (int i = 0; i < n; i++)
 		{
 			int j = (i + 1) % n;
-			FramePoint fi = _samples[i];
-			FramePoint fj = _samples[j];
+			Line(Surface(_samples[i], -hw), Surface(_samples[j], -hw), Palette.TrackEdge);
+			Line(Surface(_samples[i], hw), Surface(_samples[j], hw), Palette.TrackEdge);
+			Line(Surface(_samples[i], 0f), Surface(_samples[j], 0f), lane);
+		}
 
-			// Bordes brillantes
-			Line(Surface(fi, -hw), Surface(fj, -hw), Palette.TrackEdge);
-			Line(Surface(fi, hw), Surface(fj, hw), Palette.TrackEdge);
-
-			// Dos líneas interiores tenues (dan el aspecto de rejilla de la imagen)
-			Line(Surface(fi, -hw / 3f), Surface(fj, -hw / 3f), Palette.BlueDim);
-			Line(Surface(fi, hw / 3f), Surface(fj, hw / 3f), Palette.BlueDim);
-
-			// Líneas transversales cada RungSpacing metros
-			distSinceRung += Centerline[i].DistanceTo(Centerline[j]);
-			if (distSinceRung >= RungSpacing)
+		// Carriles: cada trazo se parte en tramos de ~1 m para que siga la curva y la altura
+		const float DashStep = 1f;
+		float period = Mathf.Max(1f, LaneDashPeriod);
+		float dash = Mathf.Clamp(LaneDashLength, 0.1f, period);
+		for (float d = 0f; d < LapLength - 0.5f; d += period)
+		{
+			float end = Mathf.Min(d + dash, LapLength);
+			int pieces = Mathf.Max(1, Mathf.CeilToInt((end - d) / DashStep));
+			for (int k = 0; k < pieces; k++)
 			{
-				distSinceRung = 0f;
-				Line(Surface(fi, -hw), Surface(fi, hw), Palette.BlueDim);
+				FramePoint a = Frame.At(d + (end - d) * k / pieces);
+				FramePoint b = Frame.At(d + (end - d) * (k + 1) / pieces);
+				Line(Surface(a, -hw / 3f), Surface(b, -hw / 3f), lane);
+				Line(Surface(a, hw / 3f), Surface(b, hw / 3f), lane);
 			}
 		}
+
+		Color rung = Dim(Palette.TrackRung, RungOpacity);
+		float spacing = Mathf.Max(1f, RungSpacing);
+		for (float d = 0f; d < LapLength - 0.5f; d += spacing)
+		{
+			FramePoint f = Frame.At(d);
+			Line(Surface(f, -hw), Surface(f, hw), rung);
+		}
 	}
+
+	// Color multiplicado por una opacidad (opaco: la "opacidad" se aplica oscureciendo el color)
+	private static Color Dim(Color c, float k) => new(c.R * k, c.G * k, c.B * k, 1f);
 
 	// Barreras: un muro a cada lado, a BarrierOffset del eje, con una franja cian arriba y otra abajo y un
 	// relleno ligero entre ellas (línea media y verticales azules). Las horizontales siguen el eje con la
@@ -460,13 +565,18 @@ void fragment() {
 	// dentro de la franja). Verticales y travesaños, repartidos por igual en la vuelta (BarrierGeometry).
 	// Las alturas se miden a lo largo de N: el muro es perpendicular a la superficie y se ladea con el peralte.
 	// Malla aparte con su shader para el destello.
+	// Cresta (spec docs/elementos-circuito.md, 9.3): de CrestBarrierHalfLength m antes a otros tantos después de cada
+	// cresta señalizada, la barrera se dibuja en naranja (no encima de la cian: la sustituye), con una segunda
+	// línea de remate CrestBarrierRaise m más arriba y las verticales subiendo hasta ella. Esas líneas llevan
+	// UV2.x = 1 para que el shader les aplique el latido.
 	private ArrayMesh BuildBarrierMesh()
 	{
 		var verts = new List<Vector3>();
 		var colors = new List<Color>();
 		var uvs = new List<Vector2>();
+		var uv2s = new List<Vector2>();
 
-		void Add(Vector3 a, float da, Vector3 b, float db, float side, Color c)
+		void Add(Vector3 a, float da, Vector3 b, float db, float side, Color c, bool crest = false)
 		{
 			verts.Add(a);
 			verts.Add(b);
@@ -474,7 +584,13 @@ void fragment() {
 			colors.Add(c);
 			uvs.Add(new Vector2(da, side));
 			uvs.Add(new Vector2(db, side));
+			Vector2 flag = crest ? Vector2.Right : Vector2.Zero;
+			uv2s.Add(flag);
+			uv2s.Add(flag);
 		}
+
+		bool InCrest(float d) => TrackElementShapes.InCrestBarrier(d, CrestWarnings, CrestBarrierHalfLength, LapLength);
+		Color CrestColor(Color c) => new(Palette.CrestBarrier, c.A);
 
 		int n = Centerline.Count;
 		float offset = BarrierOffset;
@@ -509,16 +625,31 @@ void fragment() {
 				// El tramo del cierre llega a la vuelta completa (no a 0) para que la distancia sea continua
 				float da = _cumulative[i];
 				float db = _cumulative[i + 1];
+				bool crest = InCrest((da + db) * 0.5f);
 
 				foreach (var line in horizontals)
-					Add(Surface(_samples[i], lateral, line.Height), da, Surface(_samples[j], lateral, line.Height), db, side, line.Color);
+				{
+					Color c = crest ? CrestColor(line.Color) : line.Color;
+					Add(Surface(_samples[i], lateral, line.Height), da, Surface(_samples[j], lateral, line.Height), db, side, c, crest);
+				}
+				if (crest)
+				{
+					float raised = h.Top + CrestBarrierRaise;
+					Add(Surface(_samples[i], lateral, raised), da, Surface(_samples[j], lateral, raised), db, side, Palette.CrestBarrier, true);
+				}
 			}
 
 			foreach (float d in posts)
 			{
 				FramePoint f = Frame.At(d);
+				bool crest = InCrest(d);
 				foreach (var line in verticals)
-					Add(Surface(f, lateral, line.From), d, Surface(f, lateral, line.To), d, side, line.Color);
+				{
+					Color c = crest ? CrestColor(line.Color) : line.Color;
+					Add(Surface(f, lateral, line.From), d, Surface(f, lateral, line.To), d, side, c, crest);
+				}
+				if (crest)
+					Add(Surface(f, lateral, h.Top), d, Surface(f, lateral, h.Top + CrestBarrierRaise), d, side, CrestColor(Palette.BarrierBandTie), true);
 			}
 		}
 
@@ -527,6 +658,7 @@ void fragment() {
 		arrays[(int)Mesh.ArrayType.Vertex] = verts.ToArray();
 		arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
 		arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+		arrays[(int)Mesh.ArrayType.TexUV2] = uv2s.ToArray();
 
 		var mesh = new ArrayMesh();
 		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);
@@ -539,84 +671,20 @@ void fragment() {
 		return mesh;
 	}
 
-	// Línea de meta: medio hexágono (mitad superior) en la muestra FinishIndex de la línea central.
-	private void BuildFinishLine()
-	{
-		BuildArch(FinishIndex, GateHeight, Palette.Orange, true);
-	}
-
-	// Checkpoints: medio rectángulo, repartidos a distancias iguales a lo largo del circuito
-	// (sin contar la meta, que está en FinishIndex). Sus índices quedan guardados, en orden
-	// de carrera, en CheckpointIndices.
-	private void BuildCheckpoints()
+	// Checkpoints repartidos a distancias iguales a lo largo del circuito (sin contar la meta, que está en
+	// FinishIndex). Sus índices quedan guardados, en orden de carrera, en CheckpointIndices, y sus distancias
+	// en CheckpointDistances. Sus pórticos los dibuja TrackElements.
+	private void FindCheckpoints()
 	{
 		CheckpointIndices.Clear();
+		CheckpointDistances.Clear();
 
 		var numerics = Centerline.ConvertAll(p => new System.Numerics.Vector3(p.X, p.Y, p.Z));
 		foreach (int index in CenterlineBuilder.CheckpointIndices(numerics, CheckpointCount))
 		{
 			CheckpointIndices.Add(index);
-			BuildArch(index, CheckpointHeight, Palette.Checkpoint, false);
+			CheckpointDistances.Add(_cumulative[index]);
 		}
-	}
-
-	// Marcas de parrilla: un corchete por posición, con la línea transversal delante (donde va
-	// el morro de la nave) y dos patas cortas hacia atrás. Son parte fija del circuito y se apoyan
-	// en la superficie (cada extremo toma su altura).
-	private void BuildGridMarks()
-	{
-		float hw = GridMarkWidth * 0.5f;
-
-		for (int position = 1; position <= GridSlots; position++)
-		{
-			GetGridMark(position, out Vector3 front, out Vector3 forward, out Vector3 right);
-			GridSlot slot = GridLayout.Slot(position, TrackWidth, GridSettings);
-			float s = LapLength - slot.Distance;
-
-			Vector3 frontLeft = front - right * hw;
-			Vector3 frontRight = front + right * hw;
-			frontLeft.Y = SurfaceY(s, slot.Lateral - hw);
-			frontRight.Y = SurfaceY(s, slot.Lateral + hw);
-			Vector3 backLeft = frontLeft - forward * GridMarkLegLength;
-			Vector3 backRight = frontRight - forward * GridMarkLegLength;
-			backLeft.Y = SurfaceY(s - GridMarkLegLength, slot.Lateral - hw);
-			backRight.Y = SurfaceY(s - GridMarkLegLength, slot.Lateral + hw);
-
-			Line(frontLeft, frontRight, Palette.GridMark);
-			Line(frontLeft, backLeft, Palette.GridMark);
-			Line(frontRight, backRight, Palette.GridMark);
-		}
-	}
-
-	// Arco en el plano perpendicular a la pista, apoyado en la superficie y cerrado con una línea base.
-	// Sigue el marco de la pista en su punto: base sobre la superficie y lados a lo largo de N.
-	// hexagon = true: mitad superior de un hexágono; false: mitad superior de un rectángulo.
-	private void BuildArch(int index, float height, Color color, bool hexagon)
-	{
-		FramePoint f = _samples[index];
-		float hw = TrackWidth * 0.5f;
-
-		Vector3 leftBase = Surface(f, -hw);
-		Vector3 rightBase = Surface(f, hw);
-
-		Vector3 leftTop;
-		Vector3 rightTop;
-		if (hexagon)
-		{
-			// Los vértices superiores quedan a la mitad del ancho
-			leftTop = Surface(f, -hw * 0.5f, height);
-			rightTop = Surface(f, hw * 0.5f, height);
-		}
-		else
-		{
-			leftTop = Surface(f, -hw, height);
-			rightTop = Surface(f, hw, height);
-		}
-
-		Line(leftBase, leftTop, color);
-		Line(leftTop, rightTop, color);
-		Line(rightTop, rightBase, color);
-		Line(rightBase, leftBase, color);
 	}
 }
 

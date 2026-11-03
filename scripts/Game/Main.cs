@@ -193,8 +193,16 @@ public partial class Main : Node3D
 			_track.GetGridStart(gridOrder[0], Player.NoseDistance, out Vector3 startPosition, out float startYaw);
 			_player.PlaceAt(startPosition, startYaw);
 			_race = RaceSession.ForRace(_track, BuildStartSettings(), participants);
+			_track.Elements.ShowGrid(gridOrder[0], Player.NoseDistance);
 		}
 		_player.SetRaceSession(_race);
+
+		// Elementos del circuito: meta y checkpoints destellan al cruzarlos, el panel muestra el tiempo del sector
+		// y el semáforo y la parrilla siguen la secuencia de salida (null en TIME TRIAL: semáforo apagado)
+		_track.Elements.SetStartSequence(_race.StartSequence);
+		_race.FinishLineCrossed += _track.Elements.FlashFinish;
+		_race.CheckpointLineCrossed += _track.Elements.FlashCheckpoint;
+		_race.SectorTimed += OnSectorTimed;
 
 		_barrierFlash = new BarrierFlash(_track.LapLength, _track.BarrierFlashSettings);
 		_respawn = new RespawnDetector(new RespawnSettings
@@ -391,6 +399,16 @@ public partial class Main : Node3D
 	}
 
 	private TimeTrialRecord TimeTrialRecord() => _records.Book.GetTimeTrial(_track.CircuitId);
+
+	// Sector cerrado: tiempo y diferencia con el mejor anterior de la nave, en el panel del checkpoint (si el sector
+	// termina en uno; el último termina en la meta) y en el HUD
+	private void OnSectorTimed(int sector, double time, double? previousBest)
+	{
+		SectorTimeText text = SectorTimeText.Build(sector, time, previousBest);
+		if (sector < _track.CheckpointIndices.Count)
+			_track.Elements.ShowCheckpointTime(sector, text);
+		_hud.ShowSectorTime(text);
+	}
 
 	// TIME TRIAL: delta del checkpoint contra el tiempo de paso del récord (si hay récord con
 	// tiempos de paso válidos para los checkpoints actuales)

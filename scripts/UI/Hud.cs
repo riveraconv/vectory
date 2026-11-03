@@ -10,9 +10,11 @@ namespace Vectory.UI;
 // Se crea por código desde Main, que le pasa los datos cada frame. Colores de Palette.
 //
 //   Arriba izquierda:  posición / participantes (TIME TRIAL: TIME TRIAL y el circuito)
-//   Arriba derecha:    vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de vuelta y mejor tiempo
+//   Arriba derecha:    vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de vuelta, mejor tiempo y, 2 s tras cerrar un
+//                      sector, su tiempo y la diferencia con el mejor anterior (S1  0:23.456  -0.214)
 //   Abajo derecha:     indicador de daño (solo RACE) y cargas de boost (esferas), velocidad (km/h) y su barra
-//   Arriba centro:     RACE: semáforo y cuenta atrás; TIME TRIAL: delta por sector y franja de fin de vuelta
+//   Arriba centro:     RACE: cuenta atrás y GO! (el semáforo está en la meta); TIME TRIAL: READY? / GO!, delta por
+//                      sector y franja de fin de vuelta
 //   Centro:            pantalla de resultados (al terminar la carrera)
 //
 // Es una capa 2D fija a la pantalla: en cabina queda pegada al marco de la cabina.
@@ -28,6 +30,11 @@ public partial class Hud : CanvasLayer
 	private const float StartLightsWidth = 900f;   // ancho de sobra para READY? / GO! en grande
 	private const string ReadyText = "READY?";
 	private const string GoText = "GO!";
+
+	// Tiempo de sector (spec docs/elementos-circuito.md, 4.3): segundos visible, aparición y desvanecido
+	public float SectorTimeVisible = 2f;
+	private const float SectorFadeIn = 0.1f;
+	private const float SectorFadeOut = 0.3f;
 
 	// Tamaño del texto de salida (cuenta atrás, READY?, GO!), px sobre 1280×720. Se fija antes de añadir el HUD.
 	public int StartTextFontSize = StartLightsView.DefaultTextFontSize;
@@ -45,6 +52,10 @@ public partial class Hud : CanvasLayer
 	private Label _lapLabel;
 	private Label _lapTimeLabel;
 	private Label _bestLapLabel;
+	private HBoxContainer _sectorRow;
+	private Label _sectorTimeLabel;
+	private Label _sectorDeltaLabel;
+	private float _sectorElapsed = -1f;   // < 0: sin tiempo de sector a la vista
 	private Label _speedLabel;
 	private ColorRect _speedFill;
 	private BoostChargesView _boostCharges;
@@ -75,6 +86,7 @@ public partial class Hud : CanvasLayer
 
 		BuildPositionBlock(root);
 		BuildLapBlock(root);
+		BuildSectorBlock(root);
 		BuildSpeedBlock(root);
 		BuildStartLights(root);
 		BuildTimeTrial(root);
@@ -134,7 +146,37 @@ public partial class Hud : CanvasLayer
 	// Delta por sector y franja de fin de vuelta de TIME TRIAL
 	public TimeTrialView TimeTrial => _timeTrial;
 
-	// RACE: semáforo y cuenta atrás. Se ven hasta que la salida se ha dado y el GO! ha desaparecido.
+	// Sector recién cerrado: se ve SectorTimeVisible s, con la diferencia en cian si mejora y en naranja si empeora
+	public void ShowSectorTime(SectorTimeText text)
+	{
+		_sectorTimeLabel.Text = $"{text.Label}  {text.Time}";
+		_sectorDeltaLabel.Text = text.Delta ?? "";
+		_sectorDeltaLabel.Visible = text.HasDelta;
+		_sectorDeltaLabel.LabelSettings.FontColor = text.IsBetter ? Palette.SectorBetter : Palette.SectorWorse;
+		_sectorElapsed = 0f;
+		UpdateSectorTime();
+	}
+
+	// Se congela con la pausa (el HUD no procesa con el árbol en pausa)
+	public override void _Process(double delta)
+	{
+		if (_sectorElapsed < 0f)
+			return;
+		_sectorElapsed += (float)delta;
+		UpdateSectorTime();
+	}
+
+	private void UpdateSectorTime()
+	{
+		float opacity = TimedDisplay.Opacity(_sectorElapsed, SectorTimeVisible, SectorFadeIn, SectorFadeOut);
+		_sectorRow.Visible = opacity > 0f;
+		_sectorRow.Modulate = new Color(Palette.White, opacity);
+		if (_sectorElapsed >= SectorTimeVisible)
+			_sectorElapsed = -1f;
+	}
+
+	// RACE: cuenta atrás y GO!, hasta que la salida se ha dado y el GO! ha desaparecido. El semáforo ya no está en
+	// el HUD sino en la meta (spec docs/elementos-circuito.md, 6): el texto queda en el mismo sitio, sin luces.
 	public void SetStartSequence(StartSequence start)
 	{
 		if (start == null)
@@ -145,7 +187,7 @@ public partial class Hud : CanvasLayer
 		if (visible)
 		{
 			string text = start.ShowGo ? GoText : start.CountdownNumber?.ToString() ?? "";
-			_startLights.SetState(start.LightsOn, start.LightCount, text, start.ShowGo);
+			_startLights.SetState(0, 0, text, start.ShowGo);
 		}
 	}
 
@@ -250,6 +292,37 @@ public partial class Hud : CanvasLayer
 		_bestLapLabel = AddLabel(root, $"BEST {NoTime}", 22, Palette.BlueGray,
 			HorizontalAlignment.Right, VerticalAlignment.Center,
 			Corner.TopRight, Margin, 114f, 320f, 30f);
+	}
+
+	// Debajo de BEST, alineado a la derecha: S1  0:23.456 y la diferencia
+	private void BuildSectorBlock(Control root)
+	{
+		_sectorRow = new HBoxContainer
+		{
+			Name = "SectorTime",
+			Visible = false,
+			Alignment = BoxContainer.AlignmentMode.End,
+			MouseFilter = Control.MouseFilterEnum.Ignore
+		};
+		_sectorRow.AddThemeConstantOverride("separation", 14);
+		Place(_sectorRow, Corner.TopRight, Margin, 146f, 320f, 30f);
+		root.AddChild(_sectorRow);
+
+		_sectorTimeLabel = new Label
+		{
+			VerticalAlignment = VerticalAlignment.Center,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			LabelSettings = new LabelSettings { FontSize = 22, FontColor = Palette.Cyan }
+		};
+		_sectorRow.AddChild(_sectorTimeLabel);
+
+		_sectorDeltaLabel = new Label
+		{
+			VerticalAlignment = VerticalAlignment.Center,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			LabelSettings = new LabelSettings { FontSize = 22, FontColor = Palette.SectorBetter }
+		};
+		_sectorRow.AddChild(_sectorDeltaLabel);
 	}
 
 	// De abajo hacia arriba: barra de velocidad, número y unidad, cargas de boost
