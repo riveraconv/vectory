@@ -16,6 +16,8 @@ namespace Vectory.Ship;
 // está quieta y el boost no recarga; al terminar se suelta todo y la nave se para sola.
 //
 // El derrape (spec docs/conduccion-avanzada.md) vive en ShipDynamics; la inclinación visual en ShipBank.
+// Los efectos de cámara (spec docs/camara.md: inclinación de la cabina, vibración y reacción al boost)
+// viven en CockpitBank, CameraVibration y BoostCameraEffect; aquí solo se aplican a las dos cámaras.
 //
 // W / Flecha arriba: acelerar    S / Flecha abajo: frenar (también corta el impulso del boost)
 // A,D / Flechas izq.-der.: girar
@@ -67,6 +69,22 @@ public partial class Player : CharacterBody3D
 	[Export] public float BankMaxNormal = 25f;   // grados a giro máximo y velocidad punta
 	[Export] public float BankMaxDrift = 20f;    // grados en derrape
 	[Export] public float BankSmoothing = 0.15f; // constante de tiempo del suavizado (s)
+
+	[ExportGroup("Efectos de cámara")]
+	[Export(PropertyHint.Range, "0,1,0.01")] public float CockpitBankFactor = 0.4f;   // inclinación de la cabina respecto a la de la nave (0 = no se inclina)
+	[Export] public float CockpitBankMax = 8f;            // grados
+	[Export] public float CockpitBankSmoothing = 0.35f;   // constante de tiempo del suavizado (s)
+	[Export(PropertyHint.Range, "0,1,0.01")] public float VibrationThreshold = 0.85f;   // fracción de la punta desde la que vibra
+	[Export] public float VibrationAmplitudeCockpit = 0.03f;    // m
+	[Export] public float VibrationAmplitudeChase = 0.018f;    // m
+	[Export] public float VibrationBoostMultiplier = 1.5f;
+	[Export] public float VibrationFrequency = 8f;              // Hz base
+	[Export] public float VibrationSmoothing = 0.2f;            // constante de tiempo de la intensidad (s)
+	[Export] public float BoostFovExtra = 8f;                   // grados sobre el FOV base de cada cámara
+	[Export] public float BoostPushCockpit = 0.05f;             // m hacia atrás
+	[Export] public float BoostPushChase = 0.6f;                // m hacia atrás
+	[Export] public float BoostEffectEnterTime = 0.25f;         // s
+	[Export] public float BoostEffectExitTime = 0.5f;           // s
 
 	[ExportGroup("Colisiones")]
 	[Export] public float CollisionHalfWidth = 3.4f;   // semiancho de colisión con la barrera (m; las puntas de las alas)
@@ -120,6 +138,10 @@ public partial class Player : CharacterBody3D
 	private readonly BarrierCollision _collision = new();
 	private readonly ImpactRecovery _recovery = new();
 	private readonly ShipBank _bank = new();
+	private readonly CockpitBank _cockpitBank = new();
+	private readonly CameraVibration _vibration = new();
+	private readonly BoostCameraEffect _boostCamera = new();
+	private readonly CameraEffectSettings _cameraEffects = new();
 	private CameraShake _shake;
 	private Spaceship _ship;
 	private Cockpit _cockpit;
@@ -218,6 +240,7 @@ public partial class Player : CharacterBody3D
 		_bank.Reset();
 		_collision.Reset();
 		_recovery.Cancel();
+		ResetCameraEffects();
 		Rotation = new Vector3(0f, yaw, 0f);
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 	}
@@ -231,6 +254,7 @@ public partial class Player : CharacterBody3D
 		_bank.Reset();
 		_collision.Reset();
 		_recovery.Cancel();
+		ResetCameraEffects();
 		LastBarrierTouch = default;
 		Rotation = new Vector3(0f, yaw, 0f);
 		_chaseCam.Snap(GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
@@ -355,12 +379,15 @@ public partial class Player : CharacterBody3D
 		if (GetSlideCollisionCount() > 0)
 			_dynamics.AbsorbCollision();
 
-		// 5. Inclinación visual de la nave al girar (solo la geometría exterior; la cabina no se inclina)
+		// 5. Inclinación visual de la nave al girar (solo la geometría exterior)
 		float speedRatio = tuning.MaxSpeed > 0f ? _dynamics.RealSpeed / tuning.MaxSpeed : 0f;
-		_bank.Update(_dynamics.Steer, speedRatio, _dynamics.Drifting, BuildBankSettings(), dt);
+		BankSettings bankSettings = BuildBankSettings();
+		_bank.Update(_dynamics.Steer, speedRatio, _dynamics.Drifting, bankSettings, dt);
 		_ship.Rotation = new Vector3(0f, 0f, _bank.Angle);
 
-		// 6. Sacudida (más suave en cabina) y cámara de tercera persona
+		// 6. Efectos de cámara, sacudida (más suave en cabina) y cámara de tercera persona
+		float shipBankTarget = ShipBank.Target(_dynamics.Steer, speedRatio, _dynamics.Drifting, bankSettings);
+		UpdateCameraEffects(shipBankTarget, tuning.MaxSpeed, dt);
 		UpdateShake(dt);
 		_chaseCam.UpdateFollow(dt, GlobalPosition, _dynamics.Yaw, SpeedFactor(), CameraSettings());
 
@@ -507,6 +534,57 @@ public partial class Player : CharacterBody3D
 			},
 			Frequency = ShakeFrequency
 		};
+	}
+
+	// Copia los parámetros del Inspector al objeto de ajustes (ángulos a radianes)
+	private CameraEffectSettings BuildCameraEffects()
+	{
+		CameraEffectSettings s = _cameraEffects;
+		s.CockpitBankFactor = CockpitBankFactor;
+		s.CockpitBankMax = Mathf.DegToRad(CockpitBankMax);
+		s.CockpitBankSmoothTime = CockpitBankSmoothing;
+		s.VibrationThreshold = VibrationThreshold;
+		s.VibrationAmplitudeCockpit = VibrationAmplitudeCockpit;
+		s.VibrationAmplitudeChase = VibrationAmplitudeChase;
+		s.VibrationBoostMultiplier = VibrationBoostMultiplier;
+		s.VibrationFrequency = VibrationFrequency;
+		s.VibrationSmoothTime = VibrationSmoothing;
+		s.BoostFovExtra = BoostFovExtra;
+		s.BoostPushCockpit = BoostPushCockpit;
+		s.BoostPushChase = BoostPushChase;
+		s.BoostEnterTime = BoostEffectEnterTime;
+		s.BoostExitTime = BoostEffectExitTime;
+		return s;
+	}
+
+	// Efectos de cámara (spec docs/camara.md), solo visuales. Se calculan siempre para las dos cámaras,
+	// así cambiar de vista con C no da saltos. La vibración usa la punta actual (con daño, reducida).
+	private void UpdateCameraEffects(float shipBankTarget, float topSpeed, float dt)
+	{
+		CameraEffectSettings s = BuildCameraEffects();
+		bool boosting = _boost.IsImpulseActive;
+		_cockpitBank.Update(shipBankTarget, s, dt);
+		_vibration.Update(_dynamics.RealSpeed, topSpeed, boosting, s, dt);
+		_boostCamera.Update(boosting, s, dt);
+		ApplyCameraEffects(s);
+	}
+
+	// Recolocación y colocación: todos los efectos a su valor base al momento
+	private void ResetCameraEffects()
+	{
+		_cockpitBank.Reset();
+		_vibration.Reset();
+		_boostCamera.Reset();
+		ApplyCameraEffects(BuildCameraEffects());
+	}
+
+	private void ApplyCameraEffects(CameraEffectSettings s)
+	{
+		float fovExtra = _boostCamera.FovExtra(s);
+		System.Numerics.Vector2 chase = _vibration.Offset(CameraView.Chase, s);
+		System.Numerics.Vector2 cockpit = _vibration.Offset(CameraView.Cockpit, s);
+		_chaseCam.SetEffects(new Vector2(chase.X, chase.Y), _boostCamera.Push(CameraView.Chase, s), fovExtra);
+		_cockpit.SetEffects(_cockpitBank.Angle, new Vector2(cockpit.X, cockpit.Y), _boostCamera.Push(CameraView.Cockpit, s), fovExtra);
 	}
 
 	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos

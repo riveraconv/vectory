@@ -17,6 +17,15 @@ public partial class Cockpit : Node3D
 	public Camera3D Camera { get; private set; }
 
 	private static readonly Vector3 CameraPosition = new(0f, 0.45f, -1.2f);
+	private const float BaseFov = 80f;
+
+	// Sacudida por impacto y efectos de cámara (inclinación, vibración, empuje y FOV del boost)
+	private Vector2 _shakeOffset;
+	private float _shakeRoll;
+	private float _bank;
+	private Vector2 _vibration;
+	private float _push;
+	private float _fovExtra;
 
 	public override void _Ready()
 	{
@@ -25,7 +34,7 @@ public partial class Cockpit : Node3D
 		{
 			Name = "Camera3D",
 			Position = CameraPosition,
-			Fov = 80f
+			Fov = BaseFov
 		};
 		AddChild(Camera);
 
@@ -41,8 +50,34 @@ public partial class Cockpit : Node3D
 	// El marco va pegado a la cámara y se mueve con ella.
 	public void SetShake(Vector2 offset, float roll)
 	{
-		Camera.Position = CameraPosition + new Vector3(offset.X, offset.Y, 0f);
-		Camera.Rotation = new Vector3(0f, 0f, roll);
+		_shakeOffset = offset;
+		_shakeRoll = roll;
+		ApplyCamera();
+	}
+
+	// Efectos de cámara (spec docs/camara.md): inclinación en curva (rad, ladea cámara y marco juntos),
+	// vibración (m, en el plano de la vista), empuje hacia atrás (m) y FOV extra (grados) del boost
+	public void SetEffects(float bank, Vector2 vibration, float push, float fovExtra)
+	{
+		_bank = bank;
+		_vibration = vibration;
+		_push = push;
+		_fovExtra = fovExtra;
+		ApplyCamera();
+	}
+
+	private void ApplyCamera()
+	{
+		Vector2 offset = _shakeOffset + _vibration;
+		Camera.Position = CameraPosition + new Vector3(offset.X, offset.Y, _push);
+		Camera.Rotation = new Vector3(0f, 0f, _shakeRoll + _bank);
+		Camera.Fov = BaseFov + _fovExtra;
+
+		// El marco está dibujado para el FOV base. Al abrirse el FOV con el boost se vería más pequeño
+		// y dejaría hueco hasta los bordes de la pantalla, así que se escala en X e Y con la misma
+		// proporción que crece el plano visible a 1 m: en pantalla se queda igual y solo se abre el mundo.
+		float k = Mathf.Tan(Mathf.DegToRad(Camera.Fov) * 0.5f) / Mathf.Tan(Mathf.DegToRad(BaseFov) * 0.5f);
+		_frame.Scale = new Vector3(k, k, 1f);
 	}
 
 	// El marco solo se ve en primera persona
