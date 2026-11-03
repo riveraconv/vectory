@@ -14,7 +14,7 @@ public sealed class TrackData
 	public float TrackWidth { get; init; }           // m
 	public int Sectors { get; init; }                // checkpoints + 1
 	public int GridSlots { get; init; }
-	public float MaxBanking { get; init; }           // grados; hoy no hay peralte: siempre 0
+	public float MaxBanking { get; init; }           // grados, valor absoluto (lo da el marco de la pista)
 
 	// Perfil de elevación: alturas (m, respecto a la meta) de la salida (0) a la meta (último), repartidas por distancia
 	public float[] Profile { get; init; } = Array.Empty<float>();
@@ -48,7 +48,7 @@ public static class TrackAnalysis
 
 	public static TrackData Analyze(IReadOnlyList<Vector3> centerline, float trackWidth,
 		IReadOnlyList<float> checkpointDistances, int gridSlots,
-		int profileSamples = DefaultProfileSamples, float minProfileScale = DefaultMinProfileScale)
+		int profileSamples = DefaultProfileSamples, float minProfileScale = DefaultMinProfileScale, float maxBanking = 0f)
 	{
 		if (centerline == null)
 			throw new ArgumentNullException(nameof(centerline));
@@ -75,7 +75,7 @@ public static class TrackAnalysis
 			TrackWidth = trackWidth,
 			Sectors = checkpoints + 1,
 			GridSlots = gridSlots,
-			MaxBanking = 0f,
+			MaxBanking = maxBanking,
 			Profile = profile,
 			ProfileScale = ProfileScale(centerline, minProfileScale),
 			CheckpointFractions = fractions

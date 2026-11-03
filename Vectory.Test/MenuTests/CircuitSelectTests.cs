@@ -9,6 +9,7 @@ public class CircuitSelectLogicTests
 {
     private const string Circuit01 = "res://circuits/circuit_01.tres";
     private const string TestOval = "res://circuits/test_oval.tres";
+    private const string TestHills = "res://circuits/test_hills.tres";
     private static readonly string[] TwoCircuits = { Circuit01, TestOval };
 
     // ---- 9. Lógica de la pantalla ----
@@ -114,25 +115,25 @@ public class CircuitSelectLogicTests
     // ---- 11. Catálogo ----
 
     [Fact]
-    public void Catalog_OrderCircuit01ThenTestOval()
+    public void Catalog_OrderCircuit01ThenTestOvalThenTestHills()
     {
-        Assert.Equal(new[] { Circuit01, TestOval }, CircuitCatalog.AllPaths);
+        Assert.Equal(new[] { Circuit01, TestOval, TestHills }, CircuitCatalog.AllPaths);
     }
 
     [Fact]
-    public void Catalog_WithoutTestCircuits_HidesTestOval()
+    public void Catalog_WithoutTestCircuits_HidesTestCircuits()
     {
-        var paths = CircuitCatalog.Filter(CircuitCatalog.AllPaths, false, p => p == TestOval);
+        var paths = CircuitCatalog.Filter(CircuitCatalog.AllPaths, false, p => p == TestOval || p == TestHills);
 
         Assert.Equal(new[] { Circuit01 }, paths);
     }
 
     [Fact]
-    public void Catalog_WithTestCircuits_TestOvalAfterCircuit01()
+    public void Catalog_WithTestCircuits_TestCircuitsAfterCircuit01()
     {
-        var paths = CircuitCatalog.Filter(CircuitCatalog.AllPaths, true, p => p == TestOval);
+        var paths = CircuitCatalog.Filter(CircuitCatalog.AllPaths, true, p => p == TestOval || p == TestHills);
 
-        Assert.Equal(new[] { Circuit01, TestOval }, paths);
+        Assert.Equal(new[] { Circuit01, TestOval, TestHills }, paths);
     }
 }
 

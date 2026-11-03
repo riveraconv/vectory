@@ -42,6 +42,14 @@ public partial class TrackDefinition : Resource
 	// Número de checkpoints repartidos por el circuito (sin contar la meta)
 	[Export] public int CheckpointCount = 5;
 
+	// Pista 3D (spec docs/pista-3d.md, 2.1). Claves (distancia sobre el eje en planta en m desde la meta, valor),
+	// en orden y dentro de la vuelta; entre ellas se interpola de forma suave y cerrada. Vacías = pista plana.
+	// Altura en m respecto a la meta.
+	[Export] public Vector2[] ElevationKeys = System.Array.Empty<Vector2>();
+
+	// Peralte en grados: positivo = el borde derecho más alto que el izquierdo, en el sentido de la marcha
+	[Export] public Vector2[] BankKeys = System.Array.Empty<Vector2>();
+
 	// Comprueba que los datos permiten generar un circuito
 	public bool IsValid(out string error)
 	{

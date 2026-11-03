@@ -16,6 +16,8 @@ script = ExtResource("2_r0du0")
 script = ExtResource("3_cm0pq")
 MaxSpeed = 110.0
 Drag = 5.0
+TurnRate = 1.3
+SteerResponse = 8.0
 
 [node name="PauseMenu" type="CanvasLayer" parent="." unique_id=1844954761]
 script = ExtResource("4_pause")

@@ -149,6 +149,22 @@ public class ShipDynamics
 			Speed = MathF.Min(Speed, RealSpeed);
 	}
 
+	// Paso en el aire (spec docs/pista-3d.md, 3.3): W y S no hacen nada y no hay agarre lateral, así que
+	// la velocidad real se conserva (y el motor no pierde velocidad); el giro va a turnFactor del normal.
+	// El derrape ni entra ni sale: se resuelve al aterrizar con las reglas de siempre. El impulso del
+	// boost se suma al motor y a la velocidad real hacia el morro (la longitudinal).
+	public void StepAirborne(in ShipInput input, in ShipTuning t, float dt, float boostGain = 0f, float turnFactor = 1f, float control = 1f)
+	{
+		float gain = MathF.Max(0f, boostGain);
+		Speed += gain;
+		PushAlongNose(gain);
+
+		float steerInput = (input.SteerLeft ? 1f : 0f) - (input.SteerRight ? 1f : 0f);
+		Steer = MoveToward(Steer, steerInput, t.SteerResponse * dt);
+		TurnFactor = Math.Clamp(Speed / 10f, 0f, 1f);
+		Yaw += Steer * t.TurnRate * TurnFactor * control * turnFactor * dt;
+	}
+
 	// Suma "delta" m/s a la velocidad real en la dirección del morro, sin que la parte hacia delante baje de 0
 	private void PushAlongNose(float delta)
 	{
