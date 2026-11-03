@@ -21,13 +21,13 @@ public partial class Track : Node3D
 	[Export] public TrackDefinition Definition;
 
 	// ---- Ajustes comunes a todos los circuitos ----
-	[Export] public float TrackY = -2f;          // altura de la pista (la nave flota 2 m por encima)
+	[Export] public float TrackY = DefaultTrackY; // altura de la pista (la nave flota 2 m por encima)
 	[Export] public float RungSpacing = 8f;      // separación de las líneas transversales
 	[Export] public float GateHeight = 12f;      // altura de la línea de meta
 	[Export] public float CheckpointHeight = 6f; // altura de cada checkpoint
 
 	[ExportGroup("Parrilla")]
-	[Export] public int GridSlots = 8;               // participantes de una carrera (una marca por cada uno)
+	[Export] public int GridSlots = DefaultGridSlots;   // participantes de una carrera (una marca por cada uno)
 	[Export] public float GridFirstDistance = 12f;   // metros de la meta a la marca 1 (hacia atrás)
 	[Export] public float GridRowSpacing = 16f;      // metros entre filas de una misma columna
 	[Export] public float GridEvenOffset = 8f;       // cuánto más atrás va cada marca par
@@ -77,10 +77,13 @@ public partial class Track : Node3D
 		Strong = new FlashLevelSettings { Radius = StrongFlashRadius, Intensity = StrongFlashIntensity, Duration = StrongFlashDuration }
 	};
 
+	// Valores por defecto de TrackY y GridSlots: los usa también SELECT CIRCUIT, que calcula el eje y los datos
+	// del circuito sin montar la carrera
+	public const float DefaultTrackY = -2f;
+	public const int DefaultGridSlots = 8;
+
 	// La nave flota esta altura por encima de la pista
 	private const float ShipHover = 2f;
-
-	private const float SampleStep = 4f;         // metros entre muestras de la spline
 
 	// Índice de la línea central donde está la meta (el primer punto de control)
 	public const int FinishIndex = 0;
@@ -160,23 +163,8 @@ void fragment() {
 			return;
 		}
 
-		var control = new List<Vector3>();
-		foreach (Vector2 px in Definition.ControlPoints)
-		{
-			Vector2 m = (px - Definition.ImageCenter) * Definition.MetersPerPixel;
-			control.Add(new Vector3(m.X, TrackY, m.Y));
-		}
-
-		if (!Clockwise)
-		{
-			// Mismo circuito en sentido contrario, manteniendo el primer punto como salida
-			Vector3 first = control[0];
-			control.RemoveAt(0);
-			control.Reverse();
-			control.Insert(0, first);
-		}
-
-		Centerline = SampleSpline(control);
+		// El eje sale de CenterlineBuilder (lógica pura), el mismo que usan la miniatura y los datos de SELECT CIRCUIT
+		Centerline = BuildCenterline(Definition, TrackY).ConvertAll(p => new Vector3(p.X, p.Y, p.Z));
 
 		int count = Centerline.Count;
 		_cumulative = new float[count + 1];
@@ -369,41 +357,15 @@ void fragment() {
 		forward = TangentAt(FinishIndex);
 	}
 
-	// ---------------------------------------------------------------
-	// Spline cerrada (Hermite con tangentes escaladas por la longitud del tramo)
-	// ---------------------------------------------------------------
-
-	private static List<Vector3> SampleSpline(List<Vector3> pts)
+	// Eje de un circuito en coordenadas de System.Numerics, sin montar la escena (spline cerrada, empezando en la meta)
+	public static List<System.Numerics.Vector3> BuildCenterline(TrackDefinition definition, float trackY)
 	{
-		int n = pts.Count;
-		var dirs = new Vector3[n];
-		for (int i = 0; i < n; i++)
-			dirs[i] = (pts[(i + 1) % n] - pts[(i - 1 + n) % n]).Normalized();
+		var control = new List<System.Numerics.Vector2>(definition.ControlPoints.Length);
+		foreach (Vector2 px in definition.ControlPoints)
+			control.Add(new System.Numerics.Vector2(px.X, px.Y));
 
-		var result = new List<Vector3>();
-		for (int i = 0; i < n; i++)
-		{
-			Vector3 p0 = pts[i];
-			Vector3 p1 = pts[(i + 1) % n];
-			float d = p0.DistanceTo(p1);
-			Vector3 m0 = dirs[i] * d;
-			Vector3 m1 = dirs[(i + 1) % n] * d;
-
-			int steps = Mathf.Max(2, Mathf.CeilToInt(d / SampleStep));
-			for (int s = 0; s < steps; s++)
-			{
-				float t = s / (float)steps;
-				float t2 = t * t;
-				float t3 = t2 * t;
-				Vector3 p =
-					(2f * t3 - 3f * t2 + 1f) * p0 +
-					(t3 - 2f * t2 + t) * m0 +
-					(-2f * t3 + 3f * t2) * p1 +
-					(t3 - t2) * m1;
-				result.Add(p);
-			}
-		}
-		return result;
+		var center = new System.Numerics.Vector2(definition.ImageCenter.X, definition.ImageCenter.Y);
+		return CenterlineBuilder.Build(control, center, definition.MetersPerPixel, definition.Clockwise, trackY);
 	}
 
 	private Vector3 TangentAt(int i)
@@ -583,24 +545,9 @@ void fragment() {
 	{
 		CheckpointIndices.Clear();
 
-		if (CheckpointCount <= 0)
-			return;
-
-		int n = Centerline.Count;
-
-		// Distancia acumulada a lo largo de la línea central
-		var cumulative = new float[n + 1];
-		for (int i = 0; i < n; i++)
-			cumulative[i + 1] = cumulative[i] + Centerline[i].DistanceTo(Centerline[(i + 1) % n]);
-		float total = cumulative[n];
-
-		int index = 0;
-		for (int k = 1; k <= CheckpointCount; k++)
+		var numerics = Centerline.ConvertAll(p => new System.Numerics.Vector3(p.X, p.Y, p.Z));
+		foreach (int index in CenterlineBuilder.CheckpointIndices(numerics, CheckpointCount))
 		{
-			float target = total * k / (CheckpointCount + 1);
-			while (index < n - 1 && cumulative[index + 1] < target)
-				index++;
-
 			CheckpointIndices.Add(index);
 			BuildArch(index, CheckpointHeight, Palette.Checkpoint, false);
 		}

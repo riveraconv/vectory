@@ -86,6 +86,30 @@ public static class Palette
 	public static readonly Color RecordsEmptyTime = new Color(BlueGray, 0.6f);  // --:--.--- sin récord
 	public static readonly Color RecordsArrow = Cyan;               // flechas del selector de circuito (activas)
 
+	// --- SELECT CIRCUIT ---
+	public static readonly Color MiniatureEdge = Cyan;              // bordes de pista de la miniatura
+	public static readonly Color MiniatureCenter = Blue;            // línea central discontinua de la miniatura
+	public static readonly Color MiniatureFinish = Orange;          // línea de meta de la miniatura
+	public static readonly Color MiniatureGrid = Blue.Darkened(0.72f);      // rejilla bajo la miniatura
+	public static readonly Color SelectName = Cyan;                 // nombre del circuito
+	public static readonly Color SelectNameGlow = new Color(Cyan, 0.5f);    // halo del nombre
+	public static readonly Color SelectHeader = Cyan;               // RACE · SELECT CIRCUIT y cabeceras del panel
+	public static readonly Color SelectLabel = BlueGray;            // descripción, contador y etiquetas de datos
+	public static readonly Color SelectValue = Cyan;                // valores de datos y récords
+	public static readonly Color SelectDataBar = Blue;              // línea vertical a la izquierda de cada dato
+	public static readonly Color SelectTestTag = Orange;            // etiqueta TEST
+	public static readonly Color SelectTestTagBorder = new Color(Orange, 0.7f);
+	public static readonly Color SelectNavBorder = Blue;            // borde de los botones ‹ ›
+	public static readonly Color SelectArrow = Cyan;                // flechas ‹ › con más de un circuito
+	public static readonly Color SelectArrowDisabled = new Color(Blue, 0.4f);   // flechas con un solo circuito
+	public static readonly Color SelectPanel = new Color(Background, 0.92f);    // fondo del panel de telemetría
+	public static readonly Color SelectPanelLine = Cyan;            // línea izquierda del panel
+	public static readonly Color SelectPanelGlow = new Color(Cyan, 0.18f);      // halo de esa línea, hacia la izquierda
+	public static readonly Color SelectFooter = new Color(BlueGray, 0.7f);      // ← → CIRCUIT · ↑ ↓ OPTION · ENTER SELECT
+	public static readonly Color ProfileLine = Cyan;                // perfil de elevación
+	public static readonly Color ProfileGuide = new Color(Blue, 0.45f);         // líneas guía del perfil (+E / −E)
+	public static readonly Color ProfileSector = new Color(Blue, 0.7f);         // líneas de sector del perfil
+
 	// --- TIME TRIAL y récords ---
 	public static readonly Color DeltaBetter = Green;               // delta: mejor (o igual) que el récord
 	public static readonly Color DeltaBetterGlow = new Color(Green, 0.5f);

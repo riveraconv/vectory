@@ -1,5 +1,4 @@
 using Godot;
-using Vectory.Circuit;
 using Vectory.Core;
 using Vectory.Game;
 using Vectory.UI;
@@ -9,8 +8,8 @@ namespace Vectory.Menu;
 // Menú principal (capa 2D sobre MenuBackground): título, opciones y versión.
 // Dibuja la lista de opciones con OptionList y traduce el teclado a llamadas al MenuModel;
 // la navegación vive en el modelo. Ejecuta la acción que devuelve Confirm(): RACE y TIME TRIAL
-// cargan la escena de carrera, cada una en su modo (GameSession.Mode); RECORDS abre la pantalla de
-// récords (RecordsScreen) en esta misma escena; QUIT cierra el juego.
+// abren SELECT CIRCUIT (CircuitSelectScreen) en su modo, que carga la carrera; RECORDS abre la pantalla de
+// récords (RecordsScreen); las dos en esta misma escena. QUIT cierra el juego.
 //
 // Las medidas (Inspector incluido) son las de la spec, sobre una pantalla de referencia de 1280×720,
 // multiplicadas por UiScale.Factor.
@@ -48,8 +47,9 @@ public partial class MainMenu : CanvasLayer
 
 	private MenuModel _model;
 	private OptionList _options;
-	private Control _content;         // título y opciones: se ocultan con RECORDS abierta (la versión no)
+	private Control _content;         // título y opciones: se ocultan con RECORDS o SELECT CIRCUIT abierta (la versión no)
 	private RecordsScreen _records;
+	private CircuitSelectScreen _circuitSelect;
 	private float _scale = 1f;
 
 	public override void _Ready()
@@ -79,12 +79,22 @@ public partial class MainMenu : CanvasLayer
 		_records = new RecordsScreen { Name = "Records" };
 		AddChild(_records);
 		_records.Closed += OnRecordsClosed;
+
+		// SELECT CIRCUIT: también en esta escena; oculta el fondo del menú mientras está abierta
+		_circuitSelect = new CircuitSelectScreen
+		{
+			Name = "CircuitSelect",
+			RaceScenePath = RaceScenePath,
+			Background = GetNodeOrNull<MenuBackground>("../Background")
+		};
+		AddChild(_circuitSelect);
+		_circuitSelect.Closed += OnCircuitSelectClosed;
 	}
 
 	public override void _Process(double delta)
 	{
-		// Con RECORDS abierta, el input es suyo
-		if (_records.IsOpen)
+		// Con RECORDS o SELECT CIRCUIT abierta, el input es suyo
+		if (_records.IsOpen || _circuitSelect.IsOpen)
 			return;
 
 		if (Input.IsActionJustPressed("menu_down"))
@@ -103,16 +113,16 @@ public partial class MainMenu : CanvasLayer
 		}
 	}
 
-	// Acción de cada opción activa. RACE y TIME TRIAL cargan la misma escena de carrera, cada una en su modo.
+	// Acción de cada opción activa. RACE y TIME TRIAL abren SELECT CIRCUIT, cada una en su modo.
 	private void Execute(string id)
 	{
 		switch (id)
 		{
 			case RaceId:
-				StartRace(GameMode.Race);
+				OpenCircuitSelect(GameMode.Race);
 				break;
 			case TimeTrialId:
-				StartRace(GameMode.TimeTrial);
+				OpenCircuitSelect(GameMode.TimeTrial);
 				break;
 			case RecordsId:
 				_content.Visible = false;
@@ -125,24 +135,26 @@ public partial class MainMenu : CanvasLayer
 	}
 
 	// Al volver de RECORDS, el menú reaparece con RECORDS seleccionada
-	private void OnRecordsClosed()
+	private void OnRecordsClosed() => ReturnTo(RecordsId);
+
+	// Al volver de SELECT CIRCUIT, el menú reaparece con la opción del modo seleccionada
+	private void OnCircuitSelectClosed(GameMode mode) => ReturnTo(mode == GameMode.TimeTrial ? TimeTrialId : RaceId);
+
+	private void OpenCircuitSelect(GameMode mode)
+	{
+		_content.Visible = false;
+		_circuitSelect.Open(mode);
+	}
+
+	private void ReturnTo(string optionId)
 	{
 		for (int i = 0; i < _model.Options.Count; i++)
 		{
-			if (_model.Options[i].Id == RecordsId)
+			if (_model.Options[i].Id == optionId)
 				_model.Select(i);
 		}
 		_options.Refresh();
 		_content.Visible = true;
-	}
-
-	// Deja el modo y el circuito en la sesión y carga la carrera. Mientras solo haya un circuito,
-	// siempre el de por defecto (el futuro selector de circuito rellenará CircuitPath aquí).
-	private void StartRace(GameMode mode)
-	{
-		GameSession.Mode = mode;
-		GameSession.CircuitPath = CircuitCatalog.Default;
-		SceneChanger.ChangeTo(this, RaceScenePath);
 	}
 
 	// ---------------------------------------------------------------
