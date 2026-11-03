@@ -76,6 +76,12 @@ namespace Vectory.Circuit
         /// <summary>Tiempo del último sector completado.</summary>
         public double? LastSectorTime { get; private set; }
 
+        /// <summary>
+        /// Mejor tiempo que tenía el último sector completado justo antes de completarlo
+        /// (null si era la primera vez). Para la diferencia del panel del checkpoint y del HUD.
+        /// </summary>
+        public double? LastSectorPreviousBest { get; private set; }
+
         /// <summary>Mejor tiempo de cada sector en esta carrera (null si aún no se ha completado).</summary>
         public IReadOnlyList<double?> BestSectorTimes { get; }
 
@@ -145,6 +151,7 @@ namespace Vectory.Circuit
             BestLapTime = null;
             BestLapNumber = null;
             LastSectorTime = null;
+            LastSectorPreviousBest = null;
             Array.Clear(_bestSectorTimes, 0, _bestSectorTimes.Length);
             Array.Clear(_bestSectorLaps, 0, _bestSectorLaps.Length);
             _currentLapSplits.Clear();
@@ -240,6 +247,7 @@ namespace Vectory.Circuit
         private bool RegisterSector(int sectorIndex, int lap, out double sectorTime)
         {
             sectorTime = CurrentSectorTime;
+            LastSectorPreviousBest = _bestSectorTimes[sectorIndex];
 
             bool isBest = _bestSectorTimes[sectorIndex] == null || sectorTime < _bestSectorTimes[sectorIndex].Value;
             if (isBest)

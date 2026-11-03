@@ -41,6 +41,16 @@ public sealed class RaceSession
 	// Al terminar la carrera (solo con vueltas limitadas): resultado
 	public event Action<RaceResult> RaceFinished;
 
+	// Elementos del circuito (spec docs/elementos-circuito.md): la nave cruza la meta o un checkpoint hacia delante,
+	// en cualquier estado (también en la primera pasada tras la salida y en la vuelta de lanzamiento).
+	// Solo para iluminarlos: no cuentan vueltas.
+	public event Action FinishLineCrossed;
+	public event Action<int> CheckpointLineCrossed;
+
+	// Al cerrar un sector: índice del sector (base 0; el último es el de la meta), su tiempo y el mejor tiempo
+	// que tenía antes ese sector en esta carrera (null si es el primero)
+	public event Action<int, double, double?> SectorTimed;
+
 	private RaceSession(Track track, int participantCount, int totalLaps)
 	{
 		_track = track ?? throw new ArgumentNullException(nameof(track));
@@ -108,6 +118,14 @@ public sealed class RaceSession
 
 		_detector.Update(_track.NearestIndex(position));
 
+		for (int i = 0; i < _track.CheckpointIndices.Count; i++)
+		{
+			if (_detector.Crossed(_track.CheckpointIndices[i]))
+				CheckpointLineCrossed?.Invoke(i);
+		}
+		if (_detector.Crossed(Track.FinishIndex))
+			FinishLineCrossed?.Invoke();
+
 		// Salida lanzada: el cronómetro arranca al cruzar la meta hacia delante
 		if (_flyingStart && _tracker.State == RaceState.PreStart)
 		{
@@ -167,7 +185,10 @@ public sealed class RaceSession
 			CheckpointPassed?.Invoke(index, _tracker.CurrentLapTime);
 
 		_tracker.SectorCompleted += (lap, sector, time, isBest) =>
+		{
 			GD.Print($"[Race] Lap {lap} - Sector {sector + 1}/{_tracker.SectorCount}: {TimeFormat.Format(time)}{(isBest ? " (best sector)" : "")}");
+			SectorTimed?.Invoke(sector, time, _tracker.LastSectorPreviousBest);
+		};
 
 		_tracker.LapCompleted += (lap, time, isBest) =>
 		{

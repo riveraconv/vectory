@@ -20,12 +20,14 @@ public static class Palette
 	public static readonly Color Red = new Color("FF4D5E");         // delta peor que el récord; daño grave y boost bloqueado
 	public static readonly Color Yellow = new Color("FFE04A");      // SOLO para el indicador de daño: daño leve
 
+	// Blanco: solo para mezclar en los destellos y para la marca de parrilla del jugador (spec docs/elementos-circuito.md)
+	public static readonly Color White = new Color(1f, 1f, 1f);
+
 	// --- Derivados (siempre calculados a partir de los de arriba) ---
 	public static readonly Color BlueDim = Blue.Darkened(0.4f);     // líneas tenues (rejilla, transversales); por debajo del umbral de glow
 
 	// --- Roles: qué color usa cada elemento. Para cambiar el aspecto de un elemento, se cambia aquí ---
-	public static readonly Color TrackEdge = Blue.Lightened(0.25f); // bordes de la pista: azul algo más claro, distinto del cian de la nave
-	public static readonly Color Checkpoint = Cyan.Darkened(0.5f);  // checkpoints: cian al 50 % de intensidad, más tenue que la meta
+	public static readonly Color TrackEdge = Cyan;                  // bordes de la pista (spec docs/elementos-circuito.md, 2)
 	public static readonly Color BoostCharge = Orange;              // esfera de carga de boost disponible
 	public static readonly Color BoostChargeGlow = new Color(Orange, 0.25f); // halo de la carga disponible
 	public static readonly Color BoostCooldownFill = new Color(Orange, 0.3f);    // relleno atenuado de la carga en cooldown
@@ -34,14 +36,13 @@ public static class Palette
 	public static readonly Color BoostEmptyFill = new Color(Blue, 0.25f);    // relleno apagado de la carga vacía
 	public static readonly Color BoostBlockedFill = new Color(Red, 0.3f);    // relleno de la carga bloqueada por daños (nivel 3)
 	public static readonly Color BoostBlockedBorder = new Color(Red, 0.55f); // borde de la carga bloqueada por daños
-	public static readonly Color GridMark = Blue;                   // marcas de la parrilla de salida
 	public static readonly Color BarrierBand = Cyan;                // bordes exteriores (gruesos) de las franjas de la barrera: base y remate
 	public static readonly Color BarrierBandInner = new Color(Cyan, 0.85f); // bordes interiores de las franjas
 	public static readonly Color BarrierBandTie = new Color(Cyan, 0.6f);    // travesaños de las franjas
 	public static readonly Color BarrierFill = new Color(Blue, 0.5f);   // línea media del relleno de la barrera
 	public static readonly Color BarrierPost = new Color(Blue, 0.4f);   // verticales del relleno de la barrera
 	public static readonly Color BarrierFlash = Orange;             // destello de impacto en la barrera
-	public static readonly Color StartLightOn = Magenta;            // luz del semáforo encendida (competición)
+	public static readonly Color StartLightOn = Magenta;            // luz del semáforo 2D encendida (StartLightsView; el HUD ya no la usa)
 	public static readonly Color StartLightGlow = new Color(Magenta, 0.25f); // halo de la luz encendida
 	public static readonly Color StartLightOff = BoostEmpty;        // borde de la luz apagada (como la carga de boost vacía)
 	public static readonly Color StartLightOffFill = BoostEmptyFill; // relleno de la luz apagada
@@ -51,6 +52,28 @@ public static class Palette
 	public static readonly Color GoGlow = new Color(Orange, 0.55f); // halo del GO!
 	public static readonly Color ResultsBorder = Cyan;              // borde de la pantalla de resultados
 	public static readonly Color ResultsBackground = new Color(Background, 0.85f); // fondo semitransparente de los resultados
+
+	// --- Elementos del circuito (spec docs/elementos-circuito.md). Brillo y opacidad se aplican multiplicando el color ---
+	public static readonly Color TrackRung = Blue;                  // transversales del suelo (opacidad en el Inspector del Track)
+	public static readonly Color TrackLane = Blue;                  // carriles discontinuos y línea central del suelo (ídem)
+	public static readonly Color FinishGate = Orange;               // pórtico de meta
+	public static readonly Color CheckpointGate = Cyan;             // pórticos de checkpoint (brillo en reposo en el Inspector)
+	public static readonly Color GateFlashWhite = White;            // hacia dónde va el color en los destellos de meta y checkpoints
+	public static readonly Color CheckpointText = Cyan;             // S1 y tiempo del panel del checkpoint
+	public static readonly Color SectorBetter = Cyan;               // diferencia de sector que mejora (panel y HUD)
+	public static readonly Color SectorWorse = Orange;              // diferencia de sector que empeora (panel y HUD)
+	public static readonly Color GridMark = Cyan;                   // marco y número de cada puesto de parrilla
+	public static readonly Color GridMarkPlayer = White;            // marco y número del puesto del jugador
+	public static readonly Color StartPanel = Cyan;                 // marco del semáforo de la meta (al 55 %)
+	public static readonly Color StartLamp = Orange;                // luces del semáforo de la meta (apagada al 50 %)
+	public static readonly Color StartLampLit = Orange.Lerp(White, 0.15f);   // luz encendida: naranja con un toque de blanco
+	public static readonly Color StartLampGo = Cyan;                // destello de salida
+	public static readonly Color TunnelRing = Blue;                 // anillos y celosía del túnel
+	public static readonly Color TunnelRail = Cyan;                 // largueros del túnel
+	public static readonly Color TunnelPulse = Cyan.Lerp(White, 0.6f);      // casi blanco cian del pulso
+	public static readonly Color CurveChevron = Orange;             // chevrons de los avisos de curva
+	public static readonly Color CrestBeacon = Orange;              // balizas ^ de cresta
+	public static readonly Color CrestBarrier = Orange;             // tramo de barrera iluminada de la cresta
 
 	// --- Menú principal ---
 	public static readonly Color MenuTitle = Cyan;                  // VECTORY

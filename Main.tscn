@@ -11,6 +11,7 @@ script = ExtResource("1_glv2v")
 
 [node name="Track" type="Node3D" parent="." unique_id=1902884476]
 script = ExtResource("2_r0du0")
+GrazeFlashIntensity = 1.0
 
 [node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
 script = ExtResource("3_cm0pq")
