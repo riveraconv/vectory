@@ -11,12 +11,12 @@ public enum ShipLineColor
 	Blue
 }
 
-// Una línea de la nave o de la cabina. Edge es el número de su arista: cada arista parpadea por su cuenta con los
-// daños, y los dos trazos de una línea gruesa de la cabina son la misma arista.
+// Una línea del casco. Edge es el número de su arista: cada arista parpadea por su cuenta con los daños.
 public readonly record struct ShipLine(Vector3 A, Vector3 B, ShipLineColor Color, int Edge);
 
-// Encuadre base de la cámara de cabina, sin efectos. El marco de la cabina está dibujado para este FOV.
-public readonly record struct CockpitFraming(Vector3 Eye, float Fov);
+// Encuadre base de la cámara de cabina, sin efectos. La inclinación (negativa = hacia abajo) deja el punto de fuga de
+// la pista donde la espera el diseño de la cabina: y ≈ 300 de 720 con FOV 80.
+public readonly record struct CockpitFraming(Vector3 Eye, float Fov, float PitchDegrees);
 
 // Encuadre base de la cámara exterior, sin efectos: altura, distancia, distancia extra a máxima velocidad
 // y punto al que mira (en el espacio de la cámara, sobre la nave)
@@ -26,12 +26,12 @@ public readonly record struct ChaseFraming(float Height, float Distance, float E
 	public ChaseFraming Scaled(float factor) => new(Height * factor, Distance * factor, ExtraDistance * factor, LookTarget * factor);
 }
 
-// Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco y la cabina son constructores de
-// geometría: devuelven las líneas sin nodos de Godot. Lógica pura.
+// Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco y la cabina son constructores:
+// devuelven sus líneas o sus elementos 2D, sin nodos de Godot. Lógica pura.
 public sealed record ShipVisualProfile
 {
 	public required Func<IReadOnlyList<ShipLine>> BuildHull { get; init; }
-	public required Func<IReadOnlyList<ShipLine>> BuildCockpit { get; init; }
+	public required Func<CockpitLayout> BuildCockpit { get; init; }
 	public required CockpitFraming Cockpit { get; init; }
 	public required ChaseFraming Chase { get; init; }
 

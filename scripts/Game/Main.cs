@@ -231,6 +231,10 @@ public partial class Main : Node3D
 		AddChild(_hud);
 		_hud.ResultsOptionChosen += ExecuteResultsOption;
 
+		// Velocidad, boost y daño: en pantalla o en el cuadro de mando, según la cámara
+		_hud.SetDriveHudVisible(CockpitViewRules.For(_player.View).ScreenDriveHud);
+		_player.ViewChanged += view => _hud.SetDriveHudVisible(CockpitViewRules.For(view).ScreenDriveHud);
+
 		if (_mode == GameMode.TimeTrial)
 		{
 			_hud.SetTimeTrialHeader(_track.DisplayName);
@@ -537,6 +541,7 @@ public partial class Main : Node3D
 		});
 		_damage.LevelChanged += OnDamageLevelChanged;
 		_hud.ShowDamageIndicator();
+		_player.CockpitDamageEnabled = true;
 	}
 
 	// Reparte el nivel nuevo: factores y boost a la nave, parpadeo de sus aristas e indicador del HUD

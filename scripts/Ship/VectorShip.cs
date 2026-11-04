@@ -14,8 +14,8 @@ public static class VectorShip
 		new ShipVisualProfile
 		{
 			BuildHull = BuildHull,
-			BuildCockpit = BuildCockpit,
-			Cockpit = new CockpitFraming(new Vector3(0f, 0.45f, -1.2f), 80f),
+			BuildCockpit = VectorCockpit.Build,
+			Cockpit = new CockpitFraming(new Vector3(0f, 0.45f, -1.2f), 80f, -8f),
 			Chase = new ChaseFraming(1.8f, 7f, 3f, new Vector3(0f, 0.3f, -10f)),
 			CollisionHalfWidth = 3.4f,   // las puntas de las alas
 			NoseDistance = 4f,
@@ -152,77 +152,5 @@ public static class VectorShip
 			for (int k = 0; k < seg; k++)
 				L(core, nozzle[k]);
 		}
-	}
-
-	// ---------------------------------------------------------------
-	// Cabina
-	// ---------------------------------------------------------------
-
-	// Marco en forma de capó/salpicadero central con dos alas hacia los lados.
-	// Se dibuja en un plano a 1 m delante de la cámara; con FOV 80 y pantalla 16:9 ese plano
-	// cubre x de -1,49 a 1,49 e y de -0,84 a 0,84. El lado izquierdo es el espejo del derecho.
-	private static IReadOnlyList<ShipLine> BuildCockpit()
-	{
-		const float z = -1f;
-		const float Edge = 0.012f;   // separación del segundo trazo, para dar grosor a las líneas principales
-		var lines = new List<ShipLine>();
-		int edges = 0;
-
-		void Trace(float x1, float y1, float x2, float y2, ShipLineColor c, int edge)
-		{
-			lines.Add(new ShipLine(new Vector3(x1, y1, z), new Vector3(x2, y2, z), c, edge));
-		}
-
-		void Seg(float x1, float y1, float x2, float y2, ShipLineColor c)
-		{
-			Trace(x1, y1, x2, y2, c, edges++);
-		}
-
-		// Línea gruesa: la línea y una copia desplazada un poco hacia dentro
-		void Thick(float x1, float y1, float x2, float y2, ShipLineColor c)
-		{
-			int edge = edges++;
-			Trace(x1, y1, x2, y2, c, edge);
-			if (MathF.Abs(x2 - x1) >= MathF.Abs(y2 - y1))
-			{
-				Trace(x1, y1 - Edge, x2, y2 - Edge, c, edge);
-			}
-			else
-			{
-				float dx = (x1 + x2) > 0f ? -Edge : Edge;
-				Trace(x1 + dx, y1, x2 + dx, y2, c, edge);
-			}
-		}
-
-		// Dibuja la línea y su espejo respecto al eje vertical
-		void Mirror(float x1, float y1, float x2, float y2, ShipLineColor c, bool thick)
-		{
-			if (thick)
-			{
-				Thick(x1, y1, x2, y2, c);
-				Thick(-x1, y1, -x2, y2, c);
-			}
-			else
-			{
-				Seg(x1, y1, x2, y2, c);
-				Seg(-x1, y1, -x2, y2, c);
-			}
-		}
-
-		// Capó exterior (cian, grueso): borde superior plano, chaflanes y laterales
-		Thick(-0.26f, -0.28f, 0.26f, -0.28f, ShipLineColor.Cyan);
-		Mirror(0.26f, -0.28f, 0.56f, -0.56f, ShipLineColor.Cyan, true);
-		Mirror(0.56f, -0.56f, 0.50f, -0.90f, ShipLineColor.Cyan, true);
-
-		// Contorno interior (azul): enmarca la zona donde queda la velocidad digital
-		Seg(-0.20f, -0.44f, 0.20f, -0.44f, ShipLineColor.Blue);
-		Mirror(0.20f, -0.44f, 0.42f, -0.62f, ShipLineColor.Blue, false);
-		Mirror(0.42f, -0.62f, 0.38f, -0.90f, ShipLineColor.Blue, false);
-
-		// Alas laterales hacia los bordes de la pantalla
-		Mirror(0.26f, -0.28f, 1.49f, -0.62f, ShipLineColor.Cyan, false);
-		Mirror(0.56f, -0.56f, 1.49f, -0.80f, ShipLineColor.Blue, false);
-
-		return lines;
 	}
 }

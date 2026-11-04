@@ -152,6 +152,11 @@ public partial class Player : CharacterBody3D
 	[Export] public float FlickerMaxDuration = 15f;
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerOpacity = 0.1f;   // opacidad de la arista apagada
 
+	[ExportGroup("Cabina")]
+	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitBoostTintIntensity = 1f;    // multiplica el tinte naranja del diseño (0 = apagado)
+	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitDamageTintIntensity = 1f;   // multiplica el tinte rojo del diseño (0 = apagado)
+	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitScreenGlowIntensity = 1f;   // multiplica el brillo de las pantallas (0 = apagado)
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -192,6 +197,7 @@ public partial class Player : CharacterBody3D
 	private EdgeFlicker _shipFlicker;
 	private EdgeFlicker _cockpitFlicker;
 	private readonly System.Random _flickerRandom = new();
+	private int _damageLevel;
 
 	// Factores de la velocidad punta y del giro (los daños los bajan; 1 = sin efecto).
 	// Se aplican sobre MaxSpeed y TurnRate al pasar los parámetros al modelo, sin cambiarlos.
@@ -222,6 +228,13 @@ public partial class Player : CharacterBody3D
 
 	// La nave va por el aire (tras despegar en una cresta): el atasco no cuenta
 	public bool IsAirborne => _vertical.Airborne;
+
+	// El cuadro de mando enseña el daño (RACE). En TIME TRIAL no hay daños: se queda apagado.
+	public bool CockpitDamageEnabled { get; set; }
+
+	// Vista de cámara actual y su cambio con la tecla C
+	public CameraView View => _chaseView ? CameraView.Chase : CameraView.Cockpit;
+	public event System.Action<CameraView> ViewChanged;
 
 	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
 	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();
@@ -360,6 +373,7 @@ public partial class Player : CharacterBody3D
 	// Nivel de daño visible (0–3): algunas aristas de la nave y de la cabina parpadean. Solo sube.
 	public void SetFlickerLevel(int level)
 	{
+		_damageLevel = level;
 		if (level <= 0 && _shipFlicker == null)
 			return;
 
@@ -387,26 +401,34 @@ public partial class Player : CharacterBody3D
 		{
 			_chaseView = !_chaseView;
 			ApplyView();
+			ViewChanged?.Invoke(View);
 		}
 	}
 
 	private void ApplyView()
 	{
 		_ship.SetExteriorVisible(_chaseView);
-		_cockpit.SetFrameVisible(!_chaseView);
+		_cockpit.SetLayerVisible(CockpitViewRules.For(View).CockpitLayer);
 		if (_chaseView)
 			_chaseCam.MakeCurrent();
 		else
 			_cockpit.Camera.MakeCurrent();
 	}
 
-	// Parpadeo de las aristas dañadas (con la pausa no avanza: queda congelado)
+	// HUD de cabina y parpadeo de las aristas dañadas (con la pausa no avanzan: quedan congelados)
 	public override void _Process(double delta)
 	{
+		float dt = (float)delta;
+		_cockpit.UpdateHud(BuildCockpitHudInput(), new CockpitLightSettings
+		{
+			BoostTint = CockpitBoostTintIntensity,
+			DamageTint = CockpitDamageTintIntensity,
+			ScreenGlow = CockpitScreenGlowIntensity
+		}, dt);
+
 		if (_shipFlicker == null)
 			return;
 
-		float dt = (float)delta;
 		EdgeFlickerSettings settings = BuildFlickerSettings();
 		_shipFlicker.Settings = settings;
 		_cockpitFlicker.Settings = settings;
@@ -642,6 +664,21 @@ public partial class Player : CharacterBody3D
 			SteerLeft = Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left),
 			SteerRight = Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right),
 			Drift = Input.IsActionPressed("drift")
+		};
+	}
+
+	private CockpitHudInput BuildCockpitHudInput()
+	{
+		return new CockpitHudInput
+		{
+			SpeedKmh = Speed * KmhPerMs,
+			TopKmh = MaxSpeed * KmhPerMs,
+			MaxKmh = BoostedTopSpeed * KmhPerMs,
+			BoostActive = _boost.IsImpulseActive,
+			Charges = BoostCharges,
+			Cooldown = BoostCooldownActive,
+			DamageLevel = _damageLevel,
+			DamageEnabled = CockpitDamageEnabled
 		};
 	}
 
