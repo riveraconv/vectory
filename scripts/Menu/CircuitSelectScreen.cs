@@ -13,28 +13,18 @@ namespace Vectory.Menu;
 
 // Pantalla SELECT CIRCUIT, dentro de la escena del menú principal (spec docs/selector-circuito.md):
 // a la izquierda el nombre del circuito y su miniatura 3D girando (CircuitMiniature); a la derecha el panel
-// de telemetría con los datos del trazado, el perfil de elevación, los récords del modo y START / BACK.
+// de telemetría con los datos del trazado, el perfil de elevación, los récords del modo y SHIP SELECTION / BACK.
 // Las reglas viven en CircuitSelectLogic, TrackAnalysis y CircuitSelectFormat; este nodo traduce el input,
-// lee los récords y fantasmas con los almacenes de siempre y lo dibuja. START deja el modo y el circuito
-// en GameSession y carga la carrera; BACK / ESC lanza Closed (MainMenu reaparece).
+// lee los récords y fantasmas con los almacenes de siempre y lo dibuja. SHIP SELECTION deja el modo y el circuito
+// en GameSession y lanza ShipSelectRequested (se abre SELECT SHIP); BACK / ESC lanza Closed (MainMenu reaparece).
 // Medidas sobre 1280×720, multiplicadas por UiScale.Factor.
 public partial class CircuitSelectScreen : CanvasLayer
 {
 	public const string FooterHint = "← → CIRCUIT · ↑ ↓ OPTION · ENTER SELECT";
 
 	// Posiciones del lienzo de diseño (px sobre 1280×720)
-	private const float NameX = 72f;
-	private const float NameY = 56f;
-	private const float PanelX = 836f;
-	private const float PanelTop = 52f;
-	private const float PanelLeft = 40f;
-	private const float PanelRight = 48f;
-	private const float PanelBottom = 40f;
 	private const float SectionGap = 14f;
 	private const float RecordLabelWidth = 120f;
-	private const float FooterX = 300f;
-
-	[Export(PropertyHint.File, "*.tscn")] public string RaceScenePath = SceneChanger.RaceScene;
 
 	[ExportGroup("Aspecto (px sobre 1280×720)")]
 	[Export] public int NameFontSize = 54;
@@ -50,6 +40,9 @@ public partial class CircuitSelectScreen : CanvasLayer
 
 	// Se lanza al volver al menú principal, con el modo de la pantalla
 	public event Action<GameMode> Closed;
+
+	// Se lanza con SHIP SELECTION, con el modo y el nombre del circuito: toca abrir SELECT SHIP
+	public event Action<GameMode, string> ShipSelectRequested;
 
 	public bool IsOpen => _root != null && _root.Visible;
 
@@ -73,6 +66,7 @@ public partial class CircuitSelectScreen : CanvasLayer
 	private RecordStore _store;
 	private GhostStore _ghosts;
 	private CircuitSelectLogic _logic;
+	private SelectScreenKit _kit;
 	private float _scale = 1f;
 	private ulong _openedFrame;
 
@@ -105,6 +99,7 @@ public partial class CircuitSelectScreen : CanvasLayer
 	{
 		Layer = 3;   // por encima del menú principal (capa 2) y de la sombra del fondo (capa 1)
 		_scale = UiScale.Factor;
+		_kit = new SelectScreenKit(_scale);
 
 		foreach (string path in CircuitCatalog.Paths)
 		{
@@ -130,7 +125,7 @@ public partial class CircuitSelectScreen : CanvasLayer
 		_root.Visible = false;
 	}
 
-	// Abre la pantalla en un modo: lee los récords, empieza en el circuito recordado (GameSession) con START seleccionada
+	// Abre la pantalla en un modo: lee los récords, empieza en el circuito recordado (GameSession) con SHIP SELECTION seleccionada
 	public void Open(GameMode mode)
 	{
 		_store.Load();
@@ -198,7 +193,9 @@ public partial class CircuitSelectScreen : CanvasLayer
 			case CircuitSelectAction.Start:
 				GameSession.Mode = _logic.Mode;
 				GameSession.CircuitPath = _logic.CircuitPath;
-				SceneChanger.ChangeTo(this, RaceScenePath);
+				_root.Visible = false;
+				_miniature.SetActive(false);   // el fondo del menú sigue oculto: SELECT SHIP pone su cámara
+				ShipSelectRequested?.Invoke(_logic.Mode, DisplayName(_circuits[_logic.CircuitIndex]));
 				break;
 
 			case CircuitSelectAction.BackToMenu:
@@ -282,7 +279,7 @@ public partial class CircuitSelectScreen : CanvasLayer
 		GameMode mode = _logic.Mode;
 
 		_header.Text = CircuitSelectFormat.Header(mode);
-		_name.Text = (definition?.DisplayName ?? circuit.Path.GetFile().GetBaseName()).ToUpperInvariant();
+		_name.Text = DisplayName(circuit).ToUpperInvariant();
 		_testTag.Visible = definition != null && definition.IsTest;
 		_description.Text = data != null ? CircuitSelectFormat.Description(definition.IsTest, data.Clockwise) : "";
 		_counter.Text = CircuitSelectFormat.Counter(_logic.CircuitIndex, _logic.CircuitCount);
@@ -335,6 +332,9 @@ public partial class CircuitSelectScreen : CanvasLayer
 		_options.Refresh();
 	}
 
+	private static string DisplayName(Circuit circuit) =>
+		circuit.Definition?.DisplayName ?? circuit.Path.GetFile().GetBaseName();
+
 	private void SetData(string label, string value) => _dataValues[label].Text = value;
 
 	private void SetTime(Label label, double? time)
@@ -347,9 +347,9 @@ public partial class CircuitSelectScreen : CanvasLayer
 	// Construcción
 	// ---------------------------------------------------------------
 
-	private float S(float referencePx) => referencePx * _scale;
+	private float S(float referencePx) => _kit.S(referencePx);
 
-	private int Px(float referencePx) => Mathf.RoundToInt(S(referencePx));
+	private int Px(float referencePx) => _kit.Px(referencePx);
 
 	private void Build()
 	{
@@ -357,22 +357,19 @@ public partial class CircuitSelectScreen : CanvasLayer
 		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_root);
 
-		_valueSettings = TextSettings(MenuFonts.Orbitron, 500, 19f, 0.06f, Palette.SelectValue);
-		_emptyValueSettings = TextSettings(MenuFonts.Orbitron, 500, 19f, 0.06f, Palette.RecordsEmptyTime);
-		_arrowActive = TextSettings(MenuFonts.Orbitron, 500, 22f, 0f, Palette.SelectArrow);
-		_arrowInactive = TextSettings(MenuFonts.Orbitron, 500, 22f, 0f, Palette.SelectArrowDisabled);
+		_valueSettings = _kit.TextSettings(MenuFonts.Orbitron, 500, 19f, 0.06f, Palette.SelectValue);
+		_emptyValueSettings = _kit.TextSettings(MenuFonts.Orbitron, 500, 19f, 0.06f, Palette.RecordsEmptyTime);
+		_arrowActive = _kit.TextSettings(MenuFonts.Orbitron, 500, 22f, 0f, Palette.SelectArrow);
+		_arrowInactive = _kit.TextSettings(MenuFonts.Orbitron, 500, 22f, 0f, Palette.SelectArrowDisabled);
 
 		BuildNameBlock();
 		BuildPanel();
-		BuildFooter();
+		_kit.Footer(_root, FooterHint);
 	}
 
 	private void BuildNameBlock()
 	{
-		var column = new VBoxContainer { Name = "NameBlock", MouseFilter = Control.MouseFilterEnum.Ignore };
-		column.AddThemeConstantOverride("separation", Px(10f));
-		column.Position = new Vector2(S(NameX), S(NameY));
-		_root.AddChild(column);
+		VBoxContainer column = _kit.NameColumn(_root);
 
 		_header = MakeLabel("", MenuFonts.Mono, 400, 15f, 0.22f, Palette.SelectHeader);
 		column.AddChild(_header);
@@ -384,23 +381,8 @@ public partial class CircuitSelectScreen : CanvasLayer
 		_name = MakeLabel("", MenuFonts.Orbitron, 900, NameFontSize, 0.08f, Palette.SelectName, Palette.SelectNameGlow, 16f);
 		nameRow.AddChild(_name);
 
-		var tagBox = new StyleBoxFlat
-		{
-			BgColor = Colors.Transparent,
-			BorderColor = Palette.SelectTestTagBorder,
-			ContentMarginLeft = S(8f),
-			ContentMarginRight = S(8f),
-			ContentMarginTop = S(3f),
-			ContentMarginBottom = S(3f)
-		};
-		tagBox.SetBorderWidthAll(Mathf.Max(1, Px(1f)));
-		var tag = new PanelContainer { Name = "TestTag", MouseFilter = Control.MouseFilterEnum.Ignore, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
-		tag.AddThemeStyleboxOverride("panel", tagBox);
-		Label tagLabel = MakeLabel(CircuitSelectFormat.TestTag, MenuFonts.Mono, 400, 13f, 0.22f, Palette.SelectTestTag);
-		tagLabel.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-		tag.AddChild(tagLabel);
-		nameRow.AddChild(tag);
-		_testTag = tag;
+		_testTag = _kit.Tag(CircuitSelectFormat.TestTag, Palette.SelectTestTag, Palette.SelectTestTagBorder);
+		nameRow.AddChild(_testTag);
 
 		_description = MakeLabel("", MenuFonts.Mono, 400, 14f, 0.12f, Palette.SelectLabel);
 		column.AddChild(_description);
@@ -409,99 +391,18 @@ public partial class CircuitSelectScreen : CanvasLayer
 		nav.AddThemeConstantOverride("separation", Px(14f));
 		column.AddChild(nav);
 
-		_buttonLeft = NavButton("‹", -1, out _arrowLeft);
+		_buttonLeft = _kit.NavButton("‹", () => ChangeCircuit(-1), _arrowInactive, out _arrowLeft);
 		nav.AddChild(_buttonLeft);
 		_counter = MakeLabel("", MenuFonts.Mono, 400, 14f, 0.12f, Palette.SelectLabel);
 		_counter.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
 		nav.AddChild(_counter);
-		_buttonRight = NavButton("›", 1, out _arrowRight);
+		_buttonRight = _kit.NavButton("›", () => ChangeCircuit(1), _arrowInactive, out _arrowRight);
 		nav.AddChild(_buttonRight);
-	}
-
-	// Botón ‹ / › de 44×44 con borde azul de 1 px
-	private Control NavButton(string arrow, int step, out Label label)
-	{
-		var box = new StyleBoxFlat { BgColor = Colors.Transparent, BorderColor = Palette.SelectNavBorder };
-		box.SetBorderWidthAll(Mathf.Max(1, Px(1f)));
-
-		var button = new PanelContainer
-		{
-			CustomMinimumSize = new Vector2(S(44f), S(44f)),
-			MouseFilter = Control.MouseFilterEnum.Stop
-		};
-		button.AddThemeStyleboxOverride("panel", box);
-		button.GuiInput += e =>
-		{
-			if (e is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
-				ChangeCircuit(step);
-		};
-
-		label = new Label
-		{
-			Text = arrow,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			VerticalAlignment = VerticalAlignment.Center,
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-			LabelSettings = _arrowInactive
-		};
-		button.AddChild(label);
-		return button;
 	}
 
 	private void BuildPanel()
 	{
-		var panel = new Control
-		{
-			Name = "TelemetryPanel",
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-			AnchorLeft = 0f,
-			AnchorRight = 1f,
-			AnchorTop = 0f,
-			AnchorBottom = 1f,
-			OffsetLeft = S(PanelX)
-		};
-		_root.AddChild(panel);
-
-		var background = new ColorRect { Color = Palette.SelectPanel, MouseFilter = Control.MouseFilterEnum.Ignore };
-		background.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		panel.AddChild(background);
-
-		// Halo de la línea, hacia la izquierda
-		var fade = new Gradient();
-		fade.SetColor(0, new Color(Palette.SelectPanelGlow, 0f));
-		fade.SetColor(1, Palette.SelectPanelGlow);
-		panel.AddChild(new TextureRect
-		{
-			Texture = new GradientTexture2D { Gradient = fade, Width = 64, Height = 1 },
-			StretchMode = TextureRect.StretchModeEnum.Scale,
-			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-			AnchorTop = 0f,
-			AnchorBottom = 1f,
-			OffsetLeft = -S(18f),
-			OffsetRight = 0f
-		});
-		panel.AddChild(new ColorRect
-		{
-			Color = Palette.SelectPanelLine,
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-			AnchorTop = 0f,
-			AnchorBottom = 1f,
-			OffsetLeft = 0f,
-			OffsetRight = Mathf.Max(1f, S(1f))
-		});
-
-		var margin = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-		margin.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		margin.AddThemeConstantOverride("margin_top", Px(PanelTop));
-		margin.AddThemeConstantOverride("margin_left", Px(PanelLeft));
-		margin.AddThemeConstantOverride("margin_right", Px(PanelRight));
-		margin.AddThemeConstantOverride("margin_bottom", Px(PanelBottom));
-		panel.AddChild(margin);
-
-		var content = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-		content.AddThemeConstantOverride("separation", Px(8f));
-		margin.AddChild(content);
+		VBoxContainer content = _kit.Panel(_root, "TelemetryPanel");
 
 		// TRACK DATA
 		content.AddChild(SectionHeader("TRACK DATA"));
@@ -529,17 +430,14 @@ public partial class CircuitSelectScreen : CanvasLayer
 		// Opciones abajo del panel
 		content.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Ignore });
 
-		OptionListStyle style = OptionListStyle.Scaled(_scale, OptionFontSize, 44f, 4f, new Vector2(4f, 30f), 16f);
-		style.HideDisabledHint = true;
-		_options = new OptionList { Name = "OptionList" };
-		_options.Setup(style);
-		_options.Chosen += id => Apply(_logic.Choose(id));
+		int optionSize = OptionList.FitFontSize(CircuitSelectLogic.CreateMenu(), OptionFontSize, _scale, _kit.PanelContentWidth);
+		_options = _kit.Options(optionSize, id => Apply(_logic.Choose(id)));
 		content.AddChild(_options);
 	}
 
 	private Control Gap() => new() { CustomMinimumSize = new Vector2(0f, S(SectionGap - 8f)), MouseFilter = Control.MouseFilterEnum.Ignore };
 
-	private Label SectionHeader(string text) => MakeLabel(text, MenuFonts.Mono, 400, 13f, 0.22f, Palette.SelectHeader);
+	private Label SectionHeader(string text) => _kit.SectionHeader(text);
 
 	// Dato: línea azul vertical de 2 px, etiqueta y valor debajo
 	private Control DataCell(string label)
@@ -581,36 +479,7 @@ public partial class CircuitSelectScreen : CanvasLayer
 		return (label, value);
 	}
 
-	private void BuildFooter()
-	{
-		Label hint = MakeLabel(FooterHint, MenuFonts.Mono, 400, 13f, 0.18f, Palette.SelectFooter);
-		hint.AnchorLeft = 0f;
-		hint.AnchorRight = 0f;
-		hint.AnchorTop = 1f;
-		hint.AnchorBottom = 1f;
-		hint.OffsetLeft = S(FooterX);
-		hint.OffsetTop = -S(44f);
-		hint.OffsetBottom = -S(44f);
-		hint.GrowVertical = Control.GrowDirection.Begin;
-		_root.AddChild(hint);
-	}
-
-	private LabelSettings TextSettings(FontFile file, int weight, float size, float letterSpacingEm, Color color,
-		Color? glow = null, float glowSize = 0f)
-	{
-		int px = Px(size);
-		return MenuFonts.Settings(MenuFonts.Make(file, weight, px, letterSpacingEm), px, color, glow ?? Colors.Transparent, S(glowSize));
-	}
-
-	// Texto con su fuente (peso y espaciado en em), tamaño (px sobre 1280×720), color y halo opcional
 	private Label MakeLabel(string text, FontFile file, int weight, float size, float letterSpacingEm,
-		Color color, Color? glow = null, float glowSize = 0f)
-	{
-		return new Label
-		{
-			Text = text,
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-			LabelSettings = TextSettings(file, weight, size, letterSpacingEm, color, glow, glowSize)
-		};
-	}
+		Color color, Color? glow = null, float glowSize = 0f) =>
+		_kit.MakeLabel(text, file, weight, size, letterSpacingEm, color, glow, glowSize);
 }

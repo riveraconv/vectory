@@ -15,10 +15,6 @@ GrazeFlashIntensity = 1.0
 
 [node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
 script = ExtResource("3_cm0pq")
-MaxSpeed = 110.0
-Drag = 5.0
-TurnRate = 1.3
-SteerResponse = 8.0
 
 [node name="PauseMenu" type="CanvasLayer" parent="." unique_id=1844954761]
 script = ExtResource("4_pause")

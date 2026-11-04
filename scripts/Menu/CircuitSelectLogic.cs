@@ -7,16 +7,17 @@ namespace Vectory.Menu;
 // Qué tiene que hacer quien usa SELECT CIRCUIT tras una llamada
 public enum CircuitSelectAction { None, Start, BackToMenu }
 
-// Lógica de la pantalla SELECT CIRCUIT (sin Godot): modo, circuito que se ve y opciones START / BACK.
+// Lógica de la pantalla SELECT CIRCUIT (sin Godot): modo, circuito que se ve y opciones SHIP SELECTION / BACK.
 // No carga escenas ni toca GameSession: devuelve qué hay que hacer.
 //
-//   Al abrirse: el circuito recordado (si está en la lista) o el primero, con START seleccionada.
+//   Al abrirse: el circuito recordado (si está en la lista) o el primero, con SHIP SELECTION seleccionada.
 //   Circuito anterior / siguiente con vuelta (sin efecto con un solo circuito).
-//   START -> Start (con CircuitPath); BACK o ESC -> BackToMenu.
+//   SHIP SELECTION -> Start (con CircuitPath); BACK o ESC -> BackToMenu.
 public sealed class CircuitSelectLogic
 {
 	public const string StartId = "START";
 	public const string BackId = "BACK";
+	public const string StartLabel = "SHIP SELECTION";
 
 	private readonly IReadOnlyList<string> _paths;
 
@@ -32,7 +33,7 @@ public sealed class CircuitSelectLogic
 
 	public bool CanChangeCircuit => CircuitCount > 1;
 
-	// START / BACK
+	// SHIP SELECTION / BACK
 	public MenuModel Menu { get; }
 
 	// circuitPaths: los del catálogo, en orden; currentPath: el recordado (GameSession), o null
@@ -55,12 +56,15 @@ public sealed class CircuitSelectLogic
 			}
 		}
 
-		Menu = new MenuModel(new[]
-		{
-			new MenuOption(StartId, "START", true),
-			new MenuOption(BackId, "BACK", true)
-		});
+		Menu = CreateMenu();
 	}
+
+	// Las opciones de la pantalla, con la primera seleccionada
+	public static MenuModel CreateMenu() => new(new[]
+	{
+		new MenuOption(StartId, StartLabel, true),
+		new MenuOption(BackId, "BACK", true)
+	});
 
 	public void NextCircuit() => MoveCircuit(1);
 

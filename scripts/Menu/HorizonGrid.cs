@@ -90,7 +90,7 @@ public static class HorizonGrid
 		return BuildLineMesh(verts, colors);
 	}
 
-	private static ArrayMesh BuildLineMesh(List<Vector3> verts, List<Color> colors)
+	public static ArrayMesh BuildLineMesh(List<Vector3> verts, List<Color> colors)
 	{
 		var arrays = new Godot.Collections.Array();
 		arrays.Resize((int)Mesh.ArrayType.Max);

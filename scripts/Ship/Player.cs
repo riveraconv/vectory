@@ -39,25 +39,25 @@ public partial class Player : CharacterBody3D
 
 	// --- Ajustes de conducción: se editan en el Inspector (agrupados) ---
 	[ExportGroup("Velocidad")]
-	[Export] public float MaxSpeed = 60f;
-	[Export] public float Acceleration = 25f;
-	[Export] public float BrakeDeceleration = 45f;
-	[Export] public float Drag = 8f;
+	[Export] public float MaxSpeed = VectorTuning.MaxSpeed;
+	[Export] public float Acceleration = VectorTuning.Acceleration;
+	[Export] public float BrakeDeceleration = VectorTuning.BrakeDeceleration;
+	[Export] public float Drag = VectorTuning.Drag;
 
 	[ExportGroup("Boost")]
-	[Export] public int BoostMaxCharges = 3;
+	[Export] public int BoostMaxCharges = VectorTuning.BoostMaxCharges;
 	[Export] public int BoostInitialCharges = 0;
 	[Export] public float BoostRechargeTime = 35f;   // segundos para ganar una carga
-	[Export] public float BoostSpeedGain = 100f;     // km/h que suma cada carga
+	[Export] public float BoostSpeedGain = VectorTuning.BoostSpeedGainKmh;     // km/h que suma cada carga
 	[Export] public float BoostRampTime = 0.5f;      // segundos de subida (en los que se reparte el impulso)
 	[Export] public float BoostHoldTime = 2f;        // segundos que se mantiene la velocidad alcanzada
 	[Export] public float BoostCooldown = 10f;       // segundos entre usos
-	[Export] public float OverspeedDecay = 20f;      // km/h que pierde cada segundo por encima de MaxSpeed
+	[Export] public float OverspeedDecay = VectorTuning.OverspeedDecayKmh;      // km/h que pierde cada segundo por encima de MaxSpeed
 
 	[ExportGroup("Dirección")]
-	[Export] public float TurnRate = 1.6f;       // rad/s de giro máximo
-	[Export] public float SteerResponse = 6f;    // lo rápido que llega el giro a su valor máximo
-	[Export] public float LateralGrip = 5f;      // más alto = menos inercia lateral (la nave se "agarra" antes)
+	[Export] public float TurnRate = VectorTuning.TurnRate;           // rad/s de giro máximo
+	[Export] public float SteerResponse = VectorTuning.SteerResponse; // lo rápido que llega el giro a su valor máximo
+	[Export] public float LateralGrip = VectorTuning.LateralGrip;     // más alto = menos inercia lateral (la nave se "agarra" antes)
 
 	[ExportGroup("Derrape")]
 	[Export] public float DriftEnterSpeed = 120f;      // km/h mínimos para entrar en derrape
