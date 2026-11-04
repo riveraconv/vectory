@@ -1,6 +1,6 @@
 # VECTORY — Spec: Naves 2 · Perfil técnico, colisión y ajuste en pruebas
 
-Versión 1.1 · 2026-11-04 · Estado: **propuesta, pendiente de validar**
+Versión 1.1 · 2026-11-04 · Estado: **implementada y validada**
 
 Segunda spec de naves. Da a **INTERCEPTOR (Hoja)** y **VANGUARD (Martillo)** su perfil técnico y su **ancho de colisión**, sacado de su **forma real** como el de Vector, y añade un **panel de ajuste solo para pruebas** para afinar los números conduciendo.
 
@@ -127,7 +127,7 @@ El número es el texto y la cifra tras el punto son los segmentos encendidos.
 - En Vector los deslizadores se ven pero están desactivados: Vector es la referencia.
 - El deslizador permite pasar del tope de ±10 % para experimentar. Si un valor lo pasa, se marca en naranja y **F11 lo avisa** en la consola.
 - Los deslizadores se manejan con el ratón y no cogen el foco: las flechas siguen siendo solo para conducir.
-- Los cambios se aplican **al momento**, sin reiniciar la carrera.
+- Los cambios se aplican **al momento**, sin reiniciar la carrera. El panel también funciona con la pausa abierta, por encima de ella.
 - Los multiplicadores y la nave actual duran **hasta cerrar el juego**, también con RESTART o al volver al menú, y sin pasar por el selector, que no se entera.
 - **No se guarda nada en disco.** Al cerrar el juego se vuelve a los valores de la definición.
 - Estilo sencillo, con `Palette` y `MenuFonts`; no hace falta lienzo. Va en una capa por encima del HUD y no lo mueve.
@@ -135,7 +135,7 @@ El número es el texto y la cifra tras el punto son los segmentos encendidos.
 ### 4.4 Récords y fantasma
 
 - En cuanto se usa **F10** o se cambia algún deslizador, **no se guardan récords ni fantasma hasta cerrar el juego**, en ningún circuito ni modo. F12 y RESTART no lo levantan. Al terminar una vuelta o una carrera que se habría guardado, se avisa en consola.
-- Mientras tanto no sale `NEW RECORD`.
+- Mientras tanto no sale `NEW RECORD`. En TIME TRIAL, la franja de fin de vuelta muestra el delta contra el récord o, si no hay, `LAP COMPLETE` y `RECORDS OFF · TUNING LAB`.
 - `BEST`, el delta y el fantasma que ya existían siguen visibles, para poder comparar.
 - El selector, el menú y RECORDS no se enteran del panel.
 

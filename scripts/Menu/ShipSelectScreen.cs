@@ -251,7 +251,8 @@ public partial class ShipSelectScreen : CanvasLayer
 		}
 
 		// Holograma o placeholder
-		ShipDefinition definition = ShipDefinitions.Find(ship.Id);
+		// Una nave COMING SOON no enseña sus datos, aunque ya tenga definición
+		ShipDefinition definition = selectable ? ShipDefinitions.Find(ship.Id) : null;
 		if (definition != null)
 			_hologram.SetVisual(definition.Visual);
 		_hologram.SetShipVisible(selectable);

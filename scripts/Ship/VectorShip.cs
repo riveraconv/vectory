@@ -21,7 +21,8 @@ public static class VectorShip
 			NoseDistance = 4f,
 			PhysicsBoxSize = new Vector3(6.8f, 1.2f, 7.2f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.4f)
-		});
+		},
+		ShipMultipliers.One);
 
 	// ---------------------------------------------------------------
 	// Casco

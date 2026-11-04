@@ -38,8 +38,14 @@ public partial class Player : CharacterBody3D
 	// La nave en uso: su conducción y su forma salen solo de aquí (spec docs/naves-1-definicion.md)
 	public ShipDefinition Definition { get; } = ShipDefinitions.Resolve(GameSession.ShipDesignId, message => GD.PushWarning(message));
 
+	// Perfil técnico y semiancho que manda el panel de ajuste, en lugar de los de la definición (solo en pruebas)
+	private ShipTuning? _labTuning;
+	private float? _labHalfWidth;
+
+	private ShipTuning Technical => _labTuning ?? Definition.Technical;
+
 	// Velocidad punta de la nave, sin daños (m/s)
-	public float MaxSpeed => Definition.Technical.MaxSpeed;
+	public float MaxSpeed => Technical.MaxSpeed;
 
 	// --- Ajustes comunes a todas las naves: se editan en el Inspector (agrupados) ---
 	[ExportGroup("Boost")]
@@ -253,6 +259,15 @@ public partial class Player : CharacterBody3D
 	public void SetRaceSession(RaceSession race)
 	{
 		_race = race;
+	}
+
+	// Panel de ajuste: conducción y ancho de otra nave o con otros valores, en plena carrera. Conserva posición,
+	// dirección, velocidad, boost y daño; si la velocidad pasa de la nueva punta, se pierde con la regla de siempre.
+	// Casco, cabina y cámaras no cambian.
+	public void ApplyTuningLab(ShipTuning technical, float collisionHalfWidth)
+	{
+		_labTuning = technical;
+		_labHalfWidth = collisionHalfWidth;
 	}
 
 	// Salida lanzada (GO! de TIME TRIAL): la nave pasa de golpe a "speed" m/s hacia donde apunta
@@ -612,7 +627,7 @@ public partial class Player : CharacterBody3D
 	// El perfil técnico de la nave con los factores de los daños
 	private ShipTuning BuildTuning()
 	{
-		ShipTuning tuning = Definition.Technical;
+		ShipTuning tuning = Technical;
 		tuning.MaxSpeed *= TopSpeedFactor;
 		tuning.TurnRate *= TurnRateFactor;
 		return tuning;
@@ -818,7 +833,7 @@ public partial class Player : CharacterBody3D
 		var input = new BarrierContactInput
 		{
 			Lateral = axis.Lateral,
-			HalfWidth = Definition.Visual.CollisionHalfWidth,
+			HalfWidth = _labHalfWidth ?? Definition.Visual.CollisionHalfWidth,
 			BarrierOffset = _track.BarrierOffset,
 			VelocityAlong = NVec2.Dot(velocity, tangent),
 			VelocityLateral = NVec2.Dot(velocity, right),
