@@ -2,13 +2,15 @@ using Godot;
 
 namespace Vectory.Ship;
 
-// Parámetros de la cámara de tercera persona (los edita el Inspector del nodo Player)
+// Parámetros de la cámara de tercera persona: el encuadre sale del perfil visual de la nave
+// y el resto, comunes, del Inspector del nodo Player
 public struct ChaseCameraSettings
 {
 	public float FollowRate;     // más alto = cámara más pegada, menos efecto dron
 	public float Height;
 	public float Distance;
 	public float ExtraDistance;  // distancia extra a máxima velocidad
+	public Vector3 LookTarget;   // punto al que mira, en el espacio de la cámara
 	public float BaseFov;
 	public float MaxFov;
 	public float UpSmoothTime;   // s: suavizado del "arriba" de la cámara
@@ -87,7 +89,7 @@ public partial class ChaseCamera : Camera3D
 		var offset = new Vector3(0f, s.Height, s.Distance + speedFactor * s.ExtraDistance + _push);
 
 		GlobalPosition = targetPosition + camBasis * offset;
-		LookAt(targetPosition + camBasis * new Vector3(0f, 0.3f, -10f), camBasis * Vector3.Up);
+		LookAt(targetPosition + camBasis * s.LookTarget, camBasis * Vector3.Up);
 
 		Vector2 planeOffset = _shakeOffset + _vibration;
 		if (planeOffset != Vector2.Zero || _shakeRoll != 0f)

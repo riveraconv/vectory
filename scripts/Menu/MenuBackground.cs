@@ -54,7 +54,7 @@ public partial class MenuBackground : Node3D
 		ApplyLensShift();
 		GetViewport().SizeChanged += ApplyLensShift;
 
-		_ship = new Spaceship { Name = "Spaceship" };
+		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual };
 		AddChild(_ship);
 
 		var grid = new HorizonGridSettings

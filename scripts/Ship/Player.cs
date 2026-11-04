@@ -1,5 +1,6 @@
 using Godot;
 using Vectory.Circuit;
+using Vectory.Game;
 using NVec2 = System.Numerics.Vector2;
 
 namespace Vectory.Ship;
@@ -34,30 +35,21 @@ public partial class Player : CharacterBody3D
 	// Misma conversión que usa el HUD para mostrar la velocidad
 	private const float KmhPerMs = 3.6f;
 
-	// Distancia del origen de la nave a su morro (borde delantero de la caja de colisión)
-	public const float NoseDistance = 4f;
+	// La nave en uso: su conducción y su forma salen solo de aquí (spec docs/naves-1-definicion.md)
+	public ShipDefinition Definition { get; } = ShipDefinitions.Resolve(GameSession.ShipDesignId, message => GD.PushWarning(message));
 
-	// --- Ajustes de conducción: se editan en el Inspector (agrupados) ---
-	[ExportGroup("Velocidad")]
-	[Export] public float MaxSpeed = VectorTuning.MaxSpeed;
-	[Export] public float Acceleration = VectorTuning.Acceleration;
-	[Export] public float BrakeDeceleration = VectorTuning.BrakeDeceleration;
-	[Export] public float Drag = VectorTuning.Drag;
+	// Velocidad punta de la nave, sin daños (m/s)
+	public float MaxSpeed => Definition.Technical.MaxSpeed;
 
+	// --- Ajustes comunes a todas las naves: se editan en el Inspector (agrupados) ---
 	[ExportGroup("Boost")]
-	[Export] public int BoostMaxCharges = VectorTuning.BoostMaxCharges;
+	[Export] public int BoostMaxCharges = BoostTuning.DefaultMaxCharges;
 	[Export] public int BoostInitialCharges = 0;
 	[Export] public float BoostRechargeTime = 35f;   // segundos para ganar una carga
-	[Export] public float BoostSpeedGain = VectorTuning.BoostSpeedGainKmh;     // km/h que suma cada carga
+	[Export] public float BoostSpeedGain = BoostTuning.DefaultSpeedGainKmh;     // km/h que suma cada carga
 	[Export] public float BoostRampTime = 0.5f;      // segundos de subida (en los que se reparte el impulso)
 	[Export] public float BoostHoldTime = 2f;        // segundos que se mantiene la velocidad alcanzada
 	[Export] public float BoostCooldown = 10f;       // segundos entre usos
-	[Export] public float OverspeedDecay = VectorTuning.OverspeedDecayKmh;      // km/h que pierde cada segundo por encima de MaxSpeed
-
-	[ExportGroup("Dirección")]
-	[Export] public float TurnRate = VectorTuning.TurnRate;           // rad/s de giro máximo
-	[Export] public float SteerResponse = VectorTuning.SteerResponse; // lo rápido que llega el giro a su valor máximo
-	[Export] public float LateralGrip = VectorTuning.LateralGrip;     // más alto = menos inercia lateral (la nave se "agarra" antes)
 
 	[ExportGroup("Derrape")]
 	[Export] public float DriftEnterSpeed = 120f;      // km/h mínimos para entrar en derrape
@@ -113,7 +105,6 @@ public partial class Player : CharacterBody3D
 	[Export(PropertyHint.Range, "0,1,0.01")] public float BankTurnBonus = 0.15f;      // giro extra con 25° de peralte a favor
 
 	[ExportGroup("Colisiones")]
-	[Export] public float CollisionHalfWidth = 3.4f;   // semiancho de colisión con la barrera (m; las puntas de las alas)
 	[Export] public float ImpactMediumSpeed = 30f;     // km/h contra la barrera desde los que el impacto es medio
 	[Export] public float ImpactStrongSpeed = 90f;     // km/h contra la barrera desde los que el impacto es fuerte
 	[Export(PropertyHint.Range, "0,1,0.01")] public float GrazeStraighten = 0.3f;   // fracción del ángulo que se quita al empezar un roce
@@ -153,9 +144,6 @@ public partial class Player : CharacterBody3D
 
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
-	[Export] public float CameraHeight = 1.8f;
-	[Export] public float CameraDistance = 7f;
-	[Export] public float CameraExtraDistance = 3f; // distancia extra a máxima velocidad
 	[Export] public float BaseFov = 75f;
 	[Export] public float MaxFov = 95f;
 	[Export] public float CameraUpSmoothing = 0.3f;   // s: el "arriba" de la cámara sigue al de la superficie (y al del mundo en el aire)
@@ -234,14 +222,14 @@ public partial class Player : CharacterBody3D
 		AddChild(new CollisionShape3D
 		{
 			Name = "CollisionShape3D",
-			Shape = new BoxShape3D { Size = new Vector3(6.8f, 1.2f, 7.2f) },
-			Position = new Vector3(0f, 0.2f, -0.4f)
+			Shape = new BoxShape3D { Size = ShipLineMesh.ToGodot(Definition.Visual.PhysicsBoxSize) },
+			Position = ShipLineMesh.ToGodot(Definition.Visual.PhysicsBoxCenter)
 		});
 
-		_ship = new Spaceship { Name = "Spaceship" };
+		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual };
 		AddChild(_ship);
 
-		_cockpit = new Cockpit { Name = "Cockpit" };
+		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual };
 		AddChild(_cockpit);
 
 		_chaseCam = new ChaseCamera { Name = "ChaseCamera" };
@@ -621,20 +609,13 @@ public partial class Player : CharacterBody3D
 		};
 	}
 
-	// Copia los parámetros del Inspector al modelo (cada paso, así los cambios en vivo se notan)
+	// El perfil técnico de la nave con los factores de los daños
 	private ShipTuning BuildTuning()
 	{
-		return new ShipTuning
-		{
-			MaxSpeed = MaxSpeed * TopSpeedFactor,
-			Acceleration = Acceleration,
-			BrakeDeceleration = BrakeDeceleration,
-			Drag = Drag,
-			OverspeedDecay = OverspeedDecay / KmhPerMs,
-			TurnRate = TurnRate * TurnRateFactor,
-			SteerResponse = SteerResponse,
-			LateralGrip = LateralGrip
-		};
+		ShipTuning tuning = Definition.Technical;
+		tuning.MaxSpeed *= TopSpeedFactor;
+		tuning.TurnRate *= TurnRateFactor;
+		return tuning;
 	}
 
 	// Parámetros del derrape del Inspector, con las velocidades en m/s y los ángulos en radianes
@@ -698,9 +679,10 @@ public partial class Player : CharacterBody3D
 		return new ChaseCameraSettings
 		{
 			FollowRate = CameraFollow,
-			Height = CameraHeight,
-			Distance = CameraDistance,
-			ExtraDistance = CameraExtraDistance,
+			Height = Definition.Visual.Chase.Height,
+			Distance = Definition.Visual.Chase.Distance,
+			ExtraDistance = Definition.Visual.Chase.ExtraDistance,
+			LookTarget = ShipLineMesh.ToGodot(Definition.Visual.Chase.LookTarget),
 			BaseFov = BaseFov,
 			MaxFov = MaxFov,
 			UpSmoothTime = CameraUpSmoothing
@@ -836,7 +818,7 @@ public partial class Player : CharacterBody3D
 		var input = new BarrierContactInput
 		{
 			Lateral = axis.Lateral,
-			HalfWidth = CollisionHalfWidth,
+			HalfWidth = Definition.Visual.CollisionHalfWidth,
 			BarrierOffset = _track.BarrierOffset,
 			VelocityAlong = NVec2.Dot(velocity, tangent),
 			VelocityLateral = NVec2.Dot(velocity, right),

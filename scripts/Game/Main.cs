@@ -190,10 +190,11 @@ public partial class Main : Node3D
 			// Una marca de parrilla por participante. Las posiciones se reparten al azar sin repetir;
 			// sin rivales todavía, solo se usa la del jugador (la primera del reparto).
 			int[] gridOrder = GridLayout.RandomOrder(participants, new System.Random());
-			_track.GetGridStart(gridOrder[0], Player.NoseDistance, out Vector3 startPosition, out float startYaw);
+			float noseDistance = _player.Definition.Visual.NoseDistance;
+			_track.GetGridStart(gridOrder[0], noseDistance, out Vector3 startPosition, out float startYaw);
 			_player.PlaceAt(startPosition, startYaw);
 			_race = RaceSession.ForRace(_track, BuildStartSettings(), participants);
-			_track.Elements.ShowGrid(gridOrder[0], Player.NoseDistance);
+			_track.Elements.ShowGrid(gridOrder[0], noseDistance);
 		}
 		_player.SetRaceSession(_race);
 
@@ -537,8 +538,6 @@ public partial class Main : Node3D
 			else
 				GD.Print("[Ghost] The saved ghost does not match this circuit or its record; no ghost until a new record.");
 		}
-		if (_ghost != null && !ShipCatalog.Contains(_ghost.ShipDesignId))
-			GD.PushWarning($"Ghost: unknown ship design '{_ghost.ShipDesignId}'; using '{ShipCatalog.Default}'.");
 
 		// Igual que Track y Player, se usa el de la escena si existe (así se ajusta en el Inspector)
 		_ghostShip = GetNodeOrNull<GhostShip>("GhostShip");
@@ -547,6 +546,8 @@ public partial class Main : Node3D
 			_ghostShip = new GhostShip { Name = "GhostShip" };
 			AddChild(_ghostShip);
 		}
+		if (_ghost != null)
+			_ghostShip.SetVisual(ShipDefinitions.Resolve(_ghost.ShipDesignId, message => GD.PushWarning(message)).Visual);
 
 		_pause.EnableGhostOption(_settings.Settings.GhostEnabled, () => _ghost != null);
 		_pause.GhostToggled += OnGhostToggled;

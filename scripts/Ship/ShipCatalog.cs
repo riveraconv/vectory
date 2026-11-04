@@ -3,11 +3,11 @@ using System.Linq;
 
 namespace Vectory.Ship;
 
-// Una nave del catálogo. Sin parámetros de conducción no se puede elegir todavía (COMING SOON):
+// Una nave del catálogo. Sin definición (ShipDefinitions) no se puede elegir todavía (COMING SOON):
 // solo tiene nombre y descripción para el selector.
-public sealed record ShipEntry(string Id, string Name, string Description, ShipTuning? Tuning = null)
+public sealed record ShipEntry(string Id, string Name, string Description)
 {
-	public bool Selectable => Tuning.HasValue;
+	public bool Selectable => ShipDefinitions.Has(Id);
 }
 
 // Lista única de naves del juego, en el orden de SELECT SHIP. El fantasma de TIME TRIAL guarda el diseño
@@ -21,7 +21,7 @@ public static class ShipCatalog
 	public static readonly IReadOnlyList<ShipEntry> Entries = new[]
 	{
 		new ShipEntry(Ship02, "INTERCEPTOR", "HIGH TOP SPEED · LOW TOLERANCE"),
-		new ShipEntry(Ship01, "VECTOR", "BALANCED · ALL-ROUND", VectorTuning.Values),
+		new ShipEntry(Ship01, "VECTOR", "BALANCED · ALL-ROUND"),
 		new ShipEntry(Ship03, "VANGUARD", "HIGH ACCELERATION · STRONG LAUNCH")
 	};
 

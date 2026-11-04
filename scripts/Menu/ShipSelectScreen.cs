@@ -251,6 +251,9 @@ public partial class ShipSelectScreen : CanvasLayer
 		}
 
 		// Holograma o placeholder
+		ShipDefinition definition = ShipDefinitions.Find(ship.Id);
+		if (definition != null)
+			_hologram.SetVisual(definition.Visual);
 		_hologram.SetShipVisible(selectable);
 		_hologram.SetOrientation(_spin.Orientation);
 		_placeholder.Visible = !selectable;
@@ -258,8 +261,8 @@ public partial class ShipSelectScreen : CanvasLayer
 		_dragZone.MouseDefaultCursorShape = DragCursors.Open;
 
 		// SHIP DATA: el perfil de cada nave se compara con Vector (el jugador no lo ve)
-		IReadOnlyList<ShipStat> stats = selectable
-			? ShipStats.Compute(ship.Tuning.Value, VectorTuning.Values)
+		IReadOnlyList<ShipStat> stats = definition != null
+			? ShipStats.Compute(definition.Technical, ShipDefinitions.Default.Technical)
 			: ShipStats.Empty();
 		for (int i = 0; i < _statRows.Count; i++)
 		{
@@ -269,7 +272,7 @@ public partial class ShipSelectScreen : CanvasLayer
 		}
 
 		// SHARED SYSTEMS
-		_boostValue.Text = ShipSelectFormat.Boost(VectorTuning.BoostMaxCharges, VectorTuning.BoostSpeedGainKmh);
+		_boostValue.Text = ShipSelectFormat.Boost(BoostTuning.DefaultMaxCharges, BoostTuning.DefaultSpeedGainKmh);
 		_damageValue.Text = ShipSelectFormat.Damage(_logic.Mode, DamageModel.MaxLevel);
 		_damageValue.LabelSettings = _logic.Mode == GameMode.TimeTrial ? _damageOffSettings : _damageOnSettings;
 
