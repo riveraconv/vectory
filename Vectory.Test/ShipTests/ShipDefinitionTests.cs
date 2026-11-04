@@ -13,11 +13,12 @@ namespace Vectory.Test.ShipTests;
 public class ShipDefinitionsTests
 {
     [Fact]
-    public void OnlyShip01_HasDefinition()
+    public void AllThreeShips_HaveDefinition()
     {
         Assert.True(ShipDefinitions.Has(ShipCatalog.Ship01));
-        Assert.False(ShipDefinitions.Has(ShipCatalog.Ship02));
-        Assert.False(ShipDefinitions.Has(ShipCatalog.Ship03));
+        Assert.True(ShipDefinitions.Has(ShipCatalog.Ship02));
+        Assert.True(ShipDefinitions.Has(ShipCatalog.Ship03));
+        Assert.False(ShipDefinitions.Has("nope"));
         Assert.False(ShipDefinitions.Has(null));
     }
 
@@ -39,9 +40,8 @@ public class ShipDefinitionsTests
 
     [Theory]
     [InlineData("nope")]
-    [InlineData("ship_02")]
     [InlineData(null)]
-    public void Resolve_UnknownOrWithoutDefinition_IsVector(string? id)
+    public void Resolve_Unknown_IsVector(string? id)
     {
         Assert.Same(VectorShip.Definition, ShipDefinitions.Resolve(id));
     }
@@ -62,7 +62,7 @@ public class ShipDefinitionsTests
     [Fact]
     public void Find_DoesNotFallBack()
     {
-        Assert.Null(ShipDefinitions.Find("ship_02"));
+        Assert.Null(ShipDefinitions.Find("nope"));
         Assert.Same(VectorShip.Definition, ShipDefinitions.Find("ship_01"));
     }
 }

@@ -1,19 +1,26 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Vectory.Ship;
 
-// Una nave: su perfil técnico (cómo conduce) y su perfil visual (cómo es y cómo se ve).
-// Lo común a todas las naves (boost, daños, ajustes de cámara, paleta) no entra aquí. Lógica pura.
-public sealed record ShipDefinition(string Id, ShipTuning Technical, ShipVisualProfile Visual);
+// Una nave: su perfil técnico (cómo conduce), su perfil visual (cómo es y cómo se ve) y los multiplicadores respecto a
+// Vector de los que sale el técnico. Lo común a todas las naves (boost, daños, ajustes de cámara, paleta) no entra
+// aquí. Lógica pura.
+public sealed record ShipDefinition(string Id, ShipTuning Technical, ShipVisualProfile Visual, ShipMultipliers Multipliers);
 
-// Las definiciones por id. Hoy solo tiene definición Vector; las naves sin ella no se pueden elegir (ShipCatalog).
+// Las definiciones por id. Tener definición no basta para poder elegir una nave: eso lo dice ShipCatalog.
 public static class ShipDefinitions
 {
-	private static readonly Dictionary<string, ShipDefinition> ById = new()
+	// Vector → Hoja → Martillo: el orden del panel de ajuste
+	public static readonly IReadOnlyList<ShipDefinition> All = new[]
 	{
-		[VectorShip.Definition.Id] = VectorShip.Definition
+		VectorShip.Definition,
+		HojaShip.Definition,
+		MartilloShip.Definition
 	};
+
+	private static readonly Dictionary<string, ShipDefinition> ById = All.ToDictionary(d => d.Id);
 
 	// Ids de los que ya se ha avisado: el aviso de Resolve sale una sola vez por id
 	private static readonly HashSet<string> Warned = new();

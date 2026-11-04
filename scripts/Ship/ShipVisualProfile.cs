@@ -24,7 +24,7 @@ public readonly record struct ChaseFraming(float Height, float Distance, float E
 
 // Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco y la cabina son constructores de
 // geometría: devuelven las líneas sin nodos de Godot. Lógica pura.
-public sealed class ShipVisualProfile
+public sealed record ShipVisualProfile
 {
 	public required Func<IReadOnlyList<ShipLine>> BuildHull { get; init; }
 	public required Func<IReadOnlyList<ShipLine>> BuildCockpit { get; init; }
