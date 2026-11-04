@@ -20,7 +20,11 @@ public readonly record struct CockpitFraming(Vector3 Eye, float Fov);
 
 // Encuadre base de la cámara exterior, sin efectos: altura, distancia, distancia extra a máxima velocidad
 // y punto al que mira (en el espacio de la cámara, sobre la nave)
-public readonly record struct ChaseFraming(float Height, float Distance, float ExtraDistance, Vector3 LookTarget);
+public readonly record struct ChaseFraming(float Height, float Distance, float ExtraDistance, Vector3 LookTarget)
+{
+	// Más lejos o más cerca en la misma proporción: el ángulo de la cámara no cambia
+	public ChaseFraming Scaled(float factor) => new(Height * factor, Distance * factor, ExtraDistance * factor, LookTarget * factor);
+}
 
 // Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco y la cabina son constructores de
 // geometría: devuelven las líneas sin nodos de Godot. Lógica pura.
@@ -30,6 +34,9 @@ public sealed record ShipVisualProfile
 	public required Func<IReadOnlyList<ShipLine>> BuildCockpit { get; init; }
 	public required CockpitFraming Cockpit { get; init; }
 	public required ChaseFraming Chase { get; init; }
+
+	// Factor con el que Chase se escala respecto al encuadre de Vector, según el largo de la nave
+	public float ChaseFactor { get; init; } = 1f;
 
 	// Semiancho que usa la colisión con la barrera. Sale del diseño: el de una nave con alas llega a la punta del ala.
 	public required float CollisionHalfWidth { get; init; }

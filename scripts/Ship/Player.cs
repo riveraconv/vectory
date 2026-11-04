@@ -38,11 +38,15 @@ public partial class Player : CharacterBody3D
 	// La nave en uso: su conducción y su forma salen solo de aquí (spec docs/naves-1-definicion.md)
 	public ShipDefinition Definition { get; } = ShipDefinitions.Resolve(GameSession.ShipDesignId, message => GD.PushWarning(message));
 
-	// Perfil técnico y semiancho que manda el panel de ajuste, en lugar de los de la definición (solo en pruebas)
+	// Perfil técnico y visual que manda el panel de ajuste, en lugar de los de la definición (solo en pruebas)
 	private ShipTuning? _labTuning;
-	private float? _labHalfWidth;
+	private ShipVisualProfile _labVisual;
 
 	private ShipTuning Technical => _labTuning ?? Definition.Technical;
+
+	// De este perfil salen el casco, el encuadre exterior y el ancho de colisión. La cabina, la caja física y la
+	// colocación siguen saliendo de Definition.
+	private ShipVisualProfile ExteriorVisual => _labVisual ?? Definition.Visual;
 
 	// Velocidad punta de la nave, sin daños (m/s)
 	public float MaxSpeed => Technical.MaxSpeed;
@@ -187,6 +191,7 @@ public partial class Player : CharacterBody3D
 	// Parpadeo de las aristas dañadas de la nave y de la cabina (null hasta que hay daño)
 	private EdgeFlicker _shipFlicker;
 	private EdgeFlicker _cockpitFlicker;
+	private readonly System.Random _flickerRandom = new();
 
 	// Factores de la velocidad punta y del giro (los daños los bajan; 1 = sin efecto).
 	// Se aplican sobre MaxSpeed y TurnRate al pasar los parámetros al modelo, sin cambiarlos.
@@ -261,13 +266,30 @@ public partial class Player : CharacterBody3D
 		_race = race;
 	}
 
-	// Panel de ajuste: conducción y ancho de otra nave o con otros valores, en plena carrera. Conserva posición,
-	// dirección, velocidad, boost y daño; si la velocidad pasa de la nueva punta, se pierde con la regla de siempre.
-	// Casco, cabina y cámaras no cambian.
-	public void ApplyTuningLab(ShipTuning technical, float collisionHalfWidth)
+	// Panel de ajuste: conducción, ancho, casco y encuadre exterior de otra nave o con otros valores, en plena carrera.
+	// Conserva posición, dirección, velocidad, boost y daño; si la velocidad pasa de la nueva punta, se pierde con la
+	// regla de siempre. La cabina, la caja física y la posición no cambian.
+	public void ApplyTuningLab(ShipTuning technical, ShipVisualProfile visual)
 	{
 		_labTuning = technical;
-		_labHalfWidth = collisionHalfWidth;
+		_labVisual = visual;
+
+		if (visual == _ship.Visual)
+			return;
+		_ship.SetVisual(visual);
+		RebuildShipFlicker();
+	}
+
+	// El casco nuevo tiene otro número de aristas: mismo nivel de daño, con las aristas sorteadas de nuevo
+	private void RebuildShipFlicker()
+	{
+		if (_shipFlicker == null)
+			return;
+
+		int level = _shipFlicker.Level;
+		_shipFlicker = new EdgeFlicker(_ship.EdgeCount, BuildFlickerSettings(), _flickerRandom);
+		_shipFlicker.SetLevel(level);
+		_ship.ShowEdgeFlicker(_shipFlicker, FlickerOpacity);
 	}
 
 	// Salida lanzada (GO! de TIME TRIAL): la nave pasa de golpe a "speed" m/s hacia donde apunta
@@ -343,9 +365,8 @@ public partial class Player : CharacterBody3D
 
 		if (_shipFlicker == null)
 		{
-			var random = new System.Random();
-			_shipFlicker = new EdgeFlicker(_ship.EdgeCount, BuildFlickerSettings(), random);
-			_cockpitFlicker = new EdgeFlicker(_cockpit.EdgeCount, BuildFlickerSettings(), random);
+			_shipFlicker = new EdgeFlicker(_ship.EdgeCount, BuildFlickerSettings(), _flickerRandom);
+			_cockpitFlicker = new EdgeFlicker(_cockpit.EdgeCount, BuildFlickerSettings(), _flickerRandom);
 		}
 		_shipFlicker.SetLevel(level);
 		_cockpitFlicker.SetLevel(level);
@@ -691,13 +712,14 @@ public partial class Player : CharacterBody3D
 
 	private ChaseCameraSettings CameraSettings()
 	{
+		ChaseFraming chase = ExteriorVisual.Chase;
 		return new ChaseCameraSettings
 		{
 			FollowRate = CameraFollow,
-			Height = Definition.Visual.Chase.Height,
-			Distance = Definition.Visual.Chase.Distance,
-			ExtraDistance = Definition.Visual.Chase.ExtraDistance,
-			LookTarget = ShipLineMesh.ToGodot(Definition.Visual.Chase.LookTarget),
+			Height = chase.Height,
+			Distance = chase.Distance,
+			ExtraDistance = chase.ExtraDistance,
+			LookTarget = ShipLineMesh.ToGodot(chase.LookTarget),
 			BaseFov = BaseFov,
 			MaxFov = MaxFov,
 			UpSmoothTime = CameraUpSmoothing
@@ -833,7 +855,7 @@ public partial class Player : CharacterBody3D
 		var input = new BarrierContactInput
 		{
 			Lateral = axis.Lateral,
-			HalfWidth = _labHalfWidth ?? Definition.Visual.CollisionHalfWidth,
+			HalfWidth = ExteriorVisual.CollisionHalfWidth,
 			BarrierOffset = _track.BarrierOffset,
 			VelocityAlong = NVec2.Dot(velocity, tangent),
 			VelocityLateral = NVec2.Dot(velocity, right),

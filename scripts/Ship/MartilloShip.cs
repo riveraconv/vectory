@@ -1,9 +1,14 @@
+using System.Collections.Generic;
+using System.Numerics;
+
 namespace Vectory.Ship;
 
 // VANGUARD · MARTILLO (ship_03): más aceleración y agarre que Vector, a cambio de punta, giro y frenada. Lógica pura.
-// El perfil visual es provisional: el de Vector con su propio ancho, hasta que la spec 3 traiga su geometría.
+// Casco: Vanguard_C de designs/naves-geometria.js. La cabina y el ojo son, de momento, los de Vector (spec 3b).
 public static class MartilloShip
 {
+	private const float ChaseFactor = 0.92f;   // 6,6 m de largo frente a los 7,2 de Vector
+
 	private static readonly ShipMultipliers Multipliers = new()
 	{
 		MaxSpeed = 0.94f,
@@ -16,6 +21,54 @@ public static class MartilloShip
 	public static readonly ShipDefinition Definition = new(
 		ShipCatalog.Ship03,
 		Multipliers.Apply(VectorTuning.Values),
-		VectorShip.Definition.Visual with { CollisionHalfWidth = 2.5f },   // las puntas del canard
+		VectorShip.Definition.Visual with
+		{
+			BuildHull = BuildHull,
+			ChaseFactor = ChaseFactor,
+			Chase = VectorShip.Definition.Visual.Chase.Scaled(ChaseFactor),
+			CollisionHalfWidth = 2.5f,   // las puntas del canard
+			NoseDistance = 3.6f,
+			PhysicsBoxSize = new Vector3(5f, 1.4f, 6.6f),
+			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.3f)
+		},
 		Multipliers);
+
+	// Canard ancho en el morro con las puntas caídas, cuerpo estrecho detrás y dos toberas grandes
+	private static IReadOnlyList<ShipLine> BuildHull()
+	{
+		var hull = new ShipHullBuilder();
+
+		hull.Loft(new LoftSection[]
+		{
+			new(-2.6f, 0.6f, 0.45f, -0.2f, 0.08f),
+			new(-1.0f, 0.85f, 0.7f, -0.3f),
+			new(1.2f, 0.9f, 0.72f, -0.32f),
+			new(2.2f, 0.85f, 0.68f, -0.32f)
+		}, nose: new Vector3(0f, 0.05f, -3.6f));
+
+		hull.Mirror(k =>
+		{
+			// Canard
+			var a = new Vector3(k * 0.6f, 0.12f, -3.0f);
+			var b = new Vector3(k * 2.5f, 0f, -2.6f);
+			var c = new Vector3(k * 2.5f, 0f, -1.7f);
+			var d = new Vector3(k * 0.8f, 0.12f, -1.5f);
+			var drop = new Vector3(k * 2.5f, -0.5f, -2.2f);
+			hull.Poly(a, b, c, d);
+			hull.Segment(a, c);
+			hull.Segment(b, drop);
+			hull.Segment(drop, c);
+
+			// Aletas traseras pequeñas
+			hull.Poly(
+				new Vector3(k * 0.85f, 0.3f, 1.0f),
+				new Vector3(k * 1.3f, 0.9f, 2.0f),
+				new Vector3(k * 1.3f, 0.9f, 2.4f),
+				new Vector3(k * 0.8f, 0.3f, 2.2f));
+		});
+
+		hull.Mirror(k => hull.Nozzle(k * 0.45f, 0.2f, 1.4f, 2.6f, 0.4f));
+
+		return hull.Lines;
+	}
 }

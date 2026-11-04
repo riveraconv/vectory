@@ -97,7 +97,7 @@ public partial class TuningLabPanel : CanvasLayer
 	private void ApplyToPlayer()
 	{
 		string id = _lab.Current.Id;
-		Player?.ApplyTuningLab(_lab.Tuning(id), _lab.Current.Visual.CollisionHalfWidth);
+		Player?.ApplyTuningLab(_lab.Tuning(id), _lab.Current.Visual);
 	}
 
 	private void Refresh()
