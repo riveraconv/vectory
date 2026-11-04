@@ -37,6 +37,9 @@ public partial class GhostShip : Node3D
 		_ship.SetMaterialOverride(_material);
 	}
 
+	// La nave con la que se hizo la grabación (la de su archivo, no la de la sesión)
+	public void SetVisual(ShipVisualProfile visual) => _ship.SetVisual(visual);
+
 	// Coloca el fantasma donde estaba la grabación en ese tiempo de vuelta. Si la grabación ya ha
 	// terminado, o está demasiado cerca de la nave del jugador, no se ve.
 	public void ShowAt(GhostRecording recording, double lapTime, Vector3 playerPosition)

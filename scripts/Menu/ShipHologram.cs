@@ -68,7 +68,7 @@ void fragment() {
 		_pivot = new Node3D { Name = "Pivot" };
 		AddChild(_pivot);
 
-		_ship = new Spaceship { Name = "Spaceship" };
+		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual };
 		_pivot.AddChild(_ship);
 		Aabb bounds = _ship.Bounds;
 		_ship.Position = -(bounds.Position + bounds.Size * 0.5f);   // gira alrededor del centro de su caja
@@ -108,6 +108,9 @@ void fragment() {
 
 	// Muestra u oculta la nave; la rejilla y el anillo siguen (nave COMING SOON)
 	public void SetShipVisible(bool visible) => _ship.Visible = visible;
+
+	// La nave mostrada. El encuadre se calcula una vez en _Ready: hoy solo se puede mostrar Vector.
+	public void SetVisual(ShipVisualProfile visual) => _ship.SetVisual(visual);
 
 	public void SetOrientation(System.Numerics.Quaternion q) => _pivot.Quaternion = new Quaternion(q.X, q.Y, q.Z, q.W);
 

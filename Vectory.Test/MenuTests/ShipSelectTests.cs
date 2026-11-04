@@ -213,7 +213,7 @@ public class ShipSelectFormatTests
 
     [Fact]
     public void Boost() =>
-        Assert.Equal("3 × +100 KM/H", ShipSelectFormat.Boost(VectorTuning.BoostMaxCharges, VectorTuning.BoostSpeedGainKmh));
+        Assert.Equal("3 × +100 KM/H", ShipSelectFormat.Boost(BoostTuning.DefaultMaxCharges, BoostTuning.DefaultSpeedGainKmh));
 }
 
 public class HologramSpinTests
