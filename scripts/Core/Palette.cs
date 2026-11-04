@@ -133,6 +133,25 @@ public static class Palette
 	public static readonly Color ProfileGuide = new Color(Blue, 0.45f);         // líneas guía del perfil (+E / −E)
 	public static readonly Color ProfileSector = new Color(Blue, 0.7f);         // líneas de sector del perfil
 
+	// --- SELECT SHIP ---
+	public static readonly Color ShipNameDisabled = new Color(Blue, 0.75f);     // nombre de una nave COMING SOON
+	public static readonly Color ShipTag = BlueGray;                // etiqueta COMING SOON
+	public static readonly Color ShipTagBorder = new Color(BlueGray, 0.5f);
+	public static readonly Color ShipValueEmpty = new Color(BlueGray, 0.6f);    // — de una nave COMING SOON
+	public static readonly Color ShipDamageOff = BlueGray;          // DAMAGE OFF en TIME TRIAL
+	public static readonly Color ShipBoost = Orange;                // valor de BOOST
+	public static readonly Color ShipBarOn = Cyan;                  // segmento encendido
+	public static readonly Color ShipBarGlow = new Color(Cyan, 0.3f);           // halo del segmento encendido
+	public static readonly Color ShipBarOff = new Color(Blue, 0.7f);            // borde del segmento apagado
+	public static readonly Color ShipBarEmpty = new Color(Blue, 0.35f);         // borde del segmento de una nave COMING SOON
+	public static readonly Color HologramRing = new Color(Blue, 0.45f);         // anillo de proyección
+	public static readonly Color HologramRingInner = new Color(Cyan, 0.3f);     // anillo interior discontinuo
+	public static readonly Color ShipPlaceholderFrame = Blue;       // marco del placeholder
+	public static readonly Color ShipPlaceholderTitle = new Color(BlueGray, 0.75f);  // SHIP IN DEVELOPMENT
+	public static readonly Color ShipPlaceholderHint = new Color(BlueGray, 0.5f);    // COMING SOON del placeholder
+	public static readonly Color DragCursorFill = Cyan;             // cursor de mano del arrastre
+	public static readonly Color DragCursorOutline = Background;
+
 	// --- TIME TRIAL y récords ---
 	public static readonly Color DeltaBetter = Green;               // delta: mejor (o igual) que el récord
 	public static readonly Color DeltaBetterGlow = new Color(Green, 0.5f);

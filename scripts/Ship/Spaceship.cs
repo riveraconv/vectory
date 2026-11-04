@@ -20,6 +20,9 @@ public partial class Spaceship : Node3D
 	// Número de aristas (líneas) de la nave: cada una puede parpadear por su cuenta con los daños
 	public int EdgeCount => _indices.Count / 2;
 
+	// Caja de la geometría, en coordenadas de la nave. Solo después de _Ready.
+	public Aabb Bounds => _meshInstance.GetAabb();
+
 	public override void _Ready()
 	{
 		BuildGeometry();

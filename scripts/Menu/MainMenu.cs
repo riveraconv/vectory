@@ -8,8 +8,8 @@ namespace Vectory.Menu;
 // Menú principal (capa 2D sobre MenuBackground): título, opciones y versión.
 // Dibuja la lista de opciones con OptionList y traduce el teclado a llamadas al MenuModel;
 // la navegación vive en el modelo. Ejecuta la acción que devuelve Confirm(): RACE y TIME TRIAL
-// abren SELECT CIRCUIT (CircuitSelectScreen) en su modo, que carga la carrera; RECORDS abre la pantalla de
-// récords (RecordsScreen); las dos en esta misma escena. QUIT cierra el juego.
+// abren SELECT CIRCUIT (CircuitSelectScreen) en su modo, que lleva a SELECT SHIP (ShipSelectScreen), que carga la
+// carrera; RECORDS abre la pantalla de récords (RecordsScreen); todas en esta misma escena. QUIT cierra el juego.
 //
 // Las medidas (Inspector incluido) son las de la spec, sobre una pantalla de referencia de 1280×720,
 // multiplicadas por UiScale.Factor.
@@ -50,6 +50,7 @@ public partial class MainMenu : CanvasLayer
 	private Control _content;         // título y opciones: se ocultan con RECORDS o SELECT CIRCUIT abierta (la versión no)
 	private RecordsScreen _records;
 	private CircuitSelectScreen _circuitSelect;
+	private ShipSelectScreen _shipSelect;
 	private float _scale = 1f;
 
 	public override void _Ready()
@@ -84,17 +85,22 @@ public partial class MainMenu : CanvasLayer
 		_circuitSelect = new CircuitSelectScreen
 		{
 			Name = "CircuitSelect",
-			RaceScenePath = RaceScenePath,
 			Background = GetNodeOrNull<MenuBackground>("../Background")
 		};
 		AddChild(_circuitSelect);
 		_circuitSelect.Closed += OnCircuitSelectClosed;
+		_circuitSelect.ShipSelectRequested += (mode, circuitName) => _shipSelect.Open(mode, circuitName);
+
+		// SELECT SHIP: entre SELECT CIRCUIT y la carrera; carga la carrera. Al volver reaparece SELECT CIRCUIT.
+		_shipSelect = new ShipSelectScreen { Name = "ShipSelect", RaceScenePath = RaceScenePath };
+		AddChild(_shipSelect);
+		_shipSelect.Closed += mode => _circuitSelect.Open(mode);
 	}
 
 	public override void _Process(double delta)
 	{
-		// Con RECORDS o SELECT CIRCUIT abierta, el input es suyo
-		if (_records.IsOpen || _circuitSelect.IsOpen)
+		// Con RECORDS, SELECT CIRCUIT o SELECT SHIP abierta, el input es suyo
+		if (_records.IsOpen || _circuitSelect.IsOpen || _shipSelect.IsOpen)
 			return;
 
 		if (Input.IsActionJustPressed("menu_down"))

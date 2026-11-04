@@ -1,3 +1,4 @@
+using System.Linq;
 using Vectory.Circuit;
 using Vectory.Game;
 using Vectory.Menu;
@@ -23,6 +24,15 @@ public class CircuitSelectLogicTests
         Assert.Equal(1, logic.CircuitIndex);
         Assert.Equal(TestOval, logic.CircuitPath);
         Assert.Equal(GameMode.Race, logic.Mode);
+    }
+
+    [Fact]
+    public void Options_ShipSelectionAndBack()
+    {
+        var logic = new CircuitSelectLogic(GameMode.Race, TwoCircuits, null);
+
+        Assert.Equal(new[] { "SHIP SELECTION", "BACK" }, logic.Menu.Options.Select(o => o.Label));
+        Assert.Equal(CircuitSelectAction.Start, logic.Choose(logic.Menu.Confirm()));
     }
 
     [Fact]
