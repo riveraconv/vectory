@@ -24,13 +24,19 @@ public partial class Spaceship : Node3D
 		AddChild(_meshInstance);
 	}
 
-	// Cambia la nave dibujada. Con el mismo perfil no rehace nada. El material sustituido sigue puesto.
+	// Cambia la nave dibujada. Con el mismo perfil no rehace nada. El material sustituido sigue puesto; el de parpadeo
+	// se quita porque está hecho para las aristas del casco anterior: hay que volver a llamar a ShowEdgeFlicker.
 	public void SetVisual(ShipVisualProfile visual)
 	{
 		if (visual == Visual)
 			return;
 		Visual = visual;
 		_meshInstance.Mesh = BuildMesh();
+		if (_flickerMaterial != null)
+		{
+			_flickerMaterial = null;
+			_meshInstance.SetSurfaceOverrideMaterial(0, null);
+		}
 	}
 
 	// La nave exterior solo se ve en tercera persona

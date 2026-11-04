@@ -187,3 +187,29 @@ Las pruebas existentes siguen pasando.
 - Efectos por impactos contra barreras, por derrape (chispas en el suelo) o por aterrizaje.
 - Grabar el boost en el fantasma.
 - Sonido.
+
+## Datos de cada nave
+
+Añadido desde `docs/naves-3-cascos.md` (2026-11-04): los cascos de Hoja y Martillo van antes que estos efectos, así que sus datos se aplican al implementar esta spec. Salen de `designs/naves-geometria.js`.
+
+### Toberas
+
+Centro (x, y), z delantera, z trasera y radio de las llamadas a `nozzle`. La boca queda 0,4 m por detrás de la z trasera.
+
+| Nave | Toberas (x, y) | z delante → detrás | Radio |
+|---|---|---|---|
+| Hoja | (±0,60, 0,08) | 2,2 → 2,9 | 0,20 |
+| Martillo | (±0,45, 0,20) | 1,4 → 2,6 | 0,40 |
+| Vector | (±0,75, 0,10) | 0,8 → 2,8 | 0,40 |
+
+La llama, el núcleo y el halo se colocan en cada boca y **se escalan con el radio** de la tobera respecto al de Vector (0,40): Hoja × 0,5 y Martillo igual que Vector. Si el escalado de la llama no se puede hacer sin tocar la lógica de los efectos, se avisa antes.
+
+### Estela de las alas
+
+| Nave | Puntos | Pieza |
+|---|---|---|
+| Hoja | (±1,60, 0,00, 3,60) | Puntas traseras en flecha |
+| Martillo | (±2,50, −0,50, −2,20) | Puntas caídas del canard |
+| Vector | Los de la sección 6 | Puntas de las alas |
+
+En Martillo, la estela sale **por delante**, desde el canard, y recorre todo el lateral de la nave. Si en la prueba queda mal, se prueba desde las aletas traseras (±1,30, 0,90, 2,40) y se avisa con capturas de las dos opciones.
