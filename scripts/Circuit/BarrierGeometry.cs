@@ -7,6 +7,9 @@ namespace Vectory.Circuit;
 // Lógica pura: no depende de Godot. Track la usa para construir la malla.
 public static class BarrierGeometry
 {
+	// Separación por defecto de la barrera respecto al borde de la pista (m)
+	public const float DefaultGap = 0.5f;
+
 	// Desplazamiento lateral de la barrera respecto al eje: medio ancho de pista + separación al borde
 	public static float Offset(float trackWidth, float gap)
 	{

@@ -68,14 +68,14 @@ public partial class Main : Node3D
 	[Export] public int GhostSampleRate = GhostRecorder.DefaultSampleRate;   // muestras por segundo de la grabación
 
 	[ExportGroup("Daños")]
-	[Export] public int DamageMediumPoints = 1;      // puntos por impacto medio
-	[Export] public int DamageStrongPoints = 3;      // puntos por impacto fuerte
-	[Export] public int DamageLevel1Points = 3;      // puntos para cada nivel
-	[Export] public int DamageLevel2Points = 6;
-	[Export] public int DamageLevel3Points = 9;
-	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel2TopSpeed = 0.92f;   // factor de la velocidad punta
-	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel3TopSpeed = 0.85f;
-	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel3Turn = 0.85f;       // factor del giro
+	[Export] public int DamageMediumPoints = DamageSettings.DefaultMediumPoints;      // puntos por impacto medio
+	[Export] public int DamageStrongPoints = DamageSettings.DefaultStrongPoints;      // puntos por impacto fuerte
+	[Export] public int DamageLevel1Points = DamageSettings.DefaultLevel1Points;      // puntos para cada nivel
+	[Export] public int DamageLevel2Points = DamageSettings.DefaultLevel2Points;
+	[Export] public int DamageLevel3Points = DamageSettings.DefaultLevel3Points;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel2TopSpeed = DamageSettings.DefaultLevel2TopSpeedFactor;   // factor de la velocidad punta
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel3TopSpeed = DamageSettings.DefaultLevel3TopSpeedFactor;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float DamageLevel3Turn = DamageSettings.DefaultLevel3TurnFactor;       // factor del giro
 	[Export] public float DamageSegmentWidth = 22f;    // indicador del HUD (px sobre 1280×720)
 	[Export] public float DamageSegmentHeight = 8f;
 	[Export] public float DamageSegmentGap = 4f;
@@ -83,9 +83,9 @@ public partial class Main : Node3D
 	[Export] public float DamageBlinkFrequency = 2f;   // Hz del parpadeo del indicador con nivel 3
 
 	[ExportGroup("Recolocación")]
-	[Export] public float StuckSpeed = 10f;          // km/h: por debajo, y tocando la barrera, la nave está atascada
-	[Export] public float StuckTime = 3f;            // segundos seguidos atascada antes de recolocarla
-	[Export] public float OutsideTrackMargin = 2f;   // metros más allá de la barrera para considerarla fuera de la pista
+	[Export] public float StuckSpeed = RespawnSettings.DefaultStuckSpeedKmh;          // km/h: por debajo, y tocando la barrera, la nave está atascada
+	[Export] public float StuckTime = RespawnSettings.DefaultStuckTime;               // segundos seguidos atascada antes de recolocarla
+	[Export] public float OutsideTrackMargin = RespawnSettings.DefaultOutsideMargin;  // metros más allá de la barrera para considerarla fuera de la pista
 
 	private Player _player;
 	private Track _track;

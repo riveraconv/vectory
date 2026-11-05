@@ -177,6 +177,23 @@ namespace Vectory.Circuit
         }
 
         /// <summary>
+        /// Un paso de la carrera en marcha, con el detector ya actualizado: cronómetro, checkpoints y meta.
+        /// </summary>
+        public void Advance(LineCrossingDetector detector, IReadOnlyList<int> checkpointIndices, int finishIndex, double delta)
+        {
+            Tick(delta);
+
+            for (int i = 0; i < checkpointIndices.Count; i++)
+            {
+                if (detector.Crossed(checkpointIndices[i]))
+                    CheckpointCrossed(i);
+            }
+
+            if (detector.Crossed(finishIndex))
+                FinishLineCrossed();
+        }
+
+        /// <summary>
         /// Registra el cruce de un checkpoint. Solo cuenta si es el siguiente
         /// en orden; cualquier otro se ignora. Completa el sector que termina ahí.
         /// </summary>

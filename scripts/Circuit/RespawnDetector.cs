@@ -4,6 +4,11 @@ namespace Vectory.Circuit;
 
 public struct RespawnSettings
 {
+	// Valores por defecto, en las unidades del Inspector de Main
+	public const float DefaultStuckSpeedKmh = 10f;
+	public const float DefaultStuckTime = 3f;
+	public const float DefaultOutsideMargin = 2f;
+
 	public float BarrierOffset;   // desplazamiento lateral de la barrera (m)
 	public float StuckSpeed;     // por debajo de esta velocidad (m/s) y en contacto, la nave está atascada
 	public float StuckTime;      // segundos seguidos atascada antes de recolocar

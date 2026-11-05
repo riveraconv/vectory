@@ -79,6 +79,9 @@ public sealed class TrackFrame
 	public int Count => _plan.Length;
 	public float LapLength { get; }
 
+	// Eje en planta, sin la altura de los perfiles (empieza en la meta)
+	public IReadOnlyList<Vector3> Plan => _plan;
+
 	// Distancia acumulada en planta hasta cada muestra (la última entrada es la vuelta completa)
 	public IReadOnlyList<float> Cumulative => _cumulative;
 

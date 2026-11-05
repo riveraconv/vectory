@@ -139,16 +139,7 @@ public sealed class RaceSession
 		if (_tracker.State != RaceState.Running)
 			return;
 
-		_tracker.Tick(delta);
-
-		for (int i = 0; i < _track.CheckpointIndices.Count; i++)
-		{
-			if (_detector.Crossed(_track.CheckpointIndices[i]))
-				_tracker.CheckpointCrossed(i);
-		}
-
-		if (_detector.Crossed(Track.FinishIndex))
-			_tracker.FinishLineCrossed();
+		_tracker.Advance(_detector, _track.CheckpointIndices, Track.FinishIndex, delta);
 	}
 
 	private void OnStart()
