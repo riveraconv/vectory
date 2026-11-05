@@ -53,6 +53,33 @@ public class RecordFormatTests
         Assert.Equal("—", RecordFormat.Date(true, stored));
     }
 
+    [Theory]
+    [InlineData("2026-10-29", "ship_02", "29 OCT 2026 · BLADE")]
+    [InlineData("2026-10-29", "ship_01", "29 OCT 2026 · VECTOR")]
+    [InlineData("", "ship_03", "— · HAMMER")]
+    [InlineData(null, "ship_02", "— · BLADE")]
+    public void DateAndShip_WithRecord(string? date, string ship, string expected)
+    {
+        Assert.Equal(expected, RecordFormat.DateAndShip(true, date, ship));
+    }
+
+    [Theory]
+    [InlineData("ship_99")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void DateAndShip_ShipNotInTheCatalog_OnlyTheDate(string? ship)
+    {
+        Assert.Equal("29 OCT 2026", RecordFormat.DateAndShip(true, "2026-10-29", ship));
+        Assert.Equal("—", RecordFormat.DateAndShip(true, null, ship));
+    }
+
+    [Fact]
+    public void DateAndShip_NoRecord()
+    {
+        Assert.Equal("NO RECORD", RecordFormat.DateAndShip(false, null, null));
+        Assert.Equal("NO RECORD", RecordFormat.DateAndShip(false, "2026-10-29", "ship_02"));
+    }
+
     [Fact]
     public void Date_NoRecord()
     {

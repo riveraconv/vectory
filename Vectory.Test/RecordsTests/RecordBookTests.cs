@@ -24,6 +24,33 @@ public class RecordBookTests
     }
 
     [Fact]
+    public void TimeTrial_BeatenWithAnotherShip_ReplacesRecordAndShip()
+    {
+        var book = new RecordBook();
+        book.SubmitTimeTrialLap(Circuit, 72.0, Splits, When, "ship_02");
+
+        book.SubmitTimeTrialLap(Circuit, 73.0, Splits, When, "ship_03");
+        Assert.Equal("ship_02", book.GetTimeTrial(Circuit).ShipDesignId);
+
+        book.SubmitTimeTrialLap(Circuit, 71.0, Splits, When, "ship_03");
+        Assert.Equal(71.0, book.GetTimeTrial(Circuit).LapTime);
+        Assert.Equal("ship_03", book.GetTimeTrial(Circuit).ShipDesignId);
+    }
+
+    // Tiempo total y mejor vuelta son récords separados: cada uno se queda con la nave con la que se hizo
+    [Fact]
+    public void Race_EachRecordKeepsItsOwnShip()
+    {
+        var book = new RecordBook();
+        book.SubmitRace(Circuit, 230.0, 75.0, When, "ship_02");
+
+        book.SubmitRace(Circuit, 235.0, 74.0, When, "ship_03");
+
+        Assert.Equal("ship_02", book.GetRace(Circuit).TotalTime.ShipDesignId);
+        Assert.Equal("ship_03", book.GetRace(Circuit).BestLap.ShipDesignId);
+    }
+
+    [Fact]
     public void TimeTrial_SlowerDoesNotChange_FasterDoes_TieDoesNot()
     {
         var book = new RecordBook();

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using Vectory.Core;
+using Vectory.Ship;
 
 namespace Vectory.Records;
 
@@ -34,6 +35,14 @@ public static class RecordFormat
 			return NoDate;
 
 		return $"{date.Day} {Months[date.Month - 1]} {date.Year}";
+	}
+
+	// Fecha y nave: "29 OCT 2026 · BLADE", "— · BLADE"; solo la fecha si la nave no está en el catálogo; NO RECORD si no hay récord
+	public static string DateAndShip(bool hasRecord, string storedDate, string shipDesignId)
+	{
+		string date = Date(hasRecord, storedDate);
+		string ship = hasRecord ? ShipCatalog.Find(shipDesignId)?.Name : null;
+		return ship == null ? date : $"{date} · {ship}";
 	}
 
 	// Acepta la fecha guardada (yyyy-MM-dd) y, por compatibilidad, la fecha ISO completa de récords anteriores

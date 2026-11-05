@@ -460,7 +460,7 @@ public partial class Main : Node3D
 			return;
 		}
 
-		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now);
+		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now, GameSession.ShipDesignId);
 		LapBandContent content;
 		if (result.IsNewRecord)
 		{
@@ -519,7 +519,7 @@ public partial class Main : Node3D
 			return;
 		}
 
-		_raceRecords =_records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now);
+		_raceRecords =_records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now, GameSession.ShipDesignId);
 		if (_raceRecords.NewTotalTime || _raceRecords.NewBestLap)
 			SaveRecords();
 	}

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using Vectory.Ship;
 
 namespace Vectory.Records;
 
@@ -12,6 +13,7 @@ namespace Vectory.Records;
 //  - RACE: mejor tiempo total y mejor vuelta, independientes entre sí y de TIME TRIAL.
 //  - Solo cuenta lo que es estrictamente más rápido: un empate no es récord nuevo.
 //  - Un circuito sin Id no guarda nada.
+//  - Cada récord guarda con qué nave se hizo, pero sigue habiendo uno por circuito y modo: batirlo con otra nave lo sustituye.
 // Se convierte a / desde JSON con un número de versión del formato.
 public sealed class RecordBook
 {
@@ -46,7 +48,8 @@ public sealed class RecordBook
 	}
 
 	// Registra una vuelta de TIME TRIAL. Si es más rápida que el récord (o no había), pasa a ser el récord.
-	public TimeTrialLapResult SubmitTimeTrialLap(string circuitId, double lapTime, IReadOnlyList<double> splits, DateTime when)
+	public TimeTrialLapResult SubmitTimeTrialLap(string circuitId, double lapTime, IReadOnlyList<double> splits, DateTime when,
+		string shipDesignId = ShipCatalog.Ship01)
 	{
 		if (!IsValidCircuitId(circuitId))
 			return new TimeTrialLapResult(false, null);
@@ -60,13 +63,15 @@ public sealed class RecordBook
 		{
 			LapTime = lapTime,
 			Splits = splits?.ToArray() ?? Array.Empty<double>(),
-			Date = Stamp(when)
+			Date = Stamp(when),
+			ShipDesignId = shipDesignId
 		};
 		return new TimeTrialLapResult(true, previous);
 	}
 
 	// Registra una carrera terminada: tiempo total y mejor vuelta se comparan y guardan por separado
-	public RaceRecordResult SubmitRace(string circuitId, double totalTime, double bestLap, DateTime when)
+	public RaceRecordResult SubmitRace(string circuitId, double totalTime, double bestLap, DateTime when,
+		string shipDesignId = ShipCatalog.Ship01)
 	{
 		if (!IsValidCircuitId(circuitId))
 			return new RaceRecordResult(false, false);
@@ -75,11 +80,11 @@ public sealed class RecordBook
 
 		bool newTotal = race.TotalTime == null || totalTime < race.TotalTime.Time;
 		if (newTotal)
-			race.TotalTime = new TimedRecord { Time = totalTime, Date = Stamp(when) };
+			race.TotalTime = new TimedRecord { Time = totalTime, Date = Stamp(when), ShipDesignId = shipDesignId };
 
 		bool newLap = race.BestLap == null || bestLap < race.BestLap.Time;
 		if (newLap)
-			race.BestLap = new TimedRecord { Time = bestLap, Date = Stamp(when) };
+			race.BestLap = new TimedRecord { Time = bestLap, Date = Stamp(when), ShipDesignId = shipDesignId };
 
 		return new RaceRecordResult(newTotal, newLap);
 	}

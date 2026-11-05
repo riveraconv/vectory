@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using Vectory.Circuit;
 using Vectory.Core;
 using Vectory.Ghost;
 using Vectory.Records;
+using Vectory.Ship;
 using Vectory.UI;
 
 namespace Vectory.Menu;
@@ -12,6 +14,7 @@ namespace Vectory.Menu;
 // Pantalla RECORDS, dentro de la escena del menú principal (encima de su fondo 3D):
 // franja de tres columnas con el circuito y su selector, los récords de TIME TRIAL y RACE de ese
 // circuito, y las opciones BACK / RESET RECORDS (con confirmación NO / YES en la misma franja).
+// Cada récord enseña su fecha y su nave, reducidas si no caben antes del separador de la derecha.
 // Las reglas viven en RecordsLogic y RecordFormat; este nodo traduce el input, lee y borra los
 // récords con el RecordStore de siempre (RESET borra también los fantasmas) y lo dibuja. Al cerrarse lanza Closed (MainMenu reaparece).
 // Medidas sobre 1280×720, multiplicadas por UiScale.Factor.
@@ -28,6 +31,13 @@ public partial class RecordsScreen : CanvasLayer
 	private const float SeparatorHeight = 244f;
 	private const float LabelWidth = 116f;
 	private const float TimeWidth = 150f;
+	private const float RightSeparatorX = 915f;
+	private const float SeparatorMargin = 12f;     // hueco mínimo entre la fecha y el separador
+	private const float LargeTimeFontSize = 24f;   // el tiempo de TIME TRIAL, el más grande
+	private const int DateMaxFontSize = 14;       // fecha y nave: se reducen si no caben antes del separador
+	private const int DateSmallFontSize = 10;      // por debajo de este tamaño, se avisa en la consola
+	private const string WidestTime = "9:59.999";
+	private const string WidestDate = "2026-10-29";
 
 	[ExportGroup("Aspecto (px sobre 1280×720)")]
 	[Export(PropertyHint.Range, "0,1,0.01")] public float DimOpacity = 0.5f;
@@ -75,6 +85,7 @@ public partial class RecordsScreen : CanvasLayer
 	private LabelSettings _emptyTimeLarge;
 	private LabelSettings _arrowActive;
 	private LabelSettings _arrowInactive;
+	private int _dateFontSize = DateMaxFontSize;
 
 	public override void _Ready()
 	{
@@ -188,9 +199,9 @@ public partial class RecordsScreen : CanvasLayer
 
 		TimeTrialRecord timeTrial = _store.Book.GetTimeTrial(circuit.Id);
 		RaceRecord race = _store.Book.GetRace(circuit.Id);
-		SetRow(_timeTrialLap, timeTrial?.LapTime, timeTrial?.Date, _emptyTimeLarge);
-		SetRow(_raceTotal, race?.TotalTime?.Time, race?.TotalTime?.Date, _emptyTimeSmall);
-		SetRow(_raceLap, race?.BestLap?.Time, race?.BestLap?.Date, _emptyTimeSmall);
+		SetRow(_timeTrialLap, timeTrial?.LapTime, timeTrial?.Date, timeTrial?.ShipDesignId, _emptyTimeLarge);
+		SetRow(_raceTotal, race?.TotalTime?.Time, race?.TotalTime?.Date, race?.TotalTime?.ShipDesignId, _emptyTimeSmall);
+		SetRow(_raceLap, race?.BestLap?.Time, race?.BestLap?.Date, race?.BestLap?.ShipDesignId, _emptyTimeSmall);
 
 		if (_options.Model != _logic.Menu)
 			_options.SetModel(_logic.Menu);
@@ -198,11 +209,11 @@ public partial class RecordsScreen : CanvasLayer
 			_options.Refresh();
 	}
 
-	private static void SetRow(RecordRow row, double? time, string date, LabelSettings emptySettings)
+	private static void SetRow(RecordRow row, double? time, string date, string shipDesignId, LabelSettings emptySettings)
 	{
 		row.Time.Text = RecordFormat.Time(time);
 		row.Time.LabelSettings = time.HasValue ? row.TimeSettings : emptySettings;
-		row.Date.Text = RecordFormat.Date(time.HasValue, date);
+		row.Date.Text = RecordFormat.DateAndShip(time.HasValue, date, shipDesignId);
 	}
 
 	// ---------------------------------------------------------------
@@ -273,12 +284,43 @@ public partial class RecordsScreen : CanvasLayer
 	{
 		VBoxContainer column = band.AddColumn("Records", CenterX, 16f);
 
+		_dateFontSize = FitDateFontSize();
+
 		VBoxContainer timeTrial = Block(column, "TIME TRIAL");
-		_timeTrialLap = AddRow(timeTrial, "BEST LAP", 24f);
+		_timeTrialLap = AddRow(timeTrial, "BEST LAP", LargeTimeFontSize);
 
 		VBoxContainer race = Block(column, "RACE");
 		_raceTotal = AddRow(race, "TOTAL TIME", 20f);
 		_raceLap = AddRow(race, "BEST LAP", 20f);
+	}
+
+	// Mayor tamaño con el que la fecha más larga, con el nombre de nave más largo, cabe antes del separador de la derecha.
+	// Se calcula una vez y vale para las tres filas: con la fila más ancha (el tiempo más grande) y sin depender de lo que
+	// se vea, así el texto no cambia de tamaño al cambiar de circuito.
+	private int FitDateFontSize()
+	{
+		ShipEntry longest = ShipCatalog.Entries.MaxBy(e => e.Name.Length);
+		string text = RecordFormat.DateAndShip(true, WidestDate, longest.Id);
+
+		int timePx = Px(LargeTimeFontSize);
+		float timeWidth = MenuFonts.Make(MenuFonts.Orbitron, 500, timePx, 0.06f)
+			.GetStringSize(WidestTime, HorizontalAlignment.Left, -1, timePx).X;
+		float dateLeft = S(CenterX + LabelWidth) + Mathf.Max(S(TimeWidth), timeWidth);
+		float available = S(RightSeparatorX - SeparatorMargin) - dateLeft;
+
+		int size = DateMaxFontSize;
+		for (; size > 8; size--)
+		{
+			int px = Px(size);
+			if (MenuFonts.Make(MenuFonts.Mono, 400, px, 0.1f).GetStringSize(text, HorizontalAlignment.Left, -1, px).X <= available)
+				break;
+		}
+
+		if (size < DateSmallFontSize)
+			GD.PushWarning($"RecordsScreen: date and ship reduced to {size} px to fit; it may be too small to read.");
+		else if (size < DateMaxFontSize)
+			GD.Print($"RecordsScreen: fecha y nave reducidas a {size} px para que quepan antes del separador.");
+		return size;
 	}
 
 	private void BuildRight(MenuBand band)
@@ -325,7 +367,7 @@ public partial class RecordsScreen : CanvasLayer
 		time.CustomMinimumSize = new Vector2(S(TimeWidth), 0f);
 		row.AddChild(time);
 
-		Label date = MakeLabel(RecordFormat.NoRecord, MenuFonts.Mono, 400, 14f, 0.1f, Palette.BlueGray);
+		Label date = MakeLabel(RecordFormat.NoRecord, MenuFonts.Mono, 400, _dateFontSize, 0.1f, Palette.BlueGray);
 		row.AddChild(date);
 
 		return new RecordRow { Time = time, Date = date, TimeSettings = time.LabelSettings };
