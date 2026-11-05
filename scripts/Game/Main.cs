@@ -256,7 +256,10 @@ public partial class Main : Node3D
 
 		// Panel de ajuste para pruebas: no existe en una exportación de release
 		if (OS.IsDebugBuild())
+		{
 			AddChild(new TuningLabPanel { Name = "TuningLabPanel", Player = _player });
+			AddChild(new AutopilotToggle { Name = "AutopilotToggle", Player = _player });
+		}
 	}
 
 	public override void _Process(double delta)
@@ -453,6 +456,14 @@ public partial class Main : Node3D
 			return;
 		}
 
+		// Con el piloto automático, esta carrera no guarda récord ni fantasma
+		if (_player.AutopilotUsed)
+		{
+			_hud.TimeTrial.ShowLapBand(new LapBandContent(lap, lapTime, "LAP COMPLETE", LapBandTitleStyle.Record,
+				"RECORDS OFF  ·  AUTOPILOT"));
+			return;
+		}
+
 		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now, TuningLabPanel.DrivenShipId(GameSession.ShipDesignId));
 		LapBandContent content;
 		if (result.IsNewRecord)
@@ -489,6 +500,10 @@ public partial class Main : Node3D
 			return;
 
 		_damage?.Stop();
+
+		// Con el piloto automático, esta carrera no guarda récords
+		if (_player.AutopilotUsed)
+			return;
 
 		_raceRecords =_records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now, TuningLabPanel.DrivenShipId(GameSession.ShipDesignId));
 		if (_raceRecords.NewTotalTime || _raceRecords.NewBestLap)

@@ -26,6 +26,9 @@ public sealed class TrackData
 	public float[] CheckpointFractions { get; init; } = Array.Empty<float>();
 }
 
+// Curva o recta del eje: dónde empieza (m desde la meta) y cuánto mide
+public readonly record struct TrackSegment(bool IsCurve, float Start, float Length);
+
 // Cálculo puro de los datos de un trazado (sin Godot). Curvas y rectas en planta (sin la altura):
 //  - curvatura de cada punto suavizada sobre una ventana de SmoothingWindow metros;
 //  - punto de curva si su radio es menor que CurveRadius; de recta si es mayor o igual;
@@ -142,12 +145,43 @@ public static class TrackAnalysis
 	private sealed class Run
 	{
 		public Kind Kind;
+		public float Start;    // m desde la meta
 		public float Length;   // m
 		public float Turn;     // radianes, con signo
 	}
 
 	private static void CountTurnsAndStraights(IReadOnlyList<Vector3> centerline, float[] cumulative,
 		out int turns, out float longestStraight)
+	{
+		float minTurn = MinTurnDegrees * MathF.PI / 180f;
+		turns = 0;
+		longestStraight = 0f;
+		foreach (Run run in BuildRuns(centerline, cumulative))
+		{
+			if (run.Kind == Kind.Straight)
+				longestStraight = MathF.Max(longestStraight, run.Length);
+			else if (MathF.Abs(run.Turn) >= minTurn - 1e-4f)
+				turns++;
+		}
+	}
+
+	// Curvas (las que cuentan: giran MinTurnDegrees o más) y rectas del eje, en orden. Un tramo puede cruzar la meta:
+	// entonces Start + Length pasa de la vuelta.
+	public static List<TrackSegment> Segments(IReadOnlyList<Vector3> centerline)
+	{
+		float minTurn = MinTurnDegrees * MathF.PI / 180f;
+		var segments = new List<TrackSegment>();
+		foreach (Run run in BuildRuns(centerline, CenterlineBuilder.CumulativeDistances(centerline)))
+		{
+			if (run.Kind == Kind.Straight)
+				segments.Add(new TrackSegment(false, run.Start, run.Length));
+			else if (MathF.Abs(run.Turn) >= minTurn - 1e-4f)
+				segments.Add(new TrackSegment(true, run.Start, run.Length));
+		}
+		return segments;
+	}
+
+	private static List<Run> BuildRuns(IReadOnlyList<Vector3> centerline, float[] cumulative)
 	{
 		float length = cumulative[centerline.Count];
 		int count = Math.Max(8, (int)MathF.Round(length / ResampleStep));
@@ -215,17 +249,7 @@ public static class TrackAnalysis
 
 		List<Run> runs = BuildRuns(kinds, localTurn, ds);
 		MergeCloseCurves(runs);
-
-		float minTurn = MinTurnDegrees * MathF.PI / 180f;
-		turns = 0;
-		longestStraight = 0f;
-		foreach (Run run in runs)
-		{
-			if (run.Kind == Kind.Straight)
-				longestStraight = MathF.Max(longestStraight, run.Length);
-			else if (MathF.Abs(run.Turn) >= minTurn - 1e-4f)
-				turns++;
-		}
+		return runs;
 	}
 
 	// Tramos seguidos del mismo tipo, en orden. El circuito es cerrado: se empieza en un cambio de tipo,
@@ -260,7 +284,7 @@ public static class TrackAnalysis
 			int k = (start + i) % count;
 			if (current == null || current.Kind != kinds[k])
 			{
-				current = new Run { Kind = kinds[k] };
+				current = new Run { Kind = kinds[k], Start = ds * k };
 				runs.Add(current);
 			}
 			current.Length += ds;
@@ -290,7 +314,8 @@ public static class TrackAnalysis
 				var joined = new Run
 				{
 					Kind = runs[prev].Kind,
-					Length = runs[prev].Length + gap.Length + runs[next].Length,
+					Start = runs[prev].Start,
+					Length =runs[prev].Length + gap.Length + runs[next].Length,
 					Turn = runs[prev].Turn + gap.Turn + runs[next].Turn
 				};
 

@@ -1,4 +1,5 @@
 using Godot;
+using Vectory.Autopilot;
 using Vectory.Circuit;
 using Vectory.Game;
 using NVec2 = System.Numerics.Vector2;
@@ -180,6 +181,13 @@ public partial class Player : CharacterBody3D
 	private bool _chaseView = true;
 	private bool _inputBlocked;
 
+	private AutopilotDriver _autopilot;
+	private TrackFrame _trackFrame;
+	private float _trackWidth;
+
+	public bool AutopilotActive => _autopilot != null;
+	public bool AutopilotUsed { get; private set; }
+
 	private ShipDynamics Dynamics => _physics.Dynamics;
 	private ShipBoost Boost => _physics.Boost;
 	private ShipVertical Vertical => _physics.Vertical;
@@ -260,9 +268,37 @@ public partial class Player : CharacterBody3D
 	public void SetTrack(Track track)
 	{
 		if (track != null && track.IsBuilt)
+		{
 			_physics.SetTrack(track.Frame, track.BarrierOffset);
+			_trackFrame = track.Frame;
+			_trackWidth = track.TrackWidth;
+		}
 		else
+		{
 			_physics.SetTrack(null, 0f);
+			_trackFrame = null;
+		}
+	}
+
+	// Piloto automático (solo depuración, spec docs/naves-6-equilibrio.md, 4.7): conduce en lugar del teclado, sin boost.
+	// Una vez usado, esta carrera no guarda récord ni fantasma, aunque se quite.
+	public void SetAutopilot(bool active)
+	{
+		_autopilot = active && _trackFrame != null ? BuildAutopilot() : null;
+		AutopilotUsed |= _autopilot != null;
+	}
+
+	private AutopilotDriver BuildAutopilot()
+	{
+		return AutopilotDriver.Create(_trackFrame, _trackWidth, ExteriorVisual.CollisionHalfWidth, Technical,
+			BuildPhysicsSettings(), AutopilotSettings.Default);
+	}
+
+	private ShipInput AutopilotInput()
+	{
+		Vector3 p = GlobalPosition;
+		return _autopilot.Drive(new PilotState(new NVec2(p.X, p.Z), Dynamics.Velocity, Dynamics.Yaw, Dynamics.Steer,
+			Dynamics.Speed, _physics.Surface.Distance, _physics.Surface.Frame.Bank));
 	}
 
 	// Carrera en la que participa: la nave le pasa su posición cada paso y le pregunta si puede conducir
@@ -278,6 +314,8 @@ public partial class Player : CharacterBody3D
 	{
 		_labTuning = technical;
 		_labVisual = visual;
+		if (AutopilotActive)
+			_autopilot = BuildAutopilot();
 
 		if (visual == _ship.Visual)
 			return;
@@ -434,10 +472,14 @@ public partial class Player : CharacterBody3D
 		// Sin carrera en marcha no hay input ni boost (ni recarga): en la previa la nave está
 		// quieta y, al terminar, se cancela el impulso y se para sola con el Drag.
 		bool canDrive = _race == null || _race.CanDrive;
-		ShipInput input = canDrive ? ReadInput() : default;
+		ShipInput input = !canDrive ? default : AutopilotActive ? AutopilotInput() : ReadInput();
 
 		// Tras la pausa, nada cuenta hasta que se suelten las teclas que siguieran pulsadas
-		if (_inputBlocked)
+		if (AutopilotActive)
+		{
+			_inputBlocked = false;
+		}
+		else if (_inputBlocked)
 		{
 			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || input.Drift || Input.IsActionPressed("boost"))
 				input = default;
@@ -447,7 +489,7 @@ public partial class Player : CharacterBody3D
 
 		ShipTuning baseTuning = BuildTuning();
 		ShipPhysicsSettings physics = BuildPhysicsSettings();
-		bool boostPressed = !_inputBlocked && Input.IsActionJustPressed("boost");
+		bool boostPressed = !AutopilotActive && !_inputBlocked && Input.IsActionJustPressed("boost");
 		_physics.BeginStep(input, boostPressed, canDrive, baseTuning, physics, dt);
 		ApplyBodyRotation();
 
