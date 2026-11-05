@@ -5,11 +5,15 @@ using Vectory.Records;
 
 namespace Vectory.Game;
 
-// Ajustes del juego que se guardan entre partidas (user://settings.json). De momento solo el fantasma
-// de TIME TRIAL; aquí irán los demás cuando exista SETTINGS.
+// Ajustes del juego que se guardan entre partidas (user://settings.json): el fantasma de TIME TRIAL y la última
+// nave elegida; aquí irán los demás cuando exista SETTINGS.
 public sealed class GameSettings
 {
 	public bool GhostEnabled { get; set; } = true;
+
+	// Última nave con la que se pulsó START; null = ninguna. Se guarda tal cual: si ya no se puede elegir, lo decide
+	// ShipCatalog.StartShip al arrancar.
+	public string LastShipDesignId { get; set; }
 }
 
 // Carga y guarda los ajustes con las mismas reglas que los récords: lectura tolerante (lo que falte
@@ -29,6 +33,9 @@ public sealed class SettingsStore
 	{
 		[JsonRequired] public int Version { get; set; }
 		public bool? GhostEnabled { get; set; }
+
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public string LastShipDesignId { get; set; }
 	}
 
 	private readonly IRecordStorage _storage;
@@ -69,6 +76,7 @@ public sealed class SettingsStore
 			if (file != null && file.Version >= 1 && file.Version <= FormatVersion)
 			{
 				Settings.GhostEnabled = file.GhostEnabled ?? true;
+				Settings.LastShipDesignId = file.LastShipDesignId;
 				return;
 			}
 			error = file == null ? "empty file" : $"unknown format version {file.Version}";
@@ -94,7 +102,12 @@ public sealed class SettingsStore
 		Warning = null;
 		try
 		{
-			var file = new SettingsFile { Version = FormatVersion, GhostEnabled = Settings.GhostEnabled };
+			var file = new SettingsFile
+			{
+				Version = FormatVersion,
+				GhostEnabled = Settings.GhostEnabled,
+				LastShipDesignId = Settings.LastShipDesignId
+			};
 			_storage.Write(JsonSerializer.Serialize(file, JsonOptions));
 			return true;
 		}

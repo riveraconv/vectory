@@ -170,11 +170,13 @@ public class ShipDefinitionResolutionTests
     }
 
     [Fact]
-    public void NewShips_HaveDefinition_ButAreNotSelectable()
+    public void AllShips_HaveDefinition_AndAreSelectable()
     {
-        Assert.True(ShipCatalog.Find("ship_01").Selectable);
-        Assert.False(ShipCatalog.Find("ship_02").Selectable);
-        Assert.False(ShipCatalog.Find("ship_03").Selectable);
+        foreach (string id in new[] { "ship_01", "ship_02", "ship_03" })
+        {
+            Assert.True(ShipDefinitions.Has(id));
+            Assert.True(ShipCatalog.Find(id).Selectable);
+        }
     }
 }
 

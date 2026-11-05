@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Godot;
 using Vectory.Core;
 using Vectory.Game;
+using Vectory.Records;
 using Vectory.Ship;
 using Vectory.UI;
 
@@ -11,7 +12,8 @@ namespace Vectory.Menu;
 // Pantalla SELECT SHIP, dentro de la escena del menú principal (spec docs/selector-naves.md): a la izquierda el
 // nombre de la nave y su holograma 3D (ShipHologram); a la derecha el panel con SHIP DATA, SHARED SYSTEMS y
 // START / BACK. Las reglas viven en ShipSelectLogic, ShipStats, ShipSelectFormat y HologramSpin; este nodo traduce
-// teclado y ratón y lo dibuja. START deja la nave en GameSession y carga la carrera; BACK / ESC lanza Closed.
+// teclado y ratón y lo dibuja. START deja la nave en GameSession, la guarda en los ajustes y carga la carrera; BACK / ESC
+// lanza Closed.
 // Medidas sobre 1280×720, multiplicadas por UiScale.Factor.
 public partial class ShipSelectScreen : CanvasLayer
 {
@@ -183,6 +185,7 @@ public partial class ShipSelectScreen : CanvasLayer
 				EndDrag();
 				GameSession.Mode = _logic.Mode;
 				GameSession.ShipDesignId = _logic.ShipId;
+				SaveLastShip(_logic.ShipId);
 				SceneChanger.ChangeTo(this, RaceScenePath);
 				break;
 
@@ -193,6 +196,19 @@ public partial class ShipSelectScreen : CanvasLayer
 				Closed?.Invoke(_logic.Mode);
 				break;
 		}
+	}
+
+	// Si no se puede guardar, se avisa y la carrera empieza igual
+	private static void SaveLastShip(string shipId)
+	{
+		var store = new SettingsStore(new FileRecordStorage(SettingsStore.DefaultPath));
+		store.Load();
+		if (store.Warning != null)
+			GD.PushWarning($"Settings: {store.Warning}");
+
+		store.Settings.LastShipDesignId = shipId;
+		if (!store.Save())
+			GD.PushWarning($"Settings: {store.Warning}");
 	}
 
 	// ---------------------------------------------------------------

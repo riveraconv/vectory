@@ -10,8 +10,9 @@ namespace Vectory.Menu;
 //
 // Vive en el mundo 3D del menú, lejos del fondo (FarAway), con su propia cámara, que mira de frente hacia -Z y no
 // gira: los ejes de la pantalla son los del mundo. El encuadre se desplaza para que el centro de la nave caiga en
-// ScreenCenter. La distancia de la cámara sale del ancho de la nave en pantalla, y el suelo, la rejilla y los
-// anillos, de las medidas en píxeles de la spec. Medidas de pantalla sobre 1280×720.
+// ScreenCenter. La distancia de la cámara sale del ancho de Vector en pantalla, que fija la escala común a todas las
+// naves (HologramFraming), y el suelo, la rejilla y los anillos, de las medidas en píxeles de la spec. Al cambiar de
+// nave solo cambian su centro y la profundidad de las aristas lejanas. Medidas de pantalla sobre 1280×720.
 public partial class ShipHologram : Node3D
 {
 	private const float ReferenceHalfHeight = 360f;
@@ -19,7 +20,7 @@ public partial class ShipHologram : Node3D
 	private const int InnerRingDashes = 24;
 
 	[Export] public Vector2 ScreenCenter = new(410f, 400f);   // centro de la nave en pantalla
-	[Export] public float ShipScreenWidth = 480f;             // de punta a punta de las alas, en píxeles
+	[Export] public float ShipScreenWidth = 480f;             // de Vector, de punta a punta de las alas, en píxeles: fija la escala común
 	[Export] public float CameraFov = 36f;                    // vertical, en grados
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FarEdgeBrightness = 0.35f;   // brillo de las aristas más lejanas
 
@@ -59,6 +60,8 @@ void fragment() {
 	private Node3D _pivot;
 	private Spaceship _ship;
 	private Camera3D _camera;
+	private ShaderMaterial _material;
+	private float _distance;
 
 	public override void _Ready()
 	{
@@ -70,27 +73,24 @@ void fragment() {
 
 		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual };
 		_pivot.AddChild(_ship);
-		Aabb bounds = _ship.Bounds;
-		_ship.Position = -(bounds.Position + bounds.Size * 0.5f);   // gira alrededor del centro de su caja
 
 		// Píxeles por unidad de tangente: a la distancia d, una unidad mide focal / d píxeles
 		float focal = ReferenceHalfHeight / Mathf.Tan(Mathf.DegToRad(CameraFov) * 0.5f);
-		float distance = bounds.Size.X * focal / ShipScreenWidth;
+		HologramBounds reference = HologramFraming.BoundsOf(ShipDefinitions.Default.Visual.BuildHull());
+		_distance = HologramFraming.CameraDistance(focal, HologramFraming.PixelsPerMeter(reference, ShipScreenWidth));
 
-		_camera = new Camera3D { Name = "Camera3D", Near = 0.1f, Far = 200f, Position = new Vector3(0f, 0f, distance) };
+		_camera = new Camera3D { Name = "Camera3D", Near = 0.1f, Far = 200f, Position = new Vector3(0f, 0f, _distance) };
 		AddChild(_camera);
 		ApplyLensShift();
 		GetViewport().SizeChanged += ApplyLensShift;
 
 		// Aristas lejanas más tenues, multiplicando el color (con ALPHA la nave perdería el glow)
-		float radius = bounds.Size.Length() * 0.5f;
-		var material = new ShaderMaterial { Shader = new Shader { Code = HologramShaderCode } };
-		material.SetShaderParameter("depth_near", distance - radius);
-		material.SetShaderParameter("depth_far", distance + radius);
-		material.SetShaderParameter("far_brightness", FarEdgeBrightness);
-		_ship.SetMaterialOverride(material);
+		_material = new ShaderMaterial { Shader = new Shader { Code = HologramShaderCode } };
+		_material.SetShaderParameter("far_brightness", FarEdgeBrightness);
+		_ship.SetMaterialOverride(_material);
+		FitShip(_ship.Visual);
 
-		BuildFloor(focal, distance);
+		BuildFloor(focal, _distance);
 	}
 
 	public override void _ExitTree()
@@ -109,10 +109,23 @@ void fragment() {
 	// Muestra u oculta la nave; la rejilla y el anillo siguen (nave COMING SOON)
 	public void SetShipVisible(bool visible) => _ship.Visible = visible;
 
-	// La nave mostrada. El encuadre se calcula una vez en _Ready: hoy solo se puede mostrar Vector.
-	public void SetVisual(ShipVisualProfile visual) => _ship.SetVisual(visual);
+	// La nave mostrada. La escala y la cámara no cambian; el material sustituido sigue puesto.
+	public void SetVisual(ShipVisualProfile visual)
+	{
+		_ship.SetVisual(visual);
+		FitShip(visual);
+	}
 
 	public void SetOrientation(System.Numerics.Quaternion q) => _pivot.Quaternion = new Quaternion(q.X, q.Y, q.Z, q.W);
+
+	// Gira alrededor del centro de su caja, y sus aristas se atenúan a lo largo de la esfera que la envuelve
+	private void FitShip(ShipVisualProfile visual)
+	{
+		HologramBounds bounds = HologramFraming.BoundsOf(visual.BuildHull());
+		_ship.Position = -ShipLineMesh.ToGodot(bounds.Center);
+		_material.SetShaderParameter("depth_near", _distance - bounds.SphereRadius);
+		_material.SetShaderParameter("depth_far", _distance + bounds.SphereRadius);
+	}
 
 	// Suelo a la altura en la que un círculo bajo la nave se ve como la elipse de la spec
 	private void BuildFloor(float focal, float distance)
