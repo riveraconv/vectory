@@ -15,14 +15,21 @@ public static class CockpitPainter
 	private const float HaloPx = 2.4f;        // el glowSoft del diseño: se aproxima con una copia algo mayor y tenue
 	private const float HaloOpacity = 0.25f;
 	private const int CircleArcPoints = 24;
+	private const int CurveSteps = 12;
 
 	private static readonly Dictionary<CockpitGradientId, GradientTexture2D> Textures = new();
 	private static readonly Dictionary<(int Size, int Spacing), Font> Fonts = new();
 
 	// dimOpacity: opacidad del trazo si su arista está apagada por el parpadeo de daños (dimmed)
-	public static void Draw(CanvasItem item, CockpitElement e, float scale, bool dimmed, float dimOpacity)
+	public static void Draw(CanvasItem item, CockpitElement e, float scale, bool dimmed, float dimOpacity, CockpitSpriteAtlas atlas)
 	{
 		NMatrix toScreen = e.Transform * NMatrix.CreateScale(scale);
+		if (atlas.TryGetRects(e, toScreen, out Rect2 destination, out Rect2 source))
+		{
+			item.DrawTextureRectRegion(atlas.Texture, destination, source, new Color(1f, 1f, 1f, e.Opacity));
+			return;
+		}
+
 		float strokeFactor = dimmed ? dimOpacity : 1f;
 
 		switch (e.Kind)
@@ -41,7 +48,13 @@ public static class CockpitPainter
 				DrawCircle(item, e, toScreen, scale, strokeFactor);
 				break;
 			case CockpitElementKind.Ellipse:
-				DrawFill(item, e, RectPoints(e.Center - e.Radii, e.Radii * 2f), (e.Center - e.Radii, e.Radii * 2f), toScreen, scale);
+				DrawFill(item, e, CockpitGeometry.EllipsePoints(e.Center, e.Radii), (e.Center - e.Radii, e.Radii * 2f), toScreen, scale);
+				break;
+			case CockpitElementKind.Arc:
+				DrawArc(item, e, toScreen, scale, strokeFactor);
+				break;
+			case CockpitElementKind.Curve:
+				DrawOutline(item, e, CockpitGeometry.Bezier(e.Points[0], e.Points[1], e.Points[2], CurveSteps), false, toScreen, scale, strokeFactor);
 				break;
 			case CockpitElementKind.Rect:
 				DrawRect(item, e, toScreen, scale, strokeFactor);
@@ -145,7 +158,11 @@ public static class CockpitPainter
 		var center = new Vector2(c.X, c.Y);
 		float radius = e.Radii.X * scale;
 
-		if (e.Fill is { } fill)
+		if (e.Fill?.Gradient != null)
+		{
+			DrawFill(item, e, CockpitGeometry.EllipsePoints(e.Center, e.Radii), (e.Center - e.Radii, e.Radii * 2f), toScreen, scale);
+		}
+		else if (e.Fill is { } fill)
 		{
 			Color color = ColorOf(e.FillRgba, fill.Color);
 			if (e.Glow > 0f)
@@ -161,6 +178,17 @@ public static class CockpitPainter
 			if (color.A > 0f)
 				item.DrawArc(center, radius, 0f, Mathf.Tau, CircleArcPoints, color, e.StrokeWidth * scale, true);
 		}
+	}
+
+	private static void DrawArc(CanvasItem item, CockpitElement e, NMatrix toScreen, float scale, float strokeFactor)
+	{
+		NVec2[] points = CockpitGeometry.ArcPoints(e.Center, e.Radii.X, e.StartAngle, e.EndAngle);
+		if (e.Glow > 0f)
+		{
+			Color glow = Multiply(ColorOf(e.StrokeRgba, e.Stroke), HaloOpacity * e.Glow * e.Opacity);
+			item.DrawPolyline(ToScreen(points, toScreen), glow, (e.StrokeWidth + HaloPx * 2f) * scale, true);
+		}
+		DrawOutline(item, e, points, false, toScreen, scale, strokeFactor);
 	}
 
 	private static void DrawText(CanvasItem item, CockpitElement e, NMatrix toScreen, float scale)

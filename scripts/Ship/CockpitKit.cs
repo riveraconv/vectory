@@ -49,6 +49,11 @@ public static class CockpitKit
 		}),
 		[CockpitGradientId.Cowl] = Vertical((0f, CockpitColor.CowlLight), (0.5f, CockpitColor.NoseLight), (1f, CockpitColor.FrontLight)),
 		[CockpitGradientId.DeckFar] = Vertical((0f, CockpitColor.PanelMid), (1f, CockpitColor.ConsoleLight)),
+		[CockpitGradientId.FootShade] = new CockpitGradient(false, Vector2.Zero, Vector2.UnitY, new[]
+		{
+			new CockpitGradientStop(0f, CockpitColor.Black, 0f),
+			new CockpitGradientStop(1f, CockpitColor.Black, 0.35f)
+		}),
 		[CockpitGradientId.BezelIn] = new CockpitGradient(false, Vector2.Zero, Vector2.UnitY, new[]
 		{
 			new CockpitGradientStop(0f, CockpitColor.Black, 0.8f),
@@ -85,8 +90,11 @@ public static class CockpitKit
 
 	public static void Screw(this CockpitCanvas c, float x, float y)
 	{
-		c.ScrewCircle(x, y);
-		c.Line(new Vector2(x - 2f, y), new Vector2(x + 2f, y), CockpitColor.Blue, 0.8f, 1f);
+		c.AddDetail(() =>
+		{
+			c.ScrewCircle(x, y);
+			c.Line(new Vector2(x - 2f, y), new Vector2(x + 2f, y), CockpitColor.Blue, 0.8f, 1f);
+		});
 	}
 
 	// El diseño pasa aquí la x como texto ya redondeado a un decimal, así que su "x + 2" concatena ("123.4" + 2 = 123.42)
@@ -94,8 +102,11 @@ public static class CockpitKit
 	public static void ScrewRoundedX(this CockpitCanvas c, float x, float y)
 	{
 		float rounded = MathF.Round(x * 10f) / 10f;
-		c.ScrewCircle(rounded, y);
-		c.Line(new Vector2(rounded - 2f, y), new Vector2(rounded + 0.02f, y), CockpitColor.Blue, 0.8f, 1f);
+		c.AddDetail(() =>
+		{
+			c.ScrewCircle(rounded, y);
+			c.Line(new Vector2(rounded - 2f, y), new Vector2(rounded + 0.02f, y), CockpitColor.Blue, 0.8f, 1f);
+		});
 	}
 
 	private static void ScrewCircle(this CockpitCanvas c, float x, float y)

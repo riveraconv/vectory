@@ -35,6 +35,7 @@ public static class CockpitPalette
 		CockpitColor.Screen => Palette.CockpitScreen,
 		CockpitColor.Vent => Palette.CockpitVent,
 		CockpitColor.Screw => Palette.CockpitScrew,
+		CockpitColor.DialShadow => Palette.CockpitDialShadow,
 		_ => throw new ArgumentOutOfRangeException(nameof(color))
 	};
 

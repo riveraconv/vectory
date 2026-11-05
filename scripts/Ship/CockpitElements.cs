@@ -32,7 +32,8 @@ public enum CockpitColor
 	SinkWall,
 	Screen,
 	Vent,
-	Screw
+	Screw,
+	DialShadow
 }
 
 // Degradados y trama de las pantallas. Se dibujan sobre la caja de cada polígono, como hace el SVG por defecto.
@@ -54,6 +55,7 @@ public enum CockpitGradientId
 	Cowl,
 	BezelIn,
 	DeckFar,
+	FootShade,
 	Scan
 }
 
@@ -77,7 +79,9 @@ public enum CockpitElementKind
 	Circle,
 	Ellipse,
 	Rect,
-	Text
+	Text,
+	Arc,        // de StartAngle a EndAngle, en grados con Y hacia abajo (crecen en el sentido de las agujas)
+	Curve       // Bézier cuadrática: tres puntos en Points
 }
 
 public enum CockpitTextAnchor
@@ -100,7 +104,13 @@ public enum CockpitSlot
 	SpeedBar,
 	SpeedBarMark,
 	BoostTint,
-	DamageTint
+	DamageTint,
+	GaugeBack,
+	GaugeTop,
+	GaugeSpeed,
+	GaugeTicks,
+	GaugeNumber,
+	GaugeNeedle
 }
 
 // Primitiva 2D de la cabina, en el espacio del diseño (1280×720, Y hacia abajo). Lógica pura.
@@ -114,6 +124,8 @@ public sealed record CockpitElement
 	public Vector2 Position { get; init; }    // rectángulo (esquina) y texto (base de la línea)
 	public Vector2 Size { get; init; }        // rectángulo
 	public float CornerRadius { get; init; }  // rectángulo
+	public float StartAngle { get; init; }    // arco y piezas del dial
+	public float EndAngle { get; init; }
 
 	public CockpitFill? Fill { get; init; }
 	public CockpitColor? Stroke { get; init; }
@@ -146,6 +158,75 @@ public sealed record CockpitElement
 // Una cabina: todos sus elementos en el orden del diseño (lo de delante tapa a lo de detrás)
 public sealed record CockpitLayout(IReadOnlyList<CockpitElement> Elements, int EdgeCount);
 
+// Lo menudo que puede ir dibujado de antemano en una textura común (CockpitSpriteAtlas): círculos pequeños de color
+// liso y ranuras cortas horizontales, sin nada que cambie durante la carrera. La opacidad del elemento se aplica al
+// dibujarlo. Lógica pura.
+public readonly record struct CockpitSpriteKey(
+	bool IsLine, float Radius, float Length,
+	CockpitColor? Fill, float FillOpacity,
+	CockpitColor? Stroke, float StrokeWidth, float StrokeOpacity)
+{
+	public const float MaxRadius = 4f;
+	public const float MaxLineLength = 8f;
+
+	public static bool TryFrom(CockpitElement e, out CockpitSpriteKey key)
+	{
+		key = default;
+		if (e.IsLive || e.Edge >= 0)
+			return false;
+
+		if (e.Kind == CockpitElementKind.Circle)
+		{
+			if (e.Radii.X > MaxRadius || e.Fill is not { Color: not null })
+				return false;
+			key = new CockpitSpriteKey(false, e.Radii.X, 0f, e.Fill.Value.Color, e.FillOpacity,
+				e.Stroke, e.Stroke.HasValue ? e.StrokeWidth : 0f, e.StrokeOpacity);
+			return true;
+		}
+
+		if (e.Kind == CockpitElementKind.Polyline && e.Points.Count == 2 && e.Dash.Count == 0 && e.Stroke.HasValue
+			&& e.Points[0].Y == e.Points[1].Y && e.Transform.M12 == 0f)
+		{
+			float length = MathF.Abs(e.Points[1].X - e.Points[0].X);
+			if (length > MaxLineLength)
+				return false;
+			key = new CockpitSpriteKey(true, 0f, length, null, 1f, e.Stroke, e.StrokeWidth, e.StrokeOpacity);
+			return true;
+		}
+
+		return false;
+	}
+}
+
+// Un tramo de elementos seguidos: todos fijos o todos vivos
+public sealed record CockpitRun(IReadOnlyList<CockpitElement> Elements, bool IsLive);
+
+// Reparte la cabina en tramos, conservando el orden del diseño. Los fijos van en trozos pequeños: cuando parpadea una
+// arista se redibuja solo su trozo, no toda la cabina. Lógica pura.
+public static class CockpitRunPlan
+{
+	public const int MaxFixedElements = 30;
+
+	public static List<CockpitRun> Split(IReadOnlyList<CockpitElement> elements)
+	{
+		var runs = new List<CockpitRun>();
+		List<CockpitElement> current = null;
+		bool currentLive = false;
+		foreach (CockpitElement element in elements)
+		{
+			bool full = !element.IsLive && current != null && current.Count >= MaxFixedElements;
+			if (current == null || currentLive != element.IsLive || full)
+			{
+				current = new List<CockpitElement>();
+				currentLive = element.IsLive;
+				runs.Add(new CockpitRun(current, currentLive));
+			}
+			current.Add(element);
+		}
+		return runs;
+	}
+}
+
 // Lista de elementos que se va construyendo, con los grupos desplazados o girados del diseño. Lógica pura.
 public sealed class CockpitCanvas
 {
@@ -153,6 +234,7 @@ public sealed class CockpitCanvas
 	private readonly Stack<Matrix3x2> _groups = new();
 	private Matrix3x2 _transform = Matrix3x2.Identity;
 	private int _edges;
+	private bool _detail;
 
 	// Grupo: lo que se añada hasta PopGroup se transforma, además, por transform
 	public void PushGroup(Matrix3x2 transform)
@@ -166,9 +248,18 @@ public sealed class CockpitCanvas
 		_transform = _groups.Pop();
 	}
 
+	// Detalle menudo (tornillos, remaches, arañazos, marcas): se dibuja igual, pero no parpadea con los daños
+	public void AddDetail(Action draw)
+	{
+		bool previous = _detail;
+		_detail = true;
+		draw();
+		_detail = previous;
+	}
+
 	public void Add(CockpitElement element)
 	{
-		bool isEdge = element.Stroke.HasValue && !element.IsLive;
+		bool isEdge = element.Stroke.HasValue && !element.IsLive && !_detail;
 		_elements.Add(element with { Transform = _transform, Edge = isEdge ? _edges++ : -1 });
 	}
 
@@ -225,6 +316,45 @@ public sealed class CockpitCanvas
 			Radii = new Vector2(radius, radius),
 			Fill = fill,
 			Stroke = stroke,
+			StrokeWidth = width,
+			Opacity = opacity
+		});
+	}
+
+	public void Ellipse(Vector2 center, Vector2 radii, CockpitFill? fill, float opacity = 1f)
+	{
+		Add(new CockpitElement
+		{
+			Kind = CockpitElementKind.Ellipse,
+			Center = center,
+			Radii = radii,
+			Fill = fill,
+			Opacity = opacity
+		});
+	}
+
+	public void Arc(Vector2 center, float radius, float startAngle, float endAngle, CockpitColor color, float width, float opacity)
+	{
+		Add(new CockpitElement
+		{
+			Kind = CockpitElementKind.Arc,
+			Center = center,
+			Radii = new Vector2(radius, radius),
+			StartAngle = startAngle,
+			EndAngle = endAngle,
+			Stroke = color,
+			StrokeWidth = width,
+			Opacity = opacity
+		});
+	}
+
+	public void Curve(Vector2 p0, Vector2 p1, Vector2 p2, CockpitColor color, float width, float opacity)
+	{
+		Add(new CockpitElement
+		{
+			Kind = CockpitElementKind.Curve,
+			Points = new[] { p0, p1, p2 },
+			Stroke = color,
 			StrokeWidth = width,
 			Opacity = opacity
 		});
@@ -293,6 +423,33 @@ public static class CockpitGeometry
 			float b = 2f * (1f - t) * t;
 			float c = t * t;
 			result[i] = a * p0 + b * p1 + c * p2;
+		}
+		return result;
+	}
+
+	// Puntos de un arco, de startAngle a endAngle (grados, con Y hacia abajo)
+	public static Vector2[] ArcPoints(Vector2 center, float radius, float startAngle, float endAngle)
+	{
+		const float StepDegrees = 3f;
+		int steps = Math.Max(1, (int)MathF.Ceiling(MathF.Abs(endAngle - startAngle) / StepDegrees));
+		var result = new Vector2[steps + 1];
+		for (int i = 0; i <= steps; i++)
+		{
+			float angle = (startAngle + (endAngle - startAngle) * i / steps) * MathF.PI / 180f;
+			result[i] = center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius;
+		}
+		return result;
+	}
+
+	// Contorno de una elipse o un círculo
+	public static Vector2[] EllipsePoints(Vector2 center, Vector2 radii)
+	{
+		const int Sides = 40;
+		var result = new Vector2[Sides];
+		for (int i = 0; i < Sides; i++)
+		{
+			float angle = MathF.Tau * i / Sides;
+			result[i] = center + new Vector2(MathF.Cos(angle) * radii.X, MathF.Sin(angle) * radii.Y);
 		}
 		return result;
 	}

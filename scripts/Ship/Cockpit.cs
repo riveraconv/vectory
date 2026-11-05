@@ -91,7 +91,7 @@ public partial class Cockpit : Node3D
 	// La capa solo se ve en primera persona
 	public void SetLayerVisible(bool visible)
 	{
-		_layer.Visible = visible;
+		_layer.SetShown(visible);
 	}
 
 	public void UpdateHud(in CockpitHudInput input, in CockpitLightSettings light, float dt)

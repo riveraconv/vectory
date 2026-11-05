@@ -191,4 +191,5 @@ public static class Palette
 	public static readonly Color CockpitScreen = new Color("02040A");           // fondo de las pantallas
 	public static readonly Color CockpitVent = new Color("04070F");             // rejillas
 	public static readonly Color CockpitScrew = new Color("0B1222");            // tornillos e interruptores
+	public static readonly Color CockpitDialShadow = new Color("070B15");       // canto del dial de Martillo
 }

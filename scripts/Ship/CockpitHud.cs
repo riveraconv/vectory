@@ -106,6 +106,7 @@ public sealed class CockpitHudState
 
 	public float SpeedFraction { get; private set; }
 	public float TopFraction { get; private set; } = 396f / 496f;
+	public float MaxKmh { get; private set; } = 496f;
 	public string SpeedText { get; private set; } = "0";
 	public Vector4 SpeedColor => _speedColor.Value;
 	public string BoostText { get; private set; } = "";
@@ -130,6 +131,7 @@ public sealed class CockpitHudState
 		_time += dt;
 
 		float max = input.MaxKmh > 0f ? input.MaxKmh : 1f;
+		MaxKmh = max;
 		SpeedFraction = Math.Clamp(input.SpeedKmh / max, 0f, 1f);
 		TopFraction = Math.Clamp(input.TopKmh / max, 0f, 1f);
 		SpeedText = MathF.Round(input.SpeedKmh).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -237,18 +239,113 @@ public static class CockpitHudPieces
 	public static void DamageSegments(this CockpitCanvas c, float x, float y, float width, float height, float gap)
 	{
 		for (int i = 0; i < CockpitHudState.SlotCount; i++)
+			c.DamageSegment(x + i * (width + gap), y, width, height, i, 1f);
+	}
+
+	public static void DamageSegment(this CockpitCanvas c, float x, float y, float width, float height, int index, float strokeWidth)
+	{
+		c.Add(new CockpitElement
 		{
-			c.Add(new CockpitElement
-			{
-				Kind = CockpitElementKind.Rect,
-				Position = new Vector2(x + i * (width + gap), y),
-				Size = new Vector2(width, height),
-				Fill = CockpitColor.Green,
-				Stroke = CockpitColor.Green,
-				Slot = CockpitSlot.DamageSegment,
-				SlotIndex = i
-			});
+			Kind = CockpitElementKind.Rect,
+			Position = new Vector2(x, y),
+			Size = new Vector2(width, height),
+			Fill = CockpitColor.Green,
+			Stroke = CockpitColor.Green,
+			StrokeWidth = strokeWidth,
+			Slot = CockpitSlot.DamageSegment,
+			SlotIndex = index
+		});
+	}
+
+	// Dial: arco de fondo, tramo desde la punta hasta el final, arco de velocidad, 11 marcas, números y aguja.
+	// Los números se colocan según la escala de la nave; el diseño los dibuja con los 496 de Vector.
+	public static readonly int[] GaugeNumbers = { 0, 100, 200, 300, 400 };
+
+	public static void Gauge(this CockpitCanvas c, Vector2 center, float radius, float startAngle, float endAngle)
+	{
+		CockpitElement Arc(CockpitSlot slot, CockpitColor color, float opacity) => new()
+		{
+			Kind = CockpitElementKind.Arc,
+			Center = center,
+			Radii = new Vector2(radius, radius),
+			StartAngle = startAngle,
+			EndAngle = endAngle,
+			Stroke = color,
+			StrokeWidth = 6f,
+			Opacity = opacity,
+			Slot = slot
+		};
+
+		c.Add(Arc(CockpitSlot.GaugeBack, CockpitColor.Blue, 0.35f));
+		c.Add(Arc(CockpitSlot.GaugeTop, CockpitColor.Orange, 0.35f));
+		c.Add(Arc(CockpitSlot.GaugeSpeed, CockpitColor.Cyan, 1f));
+
+		var ticks = new List<Vector2>(22);
+		for (int k = 0; k <= 10; k++)
+		{
+			float a = (startAngle + (endAngle - startAngle) * k / 10f) * MathF.PI / 180f;
+			var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
+			ticks.Add(center + dir * (radius + 9f));
+			ticks.Add(center + dir * (radius + (k % 2 == 0 ? 18f : 13f)));
 		}
+		c.Add(new CockpitElement
+		{
+			Kind = CockpitElementKind.Segments,
+			Points = ticks,
+			Stroke = CockpitColor.BlueGray,
+			Opacity = 0.6f,
+			Slot = CockpitSlot.GaugeTicks
+		});
+
+		foreach (int value in GaugeNumbers)
+		{
+			var number = new CockpitElement
+			{
+				Kind = CockpitElementKind.Text,
+				Center = center,
+				Radii = new Vector2(radius, radius),
+				StartAngle = startAngle,
+				EndAngle = endAngle,
+				Text = value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+				FontSize = 8f,
+				Anchor = CockpitTextAnchor.Middle,
+				Fill = CockpitColor.BlueGray,
+				Opacity = 0.7f,
+				Slot = CockpitSlot.GaugeNumber,
+				SlotIndex = value
+			};
+			c.Add(number with { Position = GaugeNumberPosition(number, 496f) });
+		}
+
+		c.Add(new CockpitElement
+		{
+			Kind = CockpitElementKind.Segments,
+			Center = center,
+			Radii = new Vector2(radius, radius),
+			StartAngle = startAngle,
+			EndAngle = endAngle,
+			Points = NeedlePoints(center, radius, startAngle),
+			Stroke = CockpitColor.GlassReflection,
+			StrokeWidth = 2.4f,
+			Slot = CockpitSlot.GaugeNeedle
+		});
+	}
+
+	// Ángulo de la aguja (grados) con la fracción de velocidad f
+	public static float NeedleAngle(float startAngle, float endAngle, float f) => startAngle + (endAngle - startAngle) * f;
+
+	private static Vector2[] NeedlePoints(Vector2 center, float radius, float angleDegrees)
+	{
+		float a = angleDegrees * MathF.PI / 180f;
+		var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
+		return new[] { center + dir * (radius - 14f), center + dir * (radius + 6f) };
+	}
+
+	private static Vector2 GaugeNumberPosition(CockpitElement e, float maxKmh)
+	{
+		float a = (e.StartAngle + (e.EndAngle - e.StartAngle) * e.SlotIndex / maxKmh) * MathF.PI / 180f;
+		float distance = e.Radii.X + 30f;
+		return new Vector2(e.Center.X + MathF.Cos(a) * distance, e.Center.Y + MathF.Sin(a) * distance + 3f);
 	}
 
 	public static void DamageText(this CockpitCanvas c, float x, float y, CockpitTextAnchor anchor)
@@ -313,16 +410,52 @@ public static class CockpitHudPieces
 			case CockpitSlot.SpeedNumber:
 				return e with { Text = hud.SpeedText, FillRgba = hud.SpeedColor, Glow = 1f };
 			case CockpitSlot.SpeedBar:
-				return e with { Size = new Vector2(e.Size.X * hud.SpeedFraction, e.Size.Y), FillRgba = hud.SpeedColor };
+			{
+				float width = e.Size.X * hud.SpeedFraction;
+				return e with { Size = new Vector2(width >= MinBarWidth ? width : 0f, e.Size.Y), FillRgba = hud.SpeedColor };
+			}
 			case CockpitSlot.SpeedBarMark:
 			{
 				float x = e.Position.X + e.Size.X * hud.TopFraction;
 				return e with { Points = new[] { new Vector2(x, e.Points[0].Y), new Vector2(x, e.Points[1].Y) } };
 			}
+			case CockpitSlot.GaugeTop:
+				return e with { StartAngle = e.StartAngle + (e.EndAngle - e.StartAngle) * hud.TopFraction };
+			case CockpitSlot.GaugeSpeed:
+				return e with
+				{
+					EndAngle = e.StartAngle + MathF.Max(MinSpeedArcDegrees, (e.EndAngle - e.StartAngle) * hud.SpeedFraction),
+					StrokeRgba = hud.SpeedColor,
+					Glow = 1f
+				};
+			case CockpitSlot.GaugeNumber:
+				return e with { Position = GaugeNumberPosition(e, hud.MaxKmh) };
+			case CockpitSlot.GaugeNeedle:
+				return e with { Points = NeedlePoints(e.Center, e.Radii.X, NeedleAngle(e.StartAngle, e.EndAngle, hud.SpeedFraction)) };
 			default:
 				return e;
 		}
 	}
+
+	// Por debajo no se ve, y un polígono tan fino no se puede triangular
+	private const float MinBarWidth = 0.25f;
+
+	// Se dibuja igual: lo vivo solo se redibuja si cambia algo. Sirve para ahorrar, no para decidir nada del juego.
+	public static bool SameDrawing(CockpitElement a, CockpitElement b)
+	{
+		if (a == b)
+			return true;
+		if (ReferenceEquals(a.Points, b.Points) || a.Points.Count != b.Points.Count)
+			return false;
+		for (int i = 0; i < a.Points.Count; i++)
+		{
+			if (a.Points[i] != b.Points[i])
+				return false;
+		}
+		return (a with { Points = b.Points }) == b;
+	}
+
+	private const float MinSpeedArcDegrees = 0.5f;   // como el diseño: el arco de velocidad nunca desaparece del todo
 
 	private static CockpitElement Paint(CockpitElement e, CockpitHudPaint paint) =>
 		e with { FillRgba = paint.Fill, StrokeRgba = paint.Stroke, Glow = paint.Glow };

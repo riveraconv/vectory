@@ -163,17 +163,6 @@ public class ShipHullTests
         Assert.NotEqual(vector.BuildHull().Count, visual.BuildHull().Count);
     }
 
-    // Provisional hasta la etapa 3 de la spec 3b
-    [Theory]
-    [InlineData(ShipCatalog.Ship03)]
-    public void CockpitAndEye_AreStillTheOnesOfVector(string id)
-    {
-        ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
-
-        Assert.Equal(VectorShip.Definition.Visual.BuildCockpit, visual.BuildCockpit);
-        Assert.Equal(VectorShip.Definition.Visual.Cockpit, visual.Cockpit);
-    }
-
     private static void AssertClose(Vector3 expected, Vector3 actual, float tolerance)
     {
         Assert.InRange(MathF.Abs(expected.X - actual.X), 0f, tolerance);

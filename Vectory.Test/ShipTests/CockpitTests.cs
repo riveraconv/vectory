@@ -15,11 +15,17 @@ public class CockpitCaptureTests
     private const float PointTolerance = 0.06f;
     private const float ValueTolerance = 0.001f;
 
-    private static CockpitLayout Build(string name) => name == "hoja" ? HojaCockpit.Build() : VectorCockpit.Build();
+    private static CockpitLayout Build(string name) => name switch
+    {
+        "hoja" => HojaCockpit.Build(),
+        "martillo" => MartilloCockpit.Build(),
+        _ => VectorCockpit.Build()
+    };
 
     [Theory]
     [InlineData("vector")]
     [InlineData("hoja")]
+    [InlineData("martillo")]
     public void Cockpit_MatchesTheCapture_ElementByElement(string name)
     {
         CockpitLayout layout = Build(name);
@@ -34,6 +40,7 @@ public class CockpitCaptureTests
     [Theory]
     [InlineData("vector")]
     [InlineData("hoja")]
+    [InlineData("martillo")]
     public void Gradients_MatchTheDesign(string name)
     {
         foreach (JsonProperty property in CockpitReference.Root.GetProperty(name).GetProperty("gradients").EnumerateObject())
@@ -91,6 +98,14 @@ public class CockpitCaptureTests
             case CockpitElementKind.Polygon:
             case CockpitElementKind.Polyline:
                 AssertPoints(e.GetProperty("points"), actual.Points, where);
+                break;
+            case CockpitElementKind.Arc:
+                AssertArc(e, actual, live, where);
+                break;
+            case CockpitElementKind.Curve:
+                AssertPoints(e.GetProperty("quad"), actual.Points, where);
+                break;
+            case CockpitElementKind.Segments when live.Length > 0:
                 break;
             case CockpitElementKind.Segments:
                 JsonElement segments = e.GetProperty("segments");
@@ -168,10 +183,33 @@ public class CockpitCaptureTests
         CockpitSlot.SpeedBar => new[] { $"bar{e.Size.X}", "spdColor" },
         CockpitSlot.BoostTint => new[] { "boostTint" },
         CockpitSlot.DamageTint => new[] { "dmgTint", "dmgTintCls" },
+        CockpitSlot.GaugeBack => new[] { "arcBg" },
+        CockpitSlot.GaugeTop => new[] { "arcRed" },
+        CockpitSlot.GaugeSpeed => new[] { "arcFg", "spdColor" },
+        CockpitSlot.GaugeTicks => new[] { "arcTicks" },
+        CockpitSlot.GaugeNeedle => new[] { "needle" },
         _ => Array.Empty<string>()   // la marca de la barra es fija en el diseño (396 / 496, los de Vector)
     };
 
-    private static string KindName(CockpitElementKind kind) => kind == CockpitElementKind.Segments ? "path" : kind.ToString().ToLowerInvariant();
+    private static string KindName(CockpitElementKind kind) => kind is CockpitElementKind.Segments or CockpitElementKind.Arc or CockpitElementKind.Curve
+        ? "path"
+        : kind.ToString().ToLowerInvariant();
+
+    // El diseño da el arco por sus extremos: lo vivo (los arcos del dial) no tiene geometría en la captura
+    private static void AssertArc(JsonElement e, CockpitElement actual, string[] live, string where)
+    {
+        if (live.Length > 0)
+            return;
+
+        JsonElement arc = e.GetProperty("arc");
+        Vector2 Point(float degrees) => actual.Center + new Vector2(MathF.Cos(degrees * MathF.PI / 180f), MathF.Sin(degrees * MathF.PI / 180f)) * actual.Radii.X;
+
+        AssertVector(arc.GetProperty("from"), Point(actual.StartAngle), PointTolerance, where);
+        AssertVector(arc.GetProperty("to"), Point(actual.EndAngle), PointTolerance, where);
+        AssertClose(arc.GetProperty("radius").GetSingle(), actual.Radii.X, PointTolerance, where);
+        Assert.True(arc.GetProperty("sweep").GetInt32() == 1 && actual.EndAngle > actual.StartAngle, where);
+        Assert.True(arc.GetProperty("large").GetInt32() == 0 && actual.EndAngle - actual.StartAngle <= 180f, where);
+    }
 
     private static void AssertNumber(JsonElement e, string name, float actual, string where)
     {
@@ -220,6 +258,7 @@ public class CockpitCaptureTests
             "cowl" => CockpitGradientId.Cowl,
             "bezelIn" => CockpitGradientId.BezelIn,
             "deckFar" => CockpitGradientId.DeckFar,
+            "footShade" => CockpitGradientId.FootShade,
             "scan" => CockpitGradientId.Scan,
             _ => throw new ArgumentOutOfRangeException(svgId)
         };
@@ -249,30 +288,36 @@ public class CockpitCaptureTests
 
 public class CockpitProfileTests
 {
-    // Martillo lleva la de Vector hasta la etapa 3
     [Theory]
     [InlineData(ShipCatalog.Ship01, "vector")]
     [InlineData(ShipCatalog.Ship02, "hoja")]
-    [InlineData(ShipCatalog.Ship03, "vector")]
+    [InlineData(ShipCatalog.Ship03, "martillo")]
     public void CockpitOfEachShip_PitchedDown(string id, string cockpit)
     {
         ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
-        Func<CockpitLayout> expected = cockpit == "hoja" ? HojaCockpit.Build : VectorCockpit.Build;
+        Func<CockpitLayout> expected = cockpit switch
+        {
+            "hoja" => HojaCockpit.Build,
+            "martillo" => MartilloCockpit.Build,
+            _ => VectorCockpit.Build
+        };
 
         Assert.Equal(expected, visual.BuildCockpit);
         Assert.Equal(-8f, visual.Cockpit.PitchDegrees);
     }
 
-    [Fact]
-    public void HojaEye_LowerThanVector_SameFovAndDepth()
+    [Theory]
+    [InlineData(ShipCatalog.Ship02, 0.62f)]
+    [InlineData(ShipCatalog.Ship03, 1.4f)]
+    public void Eye_ScaledByHeight_SameFovAndDepth(string id, float heightFactor)
     {
         CockpitFraming vector = VectorShip.Definition.Visual.Cockpit;
-        CockpitFraming hoja = HojaShip.Definition.Visual.Cockpit;
+        CockpitFraming framing = ShipDefinitions.Find(id)!.Visual.Cockpit;
 
-        Assert.Equal(vector.Eye.Y * 0.62f, hoja.Eye.Y, 4);
-        Assert.Equal(vector.Eye.X, hoja.Eye.X);
-        Assert.Equal(vector.Eye.Z, hoja.Eye.Z);
-        Assert.Equal(vector.Fov, hoja.Fov);
+        Assert.Equal(vector.Eye.Y * heightFactor, framing.Eye.Y, 4);
+        Assert.Equal(vector.Eye.X, framing.Eye.X);
+        Assert.Equal(vector.Eye.Z, framing.Eye.Z);
+        Assert.Equal(vector.Fov, framing.Fov);
     }
 
     // El punto de fuga queda donde lo espera el diseño: y ≈ 300 de 720, con la tangente de la mitad del FOV en 360 px
@@ -288,6 +333,7 @@ public class CockpitProfileTests
     [Theory]
     [InlineData(ShipCatalog.Ship01)]
     [InlineData(ShipCatalog.Ship02)]
+    [InlineData(ShipCatalog.Ship03)]
     public void Flicker_PicksValidEdges_OnlyStrokesOfTheFixedPart(string id)
     {
         CockpitLayout layout = ShipDefinitions.Find(id)!.Visual.BuildCockpit();
@@ -306,6 +352,68 @@ public class CockpitProfileTests
 
         Assert.Equal((int)MathF.Round(0.35f * layout.EdgeCount), flicker.AffectedEdges.Count);
         Assert.All(flicker.AffectedEdges, edge => Assert.InRange(edge, 0, layout.EdgeCount - 1));
+    }
+
+    // Lo menudo no parpadea: cada arista que cambia obliga a redibujar su trozo de cabina
+    [Theory]
+    [InlineData(ShipCatalog.Ship01)]
+    [InlineData(ShipCatalog.Ship02)]
+    [InlineData(ShipCatalog.Ship03)]
+    public void Flicker_NotOnScrewsRivetsOrScratches(string id)
+    {
+        CockpitLayout layout = ShipDefinitions.Find(id)!.Visual.BuildCockpit();
+
+        Assert.DoesNotContain(layout.Elements, e => e.Edge >= 0 && e.Kind == CockpitElementKind.Circle && e.Radii.X <= 3f);
+        Assert.DoesNotContain(layout.Elements, e => e.Edge >= 0 && e.Kind == CockpitElementKind.Curve);
+        Assert.DoesNotContain(layout.Elements, e => e.Edge >= 0 && e.Kind == CockpitElementKind.Polyline
+            && e.Points.Count == 2 && Vector2.Distance(e.Points[0], e.Points[1]) < 5f);
+    }
+
+    [Theory]
+    [InlineData(ShipCatalog.Ship01)]
+    [InlineData(ShipCatalog.Ship02)]
+    [InlineData(ShipCatalog.Ship03)]
+    public void RunPlan_KeepsTheOrder_SmallFixedRuns_OnlyLiveOrFixed(string id)
+    {
+        CockpitLayout layout = ShipDefinitions.Find(id)!.Visual.BuildCockpit();
+
+        List<CockpitRun> runs = CockpitRunPlan.Split(layout.Elements);
+
+        Assert.Equal(layout.Elements, runs.SelectMany(r => r.Elements));
+        Assert.All(runs, r =>
+        {
+            Assert.All(r.Elements, e => Assert.Equal(r.IsLive, e.IsLive));
+            if (!r.IsLive)
+                Assert.InRange(r.Elements.Count, 1, CockpitRunPlan.MaxFixedElements);
+        });
+    }
+
+    [Fact]
+    public void SpriteKey_OnlySmallDetailThatNeverChanges()
+    {
+        var canvas = new CockpitCanvas();
+        canvas.Screw(100f, 100f);
+        canvas.Circle(50f, 50f, 2f, CockpitColor.Cyan, opacity: 0.8f);
+        canvas.Circle(50f, 50f, 20f, CockpitColor.Cyan);
+        canvas.Circle(50f, 50f, 2f, CockpitGradientId.BezelIn);
+        canvas.Circle(50f, 50f, 2f, CockpitColor.Cyan, CockpitColor.Blue);
+        canvas.Line(new Vector2(0f, 0f), new Vector2(300f, 0f), CockpitColor.Blue, 1f, 1f);
+        canvas.BoostOrbs(0f, 0f, 3f, 1f);
+        IReadOnlyList<CockpitElement> e = canvas.Finish().Elements;
+
+        Assert.True(CockpitSpriteKey.TryFrom(e[0], out CockpitSpriteKey circle));
+        Assert.False(circle.IsLine);
+        Assert.Equal(3f, circle.Radius);
+        Assert.Equal(CockpitColor.Blue, circle.Stroke);
+        Assert.True(CockpitSpriteKey.TryFrom(e[1], out CockpitSpriteKey slot));
+        Assert.True(slot.IsLine);
+        Assert.Equal(4f, slot.Length);
+        Assert.True(CockpitSpriteKey.TryFrom(e[2], out _));
+        Assert.False(CockpitSpriteKey.TryFrom(e[3], out _));   // grande
+        Assert.False(CockpitSpriteKey.TryFrom(e[4], out _));   // con degradado
+        Assert.False(CockpitSpriteKey.TryFrom(e[5], out _));   // arista que parpadea
+        Assert.False(CockpitSpriteKey.TryFrom(e[6], out _));   // línea larga
+        Assert.DoesNotContain(e.Where(x => x.IsLive), x => CockpitSpriteKey.TryFrom(x, out _));
     }
 
     [Fact]
@@ -519,6 +627,90 @@ public class CockpitHudStateTests
         CockpitElement bar = HojaCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
 
         Assert.Equal(130f, CockpitHudPieces.Resolve(bar, State(Input(248f))).Size.X, 3);
+    }
+
+    [Theory]
+    [InlineData(0f, 150f)]
+    [InlineData(372f, 339.1525f)]
+    [InlineData(472f, 390f)]
+    public void GaugeNeedle_PointsToTheAngleOfTheSpeed(float speed, float degrees)
+    {
+        CockpitHudInput input = Input(speed);
+        input.TopKmh = 372f;
+        input.MaxKmh = 472f;
+        CockpitHudState state = State(input);
+        CockpitElement needle = MartilloCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNeedle);
+
+        IReadOnlyList<Vector2> points = CockpitHudPieces.Resolve(needle, state).Points;
+
+        float a = degrees * MathF.PI / 180f;
+        var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
+        Assert.Equal(640f + dir.X * 34f, points[0].X, 2);
+        Assert.Equal(672f + dir.Y * 34f, points[0].Y, 2);
+        Assert.Equal(640f + dir.X * 54f, points[1].X, 2);
+        Assert.Equal(672f + dir.Y * 54f, points[1].Y, 2);
+    }
+
+    [Fact]
+    public void GaugeArcs_FollowTheScaleOfTheShip()
+    {
+        CockpitHudInput input = Input(236f);
+        input.TopKmh = 372f;
+        input.MaxKmh = 472f;
+        CockpitHudState state = State(input);
+        CockpitLayout layout = MartilloCockpit.Build();
+
+        CockpitElement top = CockpitHudPieces.Resolve(layout.Elements.Single(e => e.Slot == CockpitSlot.GaugeTop), state);
+        CockpitElement speed = CockpitHudPieces.Resolve(layout.Elements.Single(e => e.Slot == CockpitSlot.GaugeSpeed), state);
+        CockpitElement back = CockpitHudPieces.Resolve(layout.Elements.Single(e => e.Slot == CockpitSlot.GaugeBack), state);
+
+        Assert.Equal(150f + 240f * 372f / 472f, top.StartAngle, 2);
+        Assert.Equal(390f, top.EndAngle);
+        Assert.Equal(150f, speed.StartAngle);
+        Assert.Equal(150f + 120f, speed.EndAngle, 2);
+        Assert.Equal(state.SpeedColor, speed.StrokeRgba);
+        Assert.Equal(150f, back.StartAngle);
+        Assert.Equal(390f, back.EndAngle);
+    }
+
+    [Fact]
+    public void GaugeNumbers_PlacedByTheScaleOfTheShip()
+    {
+        CockpitElement number = MartilloCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNumber && e.Text == "400");
+        CockpitHudInput input = Input();
+        input.TopKmh = 372f;
+        input.MaxKmh = 472f;
+
+        Vector2 position = CockpitHudPieces.Resolve(number, State(input)).Position;
+
+        float a = (150f + 240f * 400f / 472f) * MathF.PI / 180f;
+        Assert.Equal(640f + MathF.Cos(a) * 78f, position.X, 2);
+        Assert.Equal(672f + MathF.Sin(a) * 78f + 3f, position.Y, 2);
+    }
+
+    // Tan fina que no se ve y Godot no la podría triangular: al frenar hasta parar salía un error en cada frame
+    [Theory]
+    [InlineData(0.01f, 0f)]
+    [InlineData(0.0001f, 0f)]
+    public void SpeedBar_AlmostEmpty_IsNotDrawn(float speed, float width)
+    {
+        CockpitElement bar = VectorCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
+
+        Assert.Equal(width, CockpitHudPieces.Resolve(bar, State(Input(speed))).Size.X);
+    }
+
+    [Fact]
+    public void SameDrawing_OnlyDifferentWhenSomethingChanges()
+    {
+        CockpitElement needle = MartilloCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNeedle);
+
+        CockpitElement a = CockpitHudPieces.Resolve(needle, State(Input(100f)));
+        CockpitElement same = CockpitHudPieces.Resolve(needle, State(Input(100f)));
+        CockpitElement other = CockpitHudPieces.Resolve(needle, State(Input(200f)));
+
+        Assert.True(CockpitHudPieces.SameDrawing(a, same));
+        Assert.False(CockpitHudPieces.SameDrawing(a, other));
+        Assert.False(CockpitHudPieces.SameDrawing(a, a with { Opacity = 0.5f }));
     }
 
     [Fact]
