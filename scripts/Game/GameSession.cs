@@ -13,6 +13,7 @@ public static class GameSession
 	// Ruta del TrackDefinition elegido (p. ej. "res://circuits/circuit_01.tres"); null = ninguno
 	public static string CircuitPath { get; set; }
 
-	// Diseño de nave en uso (ShipCatalog), elegido en SELECT SHIP. Hoy solo se puede elegir el de por defecto.
+	// Diseño de nave en uso (ShipCatalog), elegido en SELECT SHIP. MainMenu le da la última nave guardada la primera vez
+	// que se abre; la escena de carrera ejecutada sola desde el editor corre con la de por defecto.
 	public static string ShipDesignId { get; set; } = ShipCatalog.Default;
 }

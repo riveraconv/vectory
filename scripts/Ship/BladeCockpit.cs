@@ -5,9 +5,9 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-// Cabina de HOJA: BURBUJA (Cab_Hoja_1 de designs/cabinas-hoja-martillo-def.js), traducida tal cual: mismos puntos,
+// Cabina de BLADE: BURBUJA (Cab_Hoja_1 de designs/cabinas-hoja-martillo-def.js), traducida tal cual: mismos puntos,
 // orden, colores y opacidades, y las mismas fórmulas. Pantalla de 1280×720. Lógica pura.
-public static class HojaCockpit
+public static class BladeCockpit
 {
 	private const float DashUp = 34f;   // todo el cuadro de mando sube esto
 
@@ -71,7 +71,7 @@ public static class HojaCockpit
 			c.Screw(x, 720f - DashUp / 2f + 2f);
 		VentOut(c, 110f, 720f - DashUp + 12f, 240f, 12f, 26, -1f);
 		VentOut(c, 930f, 720f - DashUp + 12f, 240f, 12f, 26, 1f);
-		c.Micro(640f, 716f, "HOJA · INT-02", CockpitTextAnchor.Middle, opacity: 0.4f, size: 8f);
+		c.Micro(640f, 716f, "BLADE · BLD-02", CockpitTextAnchor.Middle, opacity: 0.4f, size: 8f);
 
 		c.PushGroup(Matrix3x2.CreateTranslation(0f, -DashUp));
 		Dashboard(c);

@@ -33,9 +33,13 @@ namespace Vectory.Circuit
         /// <summary>Mejor tiempo de cada sector (índice base 0), con su vuelta.</summary>
         public IReadOnlyList<SectorBest> BestSectors { get; }
 
+        /// <summary>Nombre de la nave con la que se ha corrido (la elegida; vacío si no se indicó).</summary>
+        public string ShipName { get; }
+
         public RaceResult(int position, int participantCount, double totalTime, double bestLapTime, int bestLapNumber,
-            IReadOnlyList<SectorBest> bestSectors)
+            IReadOnlyList<SectorBest> bestSectors, string shipName = "")
         {
+            ShipName = shipName;
             Position = position;
             ParticipantCount = participantCount;
             TotalTime = totalTime;

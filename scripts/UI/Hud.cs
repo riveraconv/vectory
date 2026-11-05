@@ -223,14 +223,14 @@ public partial class Hud : CanvasLayer
 	public event Action<string> ResultsOptionChosen;
 
 	// Muestra la pantalla de resultados de una carrera terminada, con su lista de opciones y qué
-	// récords de RACE ha batido. bandHeight y optionFontSize en px sobre 1280×720 (ver ResultsView).
-	public void ShowResults(RaceResult result, MenuModel options, float bandHeight, int optionFontSize,
+	// récords de RACE ha batido. bandHeight, optionFontSize y shipNameFontSize en px sobre 1280×720 (ver ResultsView).
+	public void ShowResults(RaceResult result, MenuModel options, float bandHeight, int optionFontSize, int shipNameFontSize,
 		bool newTotalRecord, bool newLapRecord)
 	{
 		if (_results.Visible || result == null)
 			return;
 
-		_results.SetResult(result, options, bandHeight, optionFontSize, newTotalRecord, newLapRecord);
+		_results.SetResult(result, options, bandHeight, optionFontSize, shipNameFontSize, newTotalRecord, newLapRecord);
 		_results.Visible = true;
 	}
 

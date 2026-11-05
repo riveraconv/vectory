@@ -17,15 +17,15 @@ public class CockpitCaptureTests
 
     private static CockpitLayout Build(string name) => name switch
     {
-        "hoja" => HojaCockpit.Build(),
-        "martillo" => MartilloCockpit.Build(),
+        "blade" => BladeCockpit.Build(),
+        "hammer" => HammerCockpit.Build(),
         _ => VectorCockpit.Build()
     };
 
     [Theory]
     [InlineData("vector")]
-    [InlineData("hoja")]
-    [InlineData("martillo")]
+    [InlineData("blade")]
+    [InlineData("hammer")]
     public void Cockpit_MatchesTheCapture_ElementByElement(string name)
     {
         CockpitLayout layout = Build(name);
@@ -39,8 +39,8 @@ public class CockpitCaptureTests
 
     [Theory]
     [InlineData("vector")]
-    [InlineData("hoja")]
-    [InlineData("martillo")]
+    [InlineData("blade")]
+    [InlineData("hammer")]
     public void Gradients_MatchTheDesign(string name)
     {
         foreach (JsonProperty property in CockpitReference.Root.GetProperty(name).GetProperty("gradients").EnumerateObject())
@@ -290,15 +290,15 @@ public class CockpitProfileTests
 {
     [Theory]
     [InlineData(ShipCatalog.Ship01, "vector")]
-    [InlineData(ShipCatalog.Ship02, "hoja")]
-    [InlineData(ShipCatalog.Ship03, "martillo")]
+    [InlineData(ShipCatalog.Ship02, "blade")]
+    [InlineData(ShipCatalog.Ship03, "hammer")]
     public void CockpitOfEachShip_PitchedDown(string id, string cockpit)
     {
         ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
         Func<CockpitLayout> expected = cockpit switch
         {
-            "hoja" => HojaCockpit.Build,
-            "martillo" => MartilloCockpit.Build,
+            "blade" => BladeCockpit.Build,
+            "hammer" => HammerCockpit.Build,
             _ => VectorCockpit.Build
         };
 
@@ -622,9 +622,9 @@ public class CockpitHudStateTests
 
     // En el lienzo no se rellena por un fallo del archivo: en el juego, con la misma regla que la de Vector
     [Fact]
-    public void SpeedBar_OfHoja_WidthTimesFraction()
+    public void SpeedBar_OfBlade_WidthTimesFraction()
     {
-        CockpitElement bar = HojaCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
+        CockpitElement bar = BladeCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
 
         Assert.Equal(130f, CockpitHudPieces.Resolve(bar, State(Input(248f))).Size.X, 3);
     }
@@ -639,7 +639,7 @@ public class CockpitHudStateTests
         input.TopKmh = 372f;
         input.MaxKmh = 472f;
         CockpitHudState state = State(input);
-        CockpitElement needle = MartilloCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNeedle);
+        CockpitElement needle = HammerCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNeedle);
 
         IReadOnlyList<Vector2> points = CockpitHudPieces.Resolve(needle, state).Points;
 
@@ -658,7 +658,7 @@ public class CockpitHudStateTests
         input.TopKmh = 372f;
         input.MaxKmh = 472f;
         CockpitHudState state = State(input);
-        CockpitLayout layout = MartilloCockpit.Build();
+        CockpitLayout layout = HammerCockpit.Build();
 
         CockpitElement top = CockpitHudPieces.Resolve(layout.Elements.Single(e => e.Slot == CockpitSlot.GaugeTop), state);
         CockpitElement speed = CockpitHudPieces.Resolve(layout.Elements.Single(e => e.Slot == CockpitSlot.GaugeSpeed), state);
@@ -676,7 +676,7 @@ public class CockpitHudStateTests
     [Fact]
     public void GaugeNumbers_PlacedByTheScaleOfTheShip()
     {
-        CockpitElement number = MartilloCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNumber && e.Text == "400");
+        CockpitElement number = HammerCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNumber && e.Text == "400");
         CockpitHudInput input = Input();
         input.TopKmh = 372f;
         input.MaxKmh = 472f;
@@ -702,7 +702,7 @@ public class CockpitHudStateTests
     [Fact]
     public void SameDrawing_OnlyDifferentWhenSomethingChanges()
     {
-        CockpitElement needle = MartilloCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNeedle);
+        CockpitElement needle = HammerCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.GaugeNeedle);
 
         CockpitElement a = CockpitHudPieces.Resolve(needle, State(Input(100f)));
         CockpitElement same = CockpitHudPieces.Resolve(needle, State(Input(100f)));

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Vectory.Game;
@@ -11,10 +12,37 @@ namespace Vectory.Test.MenuTests;
 public class ShipCatalogTests
 {
     [Fact]
-    public void Entries_InSelectorOrder_OnlyVectorSelectable()
+    public void Entries_InSelectorOrder_AllSelectable()
     {
-        Assert.Equal(new[] { "INTERCEPTOR", "VECTOR", "VANGUARD" }, ShipCatalog.Entries.Select(e => e.Name));
-        Assert.Equal(new[] { ShipCatalog.Ship01 }, ShipCatalog.Entries.Where(e => e.Selectable).Select(e => e.Id));
+        Assert.Equal(new[] { "BLADE", "VECTOR", "HAMMER" }, ShipCatalog.Entries.Select(e => e.Name));
+        Assert.Equal(new[] { "ship_02", "ship_01", "ship_03" }, ShipCatalog.Entries.Select(e => e.Id));
+        Assert.All(ShipCatalog.Entries, e => Assert.True(e.Selectable));
+    }
+
+    [Fact]
+    public void Descriptions()
+    {
+        Assert.Equal("HIGH TOP SPEED · LOW TOLERANCE", ShipCatalog.Find("ship_02").Description);
+        Assert.Equal("BALANCED · ALL-ROUND", ShipCatalog.Find("ship_01").Description);
+        Assert.Equal("HIGH ACCELERATION · STRONG GRIP", ShipCatalog.Find("ship_03").Description);
+    }
+
+    [Theory]
+    [InlineData("ship_02", "ship_02")]
+    [InlineData("ship_03", "ship_03")]
+    [InlineData("ship_01", "ship_01")]
+    [InlineData("unknown", "ship_01")]
+    [InlineData("", "ship_01")]
+    [InlineData(null, "ship_01")]
+    public void StartShip_SavedIfItExists_ElseDefault(string? saved, string expected)
+    {
+        Assert.Equal(expected, ShipCatalog.StartShip(saved));
+    }
+
+    [Fact]
+    public void StartShip_SavedButNotSelectable_Default()
+    {
+        Assert.Equal("ship_01", ShipCatalog.StartShip("ship_02", ShipSelectLogicTests.CatalogWithComingSoon, "ship_01"));
     }
 
     [Fact]
@@ -111,25 +139,37 @@ public class ShipStatsTests
 
 public class ShipSelectLogicTests
 {
+    // El COMING SOON se conserva para naves futuras: hoy solo se puede probar con un catálogo de prueba
+    internal static readonly IReadOnlyList<ShipEntry> CatalogWithComingSoon = new[]
+    {
+        new ShipEntry("ship_02", "BLADE", "", false),
+        new ShipEntry("ship_01", "VECTOR", "", true),
+        new ShipEntry("ship_03", "HAMMER", "", false)
+    };
+
     private static ShipSelectLogic Open(string? currentId, GameMode mode = GameMode.Race) =>
         new(mode, "Circuit 01", ShipCatalog.Entries, currentId, ShipCatalog.Default);
 
-    [Fact]
-    public void Open_RememberedShip_StartSelected()
-    {
-        ShipSelectLogic logic = Open("ship_01");
+    private static ShipSelectLogic OpenWithComingSoon(string? currentId) =>
+        new(GameMode.Race, "Circuit 01", CatalogWithComingSoon, currentId, ShipCatalog.Default);
 
-        Assert.Equal("ship_01", logic.ShipId);
-        Assert.Equal(1, logic.ShipIndex);
+    [Theory]
+    [InlineData("ship_02", 0)]
+    [InlineData("ship_01", 1)]
+    [InlineData("ship_03", 2)]
+    public void Open_RememberedShip_StartSelected(string id, int index)
+    {
+        ShipSelectLogic logic = Open(id);
+
+        Assert.Equal(id, logic.ShipId);
+        Assert.Equal(index, logic.ShipIndex);
         Assert.Equal(ShipSelectLogic.StartId, logic.Menu.Confirm());
     }
 
     [Theory]
-    [InlineData("ship_02")]
-    [InlineData("ship_03")]
     [InlineData("unknown")]
     [InlineData(null)]
-    public void Open_NotSelectableOrUnknown_Vector(string? id)
+    public void Open_Unknown_Vector(string? id)
     {
         ShipSelectLogic logic = Open(id);
 
@@ -138,9 +178,35 @@ public class ShipSelectLogicTests
     }
 
     [Fact]
+    public void AllShips_StartEnabled_AndReturnsItsId()
+    {
+        ShipSelectLogic logic = Open("ship_02");
+
+        foreach (string id in new[] { "ship_02", "ship_01", "ship_03" })
+        {
+            Assert.Equal(id, logic.ShipId);
+            Assert.True(logic.Menu.Options[0].Enabled);
+            Assert.Equal(ShipSelectLogic.StartId, logic.Menu.Confirm());
+            Assert.Equal(ShipSelectAction.Start, logic.Choose(ShipSelectLogic.StartId));
+            logic.NextShip();
+        }
+    }
+
+    [Theory]
+    [InlineData("ship_02")]
+    [InlineData("ship_03")]
+    public void ComingSoon_Open_NotSelectable_Vector(string id)
+    {
+        ShipSelectLogic logic = OpenWithComingSoon(id);
+
+        Assert.Equal("ship_01", logic.ShipId);
+        Assert.Equal(ShipSelectLogic.StartId, logic.Menu.Confirm());
+    }
+
+    [Fact]
     public void NextAndPrevious_WrapAndPassThroughNotSelectable()
     {
-        ShipSelectLogic logic = Open("ship_01");
+        ShipSelectLogic logic = OpenWithComingSoon("ship_01");
 
         logic.NextShip();
         Assert.Equal("ship_03", logic.ShipId);
@@ -158,7 +224,7 @@ public class ShipSelectLogicTests
     [Fact]
     public void NotSelectable_StartDisabled_BackSelected_ChooseStartDoesNothing()
     {
-        ShipSelectLogic logic = Open("ship_01");
+        ShipSelectLogic logic = OpenWithComingSoon("ship_01");
         logic.NextShip();
 
         Assert.False(logic.Menu.Options[0].Enabled);
@@ -172,7 +238,7 @@ public class ShipSelectLogicTests
     [Fact]
     public void BackToSelectable_StartSelectedAgain()
     {
-        ShipSelectLogic logic = Open("ship_01");
+        ShipSelectLogic logic = OpenWithComingSoon("ship_01");
         logic.NextShip();
         logic.PreviousShip();
 
@@ -189,6 +255,73 @@ public class ShipSelectLogicTests
         Assert.Equal(ShipSelectAction.BackToCircuitSelect, logic.Choose(ShipSelectLogic.BackId));
         Assert.Equal(ShipSelectAction.BackToCircuitSelect, logic.Back());
         Assert.Equal(ShipSelectAction.None, logic.Choose(null));
+    }
+}
+
+public class HologramFramingTests
+{
+    private static HologramBounds Bounds(ShipDefinition ship) => HologramFraming.BoundsOf(ship.Visual.BuildHull());
+
+    private static float Scale => HologramFraming.PixelsPerMeter(Bounds(VectorShip.Definition), 480f);
+
+    [Fact]
+    public void BoundsOf_CenterAndSize()
+    {
+        var hull = new[]
+        {
+            new ShipLine(new Vector3(-1f, 0f, -4f), new Vector3(3f, 2f, 0f), ShipLineColor.Cyan, 0),
+            new ShipLine(new Vector3(0f, -2f, 1f), new Vector3(1f, 1f, 2f), ShipLineColor.Blue, 1)
+        };
+
+        HologramBounds bounds = HologramFraming.BoundsOf(hull);
+
+        Assert.Equal(new Vector3(1f, 0f, -1f), bounds.Center);
+        Assert.Equal(new Vector3(4f, 4f, 6f), bounds.Size);
+    }
+
+    [Fact]
+    public void BoundsOf_EmptyHull_Zero()
+    {
+        Assert.Equal(0f, HologramFraming.BoundsOf(Array.Empty<ShipLine>()).SphereDiameter);
+    }
+
+    // Misma escala: el tamaño en pantalla es el ancho real de cada nave por los mismos px por metro
+    [Theory]
+    [InlineData(ShipCatalog.Ship01, 480f)]
+    [InlineData(ShipCatalog.Ship02, 225.9f)]
+    [InlineData(ShipCatalog.Ship03, 352.9f)]
+    public void CommonScale_WidthOnScreen(string id, float expected)
+    {
+        Assert.Equal(expected, Bounds(ShipDefinitions.Find(id)).Size.X * Scale, 0.1f);
+    }
+
+    [Fact]
+    public void CameraDistance_ThatKeepsTheScale()
+    {
+        const float Focal = 1100f;
+
+        float distance = HologramFraming.CameraDistance(Focal, Scale);
+
+        Assert.Equal(480f, Bounds(VectorShip.Definition).Size.X * Focal / distance, 0.01f);
+    }
+
+    [Theory]
+    [InlineData(ShipCatalog.Ship01, 9.95f)]
+    [InlineData(ShipCatalog.Ship02, 9.38f)]
+    [InlineData(ShipCatalog.Ship03, 8.40f)]
+    public void SphereDiameter_OfEachShip(string id, float expected)
+    {
+        Assert.Equal(expected, Bounds(ShipDefinitions.Find(id)).SphereDiameter, 0.02f);
+    }
+
+    // Aviso: si una nave nueva lo pasa, se saldrá más que Vector al girar y habrá que calcular la escala con la más grande
+    [Fact]
+    public void NoShipHasASphereLargerThanVector()
+    {
+        float vector = Bounds(VectorShip.Definition).SphereDiameter;
+
+        foreach (ShipDefinition ship in ShipDefinitions.All)
+            Assert.True(Bounds(ship).SphereDiameter <= vector, $"{ship.Id} no cabe donde cabe Vector");
     }
 }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Vectory.Ship;
 
 namespace Vectory.Ghost;
 
@@ -19,4 +20,7 @@ public sealed record GhostRecording
 	public double LapTime { get; init; }
 	public int SampleRate { get; init; }
 	public IReadOnlyList<GhostSample> Samples { get; init; } = Array.Empty<GhostSample>();
+
+	// La nave con la que se hizo la vuelta, sea cual sea la que corre ahora. Con un id desconocido, la de por defecto.
+	public ShipDefinition Ship(Action<string> warn = null) => ShipDefinitions.Resolve(ShipDesignId, warn);
 }

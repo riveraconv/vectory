@@ -1,6 +1,8 @@
 using Godot;
 using Vectory.Core;
 using Vectory.Game;
+using Vectory.Records;
+using Vectory.Ship;
 using Vectory.UI;
 
 namespace Vectory.Menu;
@@ -52,11 +54,14 @@ public partial class MainMenu : CanvasLayer
 	private CircuitSelectScreen _circuitSelect;
 	private ShipSelectScreen _shipSelect;
 	private float _scale = 1f;
+	private static bool _lastShipRestored;   // sobrevive al cambio de escena: al volver de una carrera no se vuelve a leer
 
 	public override void _Ready()
 	{
 		Layer = 2;   // por encima de la sombra izquierda del fondo (capa 1)
 		_scale = UiScale.Factor;
+
+		RestoreLastShip();
 
 		_model = new MenuModel(Options);
 
@@ -95,6 +100,21 @@ public partial class MainMenu : CanvasLayer
 		_shipSelect = new ShipSelectScreen { Name = "ShipSelect", RaceScenePath = RaceScenePath };
 		AddChild(_shipSelect);
 		_shipSelect.Closed += mode => _circuitSelect.Open(mode);
+	}
+
+	// La primera vez que se abre el menú, la sesión empieza con la última nave elegida
+	private static void RestoreLastShip()
+	{
+		if (_lastShipRestored)
+			return;
+		_lastShipRestored = true;
+
+		var store = new SettingsStore(new FileRecordStorage(SettingsStore.DefaultPath));
+		store.Load();
+		if (store.Warning != null)
+			GD.PushWarning($"Settings: {store.Warning}");
+
+		GameSession.ShipDesignId = ShipCatalog.StartShip(store.Settings.LastShipDesignId);
 	}
 
 	public override void _Process(double delta)

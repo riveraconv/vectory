@@ -12,12 +12,12 @@ public sealed record ShipDefinition(string Id, ShipTuning Technical, ShipVisualP
 // Las definiciones por id. Tener definición no basta para poder elegir una nave: eso lo dice ShipCatalog.
 public static class ShipDefinitions
 {
-	// Vector → Hoja → Martillo: el orden del panel de ajuste
+	// Vector → Blade → Hammer: el orden del panel de ajuste
 	public static readonly IReadOnlyList<ShipDefinition> All = new[]
 	{
 		VectorShip.Definition,
-		HojaShip.Definition,
-		MartilloShip.Definition
+		BladeShip.Definition,
+		HammerShip.Definition
 	};
 
 	private static readonly Dictionary<string, ShipDefinition> ById = All.ToDictionary(d => d.Id);

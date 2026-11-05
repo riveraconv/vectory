@@ -91,6 +91,58 @@ public class RecordFileCompatibilityTests
     }
 
     [Fact]
+    public void SaveWithBlade_Reload_IsOfBlade()
+    {
+        var storage = new MemoryRecordStorage();
+        var store = new RecordStore(storage);
+        store.Load();
+        store.Book.SubmitTimeTrialLap("circuit_01", 72.0, new[] { 20.0, 45.0, 60.0 }, When, "ship_02");
+        store.Book.SubmitRace("circuit_01", 230.0, 75.0, When, "ship_03");
+        store.Save();
+
+        var reloaded = new RecordStore(storage);
+        reloaded.Load();
+
+        Assert.Null(reloaded.Warning);
+        Assert.Equal("ship_02", reloaded.Book.GetTimeTrial("circuit_01").ShipDesignId);
+        Assert.Equal("ship_03", reloaded.Book.GetRace("circuit_01").TotalTime.ShipDesignId);
+        Assert.Equal("ship_03", reloaded.Book.GetRace("circuit_01").BestLap.ShipDesignId);
+    }
+
+    [Fact]
+    public void RecordWithoutShip_LoadsAsVector_AndTheVersionDoesNotChange()
+    {
+        const string json = """
+        { "version": 1, "circuits": { "circuit_01": {
+            "timeTrial": { "lapTime": 72.384, "date": "2026-10-29" },
+            "race": { "totalTime": { "time": 230.5 }, "bestLap": { "time": 75.25 } } } } }
+        """;
+
+        Assert.True(RecordBook.TryFromJson(json, out RecordBook book, out string error), error);
+
+        Assert.Equal("ship_01", book.GetTimeTrial("circuit_01").ShipDesignId);
+        Assert.Equal("ship_01", book.GetRace("circuit_01").TotalTime.ShipDesignId);
+        Assert.Equal("ship_01", book.GetRace("circuit_01").BestLap.ShipDesignId);
+        Assert.Equal(1, RecordBook.FormatVersion);
+    }
+
+    [Fact]
+    public void RecordWithUnknownShip_Loads_AndTheViewShowsNoShip()
+    {
+        const string json = """
+        { "version": 1, "circuits": { "circuit_01": {
+            "timeTrial": { "lapTime": 72.384, "date": "2026-10-29", "shipDesignId": "ship_99" } } } }
+        """;
+
+        Assert.True(RecordBook.TryFromJson(json, out RecordBook book, out string error), error);
+        TimeTrialRecord record = book.GetTimeTrial("circuit_01");
+
+        Assert.Equal(72.384, record.LapTime);
+        Assert.Equal("ship_99", record.ShipDesignId);
+        Assert.Equal("29 OCT 2026", RecordFormat.DateAndShip(true, record.Date, record.ShipDesignId));
+    }
+
+    [Fact]
     public void NewRecords_StoreDateAsLocalDay()
     {
         var book = new RecordBook();

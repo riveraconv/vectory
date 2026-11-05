@@ -7,7 +7,7 @@ using Vectory.Menu;
 namespace Vectory.UI;
 
 // Pantalla de resultados: franja horizontal como la de la pausa (MenuBand), con tres columnas:
-//   izquierda: RACE FINISHED y la posición final (1st / 8)
+//   izquierda: RACE FINISHED, la posición final (1st / 8) y la nave con la que se ha corrido
 //   centro:    tiempo total, mejor vuelta (NEW RECORD si baten el récord de RACE) y mejor tiempo
 //              de cada sector, con la vuelta en que se hizo
 //   derecha:   opciones RESTART RACE / BACK TO MAIN MENU (OptionList)
@@ -28,6 +28,7 @@ public partial class ResultsView : Control
 	private const float VerticalPadding = 20f;     // hueco mínimo arriba y abajo del contenido antes de que la franja crezca
 	private const float SectorNameWidth = 44f;
 	private const float SectorTimeWidth = 130f;
+	private const float ShipNameGap = 14f;         // entre la posición y el nombre de la nave
 
 	// Se lanza al hacer clic en una opción, con su identificador
 	public event Action<string> OptionChosen;
@@ -43,9 +44,9 @@ public partial class ResultsView : Control
 	}
 
 	// bandHeight: alto de la franja (px sobre 1280×720). optionFontSize: tamaño máximo de las opciones;
-	// si BACK TO MAIN MENU no cabe antes del borde derecho, se reduce.
+	// si BACK TO MAIN MENU no cabe antes del borde derecho, se reduce. shipNameFontSize: tamaño del nombre de la nave.
 	// newTotalRecord / newLapRecord: el tiempo total o la mejor vuelta baten el récord de RACE del circuito
-	public void SetResult(RaceResult result, MenuModel options, float bandHeight, int optionFontSize,
+	public void SetResult(RaceResult result, MenuModel options, float bandHeight, int optionFontSize, int shipNameFontSize,
 		bool newTotalRecord = false, bool newLapRecord = false)
 	{
 		foreach (Node child in GetChildren())
@@ -60,7 +61,7 @@ public partial class ResultsView : Control
 		_band.AddSeparator(470f, SeparatorHeight);
 		_band.AddSeparator(860f, SeparatorHeight);
 
-		BuildResultColumn(result);
+		BuildResultColumn(result, shipNameFontSize);
 		BuildTimesColumn(result, newTotalRecord, newLapRecord);
 		BuildOptionsColumn(options, optionFontSize);
 
@@ -82,16 +83,31 @@ public partial class ResultsView : Control
 	// Columnas
 	// ---------------------------------------------------------------
 
-	private void BuildResultColumn(RaceResult result)
+	private void BuildResultColumn(RaceResult result, int shipNameFontSize)
 	{
 		VBoxContainer column = _band.AddColumn("Result", ResultLeft, 18f);
 
 		column.AddChild(MakeLabel("RACE FINISHED", MenuFonts.Orbitron, 900, 34f, 0.08f, Palette.Cyan, Palette.MenuTitleGlow, 14f));
 
 		var position = Row(0f);
+		if (!string.IsNullOrEmpty(result.ShipName))
+			position.AddChild(ShipNameBelow(result.ShipName, shipNameFontSize));
 		position.AddChild(MakeLabel(Ordinal(result.Position), MenuFonts.Orbitron, 700, 80f, 0.04f, Palette.Cyan, Palette.PauseTitleGlow, 16f));
 		position.AddChild(MakeLabel($" / {result.ParticipantCount}", MenuFonts.Orbitron, 500, 36f, 0.04f, Palette.BlueGray));
 		column.AddChild(position);
+	}
+
+	// Nombre de la nave colgado debajo de la fila de la posición, sin ocupar sitio en ella: la columna va centrada y, si
+	// midiera más, RACE FINISHED y la posición subirían
+	private Control ShipNameBelow(string shipName, int fontSize)
+	{
+		var anchor = new Control { MouseFilter = MouseFilterEnum.Ignore };
+		Label name = MakeLabel(shipName, MenuFonts.Mono, 400, fontSize, 0.18f, Palette.BlueGray);
+		name.AnchorTop = 1f;
+		name.AnchorBottom = 1f;
+		name.OffsetTop = S(ShipNameGap);
+		anchor.AddChild(name);
+		return anchor;
 	}
 
 	private void BuildTimesColumn(RaceResult result, bool newTotalRecord, bool newLapRecord)

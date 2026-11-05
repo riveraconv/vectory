@@ -51,6 +51,7 @@ public partial class Main : Node3D
 	[Export] public float ResultsDelay = 1.5f;    // segundos desde la meta hasta la pantalla de resultados
 	[Export] public float ResultsBandHeight = 340f;   // alto de la franja de resultados (px sobre 1280×720)
 	[Export] public int ResultsOptionFontSize = 24;   // opciones RESTART RACE / BACK TO MAIN MENU (máximo: se reduce si no caben)
+	[Export] public int ResultsShipNameFontSize = 16; // nombre de la nave, bajo la posición (px sobre 1280×720)
 	[Export(PropertyHint.File, "*.tscn")] public string MainMenuScenePath = SceneChanger.MainMenuScene;
 
 	[ExportGroup("Time Trial")]
@@ -193,7 +194,9 @@ public partial class Main : Node3D
 			float noseDistance = _player.Definition.Visual.NoseDistance;
 			_track.GetGridStart(gridOrder[0], noseDistance, out Vector3 startPosition, out float startYaw);
 			_player.PlaceAt(startPosition, startYaw);
-			_race = RaceSession.ForRace(_track, BuildStartSettings(), participants);
+			// La nave de la sesión: Definition no cambia aunque se use F10 en la carrera
+			string shipName = ShipCatalog.Find(_player.Definition.Id)?.Name ?? "";
+			_race = RaceSession.ForRace(_track, BuildStartSettings(), participants, shipName);
 			_track.Elements.ShowGrid(gridOrder[0], noseDistance);
 		}
 		_player.SetRaceSession(_race);
@@ -349,7 +352,7 @@ public partial class Main : Node3D
 				return;
 
 			_resultsMenu = new MenuModel(ResultsOptions);
-			_hud.ShowResults(_race.Tracker.Result, _resultsMenu, ResultsBandHeight, ResultsOptionFontSize,
+			_hud.ShowResults(_race.Tracker.Result, _resultsMenu, ResultsBandHeight, ResultsOptionFontSize, ResultsShipNameFontSize,
 				_raceRecords.NewTotalTime, _raceRecords.NewBestLap);
 			_resultsShown = true;
 			return;   // el Enter de este frame no elige todavía
@@ -457,7 +460,7 @@ public partial class Main : Node3D
 			return;
 		}
 
-		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now);
+		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now, GameSession.ShipDesignId);
 		LapBandContent content;
 		if (result.IsNewRecord)
 		{
@@ -516,7 +519,7 @@ public partial class Main : Node3D
 			return;
 		}
 
-		_raceRecords =_records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now);
+		_raceRecords =_records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now, GameSession.ShipDesignId);
 		if (_raceRecords.NewTotalTime || _raceRecords.NewBestLap)
 			SaveRecords();
 	}
@@ -590,7 +593,7 @@ public partial class Main : Node3D
 			AddChild(_ghostShip);
 		}
 		if (_ghost != null)
-			_ghostShip.SetVisual(ShipDefinitions.Resolve(_ghost.ShipDesignId, message => GD.PushWarning(message)).Visual);
+			ShowGhostShipHull();
 
 		_pause.EnableGhostOption(_settings.Settings.GhostEnabled, () => _ghost != null);
 		_pause.GhostToggled += OnGhostToggled;
@@ -622,10 +625,17 @@ public partial class Main : Node3D
 			CheckpointCount = _track.CheckpointIndices.Count,
 			ShipDesignId = GameSession.ShipDesignId
 		};
+		ShowGhostShipHull();
 		if (_ghosts.Save(_ghost))
 			GD.Print($"[Ghost] New ghost saved ({_ghost.Samples.Count} samples)");
 		else
 			GD.PushWarning($"Ghost: {_ghosts.Warning}");
+	}
+
+	// El casco del fantasma es el de la nave con la que se hizo la vuelta, no el de la que corre ahora
+	private void ShowGhostShipHull()
+	{
+		_ghostShip.SetVisual(_ghost.Ship(message => GD.PushWarning(message)).Visual);
 	}
 
 	private void OnGhostToggled(bool enabled)

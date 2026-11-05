@@ -1,19 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Vectory.Ship;
 
 namespace Vectory.Records;
 
 // Lectura tolerante del archivo (para poder ampliar el formato sin romper archivos existentes):
 // los campos desconocidos se ignoran y los opcionales (fecha, tiempos de paso...) pueden faltar.
 // Solo lo marcado con [JsonRequired] es imprescindible: si falta, el archivo se trata como corrupto.
+// ShipDesignId: la nave con la que se hizo. Un récord anterior a este campo era de Vector, la única que había: si falta,
+// se queda con ese valor inicial. Un id que no está en el catálogo se carga igual (RecordFormat no enseña nave).
 
-// Un tiempo récord y cuándo se hizo (fecha local yyyy-MM-dd; los récords antiguos pueden traer
-// la fecha ISO completa o no traer ninguna)
+// Un tiempo récord, cuándo se hizo (fecha local yyyy-MM-dd; los récords antiguos pueden traer
+// la fecha ISO completa o no traer ninguna) y con qué nave
 public sealed class TimedRecord
 {
 	[JsonRequired] public double Time { get; set; }
 	public string Date { get; set; } = "";
+	public string ShipDesignId { get; set; } = ShipCatalog.Default;
 }
 
 // Récord de TIME TRIAL de un circuito: la mejor vuelta y sus tiempos de paso por cada checkpoint
@@ -23,6 +27,7 @@ public sealed class TimeTrialRecord
 	[JsonRequired] public double LapTime { get; set; }
 	public double[] Splits { get; set; } = Array.Empty<double>();
 	public string Date { get; set; } = "";
+	public string ShipDesignId { get; set; } = ShipCatalog.Default;
 
 	// Los tiempos de paso solo sirven para el delta si son del mismo número de checkpoints que el circuito actual
 	public bool SplitsMatch(int checkpointCount) => Splits != null && Splits.Length == checkpointCount && checkpointCount > 0;

@@ -5,11 +5,11 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-// Cabina de MARTILLO: BÚNKER (Cab_Martillo_1 de designs/cabinas-hoja-martillo-def.js), traducida tal cual: mismos
+// Cabina de HAMMER: BÚNKER (Cab_Martillo_1 de designs/cabinas-hoja-martillo-def.js), traducida tal cual: mismos
 // puntos, orden, colores y opacidades, y las mismas fórmulas, también el generador del desgaste con su semilla.
 // Cristal dividido por barras gruesas, dial central con aguja, boost con tapas de seguridad y daño en placas.
 // Pantalla de 1280×720. Lógica pura.
-public static class MartilloCockpit
+public static class HammerCockpit
 {
 	private const float DialX = 640f;
 	private const float DialY = 672f;
