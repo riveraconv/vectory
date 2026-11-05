@@ -57,9 +57,13 @@ public partial class Hud : CanvasLayer
 	private Label _sectorDeltaLabel;
 	private float _sectorElapsed = -1f;   // < 0: sin tiempo de sector a la vista
 	private Label _speedLabel;
+	private Label _speedUnitLabel;
 	private ColorRect _speedFill;
+	private Control _speedBar;
 	private BoostChargesView _boostCharges;
 	private DamageIndicatorView _damage;
+	private bool _damageEnabled;
+	private bool _driveHudVisible = true;
 	private StartLightsView _startLights;
 	private ResultsView _results;
 	private VBoxContainer _timeTrialHeader;
@@ -117,7 +121,19 @@ public partial class Hud : CanvasLayer
 	// RACE: muestra el indicador de daño (en TIME TRIAL no se llama y no se ve)
 	public void ShowDamageIndicator()
 	{
-		_damage.Visible = true;
+		_damageEnabled = true;
+		_damage.Visible = _driveHudVisible;
+	}
+
+	// Velocidad, boost y daño en pantalla. En la vista de cabina salen en el cuadro de mando y aquí se ocultan.
+	public void SetDriveHudVisible(bool visible)
+	{
+		_driveHudVisible = visible;
+		_speedBar.Visible = visible;
+		_speedLabel.Visible = visible;
+		_speedUnitLabel.Visible = visible;
+		_boostCharges.Visible = visible;
+		_damage.Visible = visible && _damageEnabled;
 	}
 
 	// Nivel de daño (0–3) del indicador
@@ -329,12 +345,13 @@ public partial class Hud : CanvasLayer
 	private void BuildSpeedBlock(Control root)
 	{
 		AddBar(root, Palette.Cyan, 36f, out _speedFill);
+		_speedBar = _speedFill.GetParent<Control>();
 
 		_speedLabel = AddLabel(root, "0", 56, Palette.Cyan,
 			HorizontalAlignment.Right, VerticalAlignment.Bottom,
 			Corner.BottomRight, Margin + 80f, 52f, BarWidth - 80f, 64f);
 
-		AddLabel(root, "KM/H", 20, Palette.BlueGray,
+		_speedUnitLabel = AddLabel(root, "KM/H", 20, Palette.BlueGray,
 			HorizontalAlignment.Right, VerticalAlignment.Bottom,
 			Corner.BottomRight, Margin, 52f, 76f, 64f);
 

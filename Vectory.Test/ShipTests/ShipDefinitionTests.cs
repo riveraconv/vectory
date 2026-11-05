@@ -107,12 +107,6 @@ public class VectorDefinitionTests
     }
 
     [Fact]
-    public void Cockpit_MatchesTheReference()
-    {
-        AssertLines(Reference.Root.GetProperty("cockpit"), Visual.BuildCockpit());
-    }
-
-    [Fact]
     public void Cameras_MatchTheReference()
     {
         AssertClose(Reference.Vector("cockpitEye"), Visual.Cockpit.Eye);

@@ -4,10 +4,11 @@ using System.Numerics;
 namespace Vectory.Ship;
 
 // VANGUARD · MARTILLO (ship_03): más aceleración y agarre que Vector, a cambio de punta, giro y frenada. Lógica pura.
-// Casco: Vanguard_C de designs/naves-geometria.js. La cabina y el ojo son, de momento, los de Vector (spec 3b).
+// Casco: Vanguard_C de designs/naves-geometria.js. Cabina: BÚNKER, de designs/cabinas-hoja-martillo-def.js.
 public static class MartilloShip
 {
 	private const float ChaseFactor = 0.92f;   // 6,6 m de largo frente a los 7,2 de Vector
+	private const float EyeHeightFactor = 1.4f;    // 1,40 m de alto frente al 1,0 de Vector
 
 	private static readonly ShipMultipliers Multipliers = new()
 	{
@@ -24,6 +25,11 @@ public static class MartilloShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
+			BuildCockpit = MartilloCockpit.Build,
+			Cockpit = VectorShip.Definition.Visual.Cockpit with
+			{
+				Eye = VectorShip.Definition.Visual.Cockpit.Eye * new Vector3(1f, EyeHeightFactor, 1f)
+			},
 			ChaseFactor = ChaseFactor,
 			Chase = VectorShip.Definition.Visual.Chase.Scaled(ChaseFactor),
 			CollisionHalfWidth = 2.5f,   // las puntas del canard
