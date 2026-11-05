@@ -13,7 +13,8 @@ public class ShipCatalogTests
     [Fact]
     public void Entries_InSelectorOrder_OnlyVectorSelectable()
     {
-        Assert.Equal(new[] { "INTERCEPTOR", "VECTOR", "VANGUARD" }, ShipCatalog.Entries.Select(e => e.Name));
+        Assert.Equal(new[] { "BLADE", "VECTOR", "HAMMER" }, ShipCatalog.Entries.Select(e => e.Name));
+        Assert.Equal(new[] { "ship_02", "ship_01", "ship_03" }, ShipCatalog.Entries.Select(e => e.Id));
         Assert.Equal(new[] { ShipCatalog.Ship01 }, ShipCatalog.Entries.Where(e => e.Selectable).Select(e => e.Id));
     }
 

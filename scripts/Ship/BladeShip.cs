@@ -3,9 +3,9 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-// INTERCEPTOR · HOJA (ship_02): más punta y menos agarre que Vector. Lógica pura.
+// BLADE (ship_02): más punta y menos agarre que Vector. Lógica pura.
 // Casco: Interceptor_E de designs/naves-geometria.js. Cabina: BURBUJA, de designs/cabinas-hoja-martillo-def.js.
-public static class HojaShip
+public static class BladeShip
 {
 	private const float ChaseFactor = 1.22f;   // 8,8 m de largo frente a los 7,2 de Vector
 	private const float EyeHeightFactor = 0.62f;   // 0,62 m de alto frente al 1,0 de Vector
@@ -25,7 +25,7 @@ public static class HojaShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			BuildCockpit = HojaCockpit.Build,
+			BuildCockpit = BladeCockpit.Build,
 			Cockpit = VectorShip.Definition.Visual.Cockpit with
 			{
 				Eye = VectorShip.Definition.Visual.Cockpit.Eye * new Vector3(1f, EyeHeightFactor, 1f)

@@ -20,9 +20,9 @@ public class ShipTechnicalProfileTests
     }
 
     [Fact]
-    public void Hoja_MultipliersOverVector_RestUnchanged()
+    public void Blade_MultipliersOverVector_RestUnchanged()
     {
-        ShipTuning t = HojaShip.Definition.Technical;
+        ShipTuning t = BladeShip.Definition.Technical;
 
         Assert.Equal(Vector.MaxSpeed * 1.08f, t.MaxSpeed);
         Assert.Equal(Vector.Acceleration * 0.94f, t.Acceleration);
@@ -33,9 +33,9 @@ public class ShipTechnicalProfileTests
     }
 
     [Fact]
-    public void Martillo_MultipliersOverVector_RestUnchanged()
+    public void Hammer_MultipliersOverVector_RestUnchanged()
     {
-        ShipTuning t = MartilloShip.Definition.Technical;
+        ShipTuning t = HammerShip.Definition.Technical;
 
         Assert.Equal(Vector.MaxSpeed * 0.94f, t.MaxSpeed);
         Assert.Equal(Vector.Acceleration * 1.10f, t.Acceleration);
@@ -84,9 +84,9 @@ public class ShipTechnicalStatsTests
     [InlineData(ShipStats.Handling, "74 °/S", 5)]
     [InlineData(ShipStats.Grip, "", 1)]
     [InlineData(ShipStats.Braking, "200–0 · 1.2 S", 6)]
-    public void Hoja(string label, string value, int segments)
+    public void Blade(string label, string value, int segments)
     {
-        ShipStat stat = Stat(HojaShip.Definition, label);
+        ShipStat stat = Stat(BladeShip.Definition, label);
 
         Assert.Equal(value, stat.Value);
         Assert.Equal(segments, stat.Segments);
@@ -98,9 +98,9 @@ public class ShipTechnicalStatsTests
     [InlineData(ShipStats.Handling, "72 °/S", 3)]
     [InlineData(ShipStats.Grip, "", 7)]
     [InlineData(ShipStats.Braking, "200–0 · 1.3 S", 3)]
-    public void Martillo(string label, string value, int segments)
+    public void Hammer(string label, string value, int segments)
     {
-        ShipStat stat = Stat(MartilloShip.Definition, label);
+        ShipStat stat = Stat(HammerShip.Definition, label);
 
         Assert.Equal(value, stat.Value);
         Assert.Equal(segments, stat.Segments);
@@ -128,8 +128,8 @@ public class ShipCollisionWidthTests
     public void CollisionHalfWidth_OfEachShip()
     {
         Assert.Equal(3.4f, VectorShip.Definition.Visual.CollisionHalfWidth);
-        Assert.Equal(1.6f, HojaShip.Definition.Visual.CollisionHalfWidth);
-        Assert.Equal(2.5f, MartilloShip.Definition.Visual.CollisionHalfWidth);
+        Assert.Equal(1.6f, BladeShip.Definition.Visual.CollisionHalfWidth);
+        Assert.Equal(2.5f, HammerShip.Definition.Visual.CollisionHalfWidth);
     }
 
     [Fact]
@@ -138,11 +138,11 @@ public class ShipCollisionWidthTests
         const float Lateral = 17.5f;
 
         Assert.True(Touches(VectorShip.Definition, Lateral));
-        Assert.False(Touches(MartilloShip.Definition, Lateral));
-        Assert.False(Touches(HojaShip.Definition, Lateral));
+        Assert.False(Touches(HammerShip.Definition, Lateral));
+        Assert.False(Touches(BladeShip.Definition, Lateral));
 
-        Assert.True(Touches(MartilloShip.Definition, 18.2f));
-        Assert.False(Touches(HojaShip.Definition, 18.2f));
+        Assert.True(Touches(HammerShip.Definition, 18.2f));
+        Assert.False(Touches(BladeShip.Definition, 18.2f));
     }
 
     private static bool Touches(ShipDefinition ship, float lateral)
@@ -164,8 +164,8 @@ public class ShipDefinitionResolutionTests
     [Fact]
     public void Resolve_EachShip_ItsOwnDefinition()
     {
-        Assert.Same(HojaShip.Definition, ShipDefinitions.Resolve("ship_02"));
-        Assert.Same(MartilloShip.Definition, ShipDefinitions.Resolve("ship_03"));
+        Assert.Same(BladeShip.Definition, ShipDefinitions.Resolve("ship_02"));
+        Assert.Same(HammerShip.Definition, ShipDefinitions.Resolve("ship_03"));
         Assert.Same(VectorShip.Definition, ShipDefinitions.Resolve("nope"));
     }
 
@@ -189,7 +189,7 @@ public class TuningLabTests
 
         Assert.False(lab.Touched);
         Assert.Equal(ShipCatalog.Ship01, lab.Current.Id);
-        Assert.Equal(HojaShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship02));
+        Assert.Equal(BladeShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship02));
         Assert.Equal(8, lab.Percent(ShipCatalog.Ship02, ShipParameter.MaxSpeed));
         Assert.Equal(-6, lab.Percent(ShipCatalog.Ship03, ShipParameter.MaxSpeed));
     }
@@ -201,7 +201,7 @@ public class TuningLabTests
     }
 
     [Fact]
-    public void Cycle_VectorHojaMartilloVector()
+    public void Cycle_VectorBladeHammerVector()
     {
         TuningLab lab = Open();
 
@@ -221,7 +221,7 @@ public class TuningLabTests
         Assert.True(lab.SetPercent(ShipCatalog.Ship02, ShipParameter.LateralGrip, 5));
 
         Assert.Equal(VectorTuning.LateralGrip * 1.05f, lab.Tuning(ShipCatalog.Ship02).LateralGrip);
-        Assert.Equal(MartilloShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship03));
+        Assert.Equal(HammerShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship03));
         Assert.Equal(VectorShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship01));
     }
 
@@ -255,8 +255,8 @@ public class TuningLabTests
 
         lab.Reset(ShipCatalog.Ship02);
 
-        Assert.Same(HojaShip.Definition.Multipliers, lab.Multipliers(ShipCatalog.Ship02));
-        Assert.Equal(HojaShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship02));
+        Assert.Same(BladeShip.Definition.Multipliers, lab.Multipliers(ShipCatalog.Ship02));
+        Assert.Equal(BladeShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship02));
     }
 
     [Fact]

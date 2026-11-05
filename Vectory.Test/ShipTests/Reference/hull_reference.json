@@ -1,6 +1,6 @@
 {
  "source": "designs/naves-geometria.js",
- "hoja": [
+ "blade": [
   {
    "a": [
     0,
@@ -1934,7 +1934,7 @@
    "color": "245bff"
   }
  ],
- "martillo": [
+ "hammer": [
   {
    "a": [
     0,

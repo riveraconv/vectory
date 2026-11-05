@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Vectory.Test.ShipTests;
 
-// Cascos de Hoja y Martillo (spec docs/naves-3-cascos.md). El casco de Vector ya se compara con su captura en
+// Cascos de Blade y Hammer (spec docs/naves-3-cascos.md). El casco de Vector ya se compara con su captura en
 // VectorDefinitionTests.
 public class ShipHullTests
 {
@@ -18,8 +18,8 @@ public class ShipHullTests
     private static IEnumerable<Vector3> Points(IReadOnlyList<ShipLine> hull) => hull.SelectMany(l => new[] { l.A, l.B });
 
     [Theory]
-    [InlineData(ShipCatalog.Ship02, "hoja")]
-    [InlineData(ShipCatalog.Ship03, "martillo")]
+    [InlineData(ShipCatalog.Ship02, "blade")]
+    [InlineData(ShipCatalog.Ship03, "hammer")]
     public void Hull_MatchesTheCaptureOfTheDesign_SegmentBySegment(string id, string captureName)
     {
         const float Tolerance = 1e-5f;

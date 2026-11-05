@@ -62,7 +62,7 @@ public sealed class TuningLab
 		return true;
 	}
 
-	// Siguiente nave: Vector → Hoja → Martillo → Vector
+	// Siguiente nave: Vector → Blade → Hammer → Vector
 	public void Cycle()
 	{
 		_current = (_current + 1) % _ships.Count;

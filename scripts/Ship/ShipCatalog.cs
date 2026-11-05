@@ -17,9 +17,9 @@ public static class ShipCatalog
 
 	public static readonly IReadOnlyList<ShipEntry> Entries = new[]
 	{
-		new ShipEntry(Ship02, "INTERCEPTOR", "HIGH TOP SPEED · LOW TOLERANCE", false),
+		new ShipEntry(Ship02, "BLADE", "HIGH TOP SPEED · LOW TOLERANCE", false),
 		new ShipEntry(Ship01, "VECTOR", "BALANCED · ALL-ROUND", true),
-		new ShipEntry(Ship03, "VANGUARD", "HIGH ACCELERATION · STRONG LAUNCH", false)
+		new ShipEntry(Ship03, "HAMMER", "HIGH ACCELERATION · STRONG LAUNCH", false)
 	};
 
 	public static readonly IReadOnlyList<string> Ids = Entries.Select(e => e.Id).ToArray();

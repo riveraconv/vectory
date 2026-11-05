@@ -7,7 +7,7 @@ namespace Vectory.Ship;
 // Sección en rombo de un casco: arriba, derecha, abajo e izquierda, con los lados a la altura Side
 public readonly record struct LoftSection(float Z, float HalfWidth, float Top, float Bottom, float Side = 0.1f);
 
-// Piezas con las que se construyen los cascos de Hoja y Martillo, traducidas de designs/naves-geometria.js: mismos
+// Piezas con las que se construyen los cascos de Blade y Hammer, traducidas de designs/naves-geometria.js: mismos
 // puntos, mismo orden y mismos colores, así sus líneas coinciden con la captura de referencia. Cada línea es una
 // arista. El casco de Vector tiene su propio constructor: sus líneas van en otro orden. Lógica pura.
 public sealed class ShipHullBuilder
