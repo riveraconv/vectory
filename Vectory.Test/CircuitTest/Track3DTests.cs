@@ -11,7 +11,7 @@ public class Track3DTests
     private const float Deg = MathF.PI / 180f;
 
     // Eje de TEST OVAL (plano) con los perfiles que se pasen
-    private static TrackFrame OvalWith(Vector2[] elevation, Vector2[] bank, ICollection<string> warnings = null)
+    private static TrackFrame OvalWith(Vector2[] elevation, Vector2[] bank, ICollection<string>? warnings = null)
     {
         List<Vector3> plan = TrackFile.Load("test_oval").Centerline();
         float lap = CenterlineBuilder.CumulativeDistances(plan)[plan.Count];
