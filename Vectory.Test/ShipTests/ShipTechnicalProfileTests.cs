@@ -185,6 +185,52 @@ public class TuningLabTests
     private static TuningLab Open(string currentId = ShipCatalog.Ship01) => new(ShipDefinitions.All, currentId);
 
     [Fact]
+    public void MoveTo_BecomesCurrent_AndCycleGoesOnFromIt()
+    {
+        TuningLab lab = Open(ShipCatalog.Ship01);
+
+        lab.MoveTo(ShipCatalog.Ship03);
+        Assert.Equal(ShipCatalog.Ship03, lab.Current.Id);
+
+        lab.Cycle();
+        Assert.Equal(ShipCatalog.Ship01, lab.Current.Id);
+    }
+
+    [Fact]
+    public void MoveTo_DoesNotTouchTheLab()
+    {
+        TuningLab lab = Open(ShipCatalog.Ship01);
+
+        lab.MoveTo(ShipCatalog.Ship02);
+
+        Assert.False(lab.Touched);
+    }
+
+    [Fact]
+    public void MoveTo_KeepsTheTunedValuesOfAllShips_AndTouchedStays()
+    {
+        TuningLab lab = Open(ShipCatalog.Ship02);
+        lab.SetPercent(ShipCatalog.Ship02, ShipParameter.MaxSpeed, 15);
+        lab.SetPercent(ShipCatalog.Ship03, ShipParameter.TurnRate, -12);
+
+        lab.MoveTo(ShipCatalog.Ship03);
+
+        Assert.True(lab.Touched);
+        Assert.Equal(15, lab.Percent(ShipCatalog.Ship02, ShipParameter.MaxSpeed));
+        Assert.Equal(-12, lab.Percent(ShipCatalog.Ship03, ShipParameter.TurnRate));
+    }
+
+    [Fact]
+    public void MoveTo_UnknownId_ChangesNothing()
+    {
+        TuningLab lab = Open(ShipCatalog.Ship02);
+
+        lab.MoveTo("nope");
+
+        Assert.Equal(ShipCatalog.Ship02, lab.Current.Id);
+    }
+
+    [Fact]
     public void Starts_Untouched_WithTheValuesOfTheDefinitions()
     {
         TuningLab lab = Open();

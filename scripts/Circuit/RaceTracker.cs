@@ -105,6 +105,9 @@ namespace Vectory.Circuit
         /// <summary>Resultado de la carrera (null hasta terminar).</summary>
         public RaceResult Result { get; private set; }
 
+        /// <summary>Nombre de la nave que corre: solo lo lleva el resultado.</summary>
+        public string ShipName { get; init; } = "";
+
         /// <summary>Se lanza al pasar un checkpoint en el orden correcto (índice del checkpoint).</summary>
         public event Action<int> CheckpointPassed;
 
@@ -268,7 +271,7 @@ namespace Vectory.Circuit
                 sectors[i] = new SectorBest(_bestSectorTimes[i] ?? 0, _bestSectorLaps[i] ?? 0);
 
             return new RaceResult(FinalPosition ?? 1, ParticipantCount, TotalTime,
-                BestLapTime ?? 0, BestLapNumber ?? 0, Array.AsReadOnly(sectors));
+                BestLapTime ?? 0, BestLapNumber ?? 0, Array.AsReadOnly(sectors), ShipName);
         }
     }
 }

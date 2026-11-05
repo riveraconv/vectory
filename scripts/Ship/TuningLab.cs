@@ -69,6 +69,17 @@ public sealed class TuningLab
 		Touched = true;
 	}
 
+	// Pasa a la nave elegida en el selector: conserva los valores retocados de todas y no toca Touched, porque elegir
+	// nave no es usar el panel. Un id que no está en la lista no cambia nada.
+	public void MoveTo(string shipId)
+	{
+		for (int i = 0; i < _ships.Count; i++)
+		{
+			if (_ships[i].Id == shipId)
+				_current = i;
+		}
+	}
+
 	// Devuelve una nave a los multiplicadores de su definición. No levanta el bloqueo de los récords.
 	public void Reset(string shipId)
 	{

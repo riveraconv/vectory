@@ -24,6 +24,7 @@ public sealed class RaceSession
 	private readonly int _participantCount;
 	private readonly int _totalLaps;
 	private readonly bool _flyingStart;
+	private readonly string _shipName = "";
 
 	private RaceTracker _tracker;
 	private LineCrossingDetector _detector;
@@ -58,9 +59,10 @@ public sealed class RaceSession
 		_totalLaps = totalLaps;
 	}
 
-	private RaceSession(Track track, StartSettings startSettings, int participantCount, int totalLaps)
+	private RaceSession(Track track, StartSettings startSettings, int participantCount, int totalLaps, string shipName)
 		: this(track, participantCount, totalLaps)
 	{
+		_shipName = shipName;
 		StartSequence = new StartSequence(startSettings);
 		StartSequence.Started += OnStart;
 	}
@@ -76,10 +78,10 @@ public sealed class RaceSession
 	// Vueltas de una carrera de RACE (también las muestra SELECT CIRCUIT)
 	public const int RaceLaps = 3;
 
-	// Carrera desde parrilla, con semáforo y el número de vueltas por defecto
-	public static RaceSession ForRace(Track track, StartSettings startSettings, int participantCount)
+	// Carrera desde parrilla, con semáforo y el número de vueltas por defecto. shipName: para el resultado.
+	public static RaceSession ForRace(Track track, StartSettings startSettings, int participantCount, string shipName)
 	{
-		return new RaceSession(track, startSettings, participantCount, RaceLaps);
+		return new RaceSession(track, startSettings, participantCount, RaceLaps, shipName);
 	}
 
 	// Contrarreloj: READY? / GO!, salida lanzada, vueltas libres y un solo participante
@@ -178,7 +180,7 @@ public sealed class RaceSession
 			return false;
 		}
 
-		_tracker = new RaceTracker(_track.CheckpointIndices.Count, _totalLaps, _participantCount);
+		_tracker = new RaceTracker(_track.CheckpointIndices.Count, _totalLaps, _participantCount) { ShipName = _shipName };
 		_detector = new LineCrossingDetector(_track.Centerline.Count);
 
 		_tracker.CheckpointPassed += index =>

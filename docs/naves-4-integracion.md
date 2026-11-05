@@ -1,6 +1,6 @@
 # VECTORY — Spec: Naves 4 · Integración y nombres definitivos
 
-Versión 1.1 · 2026-11-05 · Estado: **etapas 0 y 1 validadas; etapas 2 y 3 pendientes**
+Versión 1.1 · 2026-11-05 · Estado: **etapas 0, 1 y 2 validadas; etapa 3 pendiente**
 
 Cuarta spec de naves. Deja las tres naves **jugables de verdad**: se eligen en el selector y corren en RACE y TIME TRIAL con su conducción, su casco, su cabina, su colisión y su fantasma. Además, **fija los nombres definitivos** en todo el código.
 

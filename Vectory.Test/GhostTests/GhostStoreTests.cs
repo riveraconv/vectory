@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Vectory.Ghost;
 using Vectory.Records;
+using Vectory.Ship;
 using Xunit;
 
 namespace Vectory.Test.GhostTests;
@@ -24,6 +25,31 @@ public class GhostStoreTests
             new GhostSample(72.123456, new Vector3(1f, -2f, 3f), Quaternion.Identity)
         }
     };
+
+    // El casco sale del archivo: en estos tests GameSession sigue con VECTOR
+    [Theory]
+    [InlineData("ship_03", "ship_03")]
+    [InlineData("ship_02", "ship_02")]
+    [InlineData("ship_01", "ship_01")]
+    public void Ship_IsTheOneOfTheFile_NotTheOneOfTheSession(string saved, string expected)
+    {
+        GhostRecording original = Ghost() with { ShipDesignId = saved };
+
+        Assert.True(GhostJson.TryFromJson(GhostJson.ToJson(original), out GhostRecording loaded, out string error), error);
+
+        Assert.Same(ShipDefinitions.Find(expected).Visual, loaded.Ship().Visual);
+    }
+
+    [Fact]
+    public void Ship_UnknownId_VectorAndWarns()
+    {
+        string? warning = null;
+
+        ShipDefinition ship = (Ghost() with { ShipDesignId = "ship_77" }).Ship(message => warning = message);
+
+        Assert.Same(VectorShip.Definition, ship);
+        Assert.Contains("ship_77", warning);
+    }
 
     [Fact]
     public void Json_RoundTrip_KeepsSamplesShipAndTime()

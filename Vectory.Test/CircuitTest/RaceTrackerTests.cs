@@ -704,6 +704,16 @@ public class RaceTrackerTests
     }
 
     [Fact]
+    public void Result_CarriesTheShipOfTheSession()
+    {
+        var tracker = new RaceTracker(3, 1, 8) { ShipName = "HAMMER" };
+        tracker.Start();
+        DriveLap(tracker, 1.0, 1.0, 1.0, 1.0);
+
+        Assert.Equal("HAMMER", tracker.Result.ShipName);
+    }
+
+    [Fact]
     public void AfterFinish_MoreCrossingsDoNotChangeTheResult()
     {
         var tracker = new RaceTracker(3, 1, 8);
