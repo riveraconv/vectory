@@ -14,6 +14,7 @@ public static class VectorTuning
 	public const float TurnRate = 1.3f;
 	public const float SteerResponse = 8f;
 	public const float LateralGrip = 5f;
+	public const float AccelCurve = 2f;           // exponente de AccelerationCurve
 
 	// Los mismos valores con las unidades de ShipDynamics
 	public static ShipTuning Values => new()
@@ -25,6 +26,8 @@ public static class VectorTuning
 		OverspeedDecay = OverspeedDecayKmh / KmhPerMs,
 		TurnRate = TurnRate,
 		SteerResponse = SteerResponse,
-		LateralGrip = LateralGrip
+		LateralGrip = LateralGrip,
+		AccelCurve = AccelCurve,
+		MinThrust = AccelerationCurve.DefaultMinThrust
 	};
 }

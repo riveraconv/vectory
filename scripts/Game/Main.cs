@@ -453,14 +453,7 @@ public partial class Main : Node3D
 			return;
 		}
 
-		// Con el panel de ajuste usado no se toca el récord: se compara con el que había, sin guardar nada
-		if (TuningLabPanel.Used)
-		{
-			_hud.TimeTrial.ShowLapBand(TuningLabLapBand(lap, lapTime));
-			return;
-		}
-
-		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now, GameSession.ShipDesignId);
+		TimeTrialLapResult result = _records.Book.SubmitTimeTrialLap(_track.CircuitId, lapTime, splits, DateTime.Now, TuningLabPanel.DrivenShipId(GameSession.ShipDesignId));
 		LapBandContent content;
 		if (result.IsNewRecord)
 		{
@@ -488,18 +481,6 @@ public partial class Main : Node3D
 			$"BEST {TimeFormat.Format(best)}");
 	}
 
-	// Franja de fin de vuelta con el panel de ajuste usado: sin NEW RECORD y avisando si se habría guardado
-	private LapBandContent TuningLabLapBand(int lap, double lapTime)
-	{
-		double? best = TimeTrialRecord()?.LapTime;
-		if (!best.HasValue || lapTime < best.Value)
-			GD.Print("[TuningLab] Tuning lab used: this lap's record and ghost were not saved.");
-
-		return best.HasValue
-			? ComparedLapBand(lap, lapTime, best.Value)
-			: new LapBandContent(lap, lapTime, "LAP COMPLETE", LapBandTitleStyle.Record, "RECORDS OFF  ·  TUNING LAB");
-	}
-
 	// RACE terminada: tiempo total y mejor vuelta contra los récords de RACE (una carrera
 	// abandonada desde la pausa no llega aquí y no guarda nada)
 	private void OnRaceFinished(RaceResult result)
@@ -509,17 +490,7 @@ public partial class Main : Node3D
 
 		_damage?.Stop();
 
-		// Con el panel de ajuste usado no se guarda nada ni sale NEW RECORD
-		if (TuningLabPanel.Used)
-		{
-			RaceRecord race = _records.Book.GetRace(_track.CircuitId);
-			if (race?.TotalTime == null || result.TotalTime < race.TotalTime.Time
-				|| race.BestLap == null || result.BestLapTime < race.BestLap.Time)
-				GD.Print("[TuningLab] Tuning lab used: this race's records were not saved.");
-			return;
-		}
-
-		_raceRecords =_records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now, GameSession.ShipDesignId);
+		_raceRecords =_records.Book.SubmitRace(_track.CircuitId, result.TotalTime, result.BestLapTime, DateTime.Now, TuningLabPanel.DrivenShipId(GameSession.ShipDesignId));
 		if (_raceRecords.NewTotalTime || _raceRecords.NewBestLap)
 			SaveRecords();
 	}
@@ -623,7 +594,7 @@ public partial class Main : Node3D
 			CircuitId = _track.CircuitId,
 			TrackSignature = _trackSignature,
 			CheckpointCount = _track.CheckpointIndices.Count,
-			ShipDesignId = GameSession.ShipDesignId
+			ShipDesignId = TuningLabPanel.DrivenShipId(GameSession.ShipDesignId)
 		};
 		ShowGhostShipHull();
 		if (_ghosts.Save(_ghost))

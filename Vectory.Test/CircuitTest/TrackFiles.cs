@@ -50,7 +50,7 @@ public sealed class TrackFile
         CenterlineBuilder.Build(ControlPoints, ImageCenter, MetersPerPixel, Clockwise, TrackY);
 
     // Marco 3D como el de Track.BuildFrame: eje en planta más los perfiles de altura y peralte
-    public TrackFrame Frame(ICollection<string> warnings = null)
+    public TrackFrame Frame(ICollection<string>? warnings = null)
     {
         List<Vector3> plan = Centerline();
         float lap = CenterlineBuilder.CumulativeDistances(plan)[plan.Count];

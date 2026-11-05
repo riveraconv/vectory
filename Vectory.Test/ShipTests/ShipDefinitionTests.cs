@@ -94,7 +94,7 @@ public class VectorDefinitionTests
         IReadOnlyList<ShipStat> stats = ShipStats.Compute(vector, ShipDefinitions.Default.Technical);
 
         Assert.Equal("396 KM/H", stats.Single(s => s.Label == ShipStats.TopSpeed).Value);
-        Assert.Equal("0–200 · 2.2 S", stats.Single(s => s.Label == ShipStats.Acceleration).Value);
+        Assert.Equal("0–200 · 2.4 S", stats.Single(s => s.Label == ShipStats.Acceleration).Value);
         Assert.Equal("74 °/S", stats.Single(s => s.Label == ShipStats.Handling).Value);
         Assert.Equal("200–0 · 1.2 S", stats.Single(s => s.Label == ShipStats.Braking).Value);
         Assert.All(stats, s => Assert.Equal(5, s.Segments));

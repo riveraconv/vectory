@@ -71,7 +71,7 @@ public class Track3DShipTests
     }
 
     // Recorre el perfil a velocidad horizontal constante y dice si despegó en algún momento
-    private static bool CrossProfile(float r, float fromX, float toX, float speed, Action<ShipVertical, SurfaceSample> check = null)
+    private static bool CrossProfile(float r, float fromX, float toX, float speed, Action<ShipVertical, SurfaceSample>? check = null)
     {
         var vertical = new ShipVertical();
         vertical.Reset(Parabola(r, fromX).Height + Hover);

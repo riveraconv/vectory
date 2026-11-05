@@ -89,7 +89,7 @@ public class ShipStatsTests
         ShipTuning vector = VectorTuning.Values;
 
         Assert.Equal("396 KM/H", Stat(vector, ShipStats.TopSpeed).Value);
-        Assert.Equal("0–200 · 2.2 S", Stat(vector, ShipStats.Acceleration).Value);
+        Assert.Equal("0–200 · 2.4 S", Stat(vector, ShipStats.Acceleration).Value);
         Assert.Equal("74 °/S", Stat(vector, ShipStats.Handling).Value);
         Assert.Equal("", Stat(vector, ShipStats.Grip).Value);
         Assert.Equal("200–0 · 1.2 S", Stat(vector, ShipStats.Braking).Value);

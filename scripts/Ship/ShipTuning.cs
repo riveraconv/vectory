@@ -13,4 +13,6 @@ public struct ShipTuning
 	public float TurnRate;       // rad/s de giro máximo
 	public float SteerResponse;  // lo rápido que llega el giro a su valor máximo
 	public float LateralGrip;    // más alto = menos inercia lateral
+	public float AccelCurve;     // exponente de AccelerationCurve; AccelerationCurve.Linear (0, el valor por defecto) = sin curva
+	public float MinThrust;      // fracción mínima de la aceleración cerca de la punta (solo con curva)
 }

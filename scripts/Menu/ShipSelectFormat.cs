@@ -14,7 +14,7 @@ public static class ShipSelectFormat
 	public const string FooterHint = "← → SHIP · ↑ ↓ OPTION · ENTER SELECT · DRAG ROTATE";
 
 	private const double KmhPerMs = 3.6;
-	private const double ReferenceSpeedKmh = 200.0;   // la de los datos de aceleración y frenada
+	public const float ReferenceSpeedKmh = 200f;   // la de los datos de aceleración y frenada
 
 	// "RACE · CIRCUIT 01 · SELECT SHIP"
 	public static string Header(GameMode mode, string circuitName) =>
@@ -26,8 +26,12 @@ public static class ShipSelectFormat
 	// 110 m/s -> "396 KM/H"
 	public static string TopSpeed(float metersPerSecond) => $"{Round(metersPerSecond * KmhPerMs)} KM/H";
 
-	// 25 m/s² -> "0–200 · 2.2 S"
-	public static string Acceleration(float metersPerSecond2) => $"0–200 · {SecondsTo200(metersPerSecond2)} S";
+	// 2,447 s -> "0–200 · 2.4 S"
+	public static string Acceleration(float seconds) => $"0–200 · {OneDecimal(seconds)} S";
+
+	// Panel de ajuste: 2,447 s y 4,36 s -> "0–200 2.4 · 0–300 4.4 S"
+	public static string AccelerationTimes(float secondsTo200, float secondsTo300) =>
+		$"0–200 {OneDecimal(secondsTo200)} · 0–300 {OneDecimal(secondsTo300)} S";
 
 	// 45 m/s² -> "200–0 · 1.2 S"
 	public static string Braking(float metersPerSecond2) => $"200–0 · {SecondsTo200(metersPerSecond2)} S";
@@ -46,9 +50,9 @@ public static class ShipSelectFormat
 	private static string Round(double value) =>
 		Math.Round(value, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture);
 
-	private static string SecondsTo200(float metersPerSecond2)
-	{
-		double seconds = metersPerSecond2 > 0f ? ReferenceSpeedKmh / KmhPerMs / metersPerSecond2 : 0.0;
-		return Math.Round(seconds, 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture);
-	}
+	private static string SecondsTo200(float metersPerSecond2) =>
+		OneDecimal(metersPerSecond2 > 0f ? ReferenceSpeedKmh / KmhPerMs / metersPerSecond2 : 0.0);
+
+	private static string OneDecimal(double value) =>
+		Math.Round(value, 1, MidpointRounding.AwayFromZero).ToString("0.0", CultureInfo.InvariantCulture);
 }

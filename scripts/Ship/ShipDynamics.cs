@@ -110,7 +110,7 @@ public class ShipDynamics
 		if (Speed > t.MaxSpeed)
 			StepAboveMaxSpeed(input, t, dt, boosting);
 		else if (input.Accelerate)
-			Speed = MoveToward(Speed, t.MaxSpeed, t.Acceleration * control * dt);
+			Speed = MoveToward(Speed, t.MaxSpeed, t.Acceleration * AccelerationCurve.Factor(Speed, t.MaxSpeed, t.AccelCurve, t.MinThrust) * control * dt);
 		else if (input.Brake)
 			Speed = MoveToward(Speed, 0f, t.BrakeDeceleration * dt);
 		else if (!boosting)

@@ -22,17 +22,47 @@ public static class ShipStats
 
 	private const double SegmentsPerRatio = 50.0;   // ±10 % respecto a la referencia = ±5 segmentos
 
+	private const float KmhPerMs = 3.6f;
+	private const float IntegrationStep = 1f / 240f;
+	private const float MaxIntegrationTime = 60f;   // tope por si la nave no llega nunca a esa velocidad
+
 	public static IReadOnlyList<ShipStat> Compute(ShipTuning ship, ShipTuning reference)
 	{
+		float shipTime = SecondsTo(ship, ShipSelectFormat.ReferenceSpeedKmh);
+		float referenceTime = SecondsTo(reference, ShipSelectFormat.ReferenceSpeedKmh);
+
 		return new[]
 		{
 			new ShipStat(TopSpeed, ShipSelectFormat.TopSpeed(ship.MaxSpeed), Segments(ship.MaxSpeed, reference.MaxSpeed)),
-			new ShipStat(Acceleration, ShipSelectFormat.Acceleration(ship.Acceleration), Segments(ship.Acceleration, reference.Acceleration)),
+			// Por tiempo, para que cuente la forma de la curva: menos tiempo que la referencia = más segmentos
+			new ShipStat(Acceleration, ShipSelectFormat.Acceleration(shipTime), Segments(referenceTime, shipTime)),
 			new ShipStat(Handling, ShipSelectFormat.Handling(ship.TurnRate), Segments(ship.TurnRate, reference.TurnRate)),
 			// LateralGrip no tiene una unidad que entienda el jugador: solo barra
 			new ShipStat(Grip, "", Segments(ship.LateralGrip, reference.LateralGrip)),
 			new ShipStat(Braking, ShipSelectFormat.Braking(ship.BrakeDeceleration), Segments(ship.BrakeDeceleration, reference.BrakeDeceleration))
 		};
+	}
+
+	// Segundos con W a fondo desde parada hasta esa velocidad, integrando la dinámica real (con la curva, sin pista ni daño)
+	public static float SecondsTo(in ShipTuning ship, float speedKmh)
+	{
+		var input = new ShipInput { Accelerate = true };
+		var dynamics = new ShipDynamics();
+		dynamics.Reset(0f);
+
+		float target = speedKmh / KmhPerMs;
+		float time = 0f;
+		while (dynamics.Speed < target && time < MaxIntegrationTime)
+		{
+			float before = dynamics.Speed;
+			dynamics.Step(input, ship, IntegrationStep);
+			time += IntegrationStep;
+
+			// El instante del cruce dentro del último paso: si no, el tiempo sale hasta un paso de más y cambia el redondeo
+			if (dynamics.Speed >= target && dynamics.Speed > before)
+				time -= IntegrationStep * (dynamics.Speed - target) / (dynamics.Speed - before);
+		}
+		return time;
 	}
 
 	// Nave sin datos todavía (COMING SOON): "—" y barras apagadas
