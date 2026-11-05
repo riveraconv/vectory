@@ -125,7 +125,7 @@ Si con el valor real de `Acceleration` las cifras salen algo distintas, **mandan
 - En VECTOR esta fila **sí se puede mover** (a diferencia de sus porcentajes), porque la forma de la curva de VECTOR también se ajusta en el equilibrio.
 - Al lado de la fila, el dato que vería el jugador: **0–200** y **0–300** en segundos, calculados con la curva.
 - **F11** vuelca también la curva de las tres naves. **F12** la devuelve a la de la definición.
-- Fila nueva en el panel: **`EMPUJE MIN`** (común), de 0 % a 30 %, paso 1 %.
+- Fila nueva en el panel: **`MIN THRUST`** (común), de 0 % a 30 %, paso 1 %. F12 también la devuelve a su valor.
 
 ### 4.3 Selector de naves (SHIP DATA)
 

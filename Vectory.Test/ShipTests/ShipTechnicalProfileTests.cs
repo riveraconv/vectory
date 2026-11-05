@@ -80,7 +80,7 @@ public class ShipTechnicalStatsTests
 
     [Theory]
     [InlineData(ShipStats.TopSpeed, "428 KM/H", 9)]
-    [InlineData(ShipStats.Acceleration, "0–200 · 2.4 S", 2)]
+    [InlineData(ShipStats.Acceleration, "0–200 · 2.6 S", 3)]
     [InlineData(ShipStats.Handling, "74 °/S", 5)]
     [InlineData(ShipStats.Grip, "", 1)]
     [InlineData(ShipStats.Braking, "200–0 · 1.2 S", 6)]
@@ -94,7 +94,7 @@ public class ShipTechnicalStatsTests
 
     [Theory]
     [InlineData(ShipStats.TopSpeed, "372 KM/H", 2)]
-    [InlineData(ShipStats.Acceleration, "0–200 · 2.0 S", 10)]
+    [InlineData(ShipStats.Acceleration, "0–200 · 2.3 S", 9)]
     [InlineData(ShipStats.Handling, "72 °/S", 3)]
     [InlineData(ShipStats.Grip, "", 7)]
     [InlineData(ShipStats.Braking, "200–0 · 1.3 S", 3)]
@@ -117,7 +117,10 @@ public class ShipTechnicalStatsTests
             IReadOnlyList<ShipStat> stats = ShipStats.Compute(changed, ship);
 
             Assert.Equal(10, stats[index].Segments);
-            Assert.Equal(1, stats.Count(s => s.Segments != ShipStats.ReferenceSegments));
+
+            // El 0–200 sale de integrar la curva, así que también cambia con la punta; el resto, solo con su parámetro
+            Assert.All(stats.Where((s, i) => i != index && s.Label != ShipStats.Acceleration),
+                s => Assert.Equal(ShipStats.ReferenceSegments, s.Segments));
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using Vectory.Menu;
 using Vectory.Ship;
 using Xunit;
 
@@ -151,14 +152,26 @@ public class AccelerationCurveTests
         Assert.Equal(10.26f, time, 0.05f);
     }
 
+    // --- 11. Curva por nave: dentro del rango en las definiciones, y empuje mínimo común ---
+
     [Fact]
-    public void AllShips_ShareTheCurve()
+    public void AllShips_CurveWithinRange_AndCommonMinThrust()
     {
         foreach (ShipDefinition ship in ShipDefinitions.All)
         {
-            Assert.Equal(AccelerationCurve.DefaultExponent, ship.Technical.AccelCurve);
+            Assert.True(AccelerationCurve.IsWithinRange(ship.Technical.AccelCurve), ship.Id);
             Assert.Equal(AccelerationCurve.DefaultMinThrust, ship.Technical.MinThrust);
         }
+    }
+
+    [Theory]
+    [InlineData(1.5f, true)]
+    [InlineData(3.0f, true)]
+    [InlineData(1.4f, false)]
+    [InlineData(3.1f, false)]
+    public void CurveRange(float curve, bool within)
+    {
+        Assert.Equal(within, AccelerationCurve.IsWithinRange(curve));
     }
 
     // --- 6. Con daño, la curva va contra la punta reducida ---
@@ -322,7 +335,7 @@ public class AccelerationCurveTests
         Assert.True(lab.SetLinearAcceleration(false));
 
         Assert.True(lab.Touched);
-        Assert.Equal(AccelerationCurve.DefaultExponent, lab.Tuning(ShipCatalog.Ship02).AccelCurve);
+        Assert.Equal(BladeShip.Definition.Technical.AccelCurve, lab.Tuning(ShipCatalog.Ship02).AccelCurve);
     }
 
     [Fact]
@@ -334,4 +347,174 @@ public class AccelerationCurveTests
 
         Assert.False(lab.Touched);
     }
+
+    // --- 12. Curva por nave en el laboratorio ---
+
+    [Fact]
+    public void Lab_CurveChangesOnlyThatShip_AndResetRestoresIt()
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+
+        Assert.True(lab.SetAccelCurve(ShipCatalog.Ship02, 2.7f));
+
+        Assert.True(lab.Touched);
+        Assert.Equal(2.7f, lab.Tuning(ShipCatalog.Ship02).AccelCurve, 3);
+        Assert.Equal(HammerShip.Definition.Technical.AccelCurve, lab.Tuning(ShipCatalog.Ship03).AccelCurve);
+        Assert.Equal(VectorShip.Definition.Technical.AccelCurve, lab.Tuning(ShipCatalog.Ship01).AccelCurve);
+
+        lab.Reset(ShipCatalog.Ship02);
+
+        Assert.Equal(BladeShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship02));
+    }
+
+    [Fact]
+    public void Lab_VectorCurve_CanBeMoved_ButNotItsPercents()
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+
+        Assert.True(lab.SetAccelCurve(ShipCatalog.Ship01, 2.5f));
+
+        Assert.Equal(2.5f, lab.Tuning(ShipCatalog.Ship01).AccelCurve, 3);
+        Assert.False(lab.SetPercent(ShipCatalog.Ship01, ShipParameter.MaxSpeed, 5));
+    }
+
+    [Theory]
+    [InlineData(0.2f, 1f)]
+    [InlineData(9f, 4f)]
+    [InlineData(2.34f, 2.3f)]
+    public void Lab_Curve_ClampedAndSnappedToTheStep(float set, float expected)
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+
+        lab.SetAccelCurve(ShipCatalog.Ship02, set);
+
+        Assert.Equal(expected, lab.AccelCurve(ShipCatalog.Ship02), 3);
+    }
+
+    [Fact]
+    public void Lab_SameCurve_DoesNotTouch()
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+
+        Assert.False(lab.SetAccelCurve(ShipCatalog.Ship02, BladeShip.Definition.Technical.AccelCurve));
+
+        Assert.False(lab.Touched);
+    }
+
+    [Fact]
+    public void Lab_CurveOutOfRange_IsMarked()
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+        Assert.False(lab.IsCurveOutOfRange(ShipCatalog.Ship02));
+
+        lab.SetAccelCurve(ShipCatalog.Ship02, 3.5f);
+
+        Assert.True(lab.IsCurveOutOfRange(ShipCatalog.Ship02));
+        Assert.False(lab.IsCurveOutOfRange(ShipCatalog.Ship03));
+    }
+
+    [Fact]
+    public void Lab_MinThrust_IsCommon_Clamped_AndResetRestoresIt()
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+        Assert.Equal(10, lab.MinThrustPercent);
+
+        Assert.True(lab.SetMinThrustPercent(20));
+        Assert.True(lab.Touched);
+        foreach (ShipDefinition ship in ShipDefinitions.All)
+            Assert.Equal(0.20f, lab.Tuning(ship.Id).MinThrust, 3);
+
+        lab.SetMinThrustPercent(90);
+        Assert.Equal(TuningLab.MinThrustMaxPercent, lab.MinThrustPercent);
+
+        lab.Reset(ShipCatalog.Ship01);
+        Assert.Equal(10, lab.MinThrustPercent);
+    }
+
+    [Fact]
+    public void Lab_LinearWinsOverTheCurve_WhichComesBackAfterwards()
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+        lab.SetAccelCurve(ShipCatalog.Ship02, 2.5f);
+
+        lab.SetLinearAcceleration(true);
+        Assert.Equal(AccelerationCurve.Linear, lab.Tuning(ShipCatalog.Ship02).AccelCurve);
+
+        lab.SetLinearAcceleration(false);
+        Assert.Equal(2.5f, lab.Tuning(ShipCatalog.Ship02).AccelCurve, 3);
+    }
+
+    // --- 13. F11 ---
+
+    [Fact]
+    public void DumpText_IncludesTheCurves_AndMinThrust_AndMarksOutOfRange()
+    {
+        var lab = new TuningLab(ShipDefinitions.All, ShipCatalog.Ship01);
+
+        string clean = lab.DumpText();
+        Assert.Contains("ship_01: AccelCurve = 2.0f", clean);
+        Assert.Contains("ship_02: AccelCurve = 2.0f", clean);
+        Assert.Contains("ship_03: AccelCurve = 2.0f", clean);
+        Assert.Contains("MinThrust = 0.10f", clean);
+        Assert.DoesNotContain("OUT OF RANGE", clean);
+
+        lab.SetAccelCurve(ShipCatalog.Ship03, 3.5f);
+        lab.SetMinThrustPercent(15);
+
+        string changed = lab.DumpText();
+        Assert.Contains("ship_03: AccelCurve = 3.5f  // OUT OF RANGE", changed);
+        Assert.Contains("MinThrust = 0.15f", changed);
+    }
+
+    // --- 14 y 15. ShipStats ---
+
+    [Fact]
+    public void Stats_ZeroTo200_ComesFromIntegratingTheCurve()
+    {
+        ShipTuning vector = VectorTuning.Values;
+
+        // El cálculo analítico con la curva da 2,447 s; el lineal, 2,222 s
+        Assert.Equal(2.447f, ShipStats.SecondsTo(vector, 200f), 0.01f);
+        Assert.Equal("0–200 · 2.4 S", StatValue(vector, vector));
+        Assert.Equal(5, StatSegments(vector, vector));
+    }
+
+    [Fact]
+    public void Stats_LinearTuning_GivesTheLinearTime()
+    {
+        ShipTuning linear = VectorTuning.Values;
+        linear.AccelCurve = AccelerationCurve.Linear;
+
+        Assert.Equal(2.222f, ShipStats.SecondsTo(linear, 200f), 0.01f);
+    }
+
+    [Fact]
+    public void Stats_Bar_ComparedByTime()
+    {
+        ShipTuning vector = VectorTuning.Values;
+        ShipTuning quicker = vector;
+        quicker.AccelCurve = 3f;
+        ShipTuning slower = vector;
+        slower.AccelCurve = 1.5f;
+
+        Assert.True(ShipStats.SecondsTo(quicker, 200f) < ShipStats.SecondsTo(vector, 200f));
+        Assert.True(StatSegments(quicker, vector) > 5);
+        Assert.True(ShipStats.SecondsTo(slower, 200f) > ShipStats.SecondsTo(vector, 200f));
+        Assert.True(StatSegments(slower, vector) < 5);
+    }
+
+    [Fact]
+    public void Stats_ShipThatNeverGetsThere_DoesNotHang()
+    {
+        ShipTuning slow = VectorTuning.Values;
+        slow.MaxSpeed = 30f;
+
+        Assert.Equal(60f, ShipStats.SecondsTo(slow, 200f), 0.1f);
+    }
+
+    private static string StatValue(in ShipTuning ship, in ShipTuning reference) =>
+        Array.Find(System.Linq.Enumerable.ToArray(ShipStats.Compute(ship, reference)), s => s.Label == ShipStats.Acceleration).Value;
+
+    private static int StatSegments(in ShipTuning ship, in ShipTuning reference) =>
+        Array.Find(System.Linq.Enumerable.ToArray(ShipStats.Compute(ship, reference)), s => s.Label == ShipStats.Acceleration).Segments;
 }

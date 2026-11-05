@@ -33,9 +33,13 @@ public partial class TuningLabPanel : CanvasLayer
 	// La nave a la que se aplican los cambios
 	public Player Player { get; set; }
 
-	private sealed record Row(ShipParameter Parameter, Label Name, HSlider Slider, Label Percent, Label Value);
+	private const float SecondSpeedKmh = 300f;   // la segunda velocidad de la fila ACCEL CURVE
 
-	private readonly List<Row> _rows = new();
+	private sealed record Row(Label Name, HSlider Slider, Label Percent, Label Value);
+
+	private readonly List<Row> _rows = new();   // mismo orden que ShipMultipliers.Parameters
+	private Row _curveRow;
+	private Row _minThrustRow;
 	private PanelContainer _root;
 	private Label _shipLabel;
 	private CheckBox _linearCheck;
@@ -102,6 +106,20 @@ public partial class TuningLabPanel : CanvasLayer
 		Refresh();
 	}
 
+	private void OnCurveChanged(double value)
+	{
+		if (_lab.SetAccelCurve(_lab.Current.Id, (float)value))
+			ApplyToPlayer();
+		Refresh();
+	}
+
+	private void OnMinThrustChanged(double value)
+	{
+		if (_lab.SetMinThrustPercent(Mathf.RoundToInt(value)))
+			ApplyToPlayer();
+		Refresh();
+	}
+
 	private void OnLinearToggled(bool linear)
 	{
 		if (_lab.SetLinearAcceleration(linear))
@@ -122,20 +140,33 @@ public partial class TuningLabPanel : CanvasLayer
 		_shipLabel.Text = $"{ShipCatalog.Find(id).Name} · COLLISION {halfWidth} M";
 		_linearCheck.SetPressedNoSignal(_lab.LinearAcceleration);
 
-		// Mismo orden que ShipMultipliers.Parameters
-		IReadOnlyList<ShipStat> stats = ShipStats.Compute(_lab.Tuning(id), ShipDefinitions.Default.Technical);
+		// Mismo orden que ShipMultipliers.Parameters. La referencia es Vector tal como está en el panel.
+		ShipTuning tuning = _lab.Tuning(id);
+		IReadOnlyList<ShipStat> stats = ShipStats.Compute(tuning, _lab.Tuning(ShipDefinitions.Default.Id));
 		bool editable = TuningLab.IsEditable(id);
 		for (int i = 0; i < _rows.Count; i++)
 		{
 			Row row = _rows[i];
-			int percent = _lab.Percent(id, row.Parameter);
+			ShipParameter parameter = ShipMultipliers.Parameters[i];
+			int percent = _lab.Percent(id, parameter);
 			row.Name.Text = stats[i].Label;
 			row.Slider.SetValueNoSignal(percent);
 			row.Slider.Editable = editable;
 			row.Percent.Text = TuningLab.PercentText(percent);
-			row.Percent.LabelSettings = _lab.IsOverLimit(id, row.Parameter) ? _percentOverSettings : _percentSettings;
+			row.Percent.LabelSettings = _lab.IsOverLimit(id, parameter) ? _percentOverSettings : _percentSettings;
 			row.Value.Text = stats[i].Value.Length > 0 ? $"{stats[i].Value} · {stats[i].Segments}" : $"· {stats[i].Segments}";
 		}
+
+		float curve = _lab.AccelCurve(id);
+		_curveRow.Slider.SetValueNoSignal(curve);
+		_curveRow.Percent.Text = curve.ToString("0.0", CultureInfo.InvariantCulture);
+		_curveRow.Percent.LabelSettings = _lab.IsCurveOutOfRange(id) ? _percentOverSettings : _percentSettings;
+		_curveRow.Value.Text = ShipSelectFormat.AccelerationTimes(
+			ShipStats.SecondsTo(tuning, ShipSelectFormat.ReferenceSpeedKmh),
+			ShipStats.SecondsTo(tuning, SecondSpeedKmh));
+
+		_minThrustRow.Slider.SetValueNoSignal(_lab.MinThrustPercent);
+		_minThrustRow.Percent.Text = _lab.MinThrustPercent.ToString(CultureInfo.InvariantCulture) + " %";
 	}
 
 	// ---------------------------------------------------------------
@@ -187,7 +218,12 @@ public partial class TuningLabPanel : CanvasLayer
 		column.AddChild(grid);
 
 		foreach (ShipParameter parameter in ShipMultipliers.Parameters)
-			_rows.Add(BuildRow(grid, parameter, label, value, scale));
+			_rows.Add(BuildRow(grid, TuningLab.MinPercent, TuningLab.MaxPercent, 1, changed => OnSliderChanged(parameter, changed), label, value, scale));
+
+		_curveRow = BuildRow(grid, TuningLab.MinCurve, TuningLab.MaxCurve, TuningLab.CurveStep, OnCurveChanged, label, value, scale);
+		_curveRow.Name.Text = "ACCEL CURVE";
+		_minThrustRow = BuildRow(grid, TuningLab.MinThrustMinPercent, TuningLab.MinThrustMaxPercent, 1, OnMinThrustChanged, label, value, scale);
+		_minThrustRow.Name.Text = "MIN THRUST";
 
 		_linearCheck = new CheckBox
 		{
@@ -206,22 +242,22 @@ public partial class TuningLabPanel : CanvasLayer
 		column.AddChild(new Label { Text = "F9 PANEL · F10 SHIP · F11 DUMP · F12 RESET", LabelSettings = label });
 	}
 
-	private Row BuildRow(GridContainer grid, ShipParameter parameter, LabelSettings label, LabelSettings value, float scale)
+	private static Row BuildRow(GridContainer grid, double min, double max, double step, System.Action<double> changed, LabelSettings label, LabelSettings value, float scale)
 	{
 		var name = new Label { LabelSettings = label, CustomMinimumSize = new Vector2(LabelWidth * scale, 0f) };
 		grid.AddChild(name);
 
 		var slider = new HSlider
 		{
-			MinValue = TuningLab.MinPercent,
-			MaxValue = TuningLab.MaxPercent,
-			Step = 1,
+			MinValue = min,
+			MaxValue = max,
+			Step = step,
 			Scrollable = false,
 			FocusMode = Control.FocusModeEnum.None,   // las flechas son para conducir
 			CustomMinimumSize = new Vector2(SliderWidth * scale, 0f),
 			SizeFlagsVertical = Control.SizeFlags.ShrinkCenter
 		};
-		slider.ValueChanged += changed => OnSliderChanged(parameter, changed);
+		slider.ValueChanged += newValue => changed(newValue);
 		grid.AddChild(slider);
 
 		var percent = new Label
@@ -235,6 +271,6 @@ public partial class TuningLabPanel : CanvasLayer
 		var data = new Label { LabelSettings = value, CustomMinimumSize = new Vector2(ValueWidth * scale, 0f) };
 		grid.AddChild(data);
 
-		return new Row(parameter, name, slider, percent, data);
+		return new Row(name, slider, percent, data);
 	}
 }

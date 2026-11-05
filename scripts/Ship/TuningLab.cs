@@ -14,16 +14,30 @@ public sealed class TuningLab
 	public const int MinPercent = -20;
 	public const int MaxPercent = 20;
 
+	// Rangos de las filas de la curva (spec docs/naves-5-curva-aceleracion.md, 4.2)
+	public const float MinCurve = 1f;
+	public const float MaxCurve = 4f;
+	public const float CurveStep = 0.1f;
+	public const int MinThrustMinPercent = 0;
+	public const int MinThrustMaxPercent = 30;
+
 	private readonly IReadOnlyList<ShipDefinition> _ships;
 	private readonly Dictionary<string, ShipMultipliers> _live = new();
+	private readonly Dictionary<string, float> _curves = new();
+	private int _minThrustPercent = DefaultMinThrustPercent;
 	private int _current;
+
+	private static int DefaultMinThrustPercent => (int)MathF.Round(AccelerationCurve.DefaultMinThrust * 100f);
 
 	// Las naves en el orden de Cycle; la actual es currentId o, si no está en la lista, la primera
 	public TuningLab(IReadOnlyList<ShipDefinition> ships, string currentId)
 	{
 		_ships = ships;
 		foreach (ShipDefinition ship in ships)
+		{
 			_live[ship.Id] = ship.Multipliers;
+			_curves[ship.Id] = ship.Technical.AccelCurve;
+		}
 
 		for (int i = 0; i < ships.Count; i++)
 		{
@@ -50,9 +64,40 @@ public sealed class TuningLab
 	public ShipTuning Tuning(string shipId)
 	{
 		ShipTuning tuning = _live[shipId].Apply(ShipDefinitions.Default.Technical);
-		if (LinearAcceleration)
-			tuning.AccelCurve = AccelerationCurve.Linear;
+		tuning.AccelCurve = LinearAcceleration ? AccelerationCurve.Linear : _curves[shipId];
+		tuning.MinThrust = _minThrustPercent / 100f;
 		return tuning;
+	}
+
+	// Exponente de la curva de una nave. A diferencia de sus porcentajes, el de Vector también se puede mover.
+	public float AccelCurve(string shipId) => _curves[shipId];
+
+	public bool IsCurveOutOfRange(string shipId) => !AccelerationCurve.IsWithinRange(_curves[shipId]);
+
+	// Cambia la curva de una nave, limitada al rango del panel y a su paso. Devuelve si ha cambiado algo.
+	public bool SetAccelCurve(string shipId, float curve)
+	{
+		curve = MathF.Round(Math.Clamp(curve, MinCurve, MaxCurve) / CurveStep) * CurveStep;
+		if (MathF.Abs(curve - _curves[shipId]) < CurveStep / 2f)
+			return false;
+
+		_curves[shipId] = curve;
+		Touched = true;
+		return true;
+	}
+
+	// Empuje mínimo, común a todas las naves
+	public int MinThrustPercent => _minThrustPercent;
+
+	public bool SetMinThrustPercent(int percent)
+	{
+		percent = Math.Clamp(percent, MinThrustMinPercent, MinThrustMaxPercent);
+		if (percent == _minThrustPercent)
+			return false;
+
+		_minThrustPercent = percent;
+		Touched = true;
+		return true;
 	}
 
 	// Activa o quita la casilla. Devuelve si ha cambiado algo.
@@ -103,10 +148,13 @@ public sealed class TuningLab
 		}
 	}
 
-	// Devuelve una nave a los multiplicadores de su definición. No levanta el bloqueo de los récords.
+	// Devuelve una nave a los multiplicadores y la curva de su definición, y el empuje mínimo a su valor. No baja Touched.
 	public void Reset(string shipId)
 	{
-		_live[shipId] = _ships.First(s => s.Id == shipId).Multipliers;
+		ShipDefinition ship = _ships.First(s => s.Id == shipId);
+		_live[shipId] = ship.Multipliers;
+		_curves[shipId] = ship.Technical.AccelCurve;
+		_minThrustPercent = DefaultMinThrustPercent;
 	}
 
 	// "+8 %", "-6 %", "0 %"
@@ -128,6 +176,16 @@ public sealed class TuningLab
 			if (over.Length > 0)
 				text.Append("  // OVER LIMIT: ").Append(string.Join(", ", over));
 		}
+
+		text.Append("\n[TuningLab] Acceleration curve");
+		foreach (ShipDefinition ship in _ships)
+		{
+			text.Append('\n').Append(ship.Id).Append(": AccelCurve = ")
+				.Append(_curves[ship.Id].ToString("0.0", CultureInfo.InvariantCulture)).Append('f');
+			if (IsCurveOutOfRange(ship.Id))
+				text.Append("  // OUT OF RANGE");
+		}
+		text.Append("\nMinThrust = ").Append((_minThrustPercent / 100f).ToString("0.00", CultureInfo.InvariantCulture)).Append('f');
 		return text.ToString();
 	}
 

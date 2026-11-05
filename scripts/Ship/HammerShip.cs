@@ -19,9 +19,11 @@ public static class HammerShip
 		BrakeDeceleration = 0.96f
 	};
 
+	private const float AccelCurve = 2f;   // exponente de AccelerationCurve: no es un multiplicador
+
 	public static readonly ShipDefinition Definition = new(
 		ShipCatalog.Ship03,
-		Multipliers.Apply(VectorTuning.Values),
+		Multipliers.Apply(VectorTuning.Values) with { AccelCurve = AccelCurve },
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
