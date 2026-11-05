@@ -53,6 +53,7 @@ public enum CockpitGradientId
 	OcclusionRight,
 	Cowl,
 	BezelIn,
+	DeckFar,
 	Scan
 }
 

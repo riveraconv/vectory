@@ -163,9 +163,8 @@ public class ShipHullTests
         Assert.NotEqual(vector.BuildHull().Count, visual.BuildHull().Count);
     }
 
-    // Provisional hasta la spec 3b
+    // Provisional hasta la etapa 3 de la spec 3b
     [Theory]
-    [InlineData(ShipCatalog.Ship02)]
     [InlineData(ShipCatalog.Ship03)]
     public void CockpitAndEye_AreStillTheOnesOfVector(string id)
     {

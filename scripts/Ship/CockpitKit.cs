@@ -48,6 +48,7 @@ public static class CockpitKit
 			new CockpitGradientStop(1f, CockpitColor.Black, 0f)
 		}),
 		[CockpitGradientId.Cowl] = Vertical((0f, CockpitColor.CowlLight), (0.5f, CockpitColor.NoseLight), (1f, CockpitColor.FrontLight)),
+		[CockpitGradientId.DeckFar] = Vertical((0f, CockpitColor.PanelMid), (1f, CockpitColor.ConsoleLight)),
 		[CockpitGradientId.BezelIn] = new CockpitGradient(false, Vector2.Zero, Vector2.UnitY, new[]
 		{
 			new CockpitGradientStop(0f, CockpitColor.Black, 0.8f),
@@ -185,6 +186,26 @@ public static class CockpitKit
 			Opacity = opacity,
 			Slot = slot
 		});
+	}
+
+	// Hueco en el frontal: las carcasas del HUD quedan hundidas
+	public static void Sink(this CockpitCanvas c, IReadOnlyList<Vector2> frame, float grow)
+	{
+		Vector2[] rim = CockpitGeometry.Inset(frame, -grow);
+		c.Polygon(rim, CockpitColor.Sink, CockpitColor.Cyan, 1.4f);
+
+		// Paredes interiores del hueco: arriba en sombra, lados algo más claros, abajo con un poco de luz
+		(int I, int J, CockpitFill Fill, float Opacity)[] walls =
+		{
+			(0, 1, CockpitGradientId.BezelIn, 1f),
+			(1, 2, CockpitColor.FrontLight, 0.9f),
+			(3, 0, CockpitColor.FrontLight, 0.9f),
+			(2, 3, CockpitColor.SinkWall, 0.8f)
+		};
+		foreach ((int i, int j, CockpitFill fill, float opacity) in walls)
+			c.Polygon(new[] { rim[i], rim[j], frame[j], frame[i] }, fill, CockpitColor.Blue, 0.8f, opacity, 0.5f);
+
+		c.Line(rim[0], rim[1], CockpitColor.Highlight, 1f, 0.3f);
 	}
 
 	// Tintes de luz: boost (naranja) y daño fuerte (rojo) desde los bordes

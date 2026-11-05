@@ -26,6 +26,16 @@ public partial class CockpitLayer : CanvasLayer
 		_layout = layout;
 		Layer = LayerIndex;
 		_scale = UiScale.Factor;
+		_flicker = null;
+
+		// Otra cabina (panel de ajuste): fuera los tramos de la anterior. El estado del HUD sigue.
+		foreach (Node child in GetChildren())
+		{
+			RemoveChild(child);
+			child.QueueFree();
+		}
+		_fixedRuns.Clear();
+		_liveRuns.Clear();
 
 		CockpitDrawRun run = null;
 		foreach (CockpitElement element in layout.Elements)

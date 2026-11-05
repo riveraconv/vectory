@@ -9,19 +9,21 @@ using Xunit;
 
 namespace Vectory.Test.ShipTests;
 
-// Cabina de Vector contra la captura de designs/cabina-vector.js y designs/lib.js (spec docs/naves-3b-cabinas.md, 3.4)
+// Cabinas contra la captura de designs/cabina-vector.js, designs/cabinas-hoja-martillo-def.js y designs/lib.js (spec docs/naves-3b-cabinas.md, 3.4)
 public class CockpitCaptureTests
 {
     private const float PointTolerance = 0.06f;
     private const float ValueTolerance = 0.001f;
 
-    private static readonly JsonElement Capture = CockpitReference.Root.GetProperty("vector");
+    private static CockpitLayout Build(string name) => name == "hoja" ? HojaCockpit.Build() : VectorCockpit.Build();
 
-    [Fact]
-    public void Vector_MatchesTheCapture_ElementByElement()
+    [Theory]
+    [InlineData("vector")]
+    [InlineData("hoja")]
+    public void Cockpit_MatchesTheCapture_ElementByElement(string name)
     {
-        CockpitLayout layout = VectorCockpit.Build();
-        JsonElement expected = Capture.GetProperty("elements");
+        CockpitLayout layout = Build(name);
+        JsonElement expected = CockpitReference.Root.GetProperty(name).GetProperty("elements");
 
         Assert.Equal(expected.GetArrayLength(), layout.Elements.Count);
         int i = 0;
@@ -29,10 +31,12 @@ public class CockpitCaptureTests
             AssertElement(i, e, layout.Elements[i++]);
     }
 
-    [Fact]
-    public void Gradients_MatchTheDesign()
+    [Theory]
+    [InlineData("vector")]
+    [InlineData("hoja")]
+    public void Gradients_MatchTheDesign(string name)
     {
-        foreach (JsonProperty property in Capture.GetProperty("gradients").EnumerateObject())
+        foreach (JsonProperty property in CockpitReference.Root.GetProperty(name).GetProperty("gradients").EnumerateObject())
         {
             CockpitGradient gradient = CockpitKit.Gradients[CockpitReference.GradientOf(property.Name)];
             JsonElement g = property.Value;
@@ -215,6 +219,7 @@ public class CockpitCaptureTests
             "aoR" => CockpitGradientId.OcclusionRight,
             "cowl" => CockpitGradientId.Cowl,
             "bezelIn" => CockpitGradientId.BezelIn,
+            "deckFar" => CockpitGradientId.DeckFar,
             "scan" => CockpitGradientId.Scan,
             _ => throw new ArgumentOutOfRangeException(svgId)
         };
@@ -244,16 +249,30 @@ public class CockpitCaptureTests
 
 public class CockpitProfileTests
 {
+    // Martillo lleva la de Vector hasta la etapa 3
     [Theory]
-    [InlineData(ShipCatalog.Ship01)]
-    [InlineData(ShipCatalog.Ship02)]
-    [InlineData(ShipCatalog.Ship03)]
-    public void CockpitOfEachShip_DoublePanelForNow_PitchedDown(string id)
+    [InlineData(ShipCatalog.Ship01, "vector")]
+    [InlineData(ShipCatalog.Ship02, "hoja")]
+    [InlineData(ShipCatalog.Ship03, "vector")]
+    public void CockpitOfEachShip_PitchedDown(string id, string cockpit)
     {
         ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
+        Func<CockpitLayout> expected = cockpit == "hoja" ? HojaCockpit.Build : VectorCockpit.Build;
 
-        Assert.Equal(VectorCockpit.Build, visual.BuildCockpit);
+        Assert.Equal(expected, visual.BuildCockpit);
         Assert.Equal(-8f, visual.Cockpit.PitchDegrees);
+    }
+
+    [Fact]
+    public void HojaEye_LowerThanVector_SameFovAndDepth()
+    {
+        CockpitFraming vector = VectorShip.Definition.Visual.Cockpit;
+        CockpitFraming hoja = HojaShip.Definition.Visual.Cockpit;
+
+        Assert.Equal(vector.Eye.Y * 0.62f, hoja.Eye.Y, 4);
+        Assert.Equal(vector.Eye.X, hoja.Eye.X);
+        Assert.Equal(vector.Eye.Z, hoja.Eye.Z);
+        Assert.Equal(vector.Fov, hoja.Fov);
     }
 
     // El punto de fuga queda donde lo espera el diseño: y ≈ 300 de 720, con la tangente de la mitad del FOV en 360 px
@@ -266,10 +285,12 @@ public class CockpitProfileTests
         Assert.InRange(360f - rise, 298f, 302f);
     }
 
-    [Fact]
-    public void Flicker_PicksValidEdges_OnlyStrokesOfTheFixedPart()
+    [Theory]
+    [InlineData(ShipCatalog.Ship01)]
+    [InlineData(ShipCatalog.Ship02)]
+    public void Flicker_PicksValidEdges_OnlyStrokesOfTheFixedPart(string id)
     {
-        CockpitLayout layout = VectorCockpit.Build();
+        CockpitLayout layout = ShipDefinitions.Find(id)!.Visual.BuildCockpit();
         int[] edges = layout.Elements.Where(e => e.Edge >= 0).Select(e => e.Edge).ToArray();
 
         Assert.Equal(Enumerable.Range(0, layout.EdgeCount), edges);
@@ -489,6 +510,15 @@ public class CockpitHudStateTests
 
         Assert.Equal(88f, CockpitHudPieces.Resolve(bar, state).Size.X, 3);
         Assert.Equal(926f + 176f * 428f / 528f, CockpitHudPieces.Resolve(mark, state).Points[0].X, 3);
+    }
+
+    // En el lienzo no se rellena por un fallo del archivo: en el juego, con la misma regla que la de Vector
+    [Fact]
+    public void SpeedBar_OfHoja_WidthTimesFraction()
+    {
+        CockpitElement bar = HojaCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
+
+        Assert.Equal(130f, CockpitHudPieces.Resolve(bar, State(Input(248f))).Size.X, 3);
     }
 
     [Fact]

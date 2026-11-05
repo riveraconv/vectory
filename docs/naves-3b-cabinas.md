@@ -1,6 +1,6 @@
 # VECTORY — Spec: Naves 3b · Cabinas de Vector, Hoja y Martillo
 
-Versión 1.1 · 2026-11-04 · Estado: **etapa 1 validada; etapas 2 y 3 pendientes**
+Versión 1.1 · 2026-11-04 · Estado: **etapas 1 y 2 validadas; etapa 3 pendiente**
 
 Segunda parte de la spec 3. Mete en el juego las **cabinas nuevas** de las tres naves: **VECTOR · Doble pantalla**, **HOJA · Burbuja** y **MARTILLO · Búnker**, con sus paneles sólidos, su luz y el **HUD de velocidad, boost y daño integrado en el cuadro de mando**. También el **ojo de la cámara de cabina** de cada nave.
 

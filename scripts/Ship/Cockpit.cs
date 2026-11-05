@@ -49,6 +49,18 @@ public partial class Cockpit : Node3D
 		SetLayerVisible(false);
 	}
 
+	// Cambia de cabina y de encuadre en plena carrera (panel de ajuste). Después hay que volver a pasar el parpadeo.
+	public void SetVisual(ShipVisualProfile visual)
+	{
+		if (visual == Visual)
+			return;
+		bool newLayout = visual.BuildCockpit != Visual.BuildCockpit;
+		Visual = visual;
+		if (newLayout)
+			_layer.Setup(visual.BuildCockpit());
+		ApplyCamera();
+	}
+
 	// Sacudida de la cámara de cabina (desplazamiento en el plano de la vista, en m, y giro sobre la vista, en rad)
 	public void SetShake(Vector2 offset, float roll)
 	{

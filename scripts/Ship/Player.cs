@@ -44,8 +44,8 @@ public partial class Player : CharacterBody3D
 
 	private ShipTuning Technical => _labTuning ?? Definition.Technical;
 
-	// De este perfil salen el casco, el encuadre exterior y el ancho de colisión. La cabina, la caja física y la
-	// colocación siguen saliendo de Definition.
+	// De este perfil salen el encuadre exterior y el ancho de colisión. La caja física y la colocación siguen saliendo
+	// de Definition.
 	private ShipVisualProfile ExteriorVisual => _labVisual ?? Definition.Visual;
 
 	// Velocidad punta de la nave, sin daños (m/s)
@@ -279,9 +279,9 @@ public partial class Player : CharacterBody3D
 		_race = race;
 	}
 
-	// Panel de ajuste: conducción, ancho, casco y encuadre exterior de otra nave o con otros valores, en plena carrera.
+	// Panel de ajuste: conducción, ancho, casco, cabina y encuadres de otra nave o con otros valores, en plena carrera.
 	// Conserva posición, dirección, velocidad, boost y daño; si la velocidad pasa de la nueva punta, se pierde con la
-	// regla de siempre. La cabina, la caja física y la posición no cambian.
+	// regla de siempre. La caja física y la posición no cambian.
 	public void ApplyTuningLab(ShipTuning technical, ShipVisualProfile visual)
 	{
 		_labTuning = technical;
@@ -290,19 +290,24 @@ public partial class Player : CharacterBody3D
 		if (visual == _ship.Visual)
 			return;
 		_ship.SetVisual(visual);
-		RebuildShipFlicker();
+		_cockpit.SetVisual(visual);
+		RebuildFlicker();
 	}
 
-	// El casco nuevo tiene otro número de aristas: mismo nivel de daño, con las aristas sorteadas de nuevo
-	private void RebuildShipFlicker()
+	// El casco y la cabina nuevos tienen otro número de aristas: mismo nivel de daño, con las aristas sorteadas de nuevo
+	private void RebuildFlicker()
 	{
 		if (_shipFlicker == null)
 			return;
 
 		int level = _shipFlicker.Level;
-		_shipFlicker = new EdgeFlicker(_ship.EdgeCount, BuildFlickerSettings(), _flickerRandom);
+		EdgeFlickerSettings settings = BuildFlickerSettings();
+		_shipFlicker = new EdgeFlicker(_ship.EdgeCount, settings, _flickerRandom);
+		_cockpitFlicker = new EdgeFlicker(_cockpit.EdgeCount, settings, _flickerRandom);
 		_shipFlicker.SetLevel(level);
+		_cockpitFlicker.SetLevel(level);
 		_ship.ShowEdgeFlicker(_shipFlicker, FlickerOpacity);
+		_cockpit.ShowEdgeFlicker(_cockpitFlicker, FlickerOpacity);
 	}
 
 	// Salida lanzada (GO! de TIME TRIAL): la nave pasa de golpe a "speed" m/s hacia donde apunta

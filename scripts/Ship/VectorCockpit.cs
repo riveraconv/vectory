@@ -199,9 +199,9 @@ public static class VectorCockpit
 		};
 
 		foreach ((Vector2[] frame, _) in both)
-			Sink(c, frame, 18f);
+			c.Sink(frame, 18f);
 		Vector2[] console = { V(500f, 656f), V(780f, 656f), V(800f, 720f), V(480f, 720f) };
-		Sink(c, console, 16f);
+		c.Sink(console, 16f);
 
 		foreach ((Vector2[] frame, Vector2[] screen) in both)
 		{
@@ -263,25 +263,5 @@ public static class VectorCockpit
 	{
 		Vector2[] mirrored = CockpitGeometry.MirrorX(points);
 		return new[] { mirrored[1], mirrored[0], mirrored[3], mirrored[2] };
-	}
-
-	// Hueco en el frontal: las carcasas del HUD quedan hundidas
-	private static void Sink(CockpitCanvas c, Vector2[] frame, float grow)
-	{
-		Vector2[] rim = CockpitGeometry.Inset(frame, -grow);
-		c.Polygon(rim, CockpitColor.Sink, CockpitColor.Cyan, 1.4f);
-
-		// Paredes interiores del hueco: arriba en sombra, lados algo más claros, abajo con un poco de luz
-		(int I, int J, CockpitFill Fill, float Opacity)[] walls =
-		{
-			(0, 1, CockpitGradientId.BezelIn, 1f),
-			(1, 2, CockpitColor.FrontLight, 0.9f),
-			(3, 0, CockpitColor.FrontLight, 0.9f),
-			(2, 3, CockpitColor.SinkWall, 0.8f)
-		};
-		foreach ((int i, int j, CockpitFill fill, float opacity) in walls)
-			c.Polygon(new[] { rim[i], rim[j], frame[j], frame[i] }, fill, CockpitColor.Blue, 0.8f, opacity, 0.5f);
-
-		c.Line(rim[0], rim[1], CockpitColor.Highlight, 1f, 0.3f);
 	}
 }
