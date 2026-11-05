@@ -27,8 +27,8 @@ public partial class TuningLabPanel : CanvasLayer
 	private static TuningLab _lab;
 	private static string _lastChosenId;
 
-	// Se ha usado el laboratorio en esta ejecución: no se guardan récords ni fantasma
-	public static bool Used => _lab is { Touched: true };
+	// La nave que se conduce de verdad, para guardarla con los récords y el fantasma
+	public static string DrivenShipId(string chosenId) => _lab?.DrivenShipId(chosenId) ?? chosenId;
 
 	// La nave a la que se aplican los cambios
 	public Player Player { get; set; }
@@ -38,6 +38,7 @@ public partial class TuningLabPanel : CanvasLayer
 	private readonly List<Row> _rows = new();
 	private PanelContainer _root;
 	private Label _shipLabel;
+	private CheckBox _linearCheck;
 	private LabelSettings _percentSettings;
 	private LabelSettings _percentOverSettings;
 
@@ -101,6 +102,13 @@ public partial class TuningLabPanel : CanvasLayer
 		Refresh();
 	}
 
+	private void OnLinearToggled(bool linear)
+	{
+		if (_lab.SetLinearAcceleration(linear))
+			ApplyToPlayer();
+		Refresh();
+	}
+
 	private void ApplyToPlayer()
 	{
 		string id = _lab.Current.Id;
@@ -112,6 +120,7 @@ public partial class TuningLabPanel : CanvasLayer
 		string id = _lab.Current.Id;
 		string halfWidth = _lab.Current.Visual.CollisionHalfWidth.ToString("0.0", CultureInfo.InvariantCulture);
 		_shipLabel.Text = $"{ShipCatalog.Find(id).Name} · COLLISION {halfWidth} M";
+		_linearCheck.SetPressedNoSignal(_lab.LinearAcceleration);
 
 		// Mismo orden que ShipMultipliers.Parameters
 		IReadOnlyList<ShipStat> stats = ShipStats.Compute(_lab.Tuning(id), ShipDefinitions.Default.Technical);
@@ -179,6 +188,20 @@ public partial class TuningLabPanel : CanvasLayer
 
 		foreach (ShipParameter parameter in ShipMultipliers.Parameters)
 			_rows.Add(BuildRow(grid, parameter, label, value, scale));
+
+		_linearCheck = new CheckBox
+		{
+			Text = "LINEAR ACCEL (OLD)",
+			FocusMode = Control.FocusModeEnum.None   // las flechas y el Espacio son para conducir
+		};
+		_linearCheck.AddThemeFontOverride("font", font);
+		_linearCheck.AddThemeFontSizeOverride("font_size", fontSize);
+		_linearCheck.AddThemeColorOverride("font_color", Palette.SelectLabel);
+		_linearCheck.AddThemeColorOverride("font_hover_color", Palette.SelectValue);
+		_linearCheck.AddThemeColorOverride("font_pressed_color", Palette.SelectValue);
+		_linearCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
+		_linearCheck.Toggled += OnLinearToggled;
+		column.AddChild(_linearCheck);
 
 		column.AddChild(new Label { Text = "F9 PANEL · F10 SHIP · F11 DUMP · F12 RESET", LabelSettings = label });
 	}

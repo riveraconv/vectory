@@ -349,6 +349,24 @@ public class TuningLabTests
         Assert.Contains("OVER LIMIT: LateralGrip", lab.DumpText());
     }
 
+    [Fact]
+    public void DrivenShip_Untouched_IsTheChosenOne()
+    {
+        TuningLab lab = Open(ShipCatalog.Ship01);
+
+        Assert.Equal(ShipCatalog.Ship03, lab.DrivenShipId(ShipCatalog.Ship03));
+    }
+
+    [Fact]
+    public void DrivenShip_AfterCycle_IsTheOneOnThePanel()
+    {
+        TuningLab lab = Open(ShipCatalog.Ship01);
+
+        lab.Cycle();
+
+        Assert.Equal(ShipCatalog.Ship02, lab.DrivenShipId(ShipCatalog.Ship01));
+    }
+
     [Theory]
     [InlineData(8, "+8 %")]
     [InlineData(-6, "-6 %")]

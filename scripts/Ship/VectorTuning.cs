@@ -25,6 +25,8 @@ public static class VectorTuning
 		OverspeedDecay = OverspeedDecayKmh / KmhPerMs,
 		TurnRate = TurnRate,
 		SteerResponse = SteerResponse,
-		LateralGrip = LateralGrip
+		LateralGrip = LateralGrip,
+		AccelCurve = AccelerationCurve.DefaultExponent,
+		MinThrust = AccelerationCurve.DefaultMinThrust
 	};
 }

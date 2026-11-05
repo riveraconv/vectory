@@ -8,7 +8,7 @@ namespace Vectory.Ship;
 
 // Estado del panel de ajuste para pruebas (spec docs/naves-2-tecnico.md, 4): multiplicadores en vivo por nave, nave
 // actual y si se ha tocado algo. Dura toda la ejecución del juego y no se guarda en disco. Una vez tocado, Touched no
-// vuelve a false: mientras tanto no se guardan récords ni fantasma. Lógica pura.
+// vuelve a false. Los récords y el fantasma se guardan igual: sirven para comparar naves al equilibrarlas. Lógica pura.
 public sealed class TuningLab
 {
 	public const int MinPercent = -20;
@@ -36,12 +36,35 @@ public sealed class TuningLab
 
 	public bool Touched { get; private set; }
 
+	// La nave que se conduce: con el panel usado, la suya (también tras F10); si no, la elegida en el selector
+	public string DrivenShipId(string chosenId) => Touched ? Current.Id : chosenId;
+
 	// Vector es la referencia: no se puede cambiar
 	public static bool IsEditable(string shipId) => shipId != ShipDefinitions.Default.Id;
 
 	public ShipMultipliers Multipliers(string shipId) => _live[shipId];
 
-	public ShipTuning Tuning(string shipId) => _live[shipId].Apply(ShipDefinitions.Default.Technical);
+	// Casilla LINEAR ACCEL (OLD): las tres naves aceleran como antes de la curva, para comparar (spec docs/naves-5-curva-aceleracion.md, 3.4)
+	public bool LinearAcceleration { get; private set; }
+
+	public ShipTuning Tuning(string shipId)
+	{
+		ShipTuning tuning = _live[shipId].Apply(ShipDefinitions.Default.Technical);
+		if (LinearAcceleration)
+			tuning.AccelCurve = AccelerationCurve.Linear;
+		return tuning;
+	}
+
+	// Activa o quita la casilla. Devuelve si ha cambiado algo.
+	public bool SetLinearAcceleration(bool linear)
+	{
+		if (linear == LinearAcceleration)
+			return false;
+
+		LinearAcceleration = linear;
+		Touched = true;
+		return true;
+	}
 
 	public int Percent(string shipId, ShipParameter parameter) => ToPercent(_live[shipId][parameter]);
 
