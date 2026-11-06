@@ -91,6 +91,10 @@ public partial class Main : Node3D
 	[Export] public float RadarEchoFade = RadarSettings.DefaultEchoFade;                           // segundos en apagarse un eco
 	[Export] public float RadarDiameter = 120f;                                                    // diámetro en el HUD (px sobre 1280×720)
 
+	[ExportGroup("Minimapa")]
+	[Export] public float MinimapWindowRadius = 450f;   // metros de circuito del centro al borde
+	[Export] public float MinimapDiameter = 156f;       // diámetro en el HUD (px sobre 1280×720)
+
 	[ExportGroup("Recolocación")]
 	[Export] public float StuckSpeed = RespawnSettings.DefaultStuckSpeedKmh;          // km/h: por debajo, y tocando la barrera, la nave está atascada
 	[Export] public float StuckTime = RespawnSettings.DefaultStuckTime;               // segundos seguidos atascada antes de recolocarla
@@ -243,7 +247,8 @@ public partial class Main : Node3D
 			DamageSegmentGap = DamageSegmentGap,
 			DamageIndicatorGap = DamageIndicatorGap,
 			DamageBlinkFrequency = DamageBlinkFrequency,
-			RadarDiameter = RadarDiameter
+			RadarDiameter = RadarDiameter,
+			MinimapDiameter = MinimapDiameter
 		};
 		AddChild(_hud);
 		_hud.ResultsOptionChosen += ExecuteResultsOption;
@@ -257,6 +262,7 @@ public partial class Main : Node3D
 			EchoFade = RadarEchoFade
 		});
 		_hud.SetRadar(_radar);
+		_hud.SetMinimap(new MinimapPath(_track.Frame, _track.TrackWidth), MinimapWindowRadius, _raceShips.Ships);
 
 		// Velocidad, boost y daño: en pantalla o en el cuadro de mando, según la cámara
 		_hud.SetDriveHudVisible(CockpitViewRules.For(_player.View).ScreenDriveHud);
@@ -305,6 +311,7 @@ public partial class Main : Node3D
 			UpdateLapInfo();
 			UpdateGhost();
 			_radar.Update((float)delta, ToNumerics(_player.GlobalPosition), _player.PlanForward, _raceShips.Ships);
+			_hud.SetMinimapPose(new System.Numerics.Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z), _player.PlanForward);
 			_pause.RaceFinished = _race.State == RaceState.Finished;
 			UpdateResults((float)delta);
 		}

@@ -8,16 +8,17 @@ namespace Vectory.Radar;
 // La del HUD de pantalla sale de Palette (RadarPainter.HudPalette); la lógica no conoce ningún color.
 public sealed record RadarPalette(
 	Vector3 Background, Vector3 Border, Vector3 Rings, Vector3 Beam,
-	Vector3 Rival, Vector3 Close, Vector3 Self, Vector3 Label);
+	Vector3 Rival, Vector3 Close, Vector3 Self, Vector3 Label,
+	Vector3 Track, Vector3 Band, Vector3 Finish);
 
 // Paleta y medidas con las que se dibuja el radar. El tamaño solo no basta: otra pantalla (cabina 3D) no es esto a escala.
 public sealed record RadarStyle
 {
 	// Medidas del HUD de pantalla, en px de 1280×720 (spec 4.3)
-	private const float HudBackgroundOpacity = 0.72f;
-	private const float HudBorderWidth = 2f;
-	private const float HudBorderOpacity = 0.85f;
-	private const float HudBorderGlow = 6f;
+	internal const float HudBackgroundOpacity = 0.72f;   // fondo y borde: los mismos en el minimapa
+	internal const float HudBorderWidth = 2f;
+	internal const float HudBorderOpacity = 0.85f;
+	internal const float HudBorderGlow = 6f;
 	private const float HudRingWidth = 1f;
 	private const float HudRingOpacity = 0.55f;
 	private const float HudCrossOpacity = 0.35f;
@@ -99,7 +100,7 @@ public sealed record RadarStyle
 	}
 }
 
-public enum RadarPrimitiveKind { Disc, Ring, Line, Arc, Arrow, Text }
+public enum RadarPrimitiveKind { Disc, Ring, Line, Arc, Arrow, Text, DownTriangle }
 
 // Una primitiva de dibujo, en el espacio del estilo. Color con su opacidad; Glow en px (0: sin halo).
 //   Disc y Ring: centro A y Radius (Width, el grueso del anillo)
@@ -107,6 +108,7 @@ public enum RadarPrimitiveKind { Disc, Ring, Line, Arc, Arrow, Text }
 //   Arc: centro A, Radius, de StartAngle a EndAngle, con Width
 //   Arrow: centro A y tamaño Radius, apuntando arriba (ArrowPoints)
 //   Text: inicio de la línea base en A y tamaño Radius
+//   DownTriangle: punta abajo en A, medio ancho Radius y alto Width
 public readonly record struct RadarPrimitive(
 	RadarPrimitiveKind Kind, Vector2 A, Vector2 B, float Radius, float Width, float StartAngle, float EndAngle,
 	Vector4 Color, float Glow, string Text);
@@ -184,13 +186,13 @@ public static class RadarDrawing
 		left = new Vector2(center.X - size * 0.62f, center.Y + size * 0.7f);
 	}
 
-	private static RadarPrimitive Disc(Vector2 center, float radius, Vector3 color, float opacity, float glow)
+	internal static RadarPrimitive Disc(Vector2 center, float radius, Vector3 color, float opacity, float glow)
 		=> new(RadarPrimitiveKind.Disc, center, default, radius, 0f, 0f, 0f, WithOpacity(color, opacity), glow, null);
 
-	private static RadarPrimitive Ring(Vector2 center, float radius, float width, Vector3 color, float opacity, float glow)
+	internal static RadarPrimitive Ring(Vector2 center, float radius, float width, Vector3 color, float opacity, float glow)
 		=> new(RadarPrimitiveKind.Ring, center, default, radius, width, 0f, 0f, WithOpacity(color, opacity), glow, null);
 
-	private static RadarPrimitive Line(Vector2 a, Vector2 b, float width, Vector3 color, float opacity)
+	internal static RadarPrimitive Line(Vector2 a, Vector2 b, float width, Vector3 color, float opacity)
 		=> new(RadarPrimitiveKind.Line, a, b, 0f, width, 0f, 0f, WithOpacity(color, opacity), 0f, null);
 
 	private static Vector4 WithOpacity(Vector3 color, float opacity) => new(color, opacity);

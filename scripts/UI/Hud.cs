@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using Vectory.Circuit;
 using Vectory.Core;
@@ -10,7 +11,7 @@ namespace Vectory.UI;
 // HUD de la demo. Solo MUESTRA datos: no calcula reglas de conducción ni de carrera.
 // Se crea por código desde Main, que le pasa los datos cada frame. Colores de Palette.
 //
-//   Arriba izquierda:  posición / participantes (TIME TRIAL: TIME TRIAL y el circuito)
+//   Arriba izquierda:  posición / participantes (TIME TRIAL: TIME TRIAL y el circuito) y, debajo, el minimapa
 //   Arriba derecha:    vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de vuelta, mejor tiempo y, 2 s tras cerrar un
 //                      sector, su tiempo y la diferencia con el mejor anterior (S1  0:23.456  -0.214)
 //   Abajo izquierda:   radar
@@ -52,6 +53,10 @@ public partial class Hud : CanvasLayer
 	public float RadarDiameter = 120f;
 	private const float RadarBottomMargin = 40f;
 
+	// Minimapa: diámetro y margen a la parte de arriba (px sobre 1280×720). Justo debajo de la posición, alineado con ella.
+	public float MinimapDiameter = 156f;
+	private const float MinimapTopMargin = 78f;
+
 	private enum Corner { TopLeft, TopRight, BottomRight }
 
 	private Label _positionLabel;
@@ -76,6 +81,7 @@ public partial class Hud : CanvasLayer
 	private Label _circuitLabel;
 	private TimeTrialView _timeTrial;
 	private RadarView _radar;
+	private MinimapView _minimap;
 
 	public override void _Ready()
 	{
@@ -100,6 +106,7 @@ public partial class Hud : CanvasLayer
 		BuildSectorBlock(root);
 		BuildSpeedBlock(root);
 		BuildRadar(root);
+		BuildMinimap(root);
 		BuildStartLights(root);
 		BuildTimeTrial(root);
 		BuildResults(root);
@@ -177,6 +184,19 @@ public partial class Hud : CanvasLayer
 		_radar.Setup(sweep, RadarStyle.Hud(RadarPainter.HudPalette(), radius, UiScale.Factor));
 	}
 
+	// El minimapa: el trazado ya preparado, cuántos metros caben del centro al borde y las demás naves
+	public void SetMinimap(MinimapPath path, float windowRadius, IReadOnlyList<RaceShip> ships)
+	{
+		float radius = MinimapDiameter * 0.5f;
+		_minimap.Setup(path, MinimapStyle.Hud(RadarPainter.HudPalette(), radius, UiScale.Factor), windowRadius, ships);
+	}
+
+	// Dónde está la nave y hacia dónde apunta, en (X, Z) del mundo
+	public void SetMinimapPose(System.Numerics.Vector2 self, System.Numerics.Vector2 planForward)
+	{
+		_minimap.SetPose(self, planForward);
+	}
+
 	// Sector recién cerrado: se ve SectorTimeVisible s, con la diferencia en cian si mejora y en naranja si empeora
 	public void ShowSectorTime(SectorTimeText text)
 	{
@@ -248,6 +268,7 @@ public partial class Hud : CanvasLayer
 		_results.SetResult(result, options, bandHeight, optionFontSize, shipNameFontSize, newTotalRecord, newLapRecord);
 		_results.Visible = true;
 		_radar.Visible = false;
+		_minimap.Visible = false;
 	}
 
 	// Vuelve a dibujar la selección de las opciones de resultados (tras moverla con el teclado)
@@ -418,6 +439,15 @@ public partial class Hud : CanvasLayer
 			OffsetBottom = -bottom
 		};
 		root.AddChild(_radar);
+	}
+
+	// Arriba a la izquierda, debajo de la posición. El origen del nodo es el centro del círculo (ver MinimapView).
+	private void BuildMinimap(Control root)
+	{
+		float radius = MinimapDiameter * 0.5f * UiScale.Factor;
+		var center = new Vector2(Margin + radius, MinimapTopMargin * UiScale.Factor + radius);
+		_minimap = new MinimapView { Name = "Minimap", Position = center };
+		root.AddChild(_minimap);
 	}
 
 	private void BuildStartLights(Control root)

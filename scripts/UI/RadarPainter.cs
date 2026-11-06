@@ -23,11 +23,44 @@ public static class RadarPainter
 	// La paleta del HUD de pantalla sale de Palette
 	public static RadarPalette HudPalette() => new(
 		ToNumerics(Palette.Background), ToNumerics(Palette.Cyan), ToNumerics(Palette.Blue), ToNumerics(Palette.Cyan),
-		ToNumerics(Palette.Magenta), ToNumerics(Palette.Orange), ToNumerics(Palette.Cyan), ToNumerics(Palette.BlueGray));
+		ToNumerics(Palette.Magenta), ToNumerics(Palette.Orange), ToNumerics(Palette.Cyan), ToNumerics(Palette.BlueGray),
+		ToNumerics(Palette.Cyan), ToNumerics(Palette.Blue), ToNumerics(Palette.Orange));
 
 	// Búferes reutilizados: el radar se pinta cada frame
 	private static readonly Vector2[] Arrow = new Vector2[4];
 	private static readonly Vector2[] ArrowOutline = new Vector2[5];
+	private static readonly Vector2[] Triangle = new Vector2[3];
+	private static readonly Dictionary<int, Vector2[]> PolylineBuffers = new();
+
+	// El trazado del minimapa, por tramos y con el halo de su línea
+	public static void DrawRuns(CanvasItem canvas, MinimapPicture picture, in MinimapStroke stroke)
+	{
+		Color color = ToColor(stroke.Color);
+		foreach (MinimapRun run in picture.Runs)
+		{
+			Vector2[] points = PolylineBuffer(run.Count);
+			for (int i = 0; i < run.Count; i++)
+				points[i] = ToGodot(picture.Points[run.Start + i]);
+
+			if (stroke.Glow > 0f)
+			{
+				canvas.DrawPolyline(points, Faded(color, OuterHaloOpacity), stroke.Width + stroke.Glow * OuterHaloSize, true);
+				canvas.DrawPolyline(points, Faded(color, InnerHaloOpacity), stroke.Width + stroke.Glow * InnerHaloSize, true);
+			}
+			canvas.DrawPolyline(points, color, stroke.Width, true);
+		}
+	}
+
+	// Godot pide un array de la longitud exacta: se guarda uno por longitud, así no se crea nada una vez usado
+	private static Vector2[] PolylineBuffer(int length)
+	{
+		if (!PolylineBuffers.TryGetValue(length, out Vector2[] buffer))
+		{
+			buffer = new Vector2[length];
+			PolylineBuffers[length] = buffer;
+		}
+		return buffer;
+	}
 
 	public static void Draw(CanvasItem canvas, List<RadarPrimitive> primitives, Font font)
 	{
@@ -49,6 +82,13 @@ public static class RadarPainter
 					break;
 				case RadarPrimitiveKind.Arrow:
 					DrawArrow(canvas, primitive);
+					break;
+				case RadarPrimitiveKind.DownTriangle:
+					Vector2 point = ToGodot(primitive.A);
+					Triangle[0] = point;
+					Triangle[1] = point + new Vector2(-primitive.Radius, -primitive.Width);
+					Triangle[2] = point + new Vector2(primitive.Radius, -primitive.Width);
+					canvas.DrawColoredPolygon(Triangle, ToColor(primitive.Color));
 					break;
 				case RadarPrimitiveKind.Text:
 					canvas.DrawString(font, ToGodot(primitive.A), primitive.Text, HorizontalAlignment.Left, -1f,

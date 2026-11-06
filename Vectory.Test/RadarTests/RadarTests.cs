@@ -326,8 +326,8 @@ public class TestShipPatternTests
 
 public class RadarDrawingTests
 {
-	private static readonly RadarPalette PaletteA = new(new(0f), new(0.1f), new(0.2f), new(0.3f), new(0.4f), new(0.5f), new(0.6f), new(0.7f));
-	private static readonly RadarPalette PaletteB = new(new(1f), new(0.9f), new(0.8f), new(0.75f), new(0.65f), new(0.55f), new(0.45f), new(0.35f));
+	private static RadarPalette PaletteA => TestPalettes.A;
+	private static RadarPalette PaletteB => TestPalettes.B;
 
 	private static RadarSweep BusySweep()
 	{
@@ -441,6 +441,209 @@ public class RadarDrawingTests
 		Assert.Equal(one.Radius * 1.5f, big.Radius, 3);
 		Assert.Equal(one.EchoRadius * 1.5f, big.EchoRadius, 3);
 		Assert.Equal(one.BeamOpacity, big.BeamOpacity);
+	}
+}
+
+internal static class TestPalettes
+{
+	public static readonly RadarPalette A = new(new(0f), new(0.1f), new(0.2f), new(0.3f), new(0.4f), new(0.5f), new(0.6f), new(0.7f), new(0.72f), new(0.74f), new(0.76f));
+	public static readonly RadarPalette B = new(new(1f), new(0.9f), new(0.8f), new(0.75f), new(0.65f), new(0.55f), new(0.45f), new(0.35f), new(0.25f), new(0.15f), new(0.05f));
+}
+
+public class MinimapTests
+{
+	private const float Window = 450f;
+	private const float Radius = 78f;
+	private static readonly Vector2 North = new(0f, -1f);
+	private static readonly Vector2 East = new(1f, 0f);
+
+	private static MinimapStyle Style(RadarPalette palette = null) => MinimapStyle.Hud(palette ?? TestPalettes.A, Radius, 1f);
+
+	private static MinimapProjection Projection(Vector2 self, Vector2 forward) => new(self, forward, Vector2.Zero, Radius / Window);
+
+	[Fact]
+	public void A_point_to_the_north_comes_out_on_top_with_your_front_to_the_north()
+	{
+		Vector2 p = Projection(Vector2.Zero, North).ToScreen(new Vector2(0f, -100f));
+		Assert.Equal(0f, p.X, 3);
+		Assert.Equal(-100f * Radius / Window, p.Y, 3);
+	}
+
+	[Fact]
+	public void Turning_your_ship_90_degrees_puts_that_point_on_a_side()
+	{
+		Vector2 p = Projection(Vector2.Zero, East).ToScreen(new Vector2(0f, -100f));
+		Assert.Equal(-100f * Radius / Window, p.X, 3);   // a la izquierda
+		Assert.Equal(0f, p.Y, 3);
+	}
+
+	[Fact]
+	public void Your_ship_is_always_in_the_center()
+	{
+		var self = new Vector2(320f, -740f);
+		Vector2 p = Projection(self, East).ToScreen(self);
+		Assert.Equal(Vector2.Zero, p);
+
+		var picture = new MinimapPicture();
+		MinimapDrawing.Live(picture, Style(), new MinimapPath(TestTrack.Circle(), 40f), self, East, Window, Array.Empty<RaceShip>());
+		RadarPrimitive arrow = picture.Primitives[^1];
+		Assert.Equal(RadarPrimitiveKind.Arrow, arrow.Kind);
+		Assert.Equal(Vector2.Zero, arrow.A);
+	}
+
+	[Fact]
+	public void The_scale_is_the_radius_over_the_window()
+	{
+		// A 450 m justo en el borde
+		Vector2 p = Projection(Vector2.Zero, North).ToScreen(new Vector2(450f, 0f));
+		Assert.Equal(Radius, p.X, 2);
+	}
+
+	[Fact]
+	public void The_path_has_400_points_by_distance_and_a_perpendicular_finish()
+	{
+		TrackFrame frame = TestTrack.Circle();
+		var path = new MinimapPath(frame, 40f);
+		Assert.Equal(400, path.Points.Length);
+
+		FramePoint start = frame.At(0f);
+		Assert.Equal(new Vector2(start.Position.X, start.Position.Z), path.Points[0]);
+		Assert.Equal(120f, Vector2.Distance(path.FinishA, path.FinishB), 2);   // ±3 semianchos de 20 m
+
+		var tangent = new Vector2(start.PlanTangent.X, start.PlanTangent.Z);
+		Assert.Equal(0f, Vector2.Dot(path.FinishB - path.FinishA, tangent), 2);
+	}
+
+	[Fact]
+	public void The_path_ignores_the_height()
+	{
+		// Mismo eje en planta, con otra Y: los puntos en planta no cambian
+		var flat = new MinimapPath(TestTrack.Circle(), 40f);
+		var plan = new List<Vector3>();
+		foreach (Vector3 p in TestTrack.Circle().Plan)
+			plan.Add(p with { Y = 30f });
+		var high = new MinimapPath(new TrackFrame(plan), 40f);
+		Assert.Equal(flat.Points[17], high.Points[17]);
+	}
+
+	[Fact]
+	public void The_path_stays_inside_the_circle()
+	{
+		// Círculo de 500 m de radio visto desde su borde: entra y sale de la ventana
+		var path = new MinimapPath(TestTrack.Circle(), 40f);
+		var picture = new MinimapPicture();
+		MinimapDrawing.Live(picture, Style(), path, new Vector2(500f, 0f), North, Window, Array.Empty<RaceShip>());
+
+		Assert.NotEmpty(picture.Runs);
+		foreach (Vector2 p in picture.Points)
+			Assert.True(p.Length() <= Radius - 1f + 0.01f);
+
+		// Los extremos llegan hasta el recorte
+		MinimapRun run = picture.Runs[0];
+		Assert.Equal(Radius - 1f, picture.Points[run.Start].Length(), 1);
+		Assert.Equal(Radius - 1f, picture.Points[run.Start + run.Count - 1].Length(), 1);
+	}
+
+	[Fact]
+	public void A_lap_that_fits_is_one_closed_run()
+	{
+		// Con una ventana enorme cabe entera
+		var path = new MinimapPath(TestTrack.Circle(), 40f);
+		var picture = new MinimapPicture();
+		MinimapDrawing.Live(picture, Style(), path, Vector2.Zero, North, 5000f, Array.Empty<RaceShip>());
+
+		MinimapRun run = Assert.Single(picture.Runs);
+		Assert.Equal(401, run.Count);
+		Assert.Equal(picture.Points[run.Start], picture.Points[run.Start + 400]);
+	}
+
+	[Fact]
+	public void Far_from_the_track_nothing_of_it_is_drawn()
+	{
+		var path = new MinimapPath(TestTrack.Circle(), 40f);
+		var picture = new MinimapPicture();
+		MinimapDrawing.Live(picture, Style(), path, new Vector2(5000f, 0f), North, Window, Array.Empty<RaceShip>());
+		Assert.Empty(picture.Runs);
+	}
+
+	[Fact]
+	public void A_chord_with_both_ends_outside_is_also_clipped()
+	{
+		Assert.True(CircleClip.Segment(new Vector2(-10f, 0f), new Vector2(10f, 0f), Vector2.Zero, 5f, out float t0, out float t1));
+		Assert.Equal(0.25f, t0, 3);
+		Assert.Equal(0.75f, t1, 3);
+
+		Assert.False(CircleClip.Segment(new Vector2(-10f, 6f), new Vector2(10f, 6f), Vector2.Zero, 5f, out _, out _));
+	}
+
+	[Fact]
+	public void Ships_show_as_dots_only_inside_the_window()
+	{
+		var path = new MinimapPath(TestTrack.Circle(), 40f);
+		var ships = new[]
+		{
+			new RaceShip(1, new Vector3(0f, 25f, -225f), -Vector3.UnitZ, Vector3.UnitY),   // 225 m al norte
+			new RaceShip(2, new Vector3(0f, 0f, -460f), -Vector3.UnitZ, Vector3.UnitY)     // fuera de los 450 m
+		};
+		var picture = new MinimapPicture();
+		MinimapDrawing.Live(picture, Style(), path, Vector2.Zero, North, Window, ships);
+
+		RadarPrimitive dot = Assert.Single(picture.Primitives, p => p.Kind == RadarPrimitiveKind.Disc);
+		Assert.Equal(new Vector4(TestPalettes.A.Rival, 1f), dot.Color);
+		Assert.Equal(3.2f, dot.Radius, 3);
+		Assert.Equal(-Radius * 0.5f, dot.A.Y, 2);
+	}
+
+	[Fact]
+	public void The_finish_is_a_line_that_comes_down_the_map()
+	{
+		var path = new MinimapPath(TestTrack.Circle(), 40f);
+		Vector2 finish = (path.FinishA + path.FinishB) * 0.5f;
+		var picture = new MinimapPicture();
+		MinimapDrawing.Live(picture, Style(), path, finish + new Vector2(0f, 200f), North, Window, Array.Empty<RaceShip>());
+
+		RadarPrimitive line = Assert.Single(picture.Primitives, p => p.Kind == RadarPrimitiveKind.Line);
+		Assert.Equal(new Vector4(TestPalettes.A.Finish, 1f), line.Color);
+		Assert.Equal(2.5f, line.Width, 3);
+		Assert.Equal(-200f * Radius / Window, (line.A.Y + line.B.Y) * 0.5f, 1);
+	}
+
+	[Fact]
+	public void The_base_has_background_border_and_the_up_mark()
+	{
+		var primitives = new List<RadarPrimitive>();
+		MinimapDrawing.Base(primitives, Style());
+
+		Assert.Equal(0.72f, primitives[0].Color.W, 3);
+		Assert.Equal(Radius, primitives[1].Radius);
+		RadarPrimitive mark = primitives[2];
+		Assert.Equal(RadarPrimitiveKind.DownTriangle, mark.Kind);
+		Assert.Equal(new Vector2(0f, -Radius - 2f), mark.A);
+		Assert.Equal(5f, mark.Radius);
+		Assert.Equal(7f, mark.Width);
+	}
+
+	[Fact]
+	public void Two_palettes_give_the_same_drawing_with_other_colors()
+	{
+		var path = new MinimapPath(TestTrack.Circle(), 40f);
+		var a = new MinimapPicture();
+		var b = new MinimapPicture();
+		var self = new Vector2(500f, 0f);
+		MinimapDrawing.Live(a, Style(TestPalettes.A), path, self, North, Window, Array.Empty<RaceShip>());
+		MinimapDrawing.Live(b, Style(TestPalettes.B), path, self, North, Window, Array.Empty<RaceShip>());
+
+		Assert.Equal(a.Points, b.Points);
+		Assert.Equal(a.Runs, b.Runs);
+		Assert.Equal(a.Band.Width, b.Band.Width);
+		Assert.NotEqual(a.Band.Color, b.Band.Color);
+		Assert.NotEqual(a.Line.Color, b.Line.Color);
+	}
+
+	[Fact]
+	public void The_arrow_size_has_its_minimum()
+	{
+		Assert.Equal(5.5f, Style().SelfSize);
 	}
 }
 

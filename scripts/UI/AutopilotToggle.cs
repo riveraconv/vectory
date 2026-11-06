@@ -11,7 +11,7 @@ public partial class AutopilotToggle : CanvasLayer
 {
 	private const int ToggleLayer = 11;   // por encima de la pausa (10), como el panel de ajuste
 	private const float MarginX = 40f;    // medidas sobre 1280×720
-	private const float MarginY = 80f;
+	private const float MarginY = 242f;   // justo debajo del minimapa
 	private const int FontSize = 14;
 
 	public Player Player { get; set; }
