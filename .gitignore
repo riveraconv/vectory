@@ -6,3 +6,7 @@ obj/
 
 # Informes de tests y cobertura (dotnet test)
 TestResults/
+
+# Cabinas 3D: el .blend, las texturas sueltas y las capturas se regeneran con el script
+art/blender/out/
+__pycache__/

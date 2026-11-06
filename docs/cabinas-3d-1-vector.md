@@ -1,8 +1,10 @@
 # VECTORY — Spec: Cabinas 3D · 1 · Vector (piloto Blender → Godot)
 
-Versión 1.1 · 2026-11-06 · Estado: **propuesta, pendiente de validar**
+Versión 1.2 · 2026-11-06 · Estado: **propuesta, pendiente de validar**
 
-Cambios respecto a la 1.0: la cabina gana **dos pantallas pequeñas** para el **radar** y el **minimapa** (colocación «junto a pantallas»), la **consola central se estrecha** para dejarles sitio y el prototipo de referencia pasa a ser `design/cabina-3d-vector-radar.html`. Esta spec va **después** de `radar-minimapa`.
+Cambios respecto a la 1.1: carpeta `designs/` y tecla F6 corregidas; el movimiento de la cámara de cabina dice de qué datos del juego sale (4.4); el encuadre del mundo pasa a ser una decisión con capturas en la etapa 2 (4.5); criterio de rendimiento medible (4.8); la vista 3D no se rehace con F10 (5); la fuente se descarga con permiso (6.2); y se apuntan los tests y documentos que cambian al cerrar (6.7 y 11).
+
+Cambios de la 1.1 respecto a la 1.0: la cabina gana **dos pantallas pequeñas** para el **radar** y el **minimapa** (colocación «junto a pantallas»), la **consola central se estrecha** para dejarles sitio y el prototipo de referencia pasa a ser `designs/cabina-3d-vector-radar.html`. Esta spec va **después** de `radar-minimapa`.
 
 Primera spec de las **cabinas en 3D**. Hace la cabina de **VECTOR** en estilo **CARRERAS** (carbono, aluminio y halo) y, con ella, **valida toda la cadena**: script de Blender → exportar → meterla en Godot con **su propia cámara** → **HUD vivo en las pantallas del salpicadero**, incluidos el **radar** y el **minimapa** de la spec `radar-minimapa`.
 
@@ -16,7 +18,7 @@ Plan de las specs de cabinas 3D:
 4. Después: cascos exteriores realistas de las tres naves.
 
 Diseño de referencia:
-- **`design/cabina-3d-vector-radar.html`**: el prototipo. Es la variante **«3 · CARRERAS»** de la cabina 3D de prueba, sin los otros estilos, con el radar y el minimapa. Se abre en el navegador y se puede conducir. **Solo vale la colocación 1 · JUNTO A PANTALLAS, sin intercambiar** (la que sale al abrirlo): radar a la **izquierda**, junto a HULL STATUS, y minimapa a la **derecha**, junto a la velocidad. La colocación 2 (consola) está descartada: su código no se traduce.
+- **`designs/cabina-3d-vector-radar.html`**: el prototipo. Es la variante **«3 · CARRERAS»** de la cabina 3D de prueba, sin los otros estilos, con el radar y el minimapa. Se abre en el navegador y se puede conducir. **Solo vale la colocación 1 · JUNTO A PANTALLAS, sin intercambiar** (la que sale al abrirlo): radar a la **izquierda**, junto a HULL STATUS, y minimapa a la **derecha**, junto a la velocidad. La colocación 2 (consola) está descartada: su código no se traduce.
   - **Va a Blender** todo lo que construye `buildCockpit()` y las texturas (`carbonSet`, `brushedSet`, `fabricSet`, `smudgeTex`) y el entorno de reflejos.
   - **Va al código del juego** la lógica viva: HUD de las pantallas (`hudState`, `drawLeft`, `drawRight`, `screenBase`, `drawRadarScreen`, `drawMapScreen`), las shift lights, el parpadeo con daño, las luces de boost y daño y el movimiento de la cámara de cabina. La **lógica** del radar y el minimapa (barrido, ecos, proyección, ventana) **no** se copia del prototipo: es la de la spec `radar-minimapa`, que ya está en el juego.
   - **No va a ningún sitio**: el mundo (pista, torres y rivales simulados), el circuito simulado del minimapa, la conducción simulada, los botones y la mirada con el ratón. El juego tiene los suyos.
@@ -240,13 +242,37 @@ La **cámara del mundo no cambia**: sigue con todos los efectos de la spec `cama
 | Contragiro en curva | roll = `−inclinación × 0,25` | 0,25 |
 | Empuje del boost | z += `0,05 × empuje` | 0,05 |
 
-- `dirección`, `inclinación`, `vib` y `empuje` se **leen** de lo que ya calcula el juego para la cámara (punto 5 del inventario). No se duplica esa lógica.
+De dónde sale cada dato. Se **leen** de lo que ya calcula el juego, sin duplicar esa lógica, pero **sin usar sus metros**: los efectos de la cámara del mundo ya llevan su amplitud y aplicarles estos factores la multiplicaría dos veces (la vibración de cabina del juego llega a 4,5 cm; la del prototipo, a menos de 1 cm).
+
+| Dato | Viene de | Rango |
+|---|---|---|
+| `dirección` | `ShipDynamics.Steer` | −1 a 1 |
+| `f` | La de la sección 6.1 | 0 a 1 |
+| `inclinación` | `CockpitBank.Angle` (sin el peralte de la pista). El signo se comprueba en pista: la cabina gira **al revés** que el mundo | hasta ±8° |
+| `empuje` | `BoostCameraEffect.Eased`, **no** `Push` | 0 a 1 |
+| `vib` | `CameraVibration.Intensity × 0,0025 + empuje × 0,003`, constantes del prototipo. No `Offset` ni `Amplitude` | 0 a ~0,007 |
+| `ruido(t, a)` | `sin(37,1 t + a) × 0,6 + sin(61,7 t + 2,3 a) × 0,4`, del prototipo, con `a` = 7 y 9 en posición y 4 y 1 en giro; `t` = `CameraVibration.Time`, que la pausa congela | −1 a 1 |
+
+- Diferencias con el prototipo, aceptadas: con boost, `Intensity` llega a 1,5 (el prototipo, a 1), y el contragiro llega a 2° (el prototipo, a 1,4°), porque el juego se inclina más. Se ajustan con sus parámetros si marean.
 - Con los cuatro parámetros a 0, la cabina queda **quieta** en pantalla.
 
 ### 4.5 Ojo y encuadre
 
-- El **ojo de la cámara del mundo** de Vector **no cambia**.
-- La cabina se diseñó con el ojo a **1,45 m** de la pista y FOV 70°. Si el ojo del juego es muy distinto (punto 3 del inventario) y el morro o el salpicadero tapan de más o de menos, **se avisa con capturas** antes de tocar nada.
+La cámara del mundo de Vector y la del prototipo **no coinciden**:
+
+| | Juego (`VectorShip`) | Prototipo |
+|---|---|---|
+| Altura del ojo sobre la pista | ~2,45 m (0,45 m + 2 m de vuelo) | 1,45 m |
+| FOV vertical | 80° | 70° |
+| Inclinación | −8° | 0° |
+| Horizonte en pantalla (720 px) | y ≈ 300 | y = 360 |
+
+Los −8° se pusieron para cuadrar con el dibujo de la cabina 2D, que en Vector desaparece, así que esa razón ya no vale. Por eso, **decisión del usuario en la etapa 2**:
+
+- Se empieza con la cámara del mundo **sin cambios**.
+- El agente enseña **capturas de las dos opciones** en la misma recta y en una curva: A) la cámara actual; B) la del prototipo, con el ojo a 1,45 m de la pista, FOV 70° e inclinación 0°.
+- **Elige el usuario**, también después de conducirlas si quiere. Con B cambian la sensación de velocidad y lo que se ve de la pista. Solo afecta a la cabina de VECTOR, no a BLADE, HAMMER ni la cámara exterior.
+- Hasta entonces no se toca nada de esa cámara. Cualquier cosa intermedia se apunta con sus valores finales.
 
 ### 4.6 Pantallas de prueba
 
@@ -266,13 +292,22 @@ En esta etapa cada pantalla enseña una **imagen de prueba** generada por códig
 
 En la etapa 2, mientras las pantallas son de prueba, VECTOR en cabina enseña **también el HUD de pantalla** de velocidad, boost, daño, radar y minimapa, para poder conducir y probar. Se quita en la etapa 3.
 
+### 4.8 Rendimiento
+
+Que la cabina no dé tirones es **muy importante** (ver «Rendimiento de las cabinas» en `CLAUDE.md`). Los FPS medios no bastan.
+
+- **Cómo se mide**: en cabina con VECTOR, conduciendo con daño 3 y 15 s por caso, con vsync a 144 Hz. Se apuntan el **peor frame** y los **frames de más de 16,7 ms**, medidos con `Time.get_ticks_usec` y sin capturas dentro de la ventana medida. Aparte, sin vsync, el coste medio por frame.
+- **Cuándo**: la referencia, con la cabina 2D, antes de empezar la etapa 2; después, al cerrar las etapas 2 y 3.
+- **Objetivo**: los mismos frames lentos que con la cabina 2D, o casi.
+- **Si no se llega**, se avisa con los datos antes de cerrar la etapa y se propone qué recortar, de lo que menos se ve a lo que más: resolución de sombras, glow, MSAA y frecuencia de redibujado de las pantallas pequeñas.
+
 ## 5. Arquitectura
 
 Respetar la estructura de carpetas y namespaces actual.
 
 - **Perfil visual de nave**: la cabina pasa a ser **2D** (la de la spec 3b) o **3D** (ruta del `.glb` y su estilo). VECTOR → 3D carreras; BLADE y HAMMER → 2D.
 - **`Cockpit3DView`** (Godot): monta el `SubViewport`, la cámara, el `Environment`, las luces y el modelo, aplica lo del manifiesto (sección 4.1) y busca las piezas vivas por nombre. Si falta una, error claro en la consola. **Sin reglas dentro**: recibe estados y los pinta.
-- **`Cockpit`** sigue siendo el nodo de la cabina: según el perfil, crea la capa 2D o `Cockpit3DView`.
+- **`Cockpit`** sigue siendo el nodo de la cabina: según el perfil, crea la capa 2D o `Cockpit3DView`. Al cambiar de nave con F10, la vista 3D **no se destruye**: se queda creada y parada, sin dibujarse, para no dar un tirón al volver. Se crea la primera vez que hace falta (la primera entrada a VECTOR con F10 puede tardar: es solo de depuración).
 - **Movimiento de la cámara de cabina** (puro): de los datos de cámara del juego y los parámetros a posición y giro (sección 4.4).
 - **Paleta del estilo carreras** (pura): los colores de `STYLES.racing.screen` y de las luces, **centralizados** como el resto de colores del juego (junto a `Palette` o en un perfil de estilo). Nada de colores escritos a mano en los scripts. Esta paleta **no usa** los colores del juego: es propia del estilo.
 - **Lector del manifiesto** (puro): lee el JSON y da la lista de piezas y sus ajustes.
@@ -305,7 +340,7 @@ Cada pantalla (640 × 200 px) se dibuja **como `drawLeft` / `drawRight` del prot
 - **Izquierda**: `HULL STATUS`, texto del daño, 3 segmentos de 150 × 44, `INTEGRITY` y su línea.
 - **Derecha**: `BOOST` y su texto, 3 esferas con anillo, número de velocidad (88 px) con `KM/H`, barra con 10 marcas y la **marca naranja en `TOP`**.
 - Fondo con líneas de barrido (1 px cada 3 px, blanco al 2,5 %) y las cuatro esquinas.
-- Fuente: **Rajdhani Bold** (licencia OFL), tamaños del prototipo **× 1,15**. Se añade a la carpeta de fuentes con su licencia.
+- Fuente: **Rajdhani Bold** (licencia OFL), tamaños del prototipo **× 1,15**. Se añade a la carpeta de fuentes con su licencia. El agente pide permiso antes de descargarla, o la aporta el usuario.
 - **Halo** de los textos y las esferas (`shadowBlur`): se puede aproximar con una copia más gruesa y tenue. Sin shaders nuevos, salvo que sea lo más sencillo.
 - En **TIME TRIAL**, la regla de la 3b: segmentos apagados y sin texto del daño.
 - El dibujo se separa en **piezas puras** que dan primitivas 2D a partir del estado (como en la 3b, reutilizando sus primitivas si sirven) y un nodo que las pinta. El `SubViewport` de cada pantalla **solo se redibuja si su estado cambia**.
@@ -341,7 +376,7 @@ Cada pantalla (640 × 200 px) se dibuja **como `drawLeft` / `drawRight` del prot
 
 ### 6.7 Cabina 2D de Vector
 
-Al cerrar la etapa 3, si el usuario valida la 3D, se **quita** la cabina 2D de Vector del código y su prueba de captura (el diseño sigue guardado en `design/`). Lo común de la 3b (primitivas, estado, tintes, cabinas de BLADE y HAMMER) se queda.
+Al cerrar la etapa 3, si el usuario valida la 3D, se **quita** la cabina 2D de Vector del código y su prueba de captura (el diseño sigue guardado en `designs/`). Lo común de la 3b (primitivas, estado, tintes, cabinas de BLADE y HAMMER) se queda. Las pruebas de lo común que usen a Vector como ejemplo pasan a BLADE o HAMMER, sin perder lo que comprueban.
 
 ## 7. Parámetros en el Inspector
 
@@ -362,7 +397,7 @@ Tiempos (parpadeos, latidos, transiciones) y colores van como **constantes con n
 1. **Manifiesto**: el de `cockpit_vector.manifest.json` tiene todas las piezas de la tabla 3.7, con las cantidades exactas (15 shift lights, 4 LEDs de consola…); las pantallas grandes miden 0,27 × 0,085 m y las pequeñas 0,09 × 0,09 m (±1 mm).
 2. **Perfil visual**: VECTOR → cabina 3D carreras; BLADE → Burbuja 2D; HAMMER → Búnker 2D.
 3. **Qué se ve en cada caso** (tabla 4.7), incluida la regla temporal de la etapa 2.
-4. **Movimiento de la cámara de cabina**: con datos conocidos da las fórmulas de la tabla 4.4; con los parámetros a 0, queda en el origen sin giro.
+4. **Movimiento de la cámara de cabina**: con datos conocidos da las fórmulas de la tabla 4.4, también `vib` a partir de `Intensity` y `Eased`; a fondo con boost, la posición no se aparta más de ~1,1 cm por vibración; con los parámetros a 0, queda en el origen sin giro.
 5. **Shift lights**:
    - v = 0 y v = 0,55 · TOP → 0 encendidas.
    - v = TOP → 15.
@@ -398,7 +433,8 @@ Las pruebas existentes siguen pasando. La de captura de la cabina 2D de Vector s
 10. C: cámara exterior sin cabina y con el HUD de siempre. Volver con C.
 11. F10 → BLADE y HAMMER: siguen con su cabina 2D, igual que antes.
 12. Ventana a pantalla completa y estirada: la cabina 3D llena la pantalla sin cortes raros.
-13. Rendimiento: los FPS en cabina no bajan de forma notable respecto a antes (apuntar antes y después).
+13. Rendimiento: medido como dice la sección 4.8, con el antes y el después apuntados.
+13b. Encuadre: elegir entre las opciones A y B de la sección 4.5, con sus capturas.
 
 **Etapa 3 · HUD y luces**
 14. Acelerar: el número, la barra y el brillo de las pantallas suben; por encima de la punta, en naranja.
@@ -406,9 +442,10 @@ Las pruebas existentes siguen pasando. La de captura de la cabina 2D de Vector s
 16. Boost: luz naranja en la cabina, `ACTIVE`, luego `COOLDOWN` con las esferas atenuadas.
 17. Dañar hasta nivel 3: segmentos y texto del daño, luz roja latiendo, `LOCKED` con las esferas en rojo y las luces de la cabina titilando.
 18. TIME TRIAL: daño apagado y nunca luz roja.
-18b. Con naves de prueba (F7): el radar de la izquierda barre y enseña los ecos en naranja, con el arco rojo si una va pegada; el minimapa de la derecha gira contigo con las naves en naranja. Lo mismo que en el HUD de pantalla, en su sitio.
+18b. Con naves de prueba (F6): el radar de la izquierda barre y enseña los ecos en naranja, con el arco rojo si una va pegada; el minimapa de la derecha gira contigo con las naves en naranja. Lo mismo que en el HUD de pantalla, en su sitio.
 19. Pausa con boost y daño 3: todo congelado.
 20. El HUD de pantalla de velocidad, boost, daño, radar y minimapa ya no sale en la cabina de VECTOR. En la cámara exterior, sí.
+20b. Rendimiento con todo vivo: medido otra vez como dice la sección 4.8, con radar y minimapa en sus pantallas y parpadeo con daño 3.
 21. Menú principal: la versión es 0.14.4.
 
 ## 10. Etapas
@@ -432,6 +469,8 @@ Se actualiza el apartado de **identidad y arte** del documento maestro (en la ve
 > Las naves y cabinas se **modelan en Blender con scripts de Python** que ejecuta el agente, y se exportan a Godot en **glTF (`.glb`)**. El script es la fuente: el `.blend` se regenera.
 
 Y en la regla «solo líneas y aristas luminosas, sin superficies sólidas texturizadas» se añade: **«salvo naves y cabinas»**.
+
+En `CLAUDE.md`, al cerrar cada etapa, se recoge lo mismo en **Estilo visual**, junto con otra excepción: la paleta del estilo carreras es propia de esa cabina y no sale de los colores generales de `Palette`.
 
 ## 12. Fuera de alcance
 
