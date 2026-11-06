@@ -365,6 +365,137 @@ public class BalanceTests
         Assert.False(BalanceRules.MandatoryPassed(BalanceRules.Check(Fair(bladeGap: 5.0))));
     }
 
+    // --- Barrido ---
+
+    [Fact]
+    public void Sweep_gives_one_result_per_value_of_the_range()
+    {
+        Assert.Equal(new[] { 0.94f, 0.95f, 0.96f, 0.97f, 0.98f, 0.99f, 1f }, BalanceSweep.Values(0.94f, 1f, 0.01f));
+        Assert.Empty(BalanceSweep.Values(1f, 0.9f, 0.01f));
+        Assert.Empty(BalanceSweep.Values(0.9f, 1f, 0f));
+
+        BalanceCircuit circuit = Circuit("test_oval");
+        ShipDefinition[] ships = Ships.Select(Ship).ToArray();
+        var sweep = new BalanceSweep(new[] { circuit }, ships, Ship("ship_03"), BalanceParameter.MaxSpeed, StintOptions.Default);
+
+        var rows = BalanceSweep.Values(0.94f, 0.98f, 0.02f).Select(sweep.Evaluate).ToList();
+
+        Assert.Equal(3, rows.Count);
+        Assert.All(rows, row => Assert.Equal(3, row.Checks[0].GapToReference.Count));
+        // Más punta en un óvalo: HAMMER se acerca a VECTOR
+        Assert.True(rows[2].Checks[0].GapToReference["ship_03"] < rows[0].Checks[0].GapToReference["ship_03"]);
+    }
+
+    [Fact]
+    public void A_sweep_does_not_change_the_definitions()
+    {
+        ShipTuning before = Ship("ship_03").Technical;
+        var sweep = new BalanceSweep(new[] { Circuit("test_oval") }, Ships.Select(Ship).ToArray(), Ship("ship_03"), BalanceParameter.MaxSpeed, StintOptions.Default);
+
+        sweep.Evaluate(1.05f);
+
+        Assert.Equal(before, Ship("ship_03").Technical);
+    }
+
+    [Fact]
+    public void A_variant_only_changes_its_parameter()
+    {
+        ShipDefinition hammer = Ship("ship_03");
+
+        ShipDefinition faster = ShipVariant.With(hammer, BalanceParameter.MaxSpeed, 1f);
+        Assert.Equal(VectorTuning.MaxSpeed, faster.Technical.MaxSpeed);
+        Assert.Equal(hammer.Technical.Acceleration, faster.Technical.Acceleration);
+        Assert.Equal(hammer.Technical.AccelCurve, faster.Technical.AccelCurve);
+
+        ShipDefinition curve = ShipVariant.With(hammer, BalanceParameter.AccelCurve, 2.5f);
+        Assert.Equal(2.5f, curve.Technical.AccelCurve);
+        Assert.Equal(hammer.Technical.MaxSpeed, curve.Technical.MaxSpeed);
+
+        // Con su valor actual, la nave no cambia
+        foreach (BalanceParameter parameter in Enum.GetValues<BalanceParameter>())
+            Assert.Equal(hammer.Technical, ShipVariant.With(hammer, parameter, ShipVariant.Current(hammer, parameter)).Technical);
+    }
+
+    [Theory]
+    [InlineData(BalanceParameter.MaxSpeed, 0.90f, true)]
+    [InlineData(BalanceParameter.MaxSpeed, 1.10f, true)]
+    [InlineData(BalanceParameter.MaxSpeed, 1.12f, false)]
+    [InlineData(BalanceParameter.AccelCurve, 1.5f, true)]
+    [InlineData(BalanceParameter.AccelCurve, 3.0f, true)]
+    [InlineData(BalanceParameter.AccelCurve, 1.4f, false)]
+    public void The_range_is_the_usual_one(BalanceParameter parameter, float value, bool within)
+    {
+        Assert.Equal(within, ShipVariant.IsWithinRange(parameter, value));
+    }
+
+    [Fact]
+    public void Match_finds_the_value_of_a_known_function()
+    {
+        MatchResult match = BalanceSweep.Bisect(value => (value - 0.973f) * 30.0, 0.9f, 1.1f, 0.05);
+
+        Assert.True(match.Found);
+        Assert.True(Math.Abs(match.Gap) < 0.05);
+        Assert.InRange(match.Value, 0.97f, 0.976f);
+    }
+
+    [Fact]
+    public void Match_works_when_the_function_goes_down()
+    {
+        MatchResult match = BalanceSweep.Bisect(value => (1.05f - value) * 30.0, 0.9f, 1.1f, 0.05);
+
+        Assert.True(match.Found);
+        Assert.InRange(match.Value, 1.04f, 1.06f);
+    }
+
+    [Fact]
+    public void Match_says_when_there_is_no_value_in_the_range()
+    {
+        MatchResult match = BalanceSweep.Bisect(value => (value - 1.5f) * 30.0, 0.9f, 1.1f, 0.05);
+
+        Assert.False(match.Found);
+        Assert.Equal(1.1f, match.Value);   // el más cercano
+        Assert.Contains("NONE", SweepReport.MatchText("ship_03", BalanceParameter.MaxSpeed, "c", match));
+    }
+
+    [Fact]
+    public void Match_does_not_trust_an_invalid_stint()
+    {
+        MatchResult match = BalanceSweep.Bisect(_ => double.NaN, 0.9f, 1.1f, 0.05);
+
+        Assert.False(match.Found);
+        Assert.True(double.IsNaN(match.Gap));
+    }
+
+    [Fact]
+    public void Match_on_a_real_circuit_leaves_the_ship_close_to_the_reference()
+    {
+        BalanceCircuit circuit = Circuit("circuit_01");
+        ShipDefinition hammer = Ship("ship_03");
+        var sweep = new BalanceSweep(new[] { circuit }, Ships.Select(Ship).ToArray(), hammer, BalanceParameter.MaxSpeed, StintOptions.Default);
+
+        MatchResult match = sweep.Match(circuit);
+
+        Assert.True(match.Found);
+        double reference = StintRunner.Run(circuit, Ship("ship_01"), StintOptions.Default).FlyingLap;
+        double lap = StintRunner.Run(circuit, ShipVariant.With(hammer, BalanceParameter.MaxSpeed, match.Value), StintOptions.Default).FlyingLap;
+        Assert.True(Math.Abs(lap - reference) < BalanceSweep.MatchTolerance);
+    }
+
+    [Fact]
+    public void The_sweep_text_marks_what_passes_and_what_is_out_of_range()
+    {
+        var pass = new SweepRow { Value = 0.97f, Checks = new[] { BalanceRules.CheckCircuit(Fair()) } };
+        var fail = new SweepRow { Value = 1.15f, OutOfRange = true, Checks = new[] { BalanceRules.CheckCircuit(Fair(bladeGap: 5.0)) } };
+
+        string text = SweepReport.Text("ship_03", BalanceParameter.MaxSpeed, new[] { pass, fail });
+
+        Assert.True(pass.Passed);
+        Assert.False(fail.Passed);
+        Assert.Contains("0.9700  ✓", text);
+        Assert.Contains(SweepReport.OutOfRangeMark, text);
+        Assert.Contains("PASS: 0.9700", text);
+    }
+
     // --- Informe ---
 
     [Fact]
