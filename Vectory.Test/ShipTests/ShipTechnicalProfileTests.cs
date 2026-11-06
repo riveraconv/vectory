@@ -24,10 +24,10 @@ public class ShipTechnicalProfileTests
     {
         ShipTuning t = BladeShip.Definition.Technical;
 
-        Assert.Equal(Vector.MaxSpeed * 1.08f, t.MaxSpeed);
+        Assert.Equal(Vector.MaxSpeed * 1.04f, t.MaxSpeed);
         Assert.Equal(Vector.Acceleration * 0.94f, t.Acceleration);
-        Assert.Equal(Vector.TurnRate, t.TurnRate);
-        Assert.Equal(Vector.LateralGrip * 0.92f, t.LateralGrip);
+        Assert.Equal(Vector.TurnRate * 0.90f, t.TurnRate);
+        Assert.Equal(Vector.LateralGrip * 0.90f, t.LateralGrip);
         Assert.Equal(Vector.BrakeDeceleration * 1.02f, t.BrakeDeceleration);
         AssertRestLikeVector(t);
     }
@@ -37,10 +37,10 @@ public class ShipTechnicalProfileTests
     {
         ShipTuning t = HammerShip.Definition.Technical;
 
-        Assert.Equal(Vector.MaxSpeed * 0.94f, t.MaxSpeed);
+        Assert.Equal(Vector.MaxSpeed * 0.98f, t.MaxSpeed);
         Assert.Equal(Vector.Acceleration * 1.10f, t.Acceleration);
-        Assert.Equal(Vector.TurnRate * 0.96f, t.TurnRate);
-        Assert.Equal(Vector.LateralGrip * 1.04f, t.LateralGrip);
+        Assert.Equal(Vector.TurnRate * 1.04f, t.TurnRate);
+        Assert.Equal(Vector.LateralGrip * 1.10f, t.LateralGrip);
         Assert.Equal(Vector.BrakeDeceleration * 0.96f, t.BrakeDeceleration);
         AssertRestLikeVector(t);
     }
@@ -79,10 +79,10 @@ public class ShipTechnicalStatsTests
         ShipStats.Compute(ship.Technical, VectorTuning.Values).Single(s => s.Label == label);
 
     [Theory]
-    [InlineData(ShipStats.TopSpeed, "428 KM/H", 9)]
-    [InlineData(ShipStats.Acceleration, "0–200 · 2.6 S", 3)]
-    [InlineData(ShipStats.Handling, "74 °/S", 5)]
-    [InlineData(ShipStats.Grip, "", 1)]
+    [InlineData(ShipStats.TopSpeed, "412 KM/H", 7)]
+    [InlineData(ShipStats.Acceleration, "0–200 · 2.6 S", 2)]
+    [InlineData(ShipStats.Handling, "67 °/S", 0)]
+    [InlineData(ShipStats.Grip, "", 0)]
     [InlineData(ShipStats.Braking, "200–0 · 1.2 S", 6)]
     public void Blade(string label, string value, int segments)
     {
@@ -93,10 +93,10 @@ public class ShipTechnicalStatsTests
     }
 
     [Theory]
-    [InlineData(ShipStats.TopSpeed, "372 KM/H", 2)]
-    [InlineData(ShipStats.Acceleration, "0–200 · 2.3 S", 9)]
-    [InlineData(ShipStats.Handling, "72 °/S", 3)]
-    [InlineData(ShipStats.Grip, "", 7)]
+    [InlineData(ShipStats.TopSpeed, "388 KM/H", 4)]
+    [InlineData(ShipStats.Acceleration, "0–200 · 2.4 S", 6)]
+    [InlineData(ShipStats.Handling, "77 °/S", 7)]
+    [InlineData(ShipStats.Grip, "", 10)]
     [InlineData(ShipStats.Braking, "200–0 · 1.3 S", 3)]
     public void Hammer(string label, string value, int segments)
     {
@@ -241,8 +241,8 @@ public class TuningLabTests
         Assert.False(lab.Touched);
         Assert.Equal(ShipCatalog.Ship01, lab.Current.Id);
         Assert.Equal(BladeShip.Definition.Technical, lab.Tuning(ShipCatalog.Ship02));
-        Assert.Equal(8, lab.Percent(ShipCatalog.Ship02, ShipParameter.MaxSpeed));
-        Assert.Equal(-6, lab.Percent(ShipCatalog.Ship03, ShipParameter.MaxSpeed));
+        Assert.Equal(4, lab.Percent(ShipCatalog.Ship02, ShipParameter.MaxSpeed));
+        Assert.Equal(-2, lab.Percent(ShipCatalog.Ship03, ShipParameter.MaxSpeed));
     }
 
     [Fact]
@@ -330,7 +330,7 @@ public class TuningLabTests
     {
         TuningLab lab = Open();
 
-        Assert.False(lab.SetPercent(ShipCatalog.Ship02, ShipParameter.MaxSpeed, 8));
+        Assert.False(lab.SetPercent(ShipCatalog.Ship02, ShipParameter.MaxSpeed, 4));
         lab.Reset(ShipCatalog.Ship02);
 
         Assert.False(lab.Touched);
@@ -343,8 +343,8 @@ public class TuningLabTests
 
         string clean = lab.DumpText();
         Assert.Contains("ship_01: new ShipMultipliers { MaxSpeed = 1.00f", clean);
-        Assert.Contains("ship_02: new ShipMultipliers { MaxSpeed = 1.08f, Acceleration = 0.94f, TurnRate = 1.00f, LateralGrip = 0.92f, BrakeDeceleration = 1.02f }", clean);
-        Assert.Contains("ship_03: new ShipMultipliers { MaxSpeed = 0.94f, Acceleration = 1.10f", clean);
+        Assert.Contains("ship_02: new ShipMultipliers { MaxSpeed = 1.04f, Acceleration = 0.94f, TurnRate = 0.90f, LateralGrip = 0.90f, BrakeDeceleration = 1.02f }", clean);
+        Assert.Contains("ship_03: new ShipMultipliers { MaxSpeed = 0.98f, Acceleration = 1.10f", clean);
         Assert.DoesNotContain("OVER LIMIT", clean);
 
         lab.SetPercent(ShipCatalog.Ship03, ShipParameter.LateralGrip, 15);

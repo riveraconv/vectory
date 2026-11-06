@@ -365,6 +365,19 @@ public class BalanceTests
         Assert.False(BalanceRules.MandatoryPassed(BalanceRules.Check(Fair(bladeGap: 5.0))));
     }
 
+    // Si este test falla, un cambio ha roto el equilibrio de las naves en el único circuito real
+    [Fact]
+    public void The_definitions_pass_the_mandatory_rules_in_circuit_01()
+    {
+        BalanceCircuit circuit = Circuit("circuit_01");
+        var stints = Ships.Select(ship => StintRunner.Run(circuit, Ship(ship), StintOptions.Default)).ToList();
+
+        CircuitCheck check = BalanceRules.CheckCircuit(stints);
+
+        Assert.True(check.Rule1, string.Join(" ", check.GapToReference));
+        Assert.True(check.Rule2, string.Join(" ", check.SectorsWon));
+    }
+
     // --- Barrido ---
 
     [Fact]

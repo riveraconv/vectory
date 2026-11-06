@@ -1,6 +1,6 @@
 # VECTORY — Spec: Naves 6 · Equilibrio con piloto automático
 
-Versión 1.0 · 2026-11-05 · Estado: **propuesta, pendiente de validar**
+Versión 1.0 · 2026-11-05 · Estado: **propuesta, y validación**
 
 Sexta spec de naves. Su objetivo es encontrar los valores de las tres naves para que **cada una tenga personalidad** pero **ninguna sea imbatible**.
 
