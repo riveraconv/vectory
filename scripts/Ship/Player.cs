@@ -238,6 +238,9 @@ public partial class Player : CharacterBody3D
 	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
 	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();
 
+	// Hacia dónde apunta el morro, en planta (X, Z del mundo): el frente del radar y el minimapa
+	public System.Numerics.Vector2 PlanForward => Dynamics.Forward;
+
 	public override void _Ready()
 	{
 		MotionMode = MotionModeEnum.Floating;

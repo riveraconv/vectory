@@ -5,6 +5,7 @@ using Vectory.Circuit;
 using Vectory.Core;
 using Vectory.Ghost;
 using Vectory.Menu;
+using Vectory.Radar;
 using Vectory.Records;
 using Vectory.Ship;
 using Vectory.UI;
@@ -82,6 +83,18 @@ public partial class Main : Node3D
 	[Export] public float DamageIndicatorGap = 24f;    // separación entre el indicador y las esferas de boost
 	[Export] public float DamageBlinkFrequency = 2f;   // Hz del parpadeo del indicador con nivel 3
 
+	[ExportGroup("Radar")]
+	[Export] public float RadarRange = RadarSettings.DefaultRange;                                 // alcance (m)
+	[Export] public float RadarCloseDistance = RadarSettings.DefaultCloseDistance;                 // nave pegada por debajo (m)
+	[Export] public float RadarMaxHeightDifference = RadarSettings.DefaultMaxHeightDifference;     // más diferencia de altura, no sale (m)
+	[Export] public float RadarSweepPeriod = RadarSettings.DefaultSweepPeriod;                     // segundos por vuelta del barrido
+	[Export] public float RadarEchoFade = RadarSettings.DefaultEchoFade;                           // segundos en apagarse un eco
+	[Export] public float RadarDiameter = 120f;                                                    // diámetro en el HUD (px sobre 1280×720)
+
+	[ExportGroup("Minimapa")]
+	[Export] public float MinimapWindowRadius = 450f;   // metros de circuito del centro al borde
+	[Export] public float MinimapDiameter = 156f;       // diámetro en el HUD (px sobre 1280×720)
+
 	[ExportGroup("Recolocación")]
 	[Export] public float StuckSpeed = RespawnSettings.DefaultStuckSpeedKmh;          // km/h: por debajo, y tocando la barrera, la nave está atascada
 	[Export] public float StuckTime = RespawnSettings.DefaultStuckTime;               // segundos seguidos atascada antes de recolocarla
@@ -108,6 +121,10 @@ public partial class Main : Node3D
 
 	// Daños (solo RACE; null en TIME TRIAL)
 	private DamageModel _damage;
+
+	// Las demás naves de la carrera (hoy solo las de prueba; el fantasma no entra) y el radar que las lee
+	private readonly RaceShipList _raceShips = new();
+	private RadarSweep _radar;
 
 	// Fantasma (solo TIME TRIAL; null en RACE)
 	private GhostShip _ghostShip;
@@ -229,10 +246,23 @@ public partial class Main : Node3D
 			DamageSegmentHeight = DamageSegmentHeight,
 			DamageSegmentGap = DamageSegmentGap,
 			DamageIndicatorGap = DamageIndicatorGap,
-			DamageBlinkFrequency = DamageBlinkFrequency
+			DamageBlinkFrequency = DamageBlinkFrequency,
+			RadarDiameter = RadarDiameter,
+			MinimapDiameter = MinimapDiameter
 		};
 		AddChild(_hud);
 		_hud.ResultsOptionChosen += ExecuteResultsOption;
+
+		_radar = new RadarSweep(new RadarSettings
+		{
+			Range = RadarRange,
+			CloseDistance = RadarCloseDistance,
+			MaxHeightDifference = RadarMaxHeightDifference,
+			SweepPeriod = RadarSweepPeriod,
+			EchoFade = RadarEchoFade
+		});
+		_hud.SetRadar(_radar);
+		_hud.SetMinimap(new MinimapPath(_track.Frame, _track.TrackWidth), MinimapWindowRadius, _raceShips.Ships);
 
 		// Velocidad, boost y daño: en pantalla o en el cuadro de mando, según la cámara
 		_hud.SetDriveHudVisible(CockpitViewRules.For(_player.View).ScreenDriveHud);
@@ -257,8 +287,15 @@ public partial class Main : Node3D
 		// Panel de ajuste para pruebas: no existe en una exportación de release
 		if (OS.IsDebugBuild())
 		{
-			AddChild(new TuningLabPanel { Name = "TuningLabPanel", Player = _player });
+			var tuningPanel = new TuningLabPanel { Name = "TuningLabPanel", Player = _player };
+			AddChild(tuningPanel);
 			AddChild(new AutopilotToggle { Name = "AutopilotToggle", Player = _player });
+
+			var testShips = new TestShips { Name = "TestShips" };
+			AddChild(testShips);
+			testShips.Setup(_raceShips, _player, _track);
+			testShips.CountChanged += tuningPanel.SetTestShipCount;
+			tuningPanel.SetTestShipCount(testShips.Count);
 		}
 	}
 
@@ -273,6 +310,8 @@ public partial class Main : Node3D
 			_hud.SetReadySequence(_race.ReadySequence);
 			UpdateLapInfo();
 			UpdateGhost();
+			_radar.Update((float)delta, ToNumerics(_player.GlobalPosition), _player.PlanForward, _raceShips.Ships);
+			_hud.SetMinimapPose(new System.Numerics.Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z), _player.PlanForward);
 			_pause.RaceFinished = _race.State == RaceState.Finished;
 			UpdateResults((float)delta);
 		}
