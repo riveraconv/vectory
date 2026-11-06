@@ -1,6 +1,6 @@
 # VECTORY — Spec: Naves 6 · Equilibrio con piloto automático
 
-Versión 1.0 · 2026-11-05 · Estado: **propuesta, y validación**
+Versión 1.0 · 2026-11-05 · Estado: **hecha y validada** (versión del juego 0.14.2). Lo que se hizo distinto y los valores finales, en la sección 12.
 
 Sexta spec de naves. Su objetivo es encontrar los valores de las tres naves para que **cada una tenga personalidad** pero **ninguna sea imbatible**.
 
@@ -255,3 +255,39 @@ No se empieza una etapa sin validar la anterior.
 - Cambiar boost, daño, pendientes o peraltes por nave.
 - Que el barrido cambie solo las definiciones.
 - Cualquier cosa visible para el jugador fuera de los números de las naves.
+
+## 12. Resultado
+
+### 12.1 Valores finales
+
+| Parámetro (× VECTOR) | BLADE | HAMMER |
+|---|---|---|
+| Punta | 1,04 | 0,98 |
+| Aceleración | 0,94 | 1,10 |
+| Giro | 0,90 | 1,04 |
+| Agarre | 0,90 | 1,10 |
+| Frenada | 1,02 | 0,96 |
+| Curva de aceleración | 2,0 | 1,5 |
+
+Los porcentajes y la curva de VECTOR no cambian.
+
+En `circuit_01`, con el piloto y sin boost: BLADE 40,333 (−0,217), VECTOR 40,550 y HAMMER 40,783 (+0,233), sin contactos. BLADE gana S1 y S2, HAMMER gana S3 y VECTOR gana S4. Reglas 1 y 2 en ✓. Lo midió el piloto y el usuario lo dio por bueno conduciendo.
+
+### 12.2 Lo que se hizo distinto de esta spec
+
+- **F7 en vez de F8** para el piloto visible (4.7): F8 parece ser el atajo con el que Godot detiene el juego lanzado desde el editor, aunque no se ha confirmado.
+- **Récords con el piloto** (4.7): la carrera no guarda récord ni fantasma, como pide la spec, pero no por "contar como usar el panel": desde la spec 5 el panel ya no los bloquea.
+- **Margen del 97 %** (4.3): va solo sobre la velocidad de curva. Sobre la punta, la nave no llegaría nunca a ella.
+- **Trazada** (4.2): es la mínima curvatura clásica, en la que cada punto toma la curvatura media de sus vecinos. Abre antes de la curva, en vez de solo desplazarse hacia el interior, porque eso cerraba el radio y penalizaba a la nave estrecha. A más de 160 m de una curva va forzada por el centro.
+- **Empates en un sector** (2): los ganan todas las naves empatadas.
+- **`MATCH`** (5.1): busca siempre en el rango permitido y compara en el primer circuito que no sea de pruebas.
+- **`SWEEP` y `MATCH`** (5.1): solo escriben en la consola, sin CSV.
+- **Los valores finales** (6) salieron de una búsqueda temporal de combinaciones, que no forma parte de `BalanceRunner`. El barrido de varios parámetros sigue fuera de alcance en la herramienta.
+
+### 12.3 Límites conocidos
+
+- El equilibrio está medido en `circuit_01`, sin boost ni derrape. En `test_oval` gana HAMMER los cuatro sectores (−0,233) y en `test_hills` los gana BLADE (−0,700).
+- VECTOR gana S4 por solo 0,033 s: un cambio pequeño en cualquier nave se lo puede quitar. Lo vigila un test.
+- La curva 1,5 de HAMMER está en el límite del rango. Sin ella, HAMMER ganaría también S4 y VECTOR se quedaría sin sectores.
+- No se ha visto en pantalla elegir `Sweep` o `Match` desde el Inspector, ni el naranja de lo que se sale de rango.
+- `tools/` hay que excluirlo en el preset cuando se exporte el juego por primera vez.
