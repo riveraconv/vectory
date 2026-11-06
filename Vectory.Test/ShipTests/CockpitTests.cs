@@ -289,21 +289,26 @@ public class CockpitCaptureTests
 public class CockpitProfileTests
 {
     [Theory]
-    [InlineData(ShipCatalog.Ship01, "vector")]
     [InlineData(ShipCatalog.Ship02, "blade")]
     [InlineData(ShipCatalog.Ship03, "hammer")]
-    public void CockpitOfEachShip_PitchedDown(string id, string cockpit)
+    public void CockpitOf2DShips_PitchedDown(string id, string cockpit)
     {
         ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
-        Func<CockpitLayout> expected = cockpit switch
-        {
-            "blade" => BladeCockpit.Build,
-            "hammer" => HammerCockpit.Build,
-            _ => VectorCockpit.Build
-        };
+        Func<CockpitLayout> expected = cockpit == "blade" ? BladeCockpit.Build : HammerCockpit.Build;
 
         Assert.Equal(expected, visual.BuildCockpit);
         Assert.Equal(-8f, visual.Cockpit.PitchDegrees);
+    }
+
+    // Decisión del usuario: la cámara del mundo de VECTOR es la del prototipo de la cabina 3D, a 1,45 m de la pista
+    [Fact]
+    public void Vector_FramingIsTheOneOfThePrototype()
+    {
+        CockpitFraming framing = VectorShip.Definition.Visual.Cockpit;
+
+        Assert.Equal(1.45f, framing.Eye.Y + 2f, 4);
+        Assert.Equal(70f, framing.Fov);
+        Assert.Equal(0f, framing.PitchDegrees);
     }
 
     [Theory]
@@ -311,20 +316,20 @@ public class CockpitProfileTests
     [InlineData(ShipCatalog.Ship03, 1.4f)]
     public void Eye_ScaledByHeight_SameFovAndDepth(string id, float heightFactor)
     {
-        CockpitFraming vector = VectorShip.Definition.Visual.Cockpit;
+        CockpitFraming baseFraming = CockpitFraming.For2DCockpit;
         CockpitFraming framing = ShipDefinitions.Find(id)!.Visual.Cockpit;
 
-        Assert.Equal(vector.Eye.Y * heightFactor, framing.Eye.Y, 4);
-        Assert.Equal(vector.Eye.X, framing.Eye.X);
-        Assert.Equal(vector.Eye.Z, framing.Eye.Z);
-        Assert.Equal(vector.Fov, framing.Fov);
+        Assert.Equal(baseFraming.Eye.Y * heightFactor, framing.Eye.Y, 4);
+        Assert.Equal(baseFraming.Eye.X, framing.Eye.X);
+        Assert.Equal(baseFraming.Eye.Z, framing.Eye.Z);
+        Assert.Equal(baseFraming.Fov, framing.Fov);
     }
 
     // El punto de fuga queda donde lo espera el diseño: y ≈ 300 de 720, con la tangente de la mitad del FOV en 360 px
     [Fact]
     public void Pitch_PutsTheVanishingPointNearY300()
     {
-        CockpitFraming framing = VectorShip.Definition.Visual.Cockpit;
+        CockpitFraming framing = CockpitFraming.For2DCockpit;
         float rise = 360f * MathF.Tan(-framing.PitchDegrees * MathF.PI / 180f) / MathF.Tan(framing.Fov * 0.5f * MathF.PI / 180f);
 
         Assert.InRange(360f - rise, 298f, 302f);
@@ -419,8 +424,8 @@ public class CockpitProfileTests
     [Fact]
     public void ViewRules_LayerInCockpit_ScreenHudOutside()
     {
-        Assert.Equal(new CockpitViewRules(true, false), CockpitViewRules.For(CameraView.Cockpit));
-        Assert.Equal(new CockpitViewRules(false, true), CockpitViewRules.For(CameraView.Chase));
+        Assert.Equal(new CockpitViewRules(true, false, false), CockpitViewRules.For(CameraView.Cockpit, false));
+        Assert.Equal(new CockpitViewRules(false, false, true), CockpitViewRules.For(CameraView.Chase, false));
     }
 }
 

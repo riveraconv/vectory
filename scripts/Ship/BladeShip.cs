@@ -28,9 +28,10 @@ public static class BladeShip
 		{
 			BuildHull = BuildHull,
 			BuildCockpit = BladeCockpit.Build,
-			Cockpit = VectorShip.Definition.Visual.Cockpit with
+			Cockpit3D = null,
+			Cockpit = CockpitFraming.For2DCockpit with
 			{
-				Eye = VectorShip.Definition.Visual.Cockpit.Eye * new Vector3(1f, EyeHeightFactor, 1f)
+				Eye = CockpitFraming.For2DCockpit.Eye * new Vector3(1f, EyeHeightFactor, 1f)
 			},
 			ChaseFactor = ChaseFactor,
 			Chase = VectorShip.Definition.Visual.Chase.Scaled(ChaseFactor),

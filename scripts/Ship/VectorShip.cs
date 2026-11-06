@@ -15,7 +15,13 @@ public static class VectorShip
 		{
 			BuildHull = BuildHull,
 			BuildCockpit = VectorCockpit.Build,
-			Cockpit = new CockpitFraming(new Vector3(0f, 0.45f, -1.2f), 80f, -8f),
+			Cockpit3D = new Cockpit3DProfile(
+				"res://assets/cockpits/cockpit_vector.glb",
+				"res://assets/cockpits/cockpit_vector.manifest.json",
+				"res://assets/cockpits/cockpit_env.png",
+				Cockpit3DStyle.Racing),
+			// El de la cabina 3D, decisión del usuario: ojo a 1,45 m de la pista (la nave vuela a 2 m), FOV 70 y sin inclinar
+			Cockpit = new CockpitFraming(new Vector3(0f, -0.55f, -1.2f), 70f, 0f),
 			Chase = new ChaseFraming(1.8f, 7f, 3f, new Vector3(0f, 0.3f, -10f)),
 			CollisionHalfWidth = 3.4f,   // las puntas de las alas
 			NoseDistance = 4f,

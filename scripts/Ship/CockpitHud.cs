@@ -461,10 +461,16 @@ public static class CockpitHudPieces
 		e with { FillRgba = paint.Fill, StrokeRgba = paint.Stroke, Glow = paint.Glow };
 }
 
-// Qué se ve en cada cámara (spec docs/naves-3b-cabinas.md, 4.1). Posición, vuelta y tiempos se ven siempre.
-public readonly record struct CockpitViewRules(bool CockpitLayer, bool ScreenDriveHud)
+// Qué se ve en cada cámara (spec docs/naves-3b-cabinas.md, 4.1, y docs/cabinas-3d-1-vector.md, 4.7). Posición, vuelta y
+// tiempos se ven siempre. Mientras las pantallas de la cabina 3D son de prueba, enseña también el HUD de pantalla.
+public readonly record struct CockpitViewRules(bool CockpitLayer, bool Cockpit3D, bool ScreenDriveHud)
 {
-	public static CockpitViewRules For(CameraView view) => view == CameraView.Cockpit
-		? new CockpitViewRules(true, false)
-		: new CockpitViewRules(false, true);
+	public static CockpitViewRules For(CameraView view, bool hasCockpit3D)
+	{
+		if (view != CameraView.Cockpit)
+			return new CockpitViewRules(false, false, true);
+		return hasCockpit3D
+			? new CockpitViewRules(false, true, true)
+			: new CockpitViewRules(true, false, false);
+	}
 }

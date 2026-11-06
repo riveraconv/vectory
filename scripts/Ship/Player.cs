@@ -157,6 +157,23 @@ public partial class Player : CharacterBody3D
 	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitDamageTintIntensity = 1f;   // multiplica el tinte rojo del diseño (0 = apagado)
 	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitScreenGlowIntensity = 1f;   // multiplica el brillo de las pantallas (0 = apagado)
 
+	[ExportGroup("Cabina 3D")]
+	[Export] public float Cockpit3DFov = 70f;                 // grados, en vertical: no cambia con los efectos del mundo
+	[Export] public float Cockpit3DSway = 0.03f;              // m de balanceo lateral al girar
+	[Export] public float Cockpit3DVibrationPosition = 1.6f;
+	[Export] public float Cockpit3DVibrationRotation = 0.35f;
+	[Export] public float Cockpit3DCounterRoll = 0.25f;       // contragiro respecto a lo que se ladea el mundo
+	[Export] public float Cockpit3DBoostPush = 0.05f;         // m hacia atrás con el boost
+	[Export] public float Cockpit3DKeyEnergy = 0.83f;
+	[Export] public float Cockpit3DAmbientEnergy = 0.32f;
+	[Export] public float Cockpit3DLampEnergy = 0.025f;
+	[Export] public float Cockpit3DLargeScreenLight = 0.095f;
+	[Export] public float Cockpit3DSmallScreenLight = 0.064f;
+	[Export] public float Cockpit3DGlowIntensity = 0.55f;
+	[Export] public float Cockpit3DGlowStrength = 0.9f;
+	[Export] public float Cockpit3DGlowThreshold = 0.8f;
+	[Export] public float Cockpit3DScreenBrightness = 1.35f;
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -235,6 +252,9 @@ public partial class Player : CharacterBody3D
 	public CameraView View => _chaseView ? CameraView.Chase : CameraView.Cockpit;
 	public event System.Action<CameraView> ViewChanged;
 
+	// Qué se enseña en la vista actual, según la cabina de la nave que se conduce
+	public CockpitViewRules ViewRules => CockpitViewRules.For(View, _cockpit.Uses3D);
+
 	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
 	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();
 
@@ -255,7 +275,7 @@ public partial class Player : CharacterBody3D
 		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual };
 		AddChild(_ship);
 
-		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual };
+		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual, Settings3D = BuildCockpit3DSettings() };
 		AddChild(_cockpit);
 
 		_chaseCam = new ChaseCamera { Name = "ChaseCamera" };
@@ -325,6 +345,8 @@ public partial class Player : CharacterBody3D
 		_ship.SetVisual(visual);
 		_cockpit.SetVisual(visual);
 		RebuildFlicker();
+		ApplyView();
+		ViewChanged?.Invoke(View);
 	}
 
 	// El casco y la cabina nuevos tienen otro número de aristas: mismo nivel de daño, con las aristas sorteadas de nuevo
@@ -437,7 +459,7 @@ public partial class Player : CharacterBody3D
 	private void ApplyView()
 	{
 		_ship.SetExteriorVisible(_chaseView);
-		_cockpit.SetLayerVisible(CockpitViewRules.For(View).CockpitLayer);
+		_cockpit.ApplyRules(ViewRules);
 		if (_chaseView)
 			_chaseCam.MakeCurrent();
 		else
@@ -830,6 +852,19 @@ public partial class Player : CharacterBody3D
 		// La cabina hereda el ladeo de la pista del cuerpo; con un factor menor que 1 se quita esa parte
 		float trackBank = (1f - s.CockpitTrackBankFactor) * _attitude.Roll;
 		_cockpit.SetEffects(_cockpitBank.Angle - trackBank, new Vector2(cockpit.X, cockpit.Y), _boostCamera.Push(CameraView.Cockpit, s), fovExtra);
+
+		// La cabina 3D se mueve por su cuenta a partir de los mismos datos, sin sus metros
+		var input = new CockpitCameraInput(Dynamics.Steer, Mathf.Clamp(Speed / BoostedTopSpeed, 0f, 1f), _cockpitBank.Angle,
+			_vibration.Intensity, _boostCamera.Eased, _vibration.Time);
+		var settings = new CockpitCameraSettings(Cockpit3DSway, Cockpit3DVibrationPosition, Cockpit3DVibrationRotation, Cockpit3DCounterRoll, Cockpit3DBoostPush);
+		_cockpit.Update3D(CockpitCameraMotion.Compute(input, settings), BuildCockpit3DSettings());
+	}
+
+	private Cockpit3DSettings BuildCockpit3DSettings()
+	{
+		return new Cockpit3DSettings(Cockpit3DFov, Cockpit3DKeyEnergy, Cockpit3DAmbientEnergy, Cockpit3DLampEnergy,
+			Cockpit3DLargeScreenLight, Cockpit3DSmallScreenLight, Cockpit3DGlowIntensity, Cockpit3DGlowStrength,
+			Cockpit3DGlowThreshold, Cockpit3DScreenBrightness);
 	}
 
 	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos

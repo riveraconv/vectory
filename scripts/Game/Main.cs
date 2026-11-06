@@ -265,8 +265,8 @@ public partial class Main : Node3D
 		_hud.SetMinimap(new MinimapPath(_track.Frame, _track.TrackWidth), MinimapWindowRadius, _raceShips.Ships);
 
 		// Velocidad, boost y daño: en pantalla o en el cuadro de mando, según la cámara
-		_hud.SetDriveHudVisible(CockpitViewRules.For(_player.View).ScreenDriveHud);
-		_player.ViewChanged += view => _hud.SetDriveHudVisible(CockpitViewRules.For(view).ScreenDriveHud);
+		_hud.SetDriveHudVisible(_player.ViewRules.ScreenDriveHud);
+		_player.ViewChanged += _ => _hud.SetDriveHudVisible(_player.ViewRules.ScreenDriveHud);
 
 		if (_mode == GameMode.TimeTrial)
 		{

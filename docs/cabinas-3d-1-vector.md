@@ -199,7 +199,7 @@ El agente **mira las capturas** antes de dar la etapa por cerrada y las compara 
 ### 4.1 Importación
 
 - El `.glb` se importa con los nombres tal cual, **sin colisiones**, sin LOD y sin luz horneada.
-- Después de importar, un script de la cabina (en el juego, no en el importador) aplica lo que glTF no lleva (manifiesto): piezas **sin sombra**, reflejos ×0,35, **modo suma** sin escribir profundidad para `Glass_Smudge`, y comprueba que el **barniz** (clearcoat) ha llegado. Si algo no llega bien, se arregla **en Godot con su material**, sin tocar la geometría, y se avisa.
+- Después de importar, un script de la cabina (en el juego, no en el importador) aplica lo que glTF no lleva (manifiesto): piezas **sin sombra**, reflejos ×0,35, **modo suma** sin escribir profundidad para `Glass_Smudge`, y comprueba que el **barniz** (clearcoat) ha llegado. Si algo no llega bien, se arregla **en Godot con su material**, sin tocar la geometría, y se avisa. Comprobado en la etapa 2: el barniz **no llega** (Godot no lee `KHR_materials_clearcoat`) y se pone por código; la textura de rugosidad, que es gris, se leería también como metal, así que el metal queda como un valor por material.
 
 ### 4.2 Cámara propia
 
@@ -208,7 +208,7 @@ La cabina se pinta **encima del mundo** con **su propia cámara**, como el proto
 - Un `SubViewport` con **su propio mundo 3D** (`own_world_3d`), **fondo transparente** y del **tamaño de la pantalla** (sigue los cambios de tamaño).
 - Dentro: la cabina, su `Camera3D` en el origen con **FOV vertical 70°** (no cambia con los efectos de FOV del mundo), plano cercano **0,02** y lejano **30**, sus luces (sección 4.3) y su `Environment`:
   - Cielo con el panorama `cockpit_env.png`, usado para **reflejos** y luz ambiente.
-  - Tonemap **ACES**, exposición **1,05**.
+  - Tonemap **ACES**, exposición **1,05** del prototipo. En Godot son 1,05 / 0,6 = 1,75, porque el ACES de three.js divide la exposición entre 0,6 y el de Godot no.
   - **Glow** parecido al bloom del prototipo (fuerza 0,55, radio 0,45, umbral 0,8), para que brillen pantallas y LEDs.
 - La imagen del `SubViewport` se enseña a pantalla completa **en el sitio de la capa 2D de cabina**: por debajo del HUD de las esquinas, el panel de pruebas y la pausa.
 - Con la **cámara exterior** (C), el `SubViewport` **deja de dibujarse** (no solo se oculta), para no gastar.
@@ -246,7 +246,7 @@ De dónde sale cada dato. Se **leen** de lo que ya calcula el juego, sin duplica
 
 | Dato | Viene de | Rango |
 |---|---|---|
-| `dirección` | `ShipDynamics.Steer` | −1 a 1 |
+| `dirección` | `−ShipDynamics.Steer`: el del juego es positivo a la izquierda y el del prototipo, a la derecha | −1 a 1 |
 | `f` | La de la sección 6.1 | 0 a 1 |
 | `inclinación` | `CockpitBank.Angle` (sin el peralte de la pista). El signo se comprueba en pista: la cabina gira **al revés** que el mundo | hasta ±8° |
 | `empuje` | `BoostCameraEffect.Eased`, **no** `Push` | 0 a 1 |
@@ -273,6 +273,8 @@ Los −8° se pusieron para cuadrar con el dibujo de la cabina 2D, que en Vector
 - El agente enseña **capturas de las dos opciones** en la misma recta y en una curva: A) la cámara actual; B) la del prototipo, con el ojo a 1,45 m de la pista, FOV 70° e inclinación 0°.
 - **Elige el usuario**, también después de conducirlas si quiere. Con B cambian la sensación de velocidad y lo que se ve de la pista. Solo afecta a la cabina de VECTOR, no a BLADE, HAMMER ni la cámara exterior.
 - Hasta entonces no se toca nada de esa cámara. Cualquier cosa intermedia se apunta con sus valores finales.
+
+**Decidido en la etapa 2: opción B.** VECTOR va con el ojo a 1,45 m de la pista (−0,55 m respecto al `Player`), FOV 70° e inclinación 0°. BLADE y HAMMER siguen con el encuadre para el que están dibujadas sus cabinas 2D (`CockpitFraming.For2DCockpit`), con su altura de ojo. Límite conocido: desde los puestos de delante, el semáforo puede salirse por arriba.
 
 ### 4.6 Pantallas de prueba
 
