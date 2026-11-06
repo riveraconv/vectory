@@ -43,6 +43,7 @@ public partial class TuningLabPanel : CanvasLayer
 	private PanelContainer _root;
 	private Label _shipLabel;
 	private CheckBox _linearCheck;
+	private Label _testShipsLabel;
 	private LabelSettings _percentSettings;
 	private LabelSettings _percentOverSettings;
 
@@ -97,6 +98,12 @@ public partial class TuningLabPanel : CanvasLayer
 			return;
 		}
 		GetViewport().SetInputAsHandled();
+	}
+
+	// Cuántas naves de prueba hay (F6): las lleva TestShips, aquí solo se enseña
+	public void SetTestShipCount(int count)
+	{
+		_testShipsLabel.Text = $"TEST SHIPS {count} · F6";
 	}
 
 	private void OnSliderChanged(ShipParameter parameter, double value)
@@ -238,6 +245,9 @@ public partial class TuningLabPanel : CanvasLayer
 		_linearCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
 		_linearCheck.Toggled += OnLinearToggled;
 		column.AddChild(_linearCheck);
+
+		_testShipsLabel = new Label { LabelSettings = value };
+		column.AddChild(_testShipsLabel);
 
 		column.AddChild(new Label { Text = "F9 PANEL · F10 SHIP · F11 DUMP · F12 RESET", LabelSettings = label });
 	}

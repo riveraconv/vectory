@@ -3,6 +3,7 @@ using Godot;
 using Vectory.Circuit;
 using Vectory.Core;
 using Vectory.Menu;
+using Vectory.Radar;
 
 namespace Vectory.UI;
 
@@ -12,6 +13,7 @@ namespace Vectory.UI;
 //   Arriba izquierda:  posición / participantes (TIME TRIAL: TIME TRIAL y el circuito)
 //   Arriba derecha:    vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de vuelta, mejor tiempo y, 2 s tras cerrar un
 //                      sector, su tiempo y la diferencia con el mejor anterior (S1  0:23.456  -0.214)
+//   Abajo izquierda:   radar
 //   Abajo derecha:     indicador de daño (solo RACE) y cargas de boost (esferas), velocidad (km/h) y su barra
 //   Arriba centro:     RACE: cuenta atrás y GO! (el semáforo está en la meta); TIME TRIAL: READY? / GO!, delta por
 //                      sector y franja de fin de vuelta
@@ -46,6 +48,10 @@ public partial class Hud : CanvasLayer
 	public float DamageIndicatorGap = 24f;   // separación entre el indicador y las esferas de boost
 	public float DamageBlinkFrequency = 2f;
 
+	// Radar: diámetro y margen a la parte de abajo de la pantalla (px sobre 1280×720). A la izquierda, alineado con la posición.
+	public float RadarDiameter = 120f;
+	private const float RadarBottomMargin = 40f;
+
 	private enum Corner { TopLeft, TopRight, BottomRight }
 
 	private Label _positionLabel;
@@ -69,6 +75,7 @@ public partial class Hud : CanvasLayer
 	private VBoxContainer _timeTrialHeader;
 	private Label _circuitLabel;
 	private TimeTrialView _timeTrial;
+	private RadarView _radar;
 
 	public override void _Ready()
 	{
@@ -92,6 +99,7 @@ public partial class Hud : CanvasLayer
 		BuildLapBlock(root);
 		BuildSectorBlock(root);
 		BuildSpeedBlock(root);
+		BuildRadar(root);
 		BuildStartLights(root);
 		BuildTimeTrial(root);
 		BuildResults(root);
@@ -161,6 +169,13 @@ public partial class Hud : CanvasLayer
 
 	// Delta por sector y franja de fin de vuelta de TIME TRIAL
 	public TimeTrialView TimeTrial => _timeTrial;
+
+	// El radar: Main lleva su estado; el HUD solo lo dibuja
+	public void SetRadar(RadarSweep sweep)
+	{
+		float radius = RadarDiameter * 0.5f;
+		_radar.Setup(sweep, RadarStyle.Hud(RadarPainter.HudPalette(), radius, UiScale.Factor));
+	}
 
 	// Sector recién cerrado: se ve SectorTimeVisible s, con la diferencia en cian si mejora y en naranja si empeora
 	public void ShowSectorTime(SectorTimeText text)
@@ -232,6 +247,7 @@ public partial class Hud : CanvasLayer
 
 		_results.SetResult(result, options, bandHeight, optionFontSize, shipNameFontSize, newTotalRecord, newLapRecord);
 		_results.Visible = true;
+		_radar.Visible = false;
 	}
 
 	// Vuelve a dibujar la selección de las opciones de resultados (tras moverla con el teclado)
@@ -382,6 +398,26 @@ public partial class Hud : CanvasLayer
 		Place(_damage, Corner.BottomRight, Margin, rowCenter - height * 0.5f, BarWidth, height);
 		_damage.SetRightInset(BoostChargesView.WidthFor(3) + DamageIndicatorGap * scale);
 		root.AddChild(_damage);
+	}
+
+	// Abajo a la izquierda. El origen del nodo es el centro del círculo (ver RadarView).
+	private void BuildRadar(Control root)
+	{
+		float radius = RadarDiameter * 0.5f * UiScale.Factor;
+		float bottom = RadarBottomMargin * UiScale.Factor + radius;
+		_radar = new RadarView
+		{
+			Name = "Radar",
+			AnchorLeft = 0f,
+			AnchorRight = 0f,
+			AnchorTop = 1f,
+			AnchorBottom = 1f,
+			OffsetLeft = Margin + radius,
+			OffsetRight = Margin + radius,
+			OffsetTop = -bottom,
+			OffsetBottom = -bottom
+		};
+		root.AddChild(_radar);
 	}
 
 	private void BuildStartLights(Control root)
