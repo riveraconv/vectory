@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-// BLADE (ship_02): más punta y menos agarre que Vector. Lógica pura.
+// BLADE (ship_02): más punta, a cambio de giro y agarre (equilibrio en docs/naves-6-equilibrio.md). Lógica pura.
 // Casco: Interceptor_E de designs/naves-geometria.js. Cabina: BURBUJA, de designs/cabinas-hoja-martillo-def.js.
 public static class BladeShip
 {
@@ -12,10 +12,10 @@ public static class BladeShip
 
 	private static readonly ShipMultipliers Multipliers = new()
 	{
-		MaxSpeed = 1.08f,
+		MaxSpeed = 1.04f,
 		Acceleration = 0.94f,
-		TurnRate = 1f,
-		LateralGrip = 0.92f,
+		TurnRate = 0.90f,
+		LateralGrip = 0.90f,
 		BrakeDeceleration = 1.02f
 	};
 

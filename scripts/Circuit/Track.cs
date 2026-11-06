@@ -51,10 +51,10 @@ public partial class Track : Node3D
 
 	[ExportGroup("Parrilla")]
 	[Export] public int GridSlots = DefaultGridSlots;   // participantes de una carrera (una marca por cada uno)
-	[Export] public float GridFirstDistance = 12f;   // metros de la meta a la marca 1 (hacia atrás)
-	[Export] public float GridRowSpacing = 16f;      // metros entre filas de una misma columna
-	[Export] public float GridEvenOffset = 8f;       // cuánto más atrás va cada marca par
-	[Export] public float GridLateralPercent = 25f;  // desplazamiento lateral de las columnas (% del ancho de pista)
+	[Export] public float GridFirstDistance = GridSettings.DefaultFirstDistance;   // metros de la meta a la marca 1 (hacia atrás)
+	[Export] public float GridRowSpacing = GridSettings.DefaultRowSpacing;         // metros entre filas de una misma columna
+	[Export] public float GridEvenOffset = GridSettings.DefaultEvenOffset;         // cuánto más atrás va cada marca par
+	[Export] public float GridLateralPercent = GridSettings.DefaultLateralPercent; // desplazamiento lateral de las columnas (% del ancho de pista)
 	[Export] public float GridFrameWidth = 3.6f;     // marco de luz de cada puesto (m)
 	[Export] public float GridFrameLength = 6.4f;
 	[Export] public float GridFadeTime = 0.5f;       // segundos en apagarse desde el GO
@@ -79,7 +79,7 @@ public partial class Track : Node3D
 	[Export] public float CrestBarrierRaise = 0.35f;                      // segunda línea de remate, por encima de la barrera
 
 	[ExportGroup("Barrera")]
-	[Export] public float BarrierGap = 0.5f;          // separación de la barrera respecto al borde de la pista
+	[Export] public float BarrierGap = BarrierGeometry.DefaultGap;   // separación de la barrera respecto al borde de la pista
 	[Export] public float BarrierHeight = 3f;         // altura de la barrera (remate)
 	[Export] public float BarrierBottomBand = 0.4f;   // alto de la franja inferior
 	[Export] public float BarrierTopBand = 0.6f;      // alto de la franja superior
@@ -302,25 +302,12 @@ void fragment() {
 	// Eje del circuito: punto más cercano, recolocación y barreras
 	// ---------------------------------------------------------------
 
-	// Punto de la pista justo debajo de una posición (en vertical): punto del eje, tangente y derecha en planta
-	// (sentido de la marcha), desplazamiento lateral sobre la superficie (positivo = derecha), distancia sobre el
-	// eje desde la meta y la superficie en ese punto (marco, altura, pendiente, curvatura del perfil y peralte).
-	// En pista plana es la proyección en planta de siempre. Supone que el nodo Track está en el origen sin rotar ni escalar.
-	public AxisPoint ProjectOnAxis(Vector3 position)
-	{
-		SurfacePoint p = Frame.SurfaceUnder(position.X, position.Z, position.Y);
-		FramePoint f = p.Frame;
-		return new AxisPoint(ToGodot(f.Position), ToGodot(f.PlanTangent), ToGodot(f.PlanRight), p.Lateral, f.Distance,
-			ToGodot(f.Normal), ToGodot(f.Right), p.SurfaceY, f.Slope, f.Curvature, f.Bank);
-	}
-
 	// Recolocación: en el punto del eje más cercano, centrada, a la altura de vuelo sobre la superficie y
 	// mirando en el sentido de la marcha
 	public void GetRespawn(Vector3 position, out Vector3 shipPosition, out float yaw)
 	{
-		AxisPoint axis = ProjectOnAxis(position);
-		shipPosition = new Vector3(axis.Center.X, axis.Center.Y + ShipHover, axis.Center.Z);
-		yaw = Mathf.Atan2(-axis.Tangent.X, -axis.Tangent.Z);
+		TrackPlacement.Respawn(Frame, new NVec3(position.X, position.Y, position.Z), ShipHover, out NVec3 p, out yaw);
+		shipPosition = ToGodot(p);
 	}
 
 	// Brillo del tramo de barrera naranja de las crestas (latido; lo pasa TrackElements cada frame)
@@ -348,9 +335,6 @@ void fragment() {
 
 	private static Vector3 ToGodot(NVec3 v) => new(v.X, v.Y, v.Z);
 
-	// Altura (Y) de la superficie a "distance" m de la meta y "lateral" m del eje sobre la superficie
-	private float SurfaceY(float distance, float lateral) => Frame.PointAt(distance, lateral, 0f).Y;
-
 	// ---------------------------------------------------------------
 	// Parrilla de salida
 	// ---------------------------------------------------------------
@@ -368,23 +352,16 @@ void fragment() {
 	// mirando en el sentido de la marcha, a la altura de vuelo sobre la superficie.
 	public void GetGridStart(int position, float noseDistance, out Vector3 shipPosition, out float yaw)
 	{
-		GetGridMark(position, out Vector3 front, out Vector3 forward, out _);
-
-		const float NoseGap = 0.5f;
-		float back = noseDistance + NoseGap;
-		Vector3 p = front - forward * back;
-		GridSlot slot = GridLayout.Slot(position, TrackWidth, GridSettings);
-		shipPosition = new Vector3(p.X, SurfaceY(LapLength - slot.Distance - back, slot.Lateral) + ShipHover, p.Z);
-		yaw = Mathf.Atan2(-forward.X, -forward.Z);
+		TrackPlacement.GridStart(Frame, position, noseDistance, TrackWidth, GridSettings, ShipHover, out NVec3 p, out yaw);
+		shipPosition = ToGodot(p);
 	}
 
 	// Salida lanzada (TIME TRIAL): sobre el eje del circuito, centrada en la pista, "distance" metros
 	// antes de la meta (medidos sobre la línea central) y mirando en el sentido de la marcha.
 	public void GetFlyingStart(float distance, out Vector3 shipPosition, out float yaw)
 	{
-		PointBehindFinish(distance, out Vector3 point, out Vector3 forward);
-		shipPosition = new Vector3(point.X, SurfaceY(LapLength - Mathf.Max(0f, distance), 0f) + ShipHover, point.Z);
-		yaw = Mathf.Atan2(-forward.X, -forward.Z);
+		TrackPlacement.FlyingStart(Frame, distance, ShipHover, out NVec3 p, out yaw);
+		shipPosition = ToGodot(p);
 	}
 
 	// Centro de la nave colocada en la marca de la posición 1..GridSlots (como GetGridStart): distancia sobre
@@ -395,48 +372,6 @@ void fragment() {
 		GridSlot slot = GridLayout.Slot(position, TrackWidth, GridSettings);
 		distance = LapLength - slot.Distance - (noseDistance + NoseGap);
 		lateral = slot.Lateral;
-	}
-
-	// Centro de la línea transversal de una marca (sobre la superficie), y las direcciones de la marcha
-	// y derecha en ese punto
-	private void GetGridMark(int position, out Vector3 front, out Vector3 forward, out Vector3 right)
-	{
-		GridSlot slot = GridLayout.Slot(position, TrackWidth, GridSettings);
-		PointBehindFinish(slot.Distance, out Vector3 point, out forward);
-		right = forward.Cross(Vector3.Up).Normalized();
-		front = point + right * slot.Lateral;
-		front.Y = SurfaceY(LapLength - slot.Distance, slot.Lateral);
-	}
-
-	// Punto de la línea central a "distance" metros por detrás de la meta (en sentido contrario
-	// al de la marcha) y la dirección de la marcha en ese punto. Sigue la curva del circuito.
-	private void PointBehindFinish(float distance, out Vector3 point, out Vector3 forward)
-	{
-		int n = Centerline.Count;
-		int i = FinishIndex;
-		float remaining = Mathf.Max(0f, distance);
-
-		for (int step = 0; step < n; step++)
-		{
-			int prev = (i - 1 + n) % n;
-			Vector3 a = Centerline[i];
-			Vector3 b = Centerline[prev];
-			float segment = a.DistanceTo(b);
-
-			if (remaining <= segment)
-			{
-				point = a.Lerp(b, segment > 0f ? remaining / segment : 0f);
-				forward = (a - b).Normalized();
-				return;
-			}
-
-			remaining -= segment;
-			i = prev;
-		}
-
-		// Más largo que el circuito entero: se queda en la meta
-		point = Centerline[FinishIndex];
-		forward = TangentAt(FinishIndex);
 	}
 
 	// Eje de un circuito en coordenadas de System.Numerics, sin montar la escena (spline cerrada, empezando en la meta)
@@ -685,37 +620,5 @@ void fragment() {
 			CheckpointIndices.Add(index);
 			CheckpointDistances.Add(_cumulative[index]);
 		}
-	}
-}
-
-// Punto del eje del circuito bajo una posición (ver Track.ProjectOnAxis)
-public readonly struct AxisPoint
-{
-	public readonly Vector3 Center;        // punto del eje (sobre la superficie, con su altura)
-	public readonly Vector3 Tangent;       // sentido de la marcha en planta (unitario, horizontal)
-	public readonly Vector3 Right;         // hacia la derecha de la marcha en planta (unitario, horizontal)
-	public readonly float Lateral;         // desplazamiento lateral de la posición sobre la superficie: positivo = derecha
-	public readonly float Distance;        // metros sobre el eje (en planta) desde la meta
-	public readonly Vector3 Normal;        // "arriba" de la superficie (N)
-	public readonly Vector3 SurfaceRight;  // lado de la superficie (B), ladeado con el peralte
-	public readonly float SurfaceY;        // Y de la superficie justo debajo de la posición
-	public readonly float Slope;           // dh/ds del eje
-	public readonly float Curvature;       // d²h/ds² del perfil de altura (negativa en las crestas)
-	public readonly float Bank;            // peralte en radianes (positivo = borde derecho más alto)
-
-	public AxisPoint(Vector3 center, Vector3 tangent, Vector3 right, float lateral, float distance,
-		Vector3 normal, Vector3 surfaceRight, float surfaceY, float slope, float curvature, float bank)
-	{
-		Center = center;
-		Tangent = tangent;
-		Right = right;
-		Lateral = lateral;
-		Distance = distance;
-		Normal = normal;
-		SurfaceRight = surfaceRight;
-		SurfaceY = surfaceY;
-		Slope = slope;
-		Curvature = curvature;
-		Bank = bank;
 	}
 }

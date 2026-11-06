@@ -6,6 +6,16 @@ namespace Vectory.Ship;
 // Parámetros de los daños (spec docs/danos.md). Los valores se editan en el Inspector de Main.
 public struct DamageSettings
 {
+	// Valores por defecto: de aquí salen los [Export] de Main y Default
+	public const int DefaultMediumPoints = 1;
+	public const int DefaultStrongPoints = 3;
+	public const int DefaultLevel1Points = 3;
+	public const int DefaultLevel2Points = 6;
+	public const int DefaultLevel3Points = 9;
+	public const float DefaultLevel2TopSpeedFactor = 0.92f;
+	public const float DefaultLevel3TopSpeedFactor = 0.85f;
+	public const float DefaultLevel3TurnFactor = 0.85f;
+
 	public int MediumPoints;          // puntos por impacto medio
 	public int StrongPoints;          // puntos por impacto fuerte
 	public int Level1Points;          // puntos desde los que se llega a cada nivel
@@ -18,14 +28,14 @@ public struct DamageSettings
 	// Valores de la spec
 	public static DamageSettings Default => new()
 	{
-		MediumPoints = 1,
-		StrongPoints = 3,
-		Level1Points = 3,
-		Level2Points = 6,
-		Level3Points = 9,
-		Level2TopSpeedFactor = 0.92f,
-		Level3TopSpeedFactor = 0.85f,
-		Level3TurnFactor = 0.85f
+		MediumPoints = DefaultMediumPoints,
+		StrongPoints = DefaultStrongPoints,
+		Level1Points = DefaultLevel1Points,
+		Level2Points = DefaultLevel2Points,
+		Level3Points = DefaultLevel3Points,
+		Level2TopSpeedFactor = DefaultLevel2TopSpeedFactor,
+		Level3TopSpeedFactor = DefaultLevel3TopSpeedFactor,
+		Level3TurnFactor = DefaultLevel3TurnFactor
 	};
 }
 

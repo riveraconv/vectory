@@ -454,7 +454,7 @@ public class AccelerationCurveTests
         string clean = lab.DumpText();
         Assert.Contains("ship_01: AccelCurve = 2.0f", clean);
         Assert.Contains("ship_02: AccelCurve = 2.0f", clean);
-        Assert.Contains("ship_03: AccelCurve = 2.0f", clean);
+        Assert.Contains("ship_03: AccelCurve = 1.5f", clean);
         Assert.Contains("MinThrust = 0.10f", clean);
         Assert.DoesNotContain("OUT OF RANGE", clean);
 

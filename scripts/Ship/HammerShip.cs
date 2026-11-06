@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-// HAMMER (ship_03): más aceleración y agarre que Vector, a cambio de punta, giro y frenada. Lógica pura.
+// HAMMER (ship_03): más aceleración abajo, giro y agarre, a cambio de punta y frenada (equilibrio en docs/naves-6-equilibrio.md). Lógica pura.
 // Casco: Vanguard_C de designs/naves-geometria.js. Cabina: BÚNKER, de designs/cabinas-hoja-martillo-def.js.
 public static class HammerShip
 {
@@ -12,14 +12,14 @@ public static class HammerShip
 
 	private static readonly ShipMultipliers Multipliers = new()
 	{
-		MaxSpeed = 0.94f,
+		MaxSpeed = 0.98f,
 		Acceleration = 1.10f,
-		TurnRate = 0.96f,
-		LateralGrip = 1.04f,
+		TurnRate = 1.04f,
+		LateralGrip = 1.10f,
 		BrakeDeceleration = 0.96f
 	};
 
-	private const float AccelCurve = 2f;   // exponente de AccelerationCurve: no es un multiplicador
+	private const float AccelCurve = 1.5f;   // exponente de AccelerationCurve: no es un multiplicador
 
 	public static readonly ShipDefinition Definition = new(
 		ShipCatalog.Ship03,

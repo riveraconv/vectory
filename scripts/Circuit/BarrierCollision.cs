@@ -16,19 +16,19 @@ public struct BarrierCollisionSettings
 	public float StrongSpeedLoss;    // ídem en un fuerte
 	public float ImpactCooldown;     // segundos sin contar otro impacto medio o fuerte en el mismo lado
 
-	// Valores de la spec, con las velocidades ya en m/s
+	// Valores por defecto, con las velocidades ya en m/s
 	public static BarrierCollisionSettings Default => new()
 	{
-		MediumSpeed = 30f / 3.6f,
-		StrongSpeed = 90f / 3.6f,
-		GrazeStraighten = 0.3f,
-		GrazeEntryLoss = 0.04f,
-		GrazeFriction = 20f / 3.6f,
-		MediumRestitution = 0.4f,
-		StrongRestitution = 0.5f,
-		MediumSpeedLoss = 0.2f,
-		StrongSpeedLoss = 0.45f,
-		ImpactCooldown = 0.3f
+		MediumSpeed = Vectory.Ship.ShipPhysicsDefaults.ImpactMediumSpeed / 3.6f,
+		StrongSpeed = Vectory.Ship.ShipPhysicsDefaults.ImpactStrongSpeed / 3.6f,
+		GrazeStraighten = Vectory.Ship.ShipPhysicsDefaults.GrazeStraighten,
+		GrazeEntryLoss = Vectory.Ship.ShipPhysicsDefaults.GrazeEntryLoss,
+		GrazeFriction = Vectory.Ship.ShipPhysicsDefaults.GrazeFriction / 3.6f,
+		MediumRestitution = Vectory.Ship.ShipPhysicsDefaults.MediumRestitution,
+		StrongRestitution = Vectory.Ship.ShipPhysicsDefaults.StrongRestitution,
+		MediumSpeedLoss = Vectory.Ship.ShipPhysicsDefaults.MediumSpeedLoss,
+		StrongSpeedLoss = Vectory.Ship.ShipPhysicsDefaults.StrongSpeedLoss,
+		ImpactCooldown = Vectory.Ship.ShipPhysicsDefaults.ImpactCooldown
 	};
 }
 

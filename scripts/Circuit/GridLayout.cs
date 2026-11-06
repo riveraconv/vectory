@@ -5,10 +5,24 @@ namespace Vectory.Circuit;
 // Parámetros de la parrilla de salida (en metros, salvo LateralFraction)
 public struct GridSettings
 {
+	// Valores por defecto, en las unidades del Inspector del Track
+	public const float DefaultFirstDistance = 12f;
+	public const float DefaultRowSpacing = 16f;
+	public const float DefaultEvenOffset = 8f;
+	public const float DefaultLateralPercent = 25f;
+
 	public float FirstDistance;    // distancia de la meta a la marca 1
 	public float RowSpacing;       // separación entre filas de una misma columna
 	public float EvenOffset;       // cuánto más atrás va cada marca par que la impar de delante
 	public float LateralFraction;  // desplazamiento lateral de las columnas, en fracción del ancho de pista
+
+	public static GridSettings Default => new()
+	{
+		FirstDistance = DefaultFirstDistance,
+		RowSpacing = DefaultRowSpacing,
+		EvenOffset = DefaultEvenOffset,
+		LateralFraction = DefaultLateralPercent / 100f
+	};
 }
 
 // Marca de parrilla: dónde está respecto a la meta.
