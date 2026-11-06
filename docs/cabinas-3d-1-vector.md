@@ -1,8 +1,10 @@
 # VECTORY — Spec: Cabinas 3D · 1 · Vector (piloto Blender → Godot)
 
-Versión 1.2 · 2026-11-06 · Estado: **propuesta, pendiente de validar**
+Versión 1.3 · 2026-11-06 · Estado: **hecha y validada por el usuario** (versión del juego 0.14.4)
 
-Cambios respecto a la 1.1: carpeta `designs/` y tecla F6 corregidas; el movimiento de la cámara de cabina dice de qué datos del juego sale (4.4); el encuadre del mundo pasa a ser una decisión con capturas en la etapa 2 (4.5); criterio de rendimiento medible (4.8); la vista 3D no se rehace con F10 (5); la fuente se descarga con permiso (6.2); y se apuntan los tests y documentos que cambian al cerrar (6.7 y 11).
+Cambios respecto a la 1.2, al cerrar: valores finales de las luces (sección 7) y lo que se aparta de la spec en la etapa 3 (sección 13).
+
+Cambios de la 1.2 respecto a la 1.1: carpeta `designs/` y tecla F6 corregidas; el movimiento de la cámara de cabina dice de qué datos del juego sale (4.4); el encuadre del mundo pasa a ser una decisión con capturas en la etapa 2 (4.5); criterio de rendimiento medible (4.8); la vista 3D no se rehace con F10 (5); la fuente se descarga con permiso (6.2); y se apuntan los tests y documentos que cambian al cerrar (6.7 y 11).
 
 Cambios de la 1.1 respecto a la 1.0: la cabina gana **dos pantallas pequeñas** para el **radar** y el **minimapa** (colocación «junto a pantallas»), la **consola central se estrecha** para dejarles sitio y el prototipo de referencia pasa a ser `designs/cabina-3d-vector-radar.html`. Esta spec va **después** de `radar-minimapa`.
 
@@ -392,6 +394,8 @@ Al cerrar la etapa 3, si el usuario valida la 3D, se **quita** la cabina 2D de V
 
 Tiempos (parpadeos, latidos, transiciones) y colores van como **constantes con nombre**.
 
+**Valores finales**, en el grupo **Cabina 3D** del `Player`, ajustados midiendo 16 zonas de la cabina contra el prototipo, a punta y en recta: principal 0,65 · ambiente 0,32 · lámpara 0,025 · pantallas grandes 0,2 · pantallas pequeñas 0,13 · glow 0,8 / 0,9 / 0,8 · boost delantera y trasera 0,85 · daño 0,7 · brillo de las pantallas 1,35. Se añaden `Cockpit3DClearcoat` 1 (por encima de 1, Godot oscurece lo de debajo y la consola se queda negra), `Cockpit3DGlowWide` 1 (reparte el halo como el bloom del prototipo), `Cockpit3DReflections` 1 y `Cockpit3DCarbonSpecular` 1 (compensa que Godot pinta el barniz más flojo). El limitador de rugosidad se apaga en `project.godot`: apagaba el carbono, y el resto del juego son líneas sin luz. Las shift lights siguen como constantes, sin Inspector.
+
 ## 8. Pruebas
 
 ### Pruebas unitarias mínimas
@@ -483,3 +487,11 @@ En `CLAUDE.md`, al cerrar cada etapa, se recoge lo mismo en **Estilo visual**, j
 - Animar piezas (mandos, botones) o sonido.
 - Cambios en el HUD de las esquinas, en la cámara exterior o en los efectos de la cámara del mundo.
 - Menú SETTINGS (las intensidades quedan listas para él).
+
+## 13. Lo que se aparta de la spec en la etapa 3
+
+- **Estado común con aspecto propio**: `CockpitHudState` recibe un `CockpitHudLook` con lo apagado de cada estilo, para que la tabla 6.1 mande solo en esta cabina.
+- **Radar y minimapa**: se reutilizan `RadarView` y `MinimapView` dentro de sus `SubViewport`, con `RadarStyle.CockpitScreen` y `MinimapStyle.CockpitScreen`. El borde del minimapa va debajo del trazado (en el prototipo, encima): lo fijo se dibuja una vez.
+- **Parpadeo con daño**: usa `EdgeFlicker` con una "arista" por luz, las 11 de `Accent_*` y `Led_*`, y los valores de siempre del Inspector.
+- **Luces de boost y daño**: las intensidades del Inspector multiplican el valor del prototipo, y la vista lo pasa a Godot (÷ π).
+- **Diferencias visibles que quedan**, medidas en valor de rojo sobre 255 (juego / prototipo): biseles de aluminio 63 / 98, pared lateral 66 / 30, mando izquierdo 133 / 102 y morro derecho 95 / 64. El rojo de la pintura es más puro en el juego. Acercar más una zona aleja otra.

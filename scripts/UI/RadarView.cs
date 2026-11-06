@@ -17,11 +17,11 @@ public partial class RadarView : Control
 	private Control _liveLayer;
 	private Font _font;
 
-	public void Setup(RadarSweep sweep, RadarStyle style)
+	public void Setup(RadarSweep sweep, RadarStyle style, Font font = null)
 	{
 		_sweep = sweep;
 		_style = style;
-		_font = MenuFonts.Mono ?? ThemeDB.FallbackFont;
+		_font = font ?? MenuFonts.Mono ?? ThemeDB.FallbackFont;
 		MouseFilter = MouseFilterEnum.Ignore;
 
 		_base.Clear();

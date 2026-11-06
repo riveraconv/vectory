@@ -44,9 +44,10 @@ public sealed record Cockpit3DProfile(string ModelPath, string ManifestPath, str
 public sealed record ShipVisualProfile
 {
 	public required Func<IReadOnlyList<ShipLine>> BuildHull { get; init; }
-	public required Func<CockpitLayout> BuildCockpit { get; init; }
+	// Capa 2D de la cabina. Sin ella, la nave lleva cabina 3D.
+	public Func<CockpitLayout> BuildCockpit { get; init; }
 
-	// Cabina 3D (spec docs/cabinas-3d-1-vector.md). Sin ella, la nave usa la capa 2D de BuildCockpit.
+	// Cabina 3D (spec docs/cabinas-3d-1-vector.md). Con ella, BuildCockpit no se usa.
 	public Cockpit3DProfile Cockpit3D { get; init; }
 
 	public required CockpitFraming Cockpit { get; init; }

@@ -64,6 +64,42 @@ public sealed record RadarStyle
 	public float LabelSize { get; init; }
 	public float LabelOpacity { get; init; }
 	public Vector2 LabelOffset { get; init; }       // desde el centro: el inicio de la línea base del texto
+	public bool LabelCentered { get; init; }        // LabelOffset es el centro de la línea base, no su inicio
+
+	// Estilo de la pantalla pequeña de la cabina 3D, en sus 256 px (spec docs/cabinas-3d-1-vector.md, 6.3)
+	public static RadarStyle CockpitScreen(RadarPalette palette)
+	{
+		return new RadarStyle
+		{
+			Palette = palette,
+			Center = new Vector2(128f, 122f),
+			Radius = 94f,
+			BackgroundOpacity = 0f,
+			BorderWidth = 2f,
+			BorderOpacity = 0.8f,
+			BorderGlow = 0f,
+			RingWidth = 1.5f,
+			RingOpacity = 0.35f,
+			CrossOpacity = 0.35f,
+			BeamLines = 28,
+			BeamStep = 0.035f,
+			BeamWidth = 2.5f,
+			BeamOpacity = 0.35f,
+			EchoRadius = 5.5f,
+			EchoCloseRadius = 7f,
+			EchoGlow = 8f,
+			WarningOffset = 8f,
+			WarningWidth = 7f,
+			WarningHalfAngle = 0.42f,
+			WarningGlow = 8f,
+			SelfSize = 11f,
+			SelfGlow = 6f,
+			LabelSize = MathF.Round(18f * 1.15f),
+			LabelOpacity = 0.8f,
+			LabelOffset = new Vector2(0f, 122f),   // 12 px por encima del borde de abajo
+			LabelCentered = true
+		};
+	}
 
 	// Estilo del HUD de pantalla: radius en px de 1280×720 y scale el factor hasta los px reales. Centrado en el origen.
 	public static RadarStyle Hud(RadarPalette palette, float radius, float scale)
@@ -100,14 +136,14 @@ public sealed record RadarStyle
 	}
 }
 
-public enum RadarPrimitiveKind { Disc, Ring, Line, Arc, Arrow, Text, DownTriangle }
+public enum RadarPrimitiveKind { Disc, Ring, Line, Arc, Arrow, Text, DownTriangle, CenteredText }
 
 // Una primitiva de dibujo, en el espacio del estilo. Color con su opacidad; Glow en px (0: sin halo).
 //   Disc y Ring: centro A y Radius (Width, el grueso del anillo)
 //   Line: de A a B con Width
 //   Arc: centro A, Radius, de StartAngle a EndAngle, con Width
 //   Arrow: centro A y tamaño Radius, apuntando arriba (ArrowPoints)
-//   Text: inicio de la línea base en A y tamaño Radius
+//   Text: inicio de la línea base en A y tamaño Radius (CenteredText: A es el centro de la línea base)
 //   DownTriangle: punta abajo en A, medio ancho Radius y alto Width
 public readonly record struct RadarPrimitive(
 	RadarPrimitiveKind Kind, Vector2 A, Vector2 B, float Radius, float Width, float StartAngle, float EndAngle,
@@ -133,7 +169,7 @@ public static class RadarDrawing
 		output.Add(Line(c - new Vector2(r, 0f), c + new Vector2(r, 0f), style.RingWidth, palette.Rings, style.CrossOpacity));
 		output.Add(Line(c - new Vector2(0f, r), c + new Vector2(0f, r), style.RingWidth, palette.Rings, style.CrossOpacity));
 
-		output.Add(new RadarPrimitive(RadarPrimitiveKind.Text, c + style.LabelOffset, default, style.LabelSize, 0f, 0f, 0f,
+		output.Add(new RadarPrimitive(style.LabelCentered ? RadarPrimitiveKind.CenteredText : RadarPrimitiveKind.Text, c + style.LabelOffset, default, style.LabelSize, 0f, 0f, 0f,
 			WithOpacity(palette.Label, style.LabelOpacity), 0f, RangeLabel(range)));
 	}
 

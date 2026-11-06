@@ -14,7 +14,6 @@ public static class VectorShip
 		new ShipVisualProfile
 		{
 			BuildHull = BuildHull,
-			BuildCockpit = VectorCockpit.Build,
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_vector.glb",
 				"res://assets/cockpits/cockpit_vector.manifest.json",

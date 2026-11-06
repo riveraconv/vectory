@@ -279,7 +279,7 @@ public static class CockpitPainter
 		return font;
 	}
 
-	private static GradientTexture2D TextureOf(CockpitGradientId id)
+	public static GradientTexture2D TextureOf(CockpitGradientId id)
 	{
 		if (Textures.TryGetValue(id, out GradientTexture2D texture))
 			return texture;

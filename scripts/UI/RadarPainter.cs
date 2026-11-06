@@ -94,6 +94,12 @@ public static class RadarPainter
 					canvas.DrawString(font, ToGodot(primitive.A), primitive.Text, HorizontalAlignment.Left, -1f,
 						Mathf.RoundToInt(primitive.Radius), ToColor(primitive.Color));
 					break;
+				case RadarPrimitiveKind.CenteredText:
+					int size = Mathf.RoundToInt(primitive.Radius);
+					float width = font.GetStringSize(primitive.Text, HorizontalAlignment.Left, -1f, size).X;
+					canvas.DrawString(font, ToGodot(primitive.A) - new Vector2(width * 0.5f, 0f), primitive.Text, HorizontalAlignment.Left, -1f,
+						size, ToColor(primitive.Color));
+					break;
 			}
 		}
 	}

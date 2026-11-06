@@ -10,9 +10,18 @@ public static class MenuFonts
 	private const string OrbitronPath = "res://assets/fonts/Orbitron-Variable.ttf";
 	private const string MonoPath = "res://assets/fonts/ShareTechMono-Regular.ttf";
 
+	private const string RajdhaniPath = "res://assets/fonts/Rajdhani-Bold.ttf";
+
 	private static FontFile _orbitron;
 	private static FontFile _mono;
+	private static FontFile _rajdhani;
 	private static bool _loaded;
+
+	// La de las pantallas de la cabina 3D, en estilo carreras
+	public static FontFile Rajdhani
+	{
+		get { EnsureLoaded(); return _rajdhani; }
+	}
 
 	public static FontFile Orbitron
 	{
@@ -65,6 +74,7 @@ public static class MenuFonts
 
 		_orbitron = Load(OrbitronPath);
 		_mono = Load(MonoPath);
+		_rajdhani = Load(RajdhaniPath);
 		_loaded = true;
 	}
 

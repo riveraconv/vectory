@@ -164,15 +164,22 @@ public partial class Player : CharacterBody3D
 	[Export] public float Cockpit3DVibrationRotation = 0.35f;
 	[Export] public float Cockpit3DCounterRoll = 0.25f;       // contragiro respecto a lo que se ladea el mundo
 	[Export] public float Cockpit3DBoostPush = 0.05f;         // m hacia atrás con el boost
-	[Export] public float Cockpit3DKeyEnergy = 0.83f;
+	[Export] public float Cockpit3DKeyEnergy = 0.65f;
 	[Export] public float Cockpit3DAmbientEnergy = 0.32f;
 	[Export] public float Cockpit3DLampEnergy = 0.025f;
-	[Export] public float Cockpit3DLargeScreenLight = 0.095f;
-	[Export] public float Cockpit3DSmallScreenLight = 0.064f;
-	[Export] public float Cockpit3DGlowIntensity = 0.55f;
+	[Export] public float Cockpit3DLargeScreenLight = 0.2f;
+	[Export] public float Cockpit3DSmallScreenLight = 0.13f;
+	[Export] public float Cockpit3DGlowIntensity = 0.8f;
 	[Export] public float Cockpit3DGlowStrength = 0.9f;
 	[Export] public float Cockpit3DGlowThreshold = 0.8f;
 	[Export] public float Cockpit3DScreenBrightness = 1.35f;
+	[Export] public float Cockpit3DClearcoat = 1f;            // fuerza del barniz del carbono y la pintura
+	[Export] public float Cockpit3DGlowWide = 1f;             // cuánto se reparte el halo de LEDs y pantallas
+	[Export] public float Cockpit3DReflections = 1f;          // fuerza del panorama en los reflejos
+	[Export(PropertyHint.Range, "0,1,0.01")] public float Cockpit3DCarbonSpecular = 1f;   // brillo del carbono de salpicadero, consola y techo
+	[Export] public float Cockpit3DBoostFrontLight = 0.85f;      // multiplica el valor del diseño (0 = apagada)
+	[Export] public float Cockpit3DBoostRearLight = 0.85f;
+	[Export] public float Cockpit3DDamageLight = 0.7f;
 
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
@@ -285,6 +292,17 @@ public partial class Player : CharacterBody3D
 		_shake = new CameraShake(BuildShakeSettings());
 		_chaseCam.Snap(GlobalPosition, Dynamics.Yaw, SpeedFactor(), CameraSettings(), Vector3.Up);
 		ApplyView();
+	}
+
+	// Radar y minimapa para las pantallas de la cabina 3D: los lleva Main; aquí solo se pasan
+	public void SetCockpitRadar(Vectory.Radar.RadarSweep sweep, Vectory.Radar.MinimapPath path, float windowRadius, System.Collections.Generic.IReadOnlyList<Vectory.Radar.RaceShip> ships)
+	{
+		_cockpit.SetRadar(sweep, path, windowRadius, ships);
+	}
+
+	public void SetCockpitMinimapPose(NVec2 self, NVec2 planForward)
+	{
+		_cockpit.SetMinimapPose(self, planForward);
 	}
 
 	// Le dice al jugador sobre qué circuito conducir (sin circuito no hay límites)
@@ -864,7 +882,9 @@ public partial class Player : CharacterBody3D
 	{
 		return new Cockpit3DSettings(Cockpit3DFov, Cockpit3DKeyEnergy, Cockpit3DAmbientEnergy, Cockpit3DLampEnergy,
 			Cockpit3DLargeScreenLight, Cockpit3DSmallScreenLight, Cockpit3DGlowIntensity, Cockpit3DGlowStrength,
-			Cockpit3DGlowThreshold, Cockpit3DScreenBrightness);
+			Cockpit3DGlowThreshold, Cockpit3DScreenBrightness, Cockpit3DClearcoat, Cockpit3DGlowWide,
+			Cockpit3DReflections, Cockpit3DCarbonSpecular,
+			new CockpitLightIntensities(Cockpit3DBoostFrontLight, Cockpit3DBoostRearLight, Cockpit3DDamageLight));
 	}
 
 	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos

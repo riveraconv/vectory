@@ -81,12 +81,24 @@ public static class Cockpit3DPieces
 	public static readonly string[] Accents = { "Accent_Visor", "Accent_Screen_L", "Accent_Screen_R", "Accent_Radar", "Accent_Map" };
 	public static readonly string[] NoseLeds = { "Led_Nose_L", "Led_Nose_R" };
 
+	// Las luces que titilan con daño (spec, 6.5): ni las shift lights ni las pantallas
+	public static readonly IReadOnlyList<string> FlickerLights = BuildFlickerLights();
+
 	public static string ShiftLight(int index) => $"ShiftLight_{index:00}";
 	public static string ShiftLightBase(int index) => $"ShiftLight_Base_{index:00}";
 	public static string ConsoleLed(int index) => $"Led_Console_{index}";
 	public static string Shade(string screen) => screen + "_Shade";
 
 	public static readonly IReadOnlyList<string> Contract = BuildContract();
+
+	private static IReadOnlyList<string> BuildFlickerLights()
+	{
+		var names = new List<string>(Accents);
+		names.AddRange(NoseLeds);
+		for (int i = 0; i < ConsoleLedCount; i++)
+			names.Add(ConsoleLed(i));
+		return names;
+	}
 
 	private static IReadOnlyList<string> BuildContract()
 	{

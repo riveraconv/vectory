@@ -68,6 +68,31 @@ public sealed class CockpitFade
 // Una esfera de boost o un segmento de daño, ya con su transición
 public readonly record struct CockpitHudPaint(Vector4 Fill, Vector4 Stroke, float Glow);
 
+// Cómo se pinta lo apagado: cambia de un estilo de cabina a otro, las reglas no.
+// Sin SegmentOffColor, un segmento apagado va con el color del nivel de daño.
+public readonly record struct CockpitHudLook
+{
+	public CockpitColor EmptyOrbColor { get; init; }
+	public float EmptyOrbFill { get; init; }
+	public float EmptyOrbStroke { get; init; }
+	public CockpitColor? SegmentOffColor { get; init; }
+	public float SegmentOffStroke { get; init; }
+	public CockpitColor DisabledSegmentColor { get; init; }
+	public float DisabledSegmentStroke { get; init; }
+
+	// El de las cabinas 2D (spec docs/naves-3b-cabinas.md)
+	public static readonly CockpitHudLook Default = new()
+	{
+		EmptyOrbColor = CockpitColor.Blue,
+		EmptyOrbFill = 0.25f,
+		EmptyOrbStroke = 0.7f,
+		SegmentOffColor = null,
+		SegmentOffStroke = 0.6f,
+		DisabledSegmentColor = CockpitColor.Blue,
+		DisabledSegmentStroke = CockpitHudState.DisabledDamageBorderOpacity
+	};
+}
+
 // Estado del HUD de cabina y su luz (spec docs/naves-3b-cabinas.md, 4.2 y 5), común a todas las naves. Lógica pura;
 // la paleta se inyecta porque los colores viven en Palette, que depende de Godot.
 public sealed class CockpitHudState
@@ -89,6 +114,7 @@ public sealed class CockpitHudState
 	public const int SlotCount = 3;
 
 	private readonly Func<CockpitColor, Vector4> _palette;
+	private readonly CockpitHudLook _look;
 	private readonly CockpitFade _speedColor = new(HudTransitionTime);
 	private readonly CockpitFade[] _orbFill = NewFades();
 	private readonly CockpitFade[] _orbStroke = NewFades();
@@ -99,10 +125,18 @@ public sealed class CockpitHudState
 	private readonly CockpitFade _boostTint = new(BoostTintTransitionTime);
 	private float _time;
 
-	public CockpitHudState(Func<CockpitColor, Vector4> palette)
+	public CockpitHudState(Func<CockpitColor, Vector4> palette) : this(palette, CockpitHudLook.Default)
+	{
+	}
+
+	public CockpitHudState(Func<CockpitColor, Vector4> palette, CockpitHudLook look)
 	{
 		_palette = palette;
+		_look = look;
 	}
+
+	// Por encima de la punta o con boost
+	public bool OverTop { get; private set; }
 
 	public float SpeedFraction { get; private set; }
 	public float TopFraction { get; private set; } = 396f / 496f;
@@ -137,6 +171,7 @@ public sealed class CockpitHudState
 		SpeedText = MathF.Round(input.SpeedKmh).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
 		bool overTop = input.SpeedKmh > input.TopKmh + OverTopMarginKmh || input.BoostActive;
+		OverTop = overTop;
 		_speedColor.Update(_palette(overTop ? CockpitColor.Orange : CockpitColor.Cyan), dt);
 
 		UpdateBoost(input, dt);
@@ -157,7 +192,7 @@ public sealed class CockpitHudState
 				has && blocked ? (CockpitColor.Red, 0.3f, 0.55f, 0f)
 				: has && input.Cooldown ? (CockpitColor.Orange, 0.3f, 0.55f, 0f)
 				: has ? (CockpitColor.Orange, 1f, 1f, 1f)
-				: (CockpitColor.Blue, 0.25f, 0.7f, 0f);
+				: (_look.EmptyOrbColor, _look.EmptyOrbFill, _look.EmptyOrbStroke, 0f);
 			_orbFill[i].Update(WithAlpha(_palette(color), fill), dt);
 			_orbStroke[i].Update(WithAlpha(_palette(color), stroke), dt);
 			_orbGlow[i].Update(new Vector4(glow, 0f, 0f, 0f), dt);
@@ -180,8 +215,9 @@ public sealed class CockpitHudState
 			bool on = i < level;
 			Vector4 fill = WithAlpha(_palette(color), on ? 1f : 0f);
 			Vector4 stroke = !input.DamageEnabled
-				? WithAlpha(_palette(CockpitColor.Blue), DisabledDamageBorderOpacity)
-				: WithAlpha(_palette(color), on ? 1f : 0.6f);
+				? WithAlpha(_palette(_look.DisabledSegmentColor), _look.DisabledSegmentStroke)
+				: on ? _palette(color)
+				: WithAlpha(_palette(_look.SegmentOffColor ?? color), _look.SegmentOffStroke);
 			_segmentFill[i].Update(fill, dt);
 			_segmentStroke[i].Update(stroke, dt);
 			_segmentGlow[i].Update(new Vector4(on ? 1f : 0f, 0f, 0f, 0f), dt);
@@ -462,15 +498,15 @@ public static class CockpitHudPieces
 }
 
 // Qué se ve en cada cámara (spec docs/naves-3b-cabinas.md, 4.1, y docs/cabinas-3d-1-vector.md, 4.7). Posición, vuelta y
-// tiempos se ven siempre. Mientras las pantallas de la cabina 3D son de prueba, enseña también el HUD de pantalla.
-public readonly record struct CockpitViewRules(bool CockpitLayer, bool Cockpit3D, bool ScreenDriveHud)
+// tiempos se ven siempre. La cabina 3D lleva en sus pantallas velocidad, boost, daño, radar y minimapa.
+public readonly record struct CockpitViewRules(bool CockpitLayer, bool Cockpit3D, bool ScreenDriveHud, bool ScreenRadar)
 {
 	public static CockpitViewRules For(CameraView view, bool hasCockpit3D)
 	{
 		if (view != CameraView.Cockpit)
-			return new CockpitViewRules(false, false, true);
+			return new CockpitViewRules(false, false, true, true);
 		return hasCockpit3D
-			? new CockpitViewRules(false, true, true)
-			: new CockpitViewRules(true, false, false);
+			? new CockpitViewRules(false, true, false, false)
+			: new CockpitViewRules(true, false, false, true);
 	}
 }

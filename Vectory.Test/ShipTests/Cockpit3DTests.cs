@@ -103,6 +103,7 @@ public class Cockpit3DProfileTests
         Assert.NotNull(cockpit);
         Assert.Equal(Cockpit3DStyle.Racing, cockpit.Style);
         Assert.EndsWith("cockpit_vector.glb", cockpit.ModelPath);
+        Assert.Null(ShipDefinitions.Find(ShipCatalog.Ship01)!.Visual.BuildCockpit);
     }
 
     [Fact]
@@ -125,21 +126,23 @@ public class Cockpit3DProfileTests
 public class Cockpit3DViewRulesTests
 {
     [Fact]
-    public void Vector_InCockpit_Shows3D_AndKeepsTheScreenHudWhileScreensAreTestImages()
+    public void Vector_InCockpit_Shows3D_AndHidesTheScreenHud()
     {
         CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true);
         Assert.True(rules.Cockpit3D);
         Assert.False(rules.CockpitLayer);
-        Assert.True(rules.ScreenDriveHud);
+        Assert.False(rules.ScreenDriveHud);
+        Assert.False(rules.ScreenRadar);
     }
 
     [Fact]
-    public void BladeOrHammer_InCockpit_ShowLayerAndHideScreenHud()
+    public void BladeOrHammer_InCockpit_ShowLayer_DriveHudInTheCockpit_RadarOnScreen()
     {
         CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, false);
         Assert.False(rules.Cockpit3D);
         Assert.True(rules.CockpitLayer);
         Assert.False(rules.ScreenDriveHud);
+        Assert.True(rules.ScreenRadar);
     }
 
     [Theory]
@@ -151,6 +154,7 @@ public class Cockpit3DViewRulesTests
         Assert.False(rules.Cockpit3D);
         Assert.False(rules.CockpitLayer);
         Assert.True(rules.ScreenDriveHud);
+        Assert.True(rules.ScreenRadar);
     }
 }
 

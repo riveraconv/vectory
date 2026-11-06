@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Godot;
+using Vectory.Radar;
 
 namespace Vectory.Ship;
 
@@ -12,9 +14,13 @@ public partial class Cockpit : Node3D
 	private System.Func<CockpitLayout> _layerBuilder;
 	private Cockpit3DView _view3D;
 	private CockpitViewRules _rules;
+	private RadarSweep _radarSweep;
+	private MinimapPath _minimapPath;
+	private float _minimapWindowRadius;
+	private IReadOnlyList<RaceShip> _radarShips;
 
-	// Número de aristas de la cabina 2D: cada una puede parpadear por su cuenta con los daños
-	public int EdgeCount => Uses3D ? 0 : _layer.EdgeCount;
+	// Número de aristas de la cabina 2D, o de luces de la 3D: cada una puede parpadear por su cuenta con los daños
+	public int EdgeCount => Uses3D ? _view3D.FlickerCount : _layer.EdgeCount;
 
 	public Camera3D Camera { get; private set; }
 
@@ -76,6 +82,8 @@ public partial class Cockpit : Node3D
 				_view3D = new Cockpit3DView { Name = "Cockpit3DView" };
 				_view3D.Setup(Visual.Cockpit3D, Settings3D);
 				AddChild(_view3D);
+				if (_radarSweep != null)
+					_view3D.SetRadar(_radarSweep, _minimapPath, _minimapWindowRadius, _radarShips);
 			}
 			return;
 		}
@@ -136,15 +144,35 @@ public partial class Cockpit : Node3D
 		_view3D?.SetShown(rules.Cockpit3D);
 	}
 
-	public void UpdateHud(in CockpitHudInput input, in CockpitLightSettings light, float dt)
+	// Radar y minimapa de las pantallas de la cabina 3D: los de la carrera, solo cambian el tamaño y la paleta
+	public void SetRadar(RadarSweep sweep, MinimapPath path, float windowRadius, IReadOnlyList<RaceShip> ships)
 	{
-		_layer?.UpdateHud(input, light, dt);
+		_radarSweep = sweep;
+		_minimapPath = path;
+		_minimapWindowRadius = windowRadius;
+		_radarShips = ships;
+		_view3D?.SetRadar(sweep, path, windowRadius, ships);
 	}
 
-	// Daños: las aristas apagadas del parpadeo bajan a dimOpacity
+	public void SetMinimapPose(System.Numerics.Vector2 self, System.Numerics.Vector2 planForward)
+	{
+		_view3D?.SetMinimapPose(self, planForward);
+	}
+
+	public void UpdateHud(in CockpitHudInput input, in CockpitLightSettings light, float dt)
+	{
+		if (Uses3D)
+			_view3D.UpdateHud(input, light, dt);
+		else
+			_layer.UpdateHud(input, light, dt);
+	}
+
+	// Daños: las aristas apagadas del parpadeo bajan a dimOpacity; en la cabina 3D, sus luces
 	public void ShowEdgeFlicker(EdgeFlicker flicker, float dimOpacity)
 	{
-		if (!Uses3D)
+		if (Uses3D)
+			_view3D.ShowEdgeFlicker(flicker);
+		else
 			_layer.ShowEdgeFlicker(flicker, dimOpacity);
 	}
 }

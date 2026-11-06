@@ -1,5 +1,6 @@
 VECTORY — DOCUMENTO MAESTRO DE DISEÑO Y PRIMERA DEMO
-Versión 1.3
+Versión 1.4
+Cambios de la 1.4: naves y cabinas realistas (2026-11-06), en la sección 2. Spec de referencia: docs/cabinas-3d-1-vector.md.
 Cambios de la 1.3: nueva dirección visual decidida sobre maquetas (2026-11-03). Sección 2: los circuitos van suspendidos sobre una megaciudad en neblina ámbar, la pista tiene superficie opaca lisa, se añade el ámbar de ambiente y se definen los efectos de velocidad. Sección 9: entorno del circuito y señalización (chevrons y balizas en lugar de arcos de aviso). Sección 12: efectos de velocidad. Sección 16: qué pueden reducir los ajustes gráficos. Nueva sección 22: specs de referencia.
 Cambios de la 1.2: el documento se pone al día con el código (commit f134f4a). Secciones 6 y 7: el alcance de la demo se amplió a un circuito cerrado con checkpoints, cronometraje de vueltas y HUD de carrera; se añaden las etapas 4 a 6 y el estado actual. Sección 18: controles actuales. Sección 20.2: estructura real de carpetas y archivos. Sección 21: instrucciones adaptadas a la etapa actual.
 Cambios de la 1.1: nueva sección 20 (#Desarrollo del software aplicando buenas prácticas de ingeniería, principios SOLID, pruebas unitarias y refactorización orientada a la mantenibilidad y calidad del código); las instrucciones directas pasan a ser la sección 21.
@@ -32,7 +33,8 @@ Universo y estética:
 - Carreras futuristas originales; no copiar diseños, marcas, naves, circuitos ni otros elementos protegidos de franquicias existentes.
 - Inspiración general en el género de carreras futuristas y su sensación de velocidad.
 - Circuitos suspendidos en el vacío, muy por encima de una megaciudad hundida en neblina ámbar. La ciudad es solo fondo: rascacielos en líneas y puntos luminosos (ventanas y neones), sin superficies, quieta y lejana. Debajo, una rejilla del abismo; de la pista cuelgan haces de anclaje que se desvanecen. Sin paisajes naturales.
-- Geometría representada mediante líneas y aristas luminosas; evitar superficies sólidas texturizadas y modelos low-poly rellenos.
+- Geometría representada mediante líneas y aristas luminosas; evitar superficies sólidas texturizadas y modelos low-poly rellenos, salvo naves y cabinas.
+- Naves y cabinas realistas (2026-11-06): las naves y sus cabinas dejan el estilo wireframe y pasan a un estilo realista, con volumen, materiales con texturas (PBR), reflejos y luz. Cada nave tiene su propio estilo, sin una temática común (por ejemplo, VECTOR carreras, BLADE militar y HAMMER industrial), y se pueden inventar estilos nuevos sobre la marcha. Los colores de las pantallas de cada cabina son los de su estilo. Todo lo demás sigue igual: circuitos, entorno, efectos de velocidad, menús y HUD de las esquinas mantienen la estética vectorial y luminosa y la paleta del juego. Las naves y cabinas se modelan en Blender con scripts de Python que ejecuta el agente, y se exportan a Godot en glTF (.glb). El script es la fuente: el .blend se regenera.
 - Excepción: la pista tiene una superficie opaca oscura y lisa (#070B16), sin textura ni iluminación, para que no se vea lo que hay debajo. Las líneas de la pista van encima.
 - En la pista no se pinta ningún elemento (meta, checkpoints, avisos…): todos son estructuras que se alzan sobre ella o junto a ella. Única excepción: las marcas de parrilla, que se apagan al dar la salida.
 - Fondo oscuro, composición limpia, wireframe nítido y bloom moderado.

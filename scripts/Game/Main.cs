@@ -262,11 +262,13 @@ public partial class Main : Node3D
 			EchoFade = RadarEchoFade
 		});
 		_hud.SetRadar(_radar);
-		_hud.SetMinimap(new MinimapPath(_track.Frame, _track.TrackWidth), MinimapWindowRadius, _raceShips.Ships);
+		var minimapPath = new MinimapPath(_track.Frame, _track.TrackWidth);
+		_hud.SetMinimap(minimapPath, MinimapWindowRadius, _raceShips.Ships);
+		_player.SetCockpitRadar(_radar, minimapPath, MinimapWindowRadius, _raceShips.Ships);
 
-		// Velocidad, boost y daño: en pantalla o en el cuadro de mando, según la cámara
-		_hud.SetDriveHudVisible(_player.ViewRules.ScreenDriveHud);
-		_player.ViewChanged += _ => _hud.SetDriveHudVisible(_player.ViewRules.ScreenDriveHud);
+		// Velocidad, boost, daño, radar y minimapa: en pantalla o en la cabina, según la cámara y la nave
+		ApplyViewRules();
+		_player.ViewChanged += _ => ApplyViewRules();
 
 		if (_mode == GameMode.TimeTrial)
 		{
@@ -299,6 +301,13 @@ public partial class Main : Node3D
 		}
 	}
 
+	private void ApplyViewRules()
+	{
+		CockpitViewRules rules = _player.ViewRules;
+		_hud.SetDriveHudVisible(rules.ScreenDriveHud);
+		_hud.SetRadarVisible(rules.ScreenRadar);
+	}
+
 	public override void _Process(double delta)
 	{
 		// HUD: velocidad, boost, semáforo y estado de la carrera (no hay si el circuito no se generó)
@@ -311,7 +320,9 @@ public partial class Main : Node3D
 			UpdateLapInfo();
 			UpdateGhost();
 			_radar.Update((float)delta, ToNumerics(_player.GlobalPosition), _player.PlanForward, _raceShips.Ships);
-			_hud.SetMinimapPose(new System.Numerics.Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z), _player.PlanForward);
+			var self = new System.Numerics.Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z);
+			_hud.SetMinimapPose(self, _player.PlanForward);
+			_player.SetCockpitMinimapPose(self, _player.PlanForward);
 			_pause.RaceFinished = _race.State == RaceState.Finished;
 			UpdateResults((float)delta);
 		}

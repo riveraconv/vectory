@@ -139,6 +139,33 @@ public sealed record MinimapStyle
 	public float UpMarkGap { get; init; }           // de la punta al borde
 	public float UpMarkOpacity { get; init; }
 
+	// Estilo de la pantalla pequeña de la cabina 3D, en sus 256 px (spec docs/cabinas-3d-1-vector.md, 6.3)
+	public static MinimapStyle CockpitScreen(RadarPalette palette)
+	{
+		return new MinimapStyle
+		{
+			Palette = palette,
+			Center = new Vector2(128f, 128f),
+			Radius = 106f,
+			ClipInset = 0f,
+			BackgroundOpacity = 0f,
+			BorderWidth = 2f,
+			BorderOpacity = 0.8f,
+			BorderGlow = 0f,
+			BandWidth = 14f,
+			BandOpacity = 0.35f,
+			LineWidth = 3f,
+			LineOpacity = 0.9f,
+			LineGlow = 4.8f,
+			FinishWidth = 4f,
+			ShipRadius = 6f,
+			ShipGlow = 8f,
+			SelfSize = 11f,
+			SelfGlow = 6f,
+			UpMarkWidth = 0f
+		};
+	}
+
 	// Estilo del HUD de pantalla: radius en px de 1280×720 y scale el factor hasta los px reales. Centrado en el origen.
 	public static MinimapStyle Hud(RadarPalette palette, float radius, float scale)
 	{
@@ -197,7 +224,8 @@ public static class MinimapDrawing
 		Vector2 c = style.Center;
 		float r = style.Radius;
 
-		output.Add(RadarDrawing.Disc(c, r, palette.Background, style.BackgroundOpacity, 0f));
+		if (style.BackgroundOpacity > 0f)
+			output.Add(RadarDrawing.Disc(c, r, palette.Background, style.BackgroundOpacity, 0f));
 		output.Add(RadarDrawing.Ring(c, r, style.BorderWidth, palette.Border, style.BorderOpacity, style.BorderGlow));
 
 		if (style.UpMarkWidth > 0f)

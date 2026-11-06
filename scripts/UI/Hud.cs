@@ -151,6 +151,13 @@ public partial class Hud : CanvasLayer
 		_damage.Visible = visible && _damageEnabled;
 	}
 
+	// Radar y minimapa en pantalla: la cabina 3D los lleva en las suyas. Con resultados, nunca.
+	public void SetRadarVisible(bool visible)
+	{
+		_radar.Visible = visible && !_results.Visible;
+		_minimap.Visible = visible && !_results.Visible;
+	}
+
 	// Nivel de daño (0–3) del indicador
 	public void SetDamageLevel(int level)
 	{
