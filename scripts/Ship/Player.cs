@@ -260,7 +260,7 @@ public partial class Player : CharacterBody3D
 	public event System.Action<CameraView> ViewChanged;
 
 	// Qué se enseña en la vista actual, según la cabina de la nave que se conduce
-	public CockpitViewRules ViewRules => CockpitViewRules.For(View, _cockpit.Uses3D);
+	public CockpitViewRules ViewRules => CockpitViewRules.For(View, _cockpit.Uses3D, _cockpit.Screens3DShowHud);
 
 	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
 	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();

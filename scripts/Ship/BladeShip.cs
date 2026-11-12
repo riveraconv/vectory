@@ -1,14 +1,22 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 
 namespace Vectory.Ship;
 
 // BLADE (ship_02): más punta, a cambio de giro y agarre (equilibrio en docs/naves-6-equilibrio.md). Lógica pura.
-// Casco: Interceptor_E de designs/naves-geometria.js. Cabina: BURBUJA, de designs/cabinas-hoja-martillo-def.js.
+// Casco: Interceptor_E de designs/naves-geometria.js. Cabina: 3D militar, de designs/cabina-3d-blade.html (la BURBUJA 2D
+// de designs/cabinas-hoja-martillo-def.js sigue en el código hasta la etapa 3 de docs/cabinas-3d-2-blade.md).
 public static class BladeShip
 {
 	private const float ChaseFactor = 1.22f;   // 8,8 m de largo frente a los 7,2 de Vector
-	private const float EyeHeightFactor = 0.62f;   // 0,62 m de alto frente al 1,0 de Vector
+
+	// Cabina 3D (spec docs/cabinas-3d-2-blade.md, 4.5): ojo a 0,90 m de la pista (el de VECTOR × 0,62; la nave vuela a
+	// 2 m), FOV 70 y la vista 0,10 rad (5,7°) hacia abajo, como en el prototipo
+	private const float EyeY = -1.10f;
+	private const float EyeZ = -1.2f;
+	private const float CockpitFov = 70f;
+	private const float EyePitchRadians = -0.10f;
 
 	private static readonly ShipMultipliers Multipliers = new()
 	{
@@ -27,12 +35,13 @@ public static class BladeShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			BuildCockpit = BladeCockpit.Build,
-			Cockpit3D = null,
-			Cockpit = CockpitFraming.For2DCockpit with
-			{
-				Eye = CockpitFraming.For2DCockpit.Eye * new Vector3(1f, EyeHeightFactor, 1f)
-			},
+			BuildCockpit = BladeCockpit.Build,   // la Burbuja 2D: ya no se usa, se quita en la etapa 3
+			Cockpit3D = new Cockpit3DProfile(
+				"res://assets/cockpits/cockpit_blade.glb",
+				"res://assets/cockpits/cockpit_blade.manifest.json",
+				"res://assets/cockpits/cockpit_blade_env.png",
+				Cockpit3DStyle.Military),
+			Cockpit = new CockpitFraming(new Vector3(0f, EyeY, EyeZ), CockpitFov, EyePitchRadians * 180f / MathF.PI),
 			ChaseFactor = ChaseFactor,
 			Chase = VectorShip.Definition.Visual.Chase.Scaled(ChaseFactor),
 			CollisionHalfWidth = 1.6f,   // las puntas traseras en flecha

@@ -12,7 +12,8 @@ public partial class Cockpit : Node3D
 {
 	private CockpitLayer _layer;
 	private System.Func<CockpitLayout> _layerBuilder;
-	private Cockpit3DView _view3D;
+	private Cockpit3DView _view3D;   // la de la nave actual
+	private readonly Dictionary<Cockpit3DProfile, Cockpit3DView> _views3D = new();
 	private CockpitViewRules _rules;
 	private RadarSweep _radarSweep;
 	private MinimapPath _minimapPath;
@@ -32,9 +33,13 @@ public partial class Cockpit : Node3D
 
 	public bool Uses3D => Visual.Cockpit3D != null;
 
+	// Si las pantallas de la cabina 3D llevan el HUD de conducción y el radar (y el HUD de pantalla no)
+	public bool Screens3DShowHud => Uses3D && Visual.Cockpit3D.Layout.ScreensShowHud;
+
 	private Vector3 CameraPosition => ShipLineMesh.ToGodot(Visual.Cockpit.Eye);
 	private float BaseFov => Visual.Cockpit.Fov;
-	private float Pitch => Mathf.DegToRad(Visual.Cockpit.PitchDegrees);
+	// La misma en la cámara del mundo y en la de la cabina 3D, o el morro no casa con la pista
+	private float Pitch => Visual.Cockpit.PitchRadians;
 
 	// Sacudida por impacto y efectos de cámara (inclinación, vibración, empuje y FOV del boost)
 	private Vector2 _shakeOffset;
@@ -57,7 +62,7 @@ public partial class Cockpit : Node3D
 		AddChild(Camera);
 
 		EnsureCockpit();
-		ApplyRules(CockpitViewRules.For(CameraView.Chase, Uses3D));
+		ApplyRules(CockpitViewRules.For(CameraView.Chase, Uses3D, Screens3DShowHud));
 	}
 
 	// Cambia de cabina y de encuadre en plena carrera (panel de ajuste). Después hay que volver a pasar el parpadeo y
@@ -71,16 +76,17 @@ public partial class Cockpit : Node3D
 		ApplyCamera();
 	}
 
-	// Crea lo que necesite la cabina actual. La cabina 3D no se destruye al cambiar de nave: se queda parada, sin dibujarse,
-	// para no dar un tirón al volver.
+	// Crea lo que necesite la cabina actual. Una cabina 3D por nave: no se destruye al cambiar de nave, se queda parada,
+	// sin dibujarse, para no dar un tirón al volver.
 	private void EnsureCockpit()
 	{
 		if (Uses3D)
 		{
-			if (_view3D == null)
+			if (!_views3D.TryGetValue(Visual.Cockpit3D, out _view3D))
 			{
-				_view3D = new Cockpit3DView { Name = "Cockpit3DView" };
-				_view3D.Setup(Visual.Cockpit3D, Settings3D);
+				_view3D = new Cockpit3DView { Name = "Cockpit3DView_" + Visual.Cockpit3D.Style };
+				_view3D.Setup(Visual.Cockpit3D, Settings3D, Pitch);
+				_views3D[Visual.Cockpit3D] = _view3D;
 				AddChild(_view3D);
 				if (_radarSweep != null)
 					_view3D.SetRadar(_radarSweep, _minimapPath, _minimapWindowRadius, _radarShips);
@@ -130,7 +136,7 @@ public partial class Cockpit : Node3D
 	public void Update3D(in CockpitCameraPose pose, in Cockpit3DSettings settings)
 	{
 		Settings3D = settings;
-		if (_view3D == null || !_view3D.IsNodeReady())
+		if (!Uses3D || _view3D == null || !_view3D.IsNodeReady())
 			return;
 		_view3D.SetCameraPose(pose);
 		_view3D.Apply(settings);
@@ -141,7 +147,8 @@ public partial class Cockpit : Node3D
 	{
 		_rules = rules;
 		_layer?.SetShown(rules.CockpitLayer);
-		_view3D?.SetShown(rules.Cockpit3D);
+		foreach (Cockpit3DView view in _views3D.Values)
+			view.SetShown(rules.Cockpit3D && Uses3D && view == _view3D);
 	}
 
 	// Radar y minimapa de las pantallas de la cabina 3D: los de la carrera, solo cambian el tamaño y la paleta
@@ -151,12 +158,14 @@ public partial class Cockpit : Node3D
 		_minimapPath = path;
 		_minimapWindowRadius = windowRadius;
 		_radarShips = ships;
-		_view3D?.SetRadar(sweep, path, windowRadius, ships);
+		foreach (Cockpit3DView view in _views3D.Values)
+			view.SetRadar(sweep, path, windowRadius, ships);
 	}
 
 	public void SetMinimapPose(System.Numerics.Vector2 self, System.Numerics.Vector2 planForward)
 	{
-		_view3D?.SetMinimapPose(self, planForward);
+		if (Uses3D)
+			_view3D?.SetMinimapPose(self, planForward);
 	}
 
 	public void UpdateHud(in CockpitHudInput input, in CockpitLightSettings light, float dt)

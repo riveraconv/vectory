@@ -17,6 +17,8 @@ public readonly record struct ShipLine(Vector3 A, Vector3 B, ShipLineColor Color
 // Encuadre base de la cámara del mundo en cabina, sin efectos
 public readonly record struct CockpitFraming(Vector3 Eye, float Fov, float PitchDegrees)
 {
+	public float PitchRadians => PitchDegrees * MathF.PI / 180f;
+
 	// Para el que están dibujadas las cabinas 2D: la inclinación (negativa = hacia abajo) deja el punto de fuga de la
 	// pista donde la espera su diseño, y ≈ 300 de 720 con FOV 80. Cada nave ajusta la altura del ojo.
 	public static readonly CockpitFraming For2DCockpit = new(new Vector3(0f, 0.45f, -1.2f), 80f, -8f);
@@ -33,11 +35,16 @@ public readonly record struct ChaseFraming(float Height, float Distance, float E
 // Estilo de una cabina 3D: de él salen los colores de sus pantallas y sus luces
 public enum Cockpit3DStyle
 {
-	Racing
+	Racing,     // VECTOR
+	Military    // BLADE
 }
 
-// Una cabina 3D: su modelo exportado de Blender, lo que el modelo no puede llevar y su panorama de reflejos
-public sealed record Cockpit3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath, Cockpit3DStyle Style);
+// Una cabina 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
+// del que sale su disposición viva
+public sealed record Cockpit3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath, Cockpit3DStyle Style)
+{
+	public Cockpit3DLayout Layout => Cockpit3DLayout.For(Style);
+}
 
 // Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco y la cabina son constructores:
 // devuelven sus líneas o sus elementos 2D, sin nodos de Godot. Lógica pura.

@@ -106,13 +106,7 @@ public class Cockpit3DProfileTests
         Assert.Null(ShipDefinitions.Find(ShipCatalog.Ship01)!.Visual.BuildCockpit);
     }
 
-    [Fact]
-    public void Blade_KeepsTheBubble2D()
-    {
-        ShipVisualProfile visual = ShipDefinitions.Find(ShipCatalog.Ship02)!.Visual;
-        Assert.Null(visual.Cockpit3D);
-        Assert.Equal<Func<CockpitLayout>>(BladeCockpit.Build, visual.BuildCockpit);
-    }
+    // BLADE lleva la cabina 3D militar: Cockpit3DBladeTests
 
     [Fact]
     public void Hammer_KeepsTheBunker2D()

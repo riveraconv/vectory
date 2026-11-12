@@ -285,8 +285,8 @@ public class CockpitCaptureTests
 
 public class CockpitProfileTests
 {
+    // BLADE lleva cabina 3D desde docs/cabinas-3d-2-blade.md: su encuadre está en Cockpit3DTests
     [Theory]
-    [InlineData(ShipCatalog.Ship02, "blade")]
     [InlineData(ShipCatalog.Ship03, "hammer")]
     public void CockpitOf2DShips_PitchedDown(string id, string cockpit)
     {
@@ -309,7 +309,6 @@ public class CockpitProfileTests
     }
 
     [Theory]
-    [InlineData(ShipCatalog.Ship02, 0.62f)]
     [InlineData(ShipCatalog.Ship03, 1.4f)]
     public void Eye_ScaledByHeight_SameFovAndDepth(string id, float heightFactor)
     {

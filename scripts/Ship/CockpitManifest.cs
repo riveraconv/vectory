@@ -21,6 +21,13 @@ public sealed class CockpitManifestAdditive
 	[JsonPropertyName("opacity")] public float Opacity { get; set; }
 }
 
+// Cuánto refleja un material respecto a lo normal (envMapIntensity del prototipo)
+public sealed class CockpitManifestReflection
+{
+	[JsonPropertyName("material")] public string Material { get; set; } = "";
+	[JsonPropertyName("factor")] public float Factor { get; set; } = 1f;
+}
+
 public sealed class CockpitManifestBounds
 {
 	[JsonPropertyName("min")] public float[] Min { get; set; } = System.Array.Empty<float>();
@@ -37,6 +44,9 @@ public sealed class CockpitManifest
 	[JsonPropertyName("lowReflectionMaterials")] public List<string> LowReflectionMaterials { get; set; } = new();
 	[JsonPropertyName("lowReflectionFactor")] public float LowReflectionFactor { get; set; } = 1f;
 	[JsonPropertyName("additiveMaterials")] public List<CockpitManifestAdditive> AdditiveMaterials { get; set; } = new();
+	// Solo en las cabinas que lo necesitan (BLADE): todos los reflejos distintos de 1 y los materiales transparentes
+	[JsonPropertyName("reflections")] public List<CockpitManifestReflection> Reflections { get; set; } = new();
+	[JsonPropertyName("transparentMaterials")] public List<CockpitManifestAdditive> TransparentMaterials { get; set; } = new();
 	[JsonPropertyName("triangles")] public int Triangles { get; set; }
 	[JsonPropertyName("bounds")] public CockpitManifestBounds Bounds { get; set; } = new();
 
@@ -55,11 +65,22 @@ public sealed class CockpitManifest
 
 	public CockpitManifestPiece Piece(string name) => Pieces.FirstOrDefault(p => p.Name == name);
 
-	// Piezas del contrato con Godot que no aparecen entre estos nombres
-	public static IEnumerable<string> Missing(IEnumerable<string> present)
+	// Cuánto refleja un material: la lista completa si el manifiesto la trae; si no, la de los que reflejan menos
+	public float ReflectionFactor(string material)
+	{
+		if (Reflections.Count > 0)
+			return Reflections.FirstOrDefault(r => r.Material == material)?.Factor ?? 1f;
+		return LowReflectionMaterials.Contains(material) ? LowReflectionFactor : 1f;
+	}
+
+	// Piezas del contrato de VECTOR que no aparecen entre estos nombres
+	public static IEnumerable<string> Missing(IEnumerable<string> present) => Missing(present, Cockpit3DPieces.Contract);
+
+	// Piezas de un contrato que no aparecen entre estos nombres
+	public static IEnumerable<string> Missing(IEnumerable<string> present, IEnumerable<string> contract)
 	{
 		var names = new HashSet<string>(present);
-		return Cockpit3DPieces.Contract.Where(n => !names.Contains(n));
+		return contract.Where(n => !names.Contains(n));
 	}
 }
 

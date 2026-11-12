@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dkpii0xbcmy8y"
-path="res://.godot/imported/cockpit_blade_T_PaintNose_roughness.png-5ed33c3c1e6aa33e085009131a119431.ctex"
+path.s3tc="res://.godot/imported/cockpit_blade_T_PaintNose_roughness.png-5ed33c3c1e6aa33e085009131a119431.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "69cbce2dfde84b27547229ad32f4b9a2"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cockpits/cockpit_blade_T_PaintNose_roughness.png"
-dest_files=["res://.godot/imported/cockpit_blade_T_PaintNose_roughness.png-5ed33c3c1e6aa33e085009131a119431.ctex"]
+dest_files=["res://.godot/imported/cockpit_blade_T_PaintNose_roughness.png-5ed33c3c1e6aa33e085009131a119431.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

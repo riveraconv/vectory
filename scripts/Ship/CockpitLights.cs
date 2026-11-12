@@ -64,11 +64,15 @@ public sealed class CockpitLightMix
 		BoostTint += (target - BoostTint) * MathF.Min(1f, dt * TintRate);
 	}
 
-	public CockpitLightValues Values(float damageTint, in CockpitLightIntensities intensity)
+	public CockpitLightValues Values(float damageTint, in CockpitLightIntensities intensity) =>
+		Values(damageTint, intensity, DamageFactor);
+
+	// Con el factor de daño de cada cabina: 3 en VECTOR, 1,2 en BLADE
+	public CockpitLightValues Values(float damageTint, in CockpitLightIntensities intensity, float damageFactor)
 	{
 		return new CockpitLightValues(
 			BoostTint * BoostFrontFactor * intensity.BoostFront,
 			BoostTint * BoostRearFactor * intensity.BoostRear,
-			damageTint * DamageFactor * intensity.Damage);
+			damageTint * damageFactor * intensity.Damage);
 	}
 }

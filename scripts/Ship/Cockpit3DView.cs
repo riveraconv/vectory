@@ -28,10 +28,12 @@ public readonly record struct Cockpit3DSettings(
 
 // Cabina 3D pintada encima del mundo con su propia cámara: un SubViewport con su mundo, su luz y sus reflejos, cuya
 // imagen va a pantalla completa en el sitio de la capa 2D (spec docs/cabinas-3d-1-vector.md, 4). Así no se deforma con
-// el FOV de la cámara del mundo. Sin reglas: recibe estados y los pinta.
+// el FOV de la cámara del mundo. Sin reglas: recibe estados y los pinta. No sabe de ninguna nave: piezas, pantallas,
+// luces y colores salen de la disposición viva de su perfil (Cockpit3DLayout; spec docs/cabinas-3d-2-blade.md, 5).
 //
 // Redibujar es lo que cuesta: las pantallas grandes solo se pintan si cambia lo que enseñan, las pequeñas cada frame
-// (el haz se mueve siempre, y el mapa gira contigo) y, en la cámara exterior, ninguna.
+// (el haz se mueve siempre, y el mapa gira contigo), las de prueba y los textos fijos una vez y, en la cámara exterior,
+// ninguna.
 public partial class Cockpit3DView : CanvasLayer
 {
 	private const int LayerIndex = 0;   // el HUD está en la capa 1
@@ -47,10 +49,6 @@ public partial class Cockpit3DView : CanvasLayer
 	private const float LampDecay = 1.4f;
 	private const float ScreenLightRange = 0.9f;
 	private const float ScreenLightDecay = 1.6f;
-	private const float ScreenLightDistance = 0.06f;
-	private const float LargeScreenDepth = 0.045f;
-	private const float SmallScreenDepth = 0.035f;
-	private const float ScreenSurfaceOffset = 0.004f;
 	private const float BoostFrontRange = 3.5f;
 	private const float BoostRearRange = 4f;
 	private const float BoostLightDecay = 1.2f;
@@ -73,14 +71,16 @@ public partial class Cockpit3DView : CanvasLayer
 	private static readonly Vector3 DamageLightPosition = new(0f, 0.1f, -0.35f);
 
 	private readonly Dictionary<string, MeshInstance3D> _pieces = new();
-	private readonly List<OmniLight3D> _largeScreenLights = new();
-	private readonly List<OmniLight3D> _smallScreenLights = new();
+	private readonly List<(OmniLight3D Light, Cockpit3DScreenLight Group, float Factor)> _screenLights = new();
 	private readonly List<StandardMaterial3D> _screenMaterials = new();
-	private readonly StandardMaterial3D[] _shiftMaterials = new StandardMaterial3D[ShiftLights.Count];
-	private readonly ShiftLight[] _shiftShown = new ShiftLight[ShiftLights.Count];
-	private readonly StandardMaterial3D[] _flickerMaterials = new StandardMaterial3D[Cockpit3DPieces.FlickerLights.Count];
-	private readonly float[] _flickerBase = new float[Cockpit3DPieces.FlickerLights.Count];
-	private readonly bool[] _flickerDimmed = new bool[Cockpit3DPieces.FlickerLights.Count];
+	private readonly List<SubViewport> _paintOnce = new();   // pantallas de prueba y textos fijos
+	private StandardMaterial3D[] _shiftMaterials = System.Array.Empty<StandardMaterial3D>();
+	private ShiftLight[] _shiftShown = System.Array.Empty<ShiftLight>();
+	private StandardMaterial3D[] _flickerMaterials = System.Array.Empty<StandardMaterial3D>();
+	private float[] _flickerBase = System.Array.Empty<float>();
+	private bool[] _flickerDimmed = System.Array.Empty<bool>();
+	// Da los valores de luz, brillo y tinte, que no dependen del estilo, y el pintado de carreras. El militar llega en la
+	// etapa 3 de su spec.
 	private readonly CockpitHudState _hud = new(RacingPalette.Role, RacingPalette.Look);
 	private readonly CockpitLightMix _lightMix = new();
 	private readonly List<(StandardMaterial3D Material, float Coat)> _coated = new();
@@ -88,6 +88,8 @@ public partial class Cockpit3DView : CanvasLayer
 	private bool _applied;
 
 	private Cockpit3DProfile _profile;
+	private Cockpit3DLayout _layout;
+	private float _pitch;   // rad, la misma que la cámara del mundo
 	private SubViewport _viewport;
 	private Camera3D _camera;
 	private DirectionalLight3D _key;
@@ -123,10 +125,20 @@ public partial class Cockpit3DView : CanvasLayer
 		return new Color(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f, alpha);
 	}
 
-	public void Setup(Cockpit3DProfile profile, in Cockpit3DSettings settings)
+	public void Setup(Cockpit3DProfile profile, in Cockpit3DSettings settings, float pitchRadians)
 	{
 		_profile = profile;
+		_layout = profile.Layout;
 		_settings = settings;
+		_pitch = pitchRadians;
+
+		int shift = _layout.ShiftLightCount;
+		_shiftMaterials = new StandardMaterial3D[shift];
+		_shiftShown = new ShiftLight[shift];
+		int flicker = _layout.FlickerLights.Count;
+		_flickerMaterials = new StandardMaterial3D[flicker];
+		_flickerBase = new float[flicker];
+		_flickerDimmed = new bool[flicker];
 	}
 
 	public override void _Ready()
@@ -162,20 +174,28 @@ public partial class Cockpit3DView : CanvasLayer
 			return;
 
 		SubViewport.UpdateMode small = shown ? SubViewport.UpdateMode.Always : SubViewport.UpdateMode.Disabled;
-		_radarViewport.RenderTargetUpdateMode = small;
-		_mapViewport.RenderTargetUpdateMode = small;
+		if (_radarViewport != null)
+			_radarViewport.RenderTargetUpdateMode = small;
+		if (_mapViewport != null)
+			_mapViewport.RenderTargetUpdateMode = small;
 		if (_radar != null)
 			_radar.Visible = shown;
 		if (_minimap != null)
 			_minimap.Visible = shown;
 		if (shown)
+		{
 			_screensDirty = true;
+			foreach (SubViewport once in _paintOnce)
+				once.RenderTargetUpdateMode = SubViewport.UpdateMode.Once;
+		}
 	}
 
+	// La inclinación de la vista va sumada al movimiento propio de la cámara, como en el prototipo
 	public void SetCameraPose(in CockpitCameraPose pose)
 	{
-		_camera.Position = new Vector3(pose.Position.X, pose.Position.Y, pose.Position.Z);
-		_camera.Rotation = new Vector3(pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z);
+		CockpitCameraPose pitched = CockpitCameraMotion.Pitched(pose, _pitch);
+		_camera.Position = new Vector3(pitched.Position.X, pitched.Position.Y, pitched.Position.Z);
+		_camera.Rotation = new Vector3(pitched.Rotation.X, pitched.Rotation.Y, pitched.Rotation.Z);
 	}
 
 	public void Apply(in Cockpit3DSettings s)
@@ -202,10 +222,11 @@ public partial class Cockpit3DView : CanvasLayer
 			material.AlbedoColor = ScreenTint(s.ScreenBrightness);
 	}
 
-	// El radar y el minimapa: su lógica es la de siempre; aquí solo cambian el tamaño y la paleta (spec, 6.3)
+	// El radar y el minimapa: su lógica es la de siempre; aquí solo cambian el tamaño y la paleta (spec, 6.3). Sin
+	// pantallas de radar y minimapa en la disposición, nada.
 	public void SetRadar(RadarSweep sweep, MinimapPath path, float windowRadius, IReadOnlyList<RaceShip> ships)
 	{
-		if (!_built || _radar != null)
+		if (!_built || _radar != null || _radarViewport == null || _mapViewport == null)
 			return;
 
 		_radar = new RadarView { Name = "Radar" };
@@ -237,7 +258,7 @@ public partial class Cockpit3DView : CanvasLayer
 		UpdateShiftLights(input);
 		UpdateLights(light);
 		UpdateTints(light);
-		if (_shown)
+		if (_shown && _leftViewport != null && _rightViewport != null)
 			UpdateLargeScreens();
 	}
 
@@ -258,7 +279,7 @@ public partial class Cockpit3DView : CanvasLayer
 
 	private void UpdateShiftLights(in CockpitHudInput input)
 	{
-		for (int i = 0; i < ShiftLights.Count; i++)
+		for (int i = 0; i < _shiftMaterials.Length; i++)
 		{
 			ShiftLight lit = ShiftLights.Light(i, input.SpeedKmh, input.TopKmh, _hud.OverTop, _time);
 			if (lit == _shiftShown[i] || _shiftMaterials[i] == null)
@@ -272,12 +293,13 @@ public partial class Cockpit3DView : CanvasLayer
 	private void UpdateLights(in CockpitLightSettings light)
 	{
 		float glow = _hud.ScreenGlow * light.ScreenGlow;
-		foreach (OmniLight3D l in _largeScreenLights)
-			l.LightEnergy = glow * _settings.LargeScreenLightEnergy;
-		foreach (OmniLight3D l in _smallScreenLights)
-			l.LightEnergy = glow * _settings.SmallScreenLightEnergy;
+		foreach ((OmniLight3D l, Cockpit3DScreenLight group, float factor) in _screenLights)
+		{
+			float energy = group == Cockpit3DScreenLight.Large ? _settings.LargeScreenLightEnergy : _settings.SmallScreenLightEnergy;
+			l.LightEnergy = glow * energy * factor;
+		}
 
-		CockpitLightValues values = _lightMix.Values(_hud.DamageTint, _settings.Lights);
+		CockpitLightValues values = _lightMix.Values(_hud.DamageTint, _settings.Lights, _layout.Scene.DamageLightFactor);
 		_boostFront.LightEnergy = values.BoostFront * PrototypeLightToEnergy;
 		_boostRear.LightEnergy = values.BoostRear * PrototypeLightToEnergy;
 		_damageLight.LightEnergy = values.Damage * PrototypeLightToEnergy;
@@ -341,7 +363,7 @@ public partial class Cockpit3DView : CanvasLayer
 			SkyRotation = new Vector3(0f, Mathf.Pi, 0f),
 			ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
 			AmbientLightSource = Godot.Environment.AmbientSource.Color,
-			AmbientLightColor = AmbientColor(),
+			AmbientLightColor = AmbientColor(_layout.Scene),
 			TonemapMode = Godot.Environment.ToneMapper.Aces,
 			TonemapExposure = TonemapExposure,
 			GlowEnabled = true,
@@ -355,17 +377,18 @@ public partial class Cockpit3DView : CanvasLayer
 			Near = NearPlane,
 			Far = FarPlane,
 			Environment = _environment,
-			Current = true
+			Current = true,
+			Rotation = new Vector3(_pitch, 0f, 0f)
 		};
 		_viewport.AddChild(_camera);
 	}
 
 	// Hemisferio y ambiente del prototipo en un solo color: la mitad del hemisferio llega de arriba y la mitad de abajo
-	private static Color AmbientColor()
+	private static Color AmbientColor(Cockpit3DScene scene)
 	{
-		Color sky = ToColor(RacingPalette.HemisphereSky).SrgbToLinear();
-		Color ground = ToColor(RacingPalette.HemisphereGround).SrgbToLinear();
-		Color ambient = ToColor(RacingPalette.Ambient).SrgbToLinear();
+		Color sky = ToColor(scene.HemisphereSky).SrgbToLinear();
+		Color ground = ToColor(scene.HemisphereGround).SrgbToLinear();
+		Color ambient = ToColor(scene.Ambient).SrgbToLinear();
 		Color mixed = (sky + ground) * (0.5f * HemisphereStrength) + ambient * AmbientStrength;
 		return new Color(mixed.R, mixed.G, mixed.B).LinearToSrgb();
 	}
@@ -422,10 +445,11 @@ public partial class Cockpit3DView : CanvasLayer
 
 	private void BuildLights()
 	{
+		Cockpit3DScene scene = _layout.Scene;
 		_key = new DirectionalLight3D
 		{
 			Name = "Key",
-			LightColor = ToColor(RacingPalette.LightWhite),
+			LightColor = ToColor(scene.KeyLight),
 			ShadowEnabled = true,
 			ShadowBlur = 1.5f,
 			DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal,
@@ -434,10 +458,10 @@ public partial class Cockpit3DView : CanvasLayer
 		_viewport.AddChild(_key);
 		_key.LookAtFromPosition(KeySource, KeyTarget, Vector3.Up);
 
-		_lamp = NewOmni("Lamp", LampPosition, RacingPalette.LightWhite, LampRange, LampDecay);
-		_boostFront = NewOmni("BoostFront", BoostFrontPosition, RacingPalette.BoostLight, BoostFrontRange, BoostLightDecay);
-		_boostRear = NewOmni("BoostRear", BoostRearPosition, RacingPalette.BoostLight, BoostRearRange, BoostLightDecay);
-		_damageLight = NewOmni("Damage", DamageLightPosition, RacingPalette.DamageLight, DamageLightRange, DamageLightDecay);
+		_lamp = NewOmni("Lamp", LampPosition, scene.KeyLight, LampRange, LampDecay);
+		_boostFront = NewOmni("BoostFront", BoostFrontPosition, scene.BoostLight, BoostFrontRange, BoostLightDecay);
+		_boostRear = NewOmni("BoostRear", BoostRearPosition, scene.BoostLight, BoostRearRange, BoostLightDecay);
+		_damageLight = NewOmni("Damage", DamageLightPosition, scene.DamageLight, DamageLightRange, DamageLightDecay);
 	}
 
 	private OmniLight3D NewOmni(string name, Vector3 position, uint color, float range, float decay)
@@ -470,7 +494,7 @@ public partial class Cockpit3DView : CanvasLayer
 		_viewport.AddChild(model);
 		CollectPieces(model);
 
-		List<string> missing = CockpitManifest.Missing(_pieces.Keys).ToList();
+		List<string> missing = CockpitManifest.Missing(_pieces.Keys, _layout.Contract).ToList();
 		if (missing.Count > 0)
 			GD.PushError("[Cockpit3D] Missing cockpit pieces: " + string.Join(", ", missing));
 
@@ -511,12 +535,13 @@ public partial class Cockpit3DView : CanvasLayer
 			// El metal es un valor por material, y la textura de rugosidad es gris: leída como metal, lo rebajaría
 			material.MetallicTexture = null;
 			float coat = ClearcoatOf(material);
-			if (manifest.LowReflectionMaterials.Contains(material.ResourceName))
+			float reflection = manifest.ReflectionFactor(material.ResourceName);
+			if (reflection != 1f)
 			{
-				// glTF no tiene "intensidad de los reflejos" y Godot tampoco por material: se baja lo que refleja
-				material.MetallicSpecular *= manifest.LowReflectionFactor;
-				material.Metallic *= manifest.LowReflectionFactor;
-				coat *= manifest.LowReflectionFactor;
+				// glTF no tiene "intensidad de los reflejos" y Godot tampoco por material: se cambia lo que refleja
+				material.MetallicSpecular = Mathf.Min(1f, material.MetallicSpecular * reflection);
+				material.Metallic = Mathf.Min(1f, material.Metallic * reflection);
+				coat *= reflection;
 			}
 			if (coat > 0f)
 				_coated.Add((material, coat));
@@ -526,6 +551,12 @@ public partial class Cockpit3DView : CanvasLayer
 			CockpitManifestAdditive additive = manifest.AdditiveMaterials.FirstOrDefault(a => a.Material == material.ResourceName);
 			if (additive != null)
 				MakeAdditive(material, additive.Opacity);
+			else
+			{
+				CockpitManifestAdditive transparent = manifest.TransparentMaterials.FirstOrDefault(a => a.Material == material.ResourceName);
+				if (transparent != null)
+					MakeTransparent(material, transparent.Opacity);
+			}
 		}
 
 		foreach (CockpitManifestPiece piece in manifest.Pieces.Where(p => p.Intensity.HasValue))
@@ -540,12 +571,12 @@ public partial class Cockpit3DView : CanvasLayer
 
 		for (int i = 0; i < _flickerMaterials.Length; i++)
 		{
-			_flickerMaterials[i] = MaterialOf(Cockpit3DPieces.FlickerLights[i]);
-			_flickerBase[i] = manifest.Piece(Cockpit3DPieces.FlickerLights[i])?.Intensity ?? 1f;
+			_flickerMaterials[i] = MaterialOf(_layout.FlickerLights[i]);
+			_flickerBase[i] = manifest.Piece(_layout.FlickerLights[i])?.Intensity ?? 1f;
 		}
 
 		// Las shift lights empiezan apagadas
-		for (int i = 0; i < ShiftLights.Count; i++)
+		for (int i = 0; i < _shiftMaterials.Length; i++)
 		{
 			_shiftMaterials[i] = MaterialOf(Cockpit3DPieces.ShiftLight(i));
 			if (_shiftMaterials[i] != null)
@@ -554,9 +585,9 @@ public partial class Cockpit3DView : CanvasLayer
 		}
 
 		// La sombra interior de las pantallas no recibe luz
-		foreach (string screen in Cockpit3DPieces.LargeScreens.Concat(Cockpit3DPieces.SmallScreens))
+		foreach (string shade in _layout.Shades)
 		{
-			StandardMaterial3D material = MaterialOf(Cockpit3DPieces.Shade(screen));
+			StandardMaterial3D material = MaterialOf(shade);
 			if (material != null)
 				material.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
 		}
@@ -590,18 +621,43 @@ public partial class Cockpit3DView : CanvasLayer
 		material.AlbedoColor = new Color(1f, 1f, 1f, opacity);
 	}
 
+	// Cristales y sombras de pantalla: con su opacidad y sin escribir profundidad, así lo de detrás se sigue viendo
+	private static void MakeTransparent(StandardMaterial3D material, float opacity)
+	{
+		material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+		material.DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled;
+		Color albedo = material.AlbedoColor;
+		material.AlbedoColor = new Color(albedo.R, albedo.G, albedo.B, opacity);
+	}
+
 	private void BuildScreens()
 	{
-		var large = new Vector2I(RacingScreenDrawing.LargeWidth, RacingScreenDrawing.LargeHeight);
-		var small = new Vector2I(RacingScreenDrawing.SmallSize, RacingScreenDrawing.SmallSize);
-
-		_leftViewport = AddScreen(Cockpit3DPieces.ScreenLeft, large, LargeScreenDepth, _largeScreenLights);
-		_rightViewport = AddScreen(Cockpit3DPieces.ScreenRight, large, LargeScreenDepth, _largeScreenLights);
-		_radarViewport = AddScreen(Cockpit3DPieces.ScreenRadar, small, SmallScreenDepth, _smallScreenLights);
-		_mapViewport = AddScreen(Cockpit3DPieces.ScreenMap, small, SmallScreenDepth, _smallScreenLights);
-
-		_left = NewLiveCanvas(_leftViewport, large);
-		_right = NewLiveCanvas(_rightViewport, large);
+		foreach (Cockpit3DScreen screen in _layout.Screens)
+		{
+			SubViewport viewport = AddScreen(screen);
+			switch (screen.Content)
+			{
+				case Cockpit3DScreenContent.RacingLeft:
+					_leftViewport = viewport;
+					_left = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height));
+					break;
+				case Cockpit3DScreenContent.RacingRight:
+					_rightViewport = viewport;
+					_right = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height));
+					break;
+				case Cockpit3DScreenContent.Radar:
+					_radarViewport = viewport;
+					break;
+				case Cockpit3DScreenContent.Minimap:
+					_mapViewport = viewport;
+					break;
+				case Cockpit3DScreenContent.Test:
+					_paintOnce.Add(viewport);
+					break;
+			}
+		}
+		foreach (Cockpit3DLabel label in _layout.Labels)
+			AddLabel(label);
 	}
 
 	private static RacingScreenCanvas NewLiveCanvas(SubViewport viewport, Vector2I pixels)
@@ -611,48 +667,108 @@ public partial class Cockpit3DView : CanvasLayer
 		return canvas;
 	}
 
-	private SubViewport AddScreen(string pieceName, Vector2I pixels, float depth, List<OmniLight3D> lights)
+	private SubViewport AddScreen(Cockpit3DScreen screen)
 	{
-		var screenViewport = new SubViewport
+		var pixels = new Vector2I(screen.Width, screen.Height);
+		SubViewport screenViewport = NewCanvasViewport(screen.Piece + "_Viewport", pixels);
+		// En suma, lo que no se pinta no debe tapar nada: fondo transparente
+		screenViewport.TransparentBg = screen.Additive;
+
+		// La parte fija (o la imagen de prueba entera): se pinta una vez
+		var background = new RacingScreenCanvas { Name = "Base", Size = pixels, FontFamily = _layout.Font };
+		if (screen.Content == Cockpit3DScreenContent.Test)
+			MilitaryScreenDrawing.TestImage(background.Next, pixels.X, pixels.Y, screen.TestLabel, screen.Additive);
+		else
+			RacingScreenDrawing.Base(background.Next, pixels.X, pixels.Y);
+		background.Commit();
+		screenViewport.AddChild(background);
+
+		MeshInstance3D piece = _pieces[screen.Piece];
+		var material = new StandardMaterial3D
 		{
-			Name = pieceName + "_Viewport",
+			ResourceName = screen.Piece,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			AlbedoTexture = screenViewport.GetTexture(),
+			CullMode = BaseMaterial3D.CullModeEnum.Disabled
+		};
+		piece.MaterialOverride = material;
+		if (screen.Additive)
+		{
+			// Cristal HUD: en suma y sin escribir profundidad; el negro no se ve
+			material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+			material.BlendMode = BaseMaterial3D.BlendModeEnum.Add;
+			material.DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled;
+		}
+		else
+			_screenMaterials.Add(material);
+
+		if (screen.Light != Cockpit3DScreenLight.None)
+		{
+			var light = new OmniLight3D
+			{
+				Name = screen.Piece + "_Light",
+				LightColor = ToColor(_layout.Scene.ScreenLight),
+				OmniRange = ScreenLightRange,
+				OmniAttenuation = ScreenLightDecay
+			};
+			piece.AddChild(light);
+			// 6 cm por delante de la boca de la pantalla, como en el prototipo
+			light.Position = new Vector3(0f, 0f, screen.LightOffset);
+			_screenLights.Add((light, screen.Light, screen.LightFactor));
+		}
+
+		return screenViewport;
+	}
+
+	// Texto fijo (pilotos MASTER y placa): se pinta una vez y no cambia
+	private void AddLabel(Cockpit3DLabel label)
+	{
+		var pixels = new Vector2I(label.Width, label.Height);
+		SubViewport viewport = NewCanvasViewport(label.Piece + "_Viewport", pixels);
+		var canvas = new RacingScreenCanvas { Name = "Label", Size = pixels, FontFamily = _layout.Font, Bold = label.Bold };
+		MilitaryScreenDrawing.Label(canvas.Next, label);
+		canvas.Commit();
+		viewport.AddChild(canvas);
+		_paintOnce.Add(viewport);
+
+		if (!_pieces.TryGetValue(label.Piece, out MeshInstance3D piece))
+			return;
+		if (label.LampColor is uint lamp)
+		{
+			// Piloto: sin luz, multiplicando su color; apagado (los enciende la etapa 3)
+			Color off = ToColor(lamp).SrgbToLinear() * Cockpit3DLayouts.LampOffFactor;
+			piece.MaterialOverride = new StandardMaterial3D
+			{
+				ResourceName = label.Piece,
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+				AlbedoTexture = viewport.GetTexture(),
+				AlbedoColor = new Color(off.R, off.G, off.B).LinearToSrgb(),
+				CullMode = BaseMaterial3D.CullModeEnum.Disabled
+			};
+		}
+		else if (piece.GetActiveMaterial(0) is StandardMaterial3D plate)
+		{
+			// Placa: el material del modelo (rugosidad y metal), con el texto como color
+			var material = (StandardMaterial3D)plate.Duplicate();
+			material.AlbedoTexture = viewport.GetTexture();
+			material.AlbedoColor = Colors.White;
+			material.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+			piece.MaterialOverride = material;
+		}
+	}
+
+	private SubViewport NewCanvasViewport(string name, Vector2I pixels)
+	{
+		var viewport = new SubViewport
+		{
+			Name = name,
 			Size = pixels,
 			Disable3D = true,
 			HandleInputLocally = false,
 			GuiDisableInput = true,
 			RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled
 		};
-
-		// La parte fija: se pinta una vez
-		var background = new RacingScreenCanvas { Name = "Base", Size = pixels };
-		RacingScreenDrawing.Base(background.Next, pixels.X, pixels.Y);
-		background.Commit();
-		screenViewport.AddChild(background);
-		AddChild(screenViewport);
-
-		MeshInstance3D piece = _pieces[pieceName];
-		var material = new StandardMaterial3D
-		{
-			ResourceName = pieceName,
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			AlbedoTexture = screenViewport.GetTexture(),
-			CullMode = BaseMaterial3D.CullModeEnum.Disabled
-		};
-		piece.MaterialOverride = material;
-		_screenMaterials.Add(material);
-
-		var light = new OmniLight3D
-		{
-			Name = pieceName + "_Light",
-			LightColor = ToColor(RacingPalette.LightWhite),
-			OmniRange = ScreenLightRange,
-			OmniAttenuation = ScreenLightDecay
-		};
-		piece.AddChild(light);
-		// 6 cm por delante de la boca de la pantalla, como en el prototipo
-		light.Position = new Vector3(0f, 0f, depth - ScreenSurfaceOffset + ScreenLightDistance);
-		lights.Add(light);
-
-		return screenViewport;
+		AddChild(viewport);
+		return viewport;
 	}
 }
