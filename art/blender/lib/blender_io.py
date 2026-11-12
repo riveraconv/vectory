@@ -97,7 +97,6 @@ def _image(path, non_color):
 def material(name, base=(0, 0, 0, 1), metallic=0.0, roughness=0.5, coat=0.0, coat_roughness=0.03,
              textures=None, emission=None, emission_strength=0.0, alpha=1.0):
     mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
     mat.use_backface_culling = False
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
@@ -168,7 +167,6 @@ def render_environment(path):
     _standard_view(scene)
 
     world = bpy.data.worlds.new("EnvWorld")
-    world.use_nodes = True
     background = world.node_tree.nodes["Background"]
     background.inputs["Color"].default_value = hex_color(0x020306)
     background.inputs["Strength"].default_value = 1.0
@@ -179,7 +177,6 @@ def render_environment(path):
 
     def glowing(r, gr, b):
         mat = bpy.data.materials.new("Env")
-        mat.use_nodes = True
         nodes = mat.node_tree.nodes
         nodes.clear()
         out = nodes.new("ShaderNodeOutputMaterial")
@@ -221,7 +218,6 @@ def render_environment(path):
 # Los rayos de cámara ven el fondo oscuro.
 def preview_world(scene, env_path, hemi_sky, hemi_ground, hemi_strength, ambient, ambient_strength, background):
     world = bpy.data.worlds.new("PreviewWorld")
-    world.use_nodes = True
     tree = world.node_tree
     nodes = tree.nodes
     links = tree.links

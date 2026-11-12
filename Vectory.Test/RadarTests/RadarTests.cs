@@ -457,7 +457,7 @@ public class MinimapTests
 	private static readonly Vector2 North = new(0f, -1f);
 	private static readonly Vector2 East = new(1f, 0f);
 
-	private static MinimapStyle Style(RadarPalette palette = null) => MinimapStyle.Hud(palette ?? TestPalettes.A, Radius, 1f);
+	private static MinimapStyle Style(RadarPalette? palette = null) => MinimapStyle.Hud(palette ?? TestPalettes.A, Radius, 1f);
 
 	private static MinimapProjection Projection(Vector2 self, Vector2 forward) => new(self, forward, Vector2.Zero, Radius / Window);
 

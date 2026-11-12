@@ -391,6 +391,52 @@ def sphere(radius, width=10, height=8):
     return _indexed(verts, norms, uvs, indices)
 
 
+# SphereGeometry de three.js con todos sus parámetros: un trozo de esfera (cúpula del cristal de BLADE).
+# x = −r·cos φ·sen θ, y = r·cos θ, z = r·sen φ·sen θ, con φ y θ desde su inicio y a lo largo de su recorrido.
+def sphere_section(radius, width, height, phi_start, phi_length, theta_start, theta_length):
+    theta_end = min(theta_start + theta_length, math.pi)
+    verts, norms, uvs, grid, indices = [], [], [], [], []
+    for iy in range(height + 1):
+        row = []
+        v = iy / height
+        u_offset = 0.0
+        if iy == 0 and theta_start == 0:
+            u_offset = 0.5 / width
+        elif iy == height and theta_end == math.pi:
+            u_offset = -0.5 / width
+        for ix in range(width + 1):
+            u = ix / width
+            phi = phi_start + u * phi_length
+            theta = theta_start + v * theta_length
+            p = (
+                -radius * math.cos(phi) * math.sin(theta),
+                radius * math.cos(theta),
+                radius * math.sin(phi) * math.sin(theta),
+            )
+            verts.append(p)
+            norms.append(_normalize(p))
+            uvs.append((u + u_offset, 1 - v))
+            row.append(len(verts) - 1)
+        grid.append(row)
+    for iy in range(height):
+        for ix in range(width):
+            a, b = grid[iy][ix + 1], grid[iy][ix]
+            c, d = grid[iy + 1][ix], grid[iy + 1][ix + 1]
+            if iy != 0 or theta_start > 0:
+                indices += [a, b, d]
+            if iy != height - 1 or theta_end < math.pi:
+                indices += [b, c, d]
+    return _indexed(verts, norms, uvs, indices)
+
+
+# B.strip del prototipo de BLADE: los mismos cuadriláteros que strip, partidos por la otra diagonal
+def strip_ab(a, b):
+    pos = []
+    for i in range(len(a) - 1):
+        pos += [tuple(a[i]), tuple(b[i]), tuple(b[i + 1]), tuple(a[i]), tuple(b[i + 1]), tuple(a[i + 1])]
+    return box_uv(_flat(pos))
+
+
 # CylinderGeometry de three.js (mandos y botones), con tapas
 def cylinder(radius_top, radius_bottom, height, radial):
     verts, norms, uvs, indices = [], [], [], []
