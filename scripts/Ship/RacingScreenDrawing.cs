@@ -4,7 +4,7 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-public enum ScreenPrimitiveKind { FillRect, StrokeRect, Line, Disc, Ring, Text, Triangle }
+public enum ScreenPrimitiveKind { FillRect, StrokeRect, Line, Disc, Ring, Text, Triangle, Vignette }
 
 public enum ScreenTextAlign { Left, Right, Center }
 
@@ -14,6 +14,7 @@ public enum ScreenTextAlign { Left, Right, Center }
 //   Disc y Ring: centro A y Radius (Width: el grueso)
 //   Text: línea base en A, tamaño Radius y Spacing entre letras
 //   Triangle: relleno, vértices A, B y C
+//   Vignette: degradado radial de transparente (radio Radius) a Color (radio Width), desde el centro del rectángulo A–B
 public readonly record struct ScreenPrimitive(
 	ScreenPrimitiveKind Kind, Vector2 A, Vector2 B, float Radius, float Width, Vector4 Color, float Glow,
 	string Text = null, float Spacing = 0f, ScreenTextAlign Align = ScreenTextAlign.Left, Vector2 C = default);

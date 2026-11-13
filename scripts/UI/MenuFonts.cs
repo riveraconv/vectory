@@ -11,16 +11,24 @@ public static class MenuFonts
 	private const string MonoPath = "res://assets/fonts/ShareTechMono-Regular.ttf";
 
 	private const string RajdhaniPath = "res://assets/fonts/Rajdhani-Bold.ttf";
+	private const string Vt323Path = "res://assets/fonts/VT323-Regular.ttf";
 
 	private static FontFile _orbitron;
 	private static FontFile _mono;
 	private static FontFile _rajdhani;
+	private static FontFile _vt323;
 	private static bool _loaded;
 
 	// La de las pantallas de la cabina 3D, en estilo carreras
 	public static FontFile Rajdhani
 	{
 		get { EnsureLoaded(); return _rajdhani; }
+	}
+
+	// La de las pantallas CRT de la cabina 3D de HAMMER, en estilo industrial
+	public static FontFile Vt323
+	{
+		get { EnsureLoaded(); return _vt323; }
 	}
 
 	public static FontFile Orbitron
@@ -75,6 +83,7 @@ public static class MenuFonts
 		_orbitron = Load(OrbitronPath);
 		_mono = Load(MonoPath);
 		_rajdhani = Load(RajdhaniPath);
+		_vt323 = Load(Vt323Path);
 		_loaded = true;
 	}
 

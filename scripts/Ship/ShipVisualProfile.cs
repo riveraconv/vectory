@@ -18,10 +18,6 @@ public readonly record struct ShipLine(Vector3 A, Vector3 B, ShipLineColor Color
 public readonly record struct CockpitFraming(Vector3 Eye, float Fov, float PitchDegrees)
 {
 	public float PitchRadians => PitchDegrees * MathF.PI / 180f;
-
-	// Para el que están dibujadas las cabinas 2D: la inclinación (negativa = hacia abajo) deja el punto de fuga de la
-	// pista donde la espera su diseño, y ≈ 300 de 720 con FOV 80. Cada nave ajusta la altura del ojo.
-	public static readonly CockpitFraming For2DCockpit = new(new Vector3(0f, 0.45f, -1.2f), 80f, -8f);
 }
 
 // Encuadre base de la cámara exterior, sin efectos: altura, distancia, distancia extra a máxima velocidad
@@ -47,16 +43,13 @@ public sealed record Cockpit3DProfile(string ModelPath, string ManifestPath, str
 	public Cockpit3DLayout Layout => Cockpit3DLayout.For(Style);
 }
 
-// Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco y la cabina son constructores:
-// devuelven sus líneas o sus elementos 2D, sin nodos de Godot. Lógica pura.
+// Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco es un constructor: devuelve sus líneas,
+// sin nodos de Godot. Lógica pura.
 public sealed record ShipVisualProfile
 {
 	public required Func<IReadOnlyList<ShipLine>> BuildHull { get; init; }
-	// Capa 2D de la cabina. Sin ella, la nave lleva cabina 3D.
-	public Func<CockpitLayout> BuildCockpit { get; init; }
-
-	// Cabina 3D (spec docs/cabinas-3d-1-vector.md). Con ella, BuildCockpit no se usa.
-	public Cockpit3DProfile Cockpit3D { get; init; }
+	// Cabina 3D (spec docs/cabinas-3d-1-vector.md): la tienen todas las naves
+	public required Cockpit3DProfile Cockpit3D { get; init; }
 
 	public required CockpitFraming Cockpit { get; init; }
 	public required ChaseFraming Chase { get; init; }

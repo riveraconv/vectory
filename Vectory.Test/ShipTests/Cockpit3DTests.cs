@@ -103,7 +103,6 @@ public class Cockpit3DProfileTests
         Assert.NotNull(cockpit);
         Assert.Equal(Cockpit3DStyle.Racing, cockpit.Style);
         Assert.EndsWith("cockpit_vector.glb", cockpit.ModelPath);
-        Assert.Null(ShipDefinitions.Find(ShipCatalog.Ship01)!.Visual.BuildCockpit);
     }
 
     // BLADE lleva la cabina 3D militar (Cockpit3DBladeTests) y HAMMER la industrial (Cockpit3DHammerTests)
@@ -114,31 +113,19 @@ public class Cockpit3DViewRulesTests
     [Fact]
     public void Vector_InCockpit_Shows3D_AndHidesTheScreenHud()
     {
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, Cockpit3DLayouts.Racing.ScreensShowHud);
         Assert.True(rules.Cockpit3D);
-        Assert.False(rules.CockpitLayer);
         Assert.False(rules.ScreenDriveHud);
         Assert.False(rules.ScreenRadar);
-    }
-
-    [Fact]
-    public void BladeOrHammer_InCockpit_ShowLayer_DriveHudInTheCockpit_RadarOnScreen()
-    {
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, false);
-        Assert.False(rules.Cockpit3D);
-        Assert.True(rules.CockpitLayer);
-        Assert.False(rules.ScreenDriveHud);
-        Assert.True(rules.ScreenRadar);
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void AnyShip_Outside_ShowsOnlyTheScreenHud(bool has3D)
+    public void AnyShip_Outside_ShowsOnlyTheScreenHud(bool screensShowHud)
     {
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Chase, has3D);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Chase, screensShowHud);
         Assert.False(rules.Cockpit3D);
-        Assert.False(rules.CockpitLayer);
         Assert.True(rules.ScreenDriveHud);
         Assert.True(rules.ScreenRadar);
     }

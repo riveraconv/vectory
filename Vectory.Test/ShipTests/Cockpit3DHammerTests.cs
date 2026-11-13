@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Vectory.Test.ShipTests;
 
-// Cabina 3D de HAMMER, etapa 2 (spec docs/cabinas-3d-3-hammer.md, 8: pruebas 1 a 4), su disposición viva y su dibujo
+// Cabina 3D de HAMMER (spec docs/cabinas-3d-3-hammer.md, 8: pruebas 1 a 12), su disposición viva y su dibujo
 public class Cockpit3DHammerManifestTests
 {
     private static readonly CockpitManifest Manifest = Load("cockpit_hammer.manifest.json");
@@ -147,32 +147,30 @@ public class Cockpit3DHammerProfileTests
         Assert.Equal(0.90f, blade.Cockpit.Eye.Y + ShipHover, 4);
         Assert.Equal(-5.7f, blade.Cockpit.PitchDegrees, 1);
         Assert.Equal(Cockpit3DStyle.Industrial, hammer.Cockpit3D!.Style);
-        Assert.All(new[] { vector, blade, hammer }, v => Assert.Null(v.BuildCockpit));
+        Assert.All(new[] { vector, blade, hammer }, v => Assert.NotNull(v.Cockpit3D));
     }
 }
 
 public class Cockpit3DHammerViewRulesTests
 {
-    // Etapa 2: con las pantallas de prueba, en cabina se ve la cabina 3D y también el HUD de pantalla
+    // Etapa 3: las pantallas llevan velocidad, boost, daño, radar y minimapa, y el HUD de pantalla ya no sale en cabina
     [Fact]
-    public void Hammer_InCockpit_Shows3D_AndKeepsTheScreenHud()
+    public void Hammer_InCockpit_Shows3D_AndHidesTheScreenHud()
     {
         bool screensShowHud = Cockpit3DLayouts.Industrial.ScreensShowHud;
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true, screensShowHud);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, screensShowHud);
 
-        Assert.False(screensShowHud);
+        Assert.True(screensShowHud);
         Assert.True(rules.Cockpit3D);
-        Assert.False(rules.CockpitLayer);
-        Assert.True(rules.ScreenDriveHud);
-        Assert.True(rules.ScreenRadar);
+        Assert.False(rules.ScreenDriveHud);
+        Assert.False(rules.ScreenRadar);
     }
 
     [Fact]
     public void Hammer_Outside_ShowsOnlyTheScreenHud()
     {
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Chase, true, Cockpit3DLayouts.Industrial.ScreensShowHud);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Chase, Cockpit3DLayouts.Industrial.ScreensShowHud);
         Assert.False(rules.Cockpit3D);
-        Assert.False(rules.CockpitLayer);
         Assert.True(rules.ScreenDriveHud);
         Assert.True(rules.ScreenRadar);
     }
@@ -198,25 +196,45 @@ public class Cockpit3DIndustrialLayoutTests
     private static Cockpit3DLayout Industrial => Cockpit3DLayouts.Industrial;
 
     [Fact]
-    public void Industrial_HasTheFourTestScreensOfTheSpec_WithTheirPixels()
+    public void Industrial_HasTheFourScreensOfTheSpec_WithTheirPixels()
     {
         Cockpit3DScreen[] screens = Industrial.Screens.ToArray();
 
         Assert.Equal(new[] { "Screen_Radar", "Screen_Damage", "Screen_Map", "Screen_Speed" }, screens.Select(s => s.Piece));
-        Assert.Equal(new[] { "RADAR", "HULL", "MAP", "SPD" }, screens.Select(s => s.TestLabel));
+        Assert.Equal(new[]
+        {
+            Cockpit3DScreenContent.IndustrialRadar, Cockpit3DScreenContent.IndustrialDamage,
+            Cockpit3DScreenContent.IndustrialMap, Cockpit3DScreenContent.IndustrialSpeed
+        }, screens.Select(s => s.Content));
         Assert.Equal((384, 294), (screens[0].Width, screens[0].Height));
         Assert.Equal((300, 300), (screens[1].Width, screens[1].Height));
         Assert.Equal((384, 294), (screens[2].Width, screens[2].Height));
         Assert.Equal((768, 144), (screens[3].Width, screens[3].Height));
         Assert.All(screens, s =>
         {
-            Assert.Equal(Cockpit3DScreenContent.Test, s.Content);
             Assert.False(s.Additive);
             Assert.Equal(Cockpit3DScreenLight.Large, s.Light);
             Assert.Equal(0.06f - 0.0015f, s.LightOffset, 6);
         });
         Assert.True(Industrial.BrightnessFollowsGlow);
         Assert.Equal(4, Industrial.Shades.Count);
+        Assert.Equal(Cockpit3DFont.Vt323, Industrial.Font);
+        Assert.Equal(Cockpit3DFont.Mono, Industrial.LabelsFont);
+        Assert.Equal(Cockpit3DFont.Mono, Cockpit3DLayouts.Military.LabelsFont);
+    }
+
+    [Fact]
+    public void Industrial_StatusLamps_AreTheThreeSetasAndTheTwoBeacons()
+    {
+        Assert.Equal(new[]
+        {
+            ("Lamp_Boost_1", Cockpit3DStatusLampKind.Seta, 0), ("Lamp_Boost_2", Cockpit3DStatusLampKind.Seta, 1),
+            ("Lamp_Boost_3", Cockpit3DStatusLampKind.Seta, 2), ("Beacon_Boost_Lens", Cockpit3DStatusLampKind.BoostBeacon, 0),
+            ("Beacon_Damage_Lens", Cockpit3DStatusLampKind.DamageBeacon, 0)
+        }, Industrial.StatusLampList.Select(l => (l.Piece, l.Kind, l.Index)));
+        Assert.All(Industrial.StatusLampList, l => Assert.DoesNotContain(l.Piece, Industrial.FlickerLights));
+        Assert.Empty(Cockpit3DLayouts.Racing.StatusLampList);
+        Assert.Empty(Cockpit3DLayouts.Military.StatusLampList);
     }
 
     // brillo × 0,03 × área / 0,017 en el prototipo, como BLADE, frente a brillo × 0,3 de las pantallas grandes de VECTOR
@@ -289,7 +307,7 @@ public class Cockpit3DIndustrialLayoutTests
         // Ajustadas a ojo contra el prototipo, sobre las luces del Inspector (las de VECTOR)
         Assert.Equal(0.5f, scene.KeyFactor);
         Assert.Equal(3f, scene.LampFactor);
-        Assert.Equal(Cockpit3DFont.Mono, Industrial.Font);
+        Assert.Equal(Cockpit3DFont.Vt323, Industrial.Font);
     }
 
     // VECTOR y BLADE no cambian: sus luces son las del Inspector tal cual
@@ -336,24 +354,6 @@ public class IndustrialScreenDrawingTests
         IndustrialScreenDrawing.Corners(output, 768, 144);
         Assert.Equal(new Vector2(6f, 20f), output[0].A);
         Assert.Equal(new Vector2(762f, 138f), output[^1].A);
-    }
-
-    [Theory]
-    [InlineData(768, 144, "SPD")]
-    [InlineData(384, 294, "RADAR")]
-    [InlineData(300, 300, "HULL")]
-    public void TestImage_HasItsLabelInAmber_CenteredAndFitting(int width, int height, string label)
-    {
-        var output = new List<ScreenPrimitive>();
-        IndustrialScreenDrawing.TestImage(output, width, height, label);
-
-        ScreenPrimitive text = output.Single(p => p.Kind == ScreenPrimitiveKind.Text);
-        Assert.Equal(label, text.Text);
-        Assert.Equal(width / 2f, text.A.X);
-        Assert.Equal(ScreenTextAlign.Center, text.Align);
-        Assert.Equal(IndustrialPalette.Rgba(IndustrialPalette.Main), text.Color);
-        Assert.InRange(text.Radius * 0.6f * label.Length, 0f, width * 0.8f + 1f);
-        Assert.InRange(text.Radius, 0f, height * 0.4f + 0.5f);
     }
 
     [Fact]

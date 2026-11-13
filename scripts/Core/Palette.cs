@@ -170,26 +170,4 @@ public static class Palette
 	public static readonly Color DamageNoneOff = new Color(Green, 0.6f);    // borde de un segmento apagado, según el nivel
 	public static readonly Color DamageLightOff = new Color(Yellow, 0.6f);
 	public static readonly Color DamageHeavyOff = new Color(Red, 0.6f);
-
-	// --- Cabinas (spec docs/naves-3b-cabinas.md): tonos de sus paneles sólidos, tal como están en los diseños ---
-	public static readonly Color CockpitBlack = new Color("000000");            // sombras y oclusión
-	public static readonly Color CockpitHighlight = new Color("BFF6FF");        // brillo en cantos
-	public static readonly Color CockpitGlassReflection = new Color("DFFBFF");  // reflejos del cristal
-	public static readonly Color CockpitPanelLight = new Color("16213A");
-	public static readonly Color CockpitPanelMid = new Color("0C1324");
-	public static readonly Color CockpitPanelDark = new Color("060A14");
-	public static readonly Color CockpitConsoleLight = new Color("1A2744");
-	public static readonly Color CockpitConsoleDark = new Color("0A1020");
-	public static readonly Color CockpitFrontLight = new Color("070B16");
-	public static readonly Color CockpitFrontDark = new Color("03050A");
-	public static readonly Color CockpitPillarLight = new Color("121B30");
-	public static readonly Color CockpitNoseLight = new Color("101A30");
-	public static readonly Color CockpitCowlLight = new Color("1C2A48");
-	public static readonly Color CockpitStep = new Color("05080F");             // canto de los escalones del morro
-	public static readonly Color CockpitSink = new Color("02030A");             // huecos del frontal
-	public static readonly Color CockpitSinkWall = new Color("0D1424");
-	public static readonly Color CockpitScreen = new Color("02040A");           // fondo de las pantallas
-	public static readonly Color CockpitVent = new Color("04070F");             // rejillas
-	public static readonly Color CockpitScrew = new Color("0B1222");            // tornillos e interruptores
-	public static readonly Color CockpitDialShadow = new Color("070B15");       // canto del dial de Hammer
 }

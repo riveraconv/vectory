@@ -24,16 +24,17 @@ public readonly record struct Cockpit3DSettings(
 	float GlowWide,
 	float Reflections,
 	float CarbonSpecular,
-	CockpitLightIntensities Lights);
+	CockpitLightIntensities Lights,
+	IndustrialLampSettings StatusLamps);
 
 // Cabina 3D pintada encima del mundo con su propia cámara: un SubViewport con su mundo, su luz y sus reflejos, cuya
-// imagen va a pantalla completa en el sitio de la capa 2D (spec docs/cabinas-3d-1-vector.md, 4). Así no se deforma con
+// imagen va a pantalla completa por debajo del HUD (spec docs/cabinas-3d-1-vector.md, 4). Así no se deforma con
 // el FOV de la cámara del mundo. Sin reglas: recibe estados y los pinta. No sabe de ninguna nave: piezas, pantallas,
 // luces y colores salen de la disposición viva de su perfil (Cockpit3DLayout; spec docs/cabinas-3d-2-blade.md, 5).
 //
 // Redibujar es lo que cuesta: las pantallas grandes solo se pintan si cambia lo que enseñan, las pequeñas cada frame
-// (el haz se mueve siempre, y el mapa gira contigo), las de prueba y los textos fijos una vez y, en la cámara exterior,
-// ninguna.
+// (el haz se mueve siempre, y el mapa gira contigo), las CRT de HAMMER cada frame (su banda baja siempre), los
+// textos fijos una vez y, en la cámara exterior, ninguna.
 public partial class Cockpit3DView : CanvasLayer
 {
 	private const int LayerIndex = 0;   // el HUD está en la capa 1
@@ -122,6 +123,16 @@ public partial class Cockpit3DView : CanvasLayer
 	private RadarSweep _sweep;
 	private CockpitHudInput _input;
 
+	// Pantallas CRT de HAMMER: lo vivo encima de lo fijo, cada frame en la vista de cabina (la banda del CRT baja siempre)
+	private readonly List<SubViewport> _alwaysViewports = new();
+	private RacingScreenCanvas _industrialSpeed;
+	private RacingScreenCanvas _industrialDamage;
+	private RacingScreenCanvas _industrialRadar;
+	private RacingScreenCanvas _industrialMap;
+
+	// Setas y balizas de HAMMER: material, cómo se enciende y lo último que se le puso
+	private readonly List<(StandardMaterial3D Material, Cockpit3DStatusLamp Lamp, IndustrialLamp Shown)> _statusLamps = new();
+
 	private float _time;
 	private bool _shown;
 	private bool _screensDirty = true;
@@ -190,6 +201,8 @@ public partial class Cockpit3DView : CanvasLayer
 			_radarViewport.RenderTargetUpdateMode = small;
 		if (_mapViewport != null)
 			_mapViewport.RenderTargetUpdateMode = small;
+		foreach (SubViewport always in _alwaysViewports)
+			always.RenderTargetUpdateMode = small;
 		if (_radar != null)
 			_radar.Visible = shown;
 		if (_minimap != null)
@@ -242,17 +255,25 @@ public partial class Cockpit3DView : CanvasLayer
 			return;
 
 		_sweep = sweep;
-		bool military = _radarContent == Cockpit3DScreenContent.MilitaryRadar;
+		RadarStyle radarStyle = _radarContent switch
+		{
+			Cockpit3DScreenContent.MilitaryRadar => RadarStyle.MilitaryScreen(MilitaryPalette.Radar()),
+			Cockpit3DScreenContent.IndustrialRadar => RadarStyle.IndustrialScreen(IndustrialPalette.Radar()),
+			_ => RadarStyle.CockpitScreen(RacingPalette.Radar())
+		};
 		_radar = new RadarView { Name = "Radar" };
-		_radar.Setup(sweep, military ? RadarStyle.MilitaryScreen(MilitaryPalette.Radar()) : RadarStyle.CockpitScreen(RacingPalette.Radar()),
-			RacingScreenCanvas.FontWith(2));
+		_radar.Setup(sweep, radarStyle, RacingScreenCanvas.FontWith(2));
 		_radarViewport.AddChild(_radar);
 		_radarViewport.MoveChild(_radar, 1);   // encima de la parte fija y debajo de lo vivo de la pantalla
 
-		bool militaryMap = _mapContent == Cockpit3DScreenContent.MilitaryMap;
+		MinimapStyle mapStyle = _mapContent switch
+		{
+			Cockpit3DScreenContent.MilitaryMap => MinimapStyle.MilitaryScreen(MilitaryPalette.Radar()),
+			Cockpit3DScreenContent.IndustrialMap => MinimapStyle.IndustrialScreen(IndustrialPalette.Radar()),
+			_ => MinimapStyle.CockpitScreen(RacingPalette.Radar())
+		};
 		_minimap = new MinimapView { Name = "Minimap" };
-		_minimap.Setup(path, militaryMap ? MinimapStyle.MilitaryScreen(MilitaryPalette.Radar()) : MinimapStyle.CockpitScreen(RacingPalette.Radar()),
-			windowRadius, ships);
+		_minimap.Setup(path, mapStyle, windowRadius, ships);
 		_mapViewport.AddChild(_minimap);
 		_mapViewport.MoveChild(_minimap, 1);
 		if (_mapBase != null)
@@ -284,10 +305,63 @@ public partial class Cockpit3DView : CanvasLayer
 		UpdateLights(light);
 		UpdateTints(light);
 		UpdateLamps();
+		UpdateStatusLamps();
 		if (_shown && _leftViewport != null && _rightViewport != null)
 			UpdateLargeScreens();
 		if (_shown)
+		{
 			UpdateMilitaryScreens();
+			UpdateIndustrialScreens();
+		}
+	}
+
+	// Pantallas CRT de HAMMER: cambian cada frame por la banda del CRT, que va con el tiempo de la cabina (la pausa la congela)
+	private void UpdateIndustrialScreens()
+	{
+		if (_industrialSpeed != null)
+		{
+			IndustrialScreenDrawing.Speed(_industrialSpeed.Next, _hud, _input.BoostActive, _time);
+			_industrialSpeed.Commit();
+		}
+		if (_industrialDamage != null)
+		{
+			IndustrialScreenDrawing.Damage(_industrialDamage.Next, _hud, _time);
+			_industrialDamage.Commit();
+		}
+		if (_industrialRadar != null && _sweep != null)
+		{
+			IndustrialScreenDrawing.RadarLive(_industrialRadar.Next, _sweep.TargetCount, _sweep.NearestDistance, _sweep.NearestIsClose, _time);
+			_industrialRadar.Commit();
+		}
+		if (_industrialMap != null)
+		{
+			IndustrialScreenDrawing.MapLive(_industrialMap.Next, _input.LapText, _input.LapFraction, _time);
+			_industrialMap.Commit();
+		}
+	}
+
+	// Setas y balizas de HAMMER (IndustrialLamps): color e intensidad de su emisión. No titilan con el daño.
+	private void UpdateStatusLamps()
+	{
+		IndustrialLampSettings settings = _settings.StatusLamps;
+		for (int i = 0; i < _statusLamps.Count; i++)
+		{
+			(StandardMaterial3D material, Cockpit3DStatusLamp lamp, IndustrialLamp shown) = _statusLamps[i];
+			IndustrialLamp lit = lamp.Kind switch
+			{
+				Cockpit3DStatusLampKind.Seta => IndustrialLamps.Seta(lamp.Index, _input.Charges, _input.Cooldown, _hud.DamageLevel,
+					_hud.DamageEnabled, settings),
+				Cockpit3DStatusLampKind.BoostBeacon => new IndustrialLamp(IndustrialPalette.Beacon,
+					IndustrialLamps.BoostBeacon(_input.BoostActive, _time, settings)),
+				_ => new IndustrialLamp(IndustrialPalette.BeaconRed,
+					IndustrialLamps.DamageBeacon(_hud.DamageLevel, _hud.DamageEnabled, _hud.BlinkOn, settings))
+			};
+			if (lit == shown)
+				continue;
+			material.Emission = ToColor(lit.Color);
+			material.EmissionEnergyMultiplier = lit.Intensity;
+			_statusLamps[i] = (material, lamp, lit);
+		}
 	}
 
 	// Cristal HUD y velocidad: solo se pintan si cambia lo que enseñan. Lo vivo del radar y del mapa, cada frame, como
@@ -394,7 +468,7 @@ public partial class Cockpit3DView : CanvasLayer
 		_damageLight.LightEnergy = values.Damage * PrototypeLightToEnergy;
 	}
 
-	// Los tintes de los bordes de pantalla son los de la cabina 2D: comunes a todas las cabinas
+	// Los tintes de los bordes de pantalla (CockpitTints): comunes a todas las cabinas
 	private void UpdateTints(in CockpitLightSettings light)
 	{
 		SetTint(_boostTint, _hud.BoostTint * light.BoostTint);
@@ -497,16 +571,16 @@ public partial class Cockpit3DView : CanvasLayer
 		image.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(image);
 
-		_boostTint = NewTint("BoostTint", CockpitGradientId.TintOrange);
-		_damageTint = NewTint("DamageTint", CockpitGradientId.TintRed);
+		_boostTint = NewTint("BoostTint", CockpitTints.Boost);
+		_damageTint = NewTint("DamageTint", CockpitTints.Damage);
 	}
 
-	private TextureRect NewTint(string name, CockpitGradientId gradient)
+	private TextureRect NewTint(string name, Texture2D texture)
 	{
 		var tint = new TextureRect
 		{
 			Name = name,
-			Texture = CockpitPainter.TextureOf(gradient),
+			Texture = texture,
 			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
 			StretchMode = TextureRect.StretchModeEnum.Scale,
 			MouseFilter = Control.MouseFilterEnum.Ignore,
@@ -761,10 +835,33 @@ public partial class Cockpit3DView : CanvasLayer
 					_mapBase = (RacingScreenCanvas)viewport.GetChild(0);
 					_mapOverlay = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
 					break;
-				case Cockpit3DScreenContent.Test:
-					_paintOnce.Add(viewport);
+				case Cockpit3DScreenContent.IndustrialSpeed:
+					_alwaysViewports.Add(viewport);
+					_industrialSpeed = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
+					break;
+				case Cockpit3DScreenContent.IndustrialDamage:
+					_alwaysViewports.Add(viewport);
+					_industrialDamage = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
+					break;
+				case Cockpit3DScreenContent.IndustrialRadar:
+					_radarViewport = viewport;
+					_radarContent = screen.Content;
+					_industrialRadar = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
+					break;
+				case Cockpit3DScreenContent.IndustrialMap:
+					_mapViewport = viewport;
+					_mapContent = screen.Content;
+					_industrialMap = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
 					break;
 			}
+		}
+		foreach (Cockpit3DStatusLamp lamp in _layout.StatusLampList)
+		{
+			StandardMaterial3D material = MaterialOf(lamp.Piece);
+			if (material == null)
+				continue;
+			material.EmissionEnabled = true;
+			_statusLamps.Add((material, lamp, default));
 		}
 		foreach (Cockpit3DLabel label in _layout.Labels)
 			AddLabel(label);
@@ -803,8 +900,17 @@ public partial class Cockpit3DView : CanvasLayer
 			case Cockpit3DScreenContent.MilitaryMap:
 				MilitaryScreenDrawing.Base(background.Next, pixels.X, pixels.Y);
 				break;
-			case Cockpit3DScreenContent.Test:
-				IndustrialScreenDrawing.TestImage(background.Next, pixels.X, pixels.Y, screen.TestLabel ?? "");
+			case Cockpit3DScreenContent.IndustrialSpeed:
+				IndustrialScreenDrawing.SpeedBase(background.Next);
+				break;
+			case Cockpit3DScreenContent.IndustrialDamage:
+				IndustrialScreenDrawing.DamageBase(background.Next);
+				break;
+			case Cockpit3DScreenContent.IndustrialRadar:
+				IndustrialScreenDrawing.RadarBase(background.Next);
+				break;
+			case Cockpit3DScreenContent.IndustrialMap:
+				IndustrialScreenDrawing.MapBase(background.Next);
 				break;
 		}
 		background.Commit();
@@ -852,7 +958,7 @@ public partial class Cockpit3DView : CanvasLayer
 	{
 		var pixels = new Vector2I(label.Width, label.Height);
 		SubViewport viewport = NewCanvasViewport(label.Piece + "_Viewport", pixels);
-		var canvas = new RacingScreenCanvas { Name = "Label", Size = pixels, FontFamily = _layout.Font, Bold = label.Bold };
+		var canvas = new RacingScreenCanvas { Name = "Label", Size = pixels, FontFamily = _layout.LabelsFont, Bold = label.Bold };
 		MilitaryScreenDrawing.Label(canvas.Next, label);
 		canvas.Commit();
 		viewport.AddChild(canvas);
@@ -895,7 +1001,7 @@ public partial class Cockpit3DView : CanvasLayer
 	{
 		var pixels = new Vector2I(IndustrialScreenDrawing.GaugeSize, IndustrialScreenDrawing.GaugeSize);
 		SubViewport viewport = NewCanvasViewport(gauge.Piece + "_Viewport", pixels);
-		var canvas = new RacingScreenCanvas { Name = "Gauge", Size = pixels, FontFamily = _layout.Font };
+		var canvas = new RacingScreenCanvas { Name = "Gauge", Size = pixels, FontFamily = _layout.LabelsFont };
 		IndustrialScreenDrawing.GaugeFace(canvas.Next, gauge.Label, gauge.Value);
 		canvas.Commit();
 		viewport.AddChild(canvas);

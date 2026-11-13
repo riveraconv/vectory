@@ -152,15 +152,6 @@ public class CockpitRacingPaintTests
     }
 
     [Fact]
-    public void TheOtherCockpits_KeepTheirOwnLook()
-    {
-        var state = new CockpitHudState(RacingPalette.Role);
-        state.Update(Input(charges: 0), CockpitLightSettings.Default, 0.016f);
-        Assert.Equal(0.25f, state.Orb(0).Fill.W, 4);
-        Assert.Equal(0.7f, state.Orb(0).Stroke.W, 4);
-    }
-
-    [Fact]
     public void Bar_WidthTimesFraction_MarkAtTopOverMax()
     {
         var output = new List<ScreenPrimitive>();

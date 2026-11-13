@@ -109,9 +109,7 @@ public class VectorDefinitionTests
     [Fact]
     public void Cameras_MatchTheReference()
     {
-        // La cámara del mundo en cabina ya no sale de la captura: era la de la cabina 2D de Vector
-        AssertClose(Reference.Vector("cockpitEye"), CockpitFraming.For2DCockpit.Eye);
-        Assert.Equal(Reference.Number("cockpitFov"), CockpitFraming.For2DCockpit.Fov, 5);
+        // La cámara del mundo en cabina ya no sale de la captura: era la de la cabina 2D de Vector, que ya no existe
         Assert.Equal(Reference.Number("chaseHeight"), Visual.Chase.Height, 5);
         Assert.Equal(Reference.Number("chaseDistance"), Visual.Chase.Distance, 5);
         Assert.Equal(Reference.Number("chaseExtraDistance"), Visual.Chase.ExtraDistance, 5);

@@ -151,11 +151,10 @@ public class Cockpit3DBladeViewRulesTests
     public void Blade_InCockpit_Shows3D_AndHidesTheScreenHud()
     {
         bool screensShowHud = Cockpit3DLayouts.Military.ScreensShowHud;
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true, screensShowHud);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, screensShowHud);
 
         Assert.True(screensShowHud);
         Assert.True(rules.Cockpit3D);
-        Assert.False(rules.CockpitLayer);
         Assert.False(rules.ScreenDriveHud);
         Assert.False(rules.ScreenRadar);
     }
@@ -164,7 +163,7 @@ public class Cockpit3DBladeViewRulesTests
     [Fact]
     public void ScreensWithoutHud_InCockpit_KeepTheScreenHud()
     {
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true, false);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, false);
         Assert.True(rules.Cockpit3D);
         Assert.True(rules.ScreenDriveHud);
         Assert.True(rules.ScreenRadar);
@@ -173,7 +172,7 @@ public class Cockpit3DBladeViewRulesTests
     [Fact]
     public void Vector_InCockpit_StillHidesTheScreenHud()
     {
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true, Cockpit3DLayouts.Racing.ScreensShowHud);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, Cockpit3DLayouts.Racing.ScreensShowHud);
         Assert.True(rules.Cockpit3D);
         Assert.False(rules.ScreenDriveHud);
         Assert.False(rules.ScreenRadar);
@@ -182,7 +181,7 @@ public class Cockpit3DBladeViewRulesTests
     [Fact]
     public void Blade_Outside_ShowsOnlyTheScreenHud()
     {
-        CockpitViewRules rules = CockpitViewRules.For(CameraView.Chase, true, false);
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Chase, false);
         Assert.False(rules.Cockpit3D);
         Assert.True(rules.ScreenDriveHud);
         Assert.True(rules.ScreenRadar);

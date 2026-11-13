@@ -1,4 +1,5 @@
 using System.Numerics;
+using Vectory.Radar;
 
 namespace Vectory.Ship;
 
@@ -49,7 +50,20 @@ public static class IndustrialPalette
 
 	public static Vector4 Rgba(uint rgb, float alpha = 1f) => RacingPalette.Rgba(rgb, alpha);
 
-	// Los roles del estado del HUD de cabina (CockpitHudState) en este estilo (tabla 6.1). PanelDark es el apagado tenue.
+	private static Vector3 Rgb(uint rgb)
+	{
+		Vector4 c = Rgba(rgb);
+		return new Vector3(c.X, c.Y, c.Z);
+	}
+
+	// Los colores de la sección 6.4, para las clases del radar y el minimapa: anillos dim, haz y trazado main, borde y
+	// banda label, rivales y meta en sus colores
+	public static RadarPalette Radar() => new(
+		Rgb(ScreenBackground), Rgb(Label), Rgb(Dim), Rgb(Main),
+		Rgb(Rival), Rgb(Crit), Rgb(Main), Rgb(Label),
+		Rgb(Main), Rgb(Label), Rgb(Crit));
+
+	// Los roles del estado del HUD de cabina (CockpitHudState) en este estilo (tabla 6.1). Dim es el apagado tenue.
 	public static Vector4 Role(CockpitColor role) => role switch
 	{
 		CockpitColor.Cyan => Rgba(Main),
@@ -58,7 +72,7 @@ public static class IndustrialPalette
 		CockpitColor.Green => Rgba(Ok),
 		CockpitColor.Yellow => Rgba(Warn),
 		CockpitColor.Blue => Rgba(OrbOff),
-		CockpitColor.PanelDark => Rgba(Dim),
+		CockpitColor.Dim => Rgba(Dim),
 		_ => Rgba(Label)
 	};
 
@@ -70,7 +84,7 @@ public static class IndustrialPalette
 		EmptyOrbStroke = 0.9f,
 		SegmentOffColor = CockpitColor.BlueGray,
 		SegmentOffStroke = 0.6f,
-		DisabledSegmentColor = CockpitColor.PanelDark,
+		DisabledSegmentColor = CockpitColor.Dim,
 		DisabledSegmentStroke = 0.6f,
 		FullOrbColor = CockpitColor.Cyan,
 		CooldownOrbColor = CockpitColor.Orange

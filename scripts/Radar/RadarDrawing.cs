@@ -67,6 +67,7 @@ public sealed record RadarStyle
 	public Vector2 LabelOffset { get; init; }       // desde el centro: el inicio de la línea base del texto
 	public bool LabelCentered { get; init; }        // LabelOffset es el centro de la línea base, no su inicio
 	// LabelSize 0: sin rótulo de alcance (la pantalla de BLADE rotula sus anillos y el alcance por su cuenta)
+	public bool SquareEchoes { get; init; }         // ecos cuadrados (HAMMER); EchoRadius es la mitad del lado
 
 	// Estilo de la pantalla pequeña de la cabina 3D, en sus 256 px (spec docs/cabinas-3d-1-vector.md, 6.3)
 	public static RadarStyle CockpitScreen(RadarPalette palette)
@@ -138,6 +139,42 @@ public sealed record RadarStyle
 		};
 	}
 
+	// Estilo de la pantalla izquierda del bloque colgante de HAMMER, en sus 384 × 294 px: radarCore del prototipo con diag
+	// y scale 1,1 (spec docs/cabinas-3d-3-hammer.md, 6.4). Ecos cuadrados; rótulos y contactos los pinta la pantalla.
+	public static RadarStyle IndustrialScreen(RadarPalette palette)
+	{
+		const float scale = 1.1f;
+		return new RadarStyle
+		{
+			Palette = palette,
+			Center = new Vector2(192f, 158f),
+			Radius = 112f,
+			BackgroundOpacity = 0f,
+			BorderWidth = 2f,
+			BorderOpacity = 0.8f,
+			BorderGlow = 0f,
+			RingWidth = 1.5f,
+			RingOpacity = 0.7f,
+			CrossOpacity = 0.45f,
+			DiagonalOpacity = 0.25f,
+			BeamLines = 28,
+			BeamStep = 0.035f,
+			BeamWidth = 2.5f,
+			BeamOpacity = 0.38f,
+			EchoRadius = 5.5f * scale,
+			EchoCloseRadius = 7f * scale,
+			EchoGlow = 8f,
+			WarningOffset = 8f,
+			WarningWidth = 7f,
+			WarningHalfAngle = 0.42f,
+			WarningGlow = 10f,
+			SelfSize = 11f * scale,
+			SelfGlow = 8f,
+			LabelSize = 0f,
+			SquareEchoes = true
+		};
+	}
+
 	// Estilo del HUD de pantalla: radius en px de 1280×720 y scale el factor hasta los px reales. Centrado en el origen.
 	public static RadarStyle Hud(RadarPalette palette, float radius, float scale)
 	{
@@ -173,10 +210,11 @@ public sealed record RadarStyle
 	}
 }
 
-public enum RadarPrimitiveKind { Disc, Ring, Line, Arc, Arrow, Text, DownTriangle, CenteredText }
+public enum RadarPrimitiveKind { Disc, Ring, Line, Arc, Arrow, Text, DownTriangle, CenteredText, Square }
 
 // Una primitiva de dibujo, en el espacio del estilo. Color con su opacidad; Glow en px (0: sin halo).
 //   Disc y Ring: centro A y Radius (Width, el grueso del anillo)
+//   Square: relleno, centro A y medio lado Radius
 //   Line: de A a B con Width
 //   Arc: centro A, Radius, de StartAngle a EndAngle, con Width
 //   Arrow: centro A y tamaño Radius, apuntando arriba (ArrowPoints)
@@ -238,8 +276,8 @@ public static class RadarDrawing
 		{
 			RadarEcho echo = echoes[i];
 			var position = new Vector2(c.X + echo.X / range * r, c.Y - echo.Y / range * r);
-			output.Add(Disc(position, echo.IsClose ? style.EchoCloseRadius : style.EchoRadius,
-				echo.IsClose ? palette.Close : palette.Rival, sweep.EchoOpacity(in echo), style.EchoGlow));
+			output.Add(Echo(position, echo.IsClose ? style.EchoCloseRadius : style.EchoRadius,
+				echo.IsClose ? palette.Close : palette.Rival, sweep.EchoOpacity(in echo), style.EchoGlow, style.SquareEchoes));
 		}
 
 		IReadOnlyList<RadarWarning> warnings = sweep.Warnings;
@@ -268,6 +306,11 @@ public static class RadarDrawing
 
 	internal static RadarPrimitive Disc(Vector2 center, float radius, Vector3 color, float opacity, float glow)
 		=> new(RadarPrimitiveKind.Disc, center, default, radius, 0f, 0f, 0f, WithOpacity(color, opacity), glow, null);
+
+	// Un eco o una nave: disco o, en HAMMER, cuadrado de medio lado radius
+	internal static RadarPrimitive Echo(Vector2 center, float radius, Vector3 color, float opacity, float glow, bool square)
+		=> new(square ? RadarPrimitiveKind.Square : RadarPrimitiveKind.Disc, center, default, radius, 0f, 0f, 0f,
+			WithOpacity(color, opacity), glow, null);
 
 	internal static RadarPrimitive Ring(Vector2 center, float radius, float width, Vector3 color, float opacity, float glow)
 		=> new(RadarPrimitiveKind.Ring, center, default, radius, width, 0f, 0f, WithOpacity(color, opacity), glow, null);

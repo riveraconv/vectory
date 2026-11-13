@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dbsh302xub5ar"
-path="res://.godot/imported/cockpit_hammer_T_PlateDark_color.png-4e82d37cadd4cc5ebce631f5dd913fec.ctex"
+path.s3tc="res://.godot/imported/cockpit_hammer_T_PlateDark_color.png-4e82d37cadd4cc5ebce631f5dd913fec.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "8d712783747f6ea01551e52d868fbec5"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cockpits/cockpit_hammer_T_PlateDark_color.png"
-dest_files=["res://.godot/imported/cockpit_hammer_T_PlateDark_color.png-4e82d37cadd4cc5ebce631f5dd913fec.ctex"]
+dest_files=["res://.godot/imported/cockpit_hammer_T_PlateDark_color.png-4e82d37cadd4cc5ebce631f5dd913fec.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

@@ -71,6 +71,9 @@ public static class RadarPainter
 				case RadarPrimitiveKind.Disc:
 					DrawDisc(canvas, primitive);
 					break;
+				case RadarPrimitiveKind.Square:
+					DrawSquare(canvas, primitive);
+					break;
 				case RadarPrimitiveKind.Ring:
 					DrawStroke(canvas, primitive, 0f, Mathf.Tau, RingPoints);
 					break;
@@ -115,6 +118,22 @@ public static class RadarPainter
 		}
 		canvas.DrawCircle(center, primitive.Radius, color, true, -1f, true);
 	}
+
+	// Cuadrado con su halo como copias mayores y tenues, como el disco
+	private static void DrawSquare(CanvasItem canvas, in RadarPrimitive primitive)
+	{
+		Color color = ToColor(primitive.Color);
+		Vector2 center = ToGodot(primitive.A);
+		if (primitive.Glow > 0f)
+		{
+			DrawSquareAt(canvas, center, primitive.Radius + primitive.Glow * OuterHaloSize * 0.5f, Faded(color, OuterHaloOpacity));
+			DrawSquareAt(canvas, center, primitive.Radius + primitive.Glow * InnerHaloSize * 0.5f, Faded(color, InnerHaloOpacity));
+		}
+		DrawSquareAt(canvas, center, primitive.Radius, color);
+	}
+
+	private static void DrawSquareAt(CanvasItem canvas, Vector2 center, float half, Color color) =>
+		canvas.DrawRect(new Rect2(center - new Vector2(half, half), new Vector2(half * 2f, half * 2f)), color);
 
 	private static void DrawStroke(CanvasItem canvas, in RadarPrimitive primitive, float from, float to, int points)
 	{

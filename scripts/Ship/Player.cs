@@ -181,6 +181,16 @@ public partial class Player : CharacterBody3D
 	[Export] public float Cockpit3DBoostRearLight = 0.85f;
 	[Export] public float Cockpit3DDamageLight = 0.7f;
 
+	[ExportGroup("Cabina 3D: HAMMER")]   // setas del boost y balizas del larguero (spec docs/cabinas-3d-3-hammer.md, 6.5)
+	[Export] public float HammerSetaFull = IndustrialLampSettings.Default.SetaFull;
+	[Export] public float HammerSetaCooldown = IndustrialLampSettings.Default.SetaCooldown;
+	[Export] public float HammerSetaLocked = IndustrialLampSettings.Default.SetaLocked;
+	[Export] public float HammerSetaEmpty = IndustrialLampSettings.Default.SetaEmpty;
+	[Export] public float HammerBoostBeaconOn = IndustrialLampSettings.Default.BoostBeaconOn;
+	[Export] public float HammerBoostBeaconPulse = IndustrialLampSettings.Default.BoostBeaconPulse;   // ± sobre la encendida
+	[Export] public float HammerDamageBeaconOn = IndustrialLampSettings.Default.DamageBeaconOn;
+	[Export] public float HammerBeaconOff = IndustrialLampSettings.Default.BeaconOff;
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -260,7 +270,7 @@ public partial class Player : CharacterBody3D
 	public event System.Action<CameraView> ViewChanged;
 
 	// Qué se enseña en la vista actual, según la cabina de la nave que se conduce
-	public CockpitViewRules ViewRules => CockpitViewRules.For(View, _cockpit.Uses3D, _cockpit.Screens3DShowHud);
+	public CockpitViewRules ViewRules => CockpitViewRules.For(View, _cockpit.Screens3DShowHud);
 
 	// Rotación de la nave visible en el mundo (rumbo + inclinación al girar): la graba el fantasma
 	public Quaternion ShipRotation => _ship.GlobalBasis.GetRotationQuaternion();
@@ -393,7 +403,7 @@ public partial class Player : CharacterBody3D
 		_shipFlicker.SetLevel(level);
 		_cockpitFlicker.SetLevel(level);
 		_ship.ShowEdgeFlicker(_shipFlicker, FlickerOpacity);
-		_cockpit.ShowEdgeFlicker(_cockpitFlicker, FlickerOpacity);
+		_cockpit.ShowEdgeFlicker(_cockpitFlicker);
 	}
 
 	// Salida lanzada (GO! de TIME TRIAL): la nave pasa de golpe a "speed" m/s hacia donde apunta
@@ -467,7 +477,7 @@ public partial class Player : CharacterBody3D
 		_shipFlicker.SetLevel(level);
 		_cockpitFlicker.SetLevel(level);
 		_ship.ShowEdgeFlicker(_shipFlicker, FlickerOpacity);
-		_cockpit.ShowEdgeFlicker(_cockpitFlicker, FlickerOpacity);
+		_cockpit.ShowEdgeFlicker(_cockpitFlicker);
 	}
 
 	// Ignora el input de conducción (y el boost) hasta que se suelten todas sus teclas.
@@ -517,7 +527,7 @@ public partial class Player : CharacterBody3D
 		if (_shipFlicker.Update(dt))
 			_ship.ShowEdgeFlicker(_shipFlicker, FlickerOpacity);
 		if (_cockpitFlicker.Update(dt))
-			_cockpit.ShowEdgeFlicker(_cockpitFlicker, FlickerOpacity);
+			_cockpit.ShowEdgeFlicker(_cockpitFlicker);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -901,7 +911,9 @@ public partial class Player : CharacterBody3D
 			Cockpit3DLargeScreenLight, Cockpit3DSmallScreenLight, Cockpit3DGlowIntensity, Cockpit3DGlowStrength,
 			Cockpit3DGlowThreshold, Cockpit3DScreenBrightness, Cockpit3DClearcoat, Cockpit3DGlowWide,
 			Cockpit3DReflections, Cockpit3DCarbonSpecular,
-			new CockpitLightIntensities(Cockpit3DBoostFrontLight, Cockpit3DBoostRearLight, Cockpit3DDamageLight));
+			new CockpitLightIntensities(Cockpit3DBoostFrontLight, Cockpit3DBoostRearLight, Cockpit3DDamageLight),
+			new IndustrialLampSettings(HammerSetaFull, HammerSetaCooldown, HammerSetaLocked, HammerSetaEmpty,
+				HammerBoostBeaconOn, HammerBoostBeaconPulse, HammerDamageBeaconOn, HammerBeaconOff));
 	}
 
 	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos

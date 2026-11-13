@@ -20,6 +20,7 @@ public partial class RacingScreenCanvas : Control
 	private const int RingPoints = 48;
 
 	private static readonly Dictionary<(Cockpit3DFont, int, bool), Font> Fonts = new();
+	private static readonly Dictionary<(int, int), Texture2D> Vignettes = new();
 
 	private List<ScreenPrimitive> _items = new();
 	private List<ScreenPrimitive> _next = new();
@@ -84,6 +85,9 @@ public partial class RacingScreenCanvas : Control
 				case ScreenPrimitiveKind.Triangle:
 					DrawColoredPolygon(new[] { ToGodot(p.A), ToGodot(p.B), ToGodot(p.C) }, color);
 					break;
+				case ScreenPrimitiveKind.Vignette:
+					DrawTextureRect(VignetteOf(p), new Rect2(ToGodot(p.A), ToGodot(p.B)), false, color);
+					break;
 			}
 		}
 	}
@@ -113,6 +117,26 @@ public partial class RacingScreenCanvas : Control
 		DrawString(font, position, p.Text, HorizontalAlignment.Left, -1f, size, color);
 	}
 
+	// Viñeta de las pantallas CRT de HAMMER: blanca con la opacidad de IndustrialScreenDrawing.VignetteAlpha, que el color
+	// del primitivo tiñe. Se hace una vez por tamaño de pantalla: el degradado radial es circular en píxeles.
+	private static Texture2D VignetteOf(in ScreenPrimitive p)
+	{
+		int width = Mathf.Max(1, Mathf.RoundToInt(p.B.X));
+		int height = Mathf.Max(1, Mathf.RoundToInt(p.B.Y));
+		if (Vignettes.TryGetValue((width, height), out Texture2D texture))
+			return texture;
+		Image image = Image.CreateEmpty(width, height, false, Image.Format.La8);
+		float opacity = IndustrialScreenDrawing.VignetteOpacity;
+		for (int y = 0; y < height; y++)
+		{
+			for (int x = 0; x < width; x++)
+				image.SetPixel(x, y, new Color(1f, 1f, 1f, IndustrialScreenDrawing.VignetteAlpha(x + 0.5f, y + 0.5f, width, height) / opacity));
+		}
+		texture = ImageTexture.CreateFromImage(image);
+		Vignettes[(width, height)] = texture;
+		return texture;
+	}
+
 	// Una variación por espaciado entre letras, de la fuente de las pantallas de VECTOR
 	public static Font FontWith(int spacing) => FontWith(Cockpit3DFont.Rajdhani, spacing, false);
 
@@ -121,7 +145,12 @@ public partial class RacingScreenCanvas : Control
 	{
 		if (Fonts.TryGetValue((family, spacing, bold), out Font font))
 			return font;
-		Font baseFont = family == Cockpit3DFont.Mono ? MenuFonts.Mono : MenuFonts.Rajdhani;
+		Font baseFont = family switch
+		{
+			Cockpit3DFont.Mono => MenuFonts.Mono,
+			Cockpit3DFont.Vt323 => MenuFonts.Vt323,
+			_ => MenuFonts.Rajdhani
+		};
 		font = new FontVariation
 		{
 			BaseFont = baseFont ?? ThemeDB.FallbackFont,

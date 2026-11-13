@@ -138,6 +138,7 @@ public sealed record MinimapStyle
 	public float UpMarkHeight { get; init; }
 	public float UpMarkGap { get; init; }           // de la punta al borde
 	public float UpMarkOpacity { get; init; }
+	public bool SquareShips { get; init; }          // naves cuadradas (HAMMER); ShipRadius es la mitad del lado
 
 	// Estilo de la pantalla pequeña de la cabina 3D, en sus 256 px (spec docs/cabinas-3d-1-vector.md, 6.3)
 	public static MinimapStyle CockpitScreen(RadarPalette palette)
@@ -172,6 +173,19 @@ public sealed record MinimapStyle
 	{
 		Center = new Vector2(150f, 182f),
 		Radius = 128f
+	};
+
+	// Estilo de la pantalla derecha del bloque colgante de HAMMER, en sus 384 × 294 px: mapCore del prototipo, ventana en
+	// (192, 146) con radio 104, banda de 12 px y naves cuadradas de 10 px (spec docs/cabinas-3d-3-hammer.md, 6.4)
+	public static MinimapStyle IndustrialScreen(RadarPalette palette) => CockpitScreen(palette) with
+	{
+		Center = new Vector2(192f, 146f),
+		Radius = 104f,
+		BandWidth = 12f,
+		LineGlow = 6f,
+		ShipRadius = 5f,
+		ShipGlow = 6f,
+		SquareShips = true
 	};
 
 	// Estilo del HUD de pantalla: radius en px de 1280×720 y scale el factor hasta los px reales. Centrado en el origen.
@@ -270,7 +284,7 @@ public static class MinimapDrawing
 			Vector3 position = ships[i].Position;
 			Vector2 ship = projection.ToScreen(new Vector2(position.X, position.Z));
 			if (Vector2.DistanceSquared(ship, c) < clip * clip)
-				picture.Primitives.Add(RadarDrawing.Disc(ship, style.ShipRadius, palette.Rival, 1f, style.ShipGlow));
+				picture.Primitives.Add(RadarDrawing.Echo(ship, style.ShipRadius, palette.Rival, 1f, style.ShipGlow, style.SquareShips));
 		}
 
 		picture.Primitives.Add(new RadarPrimitive(RadarPrimitiveKind.Arrow, c, default, style.SelfSize, 0f, 0f, 0f,

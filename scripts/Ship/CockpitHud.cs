@@ -1,8 +1,21 @@
 using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace Vectory.Ship;
+
+// Rol de color del HUD de cabina. Cada estilo de cabina 3D lo traduce a sus colores (RacingPalette, MilitaryPalette,
+// IndustrialPalette).
+public enum CockpitColor
+{
+	Cyan,       // velocidad normal, carga lista en BLADE y HAMMER
+	Blue,       // carga vacía
+	Orange,     // por encima de la punta o con boost, carga lista en VECTOR, cooldown
+	BlueGray,   // rotulaciones, segmentos apagados
+	Green,      // daño 0
+	Yellow,     // daño 1
+	Red,        // daño 2–3, carga bloqueada
+	Dim         // apagado tenue
+}
 
 // Lo que da el juego para el HUD de cabina
 public struct CockpitHudInput
@@ -87,24 +100,10 @@ public readonly record struct CockpitHudLook
 	public float DisabledSegmentStroke { get; init; }
 	public CockpitColor FullOrbColor { get; init; }       // carga lista
 	public CockpitColor CooldownOrbColor { get; init; }   // carga en cooldown
-
-	// El de las cabinas 2D (spec docs/naves-3b-cabinas.md)
-	public static readonly CockpitHudLook Default = new()
-	{
-		EmptyOrbColor = CockpitColor.Blue,
-		EmptyOrbFill = 0.25f,
-		EmptyOrbStroke = 0.7f,
-		SegmentOffColor = null,
-		SegmentOffStroke = 0.6f,
-		DisabledSegmentColor = CockpitColor.Blue,
-		DisabledSegmentStroke = CockpitHudState.DisabledDamageBorderOpacity,
-		FullOrbColor = CockpitColor.Orange,
-		CooldownOrbColor = CockpitColor.Orange
-	};
 }
 
-// Estado del HUD de cabina y su luz (spec docs/naves-3b-cabinas.md, 4.2 y 5), común a todas las naves. Lógica pura;
-// la paleta se inyecta porque los colores viven en Palette, que depende de Godot.
+// Estado del HUD de cabina y su luz (spec docs/naves-3b-cabinas.md, 4.2 y 5), común a todas las cabinas 3D. Lógica pura;
+// la paleta y lo apagado se inyectan: son los de cada estilo.
 public sealed class CockpitHudState
 {
 	public const float HudTransitionTime = 0.25f;
@@ -118,7 +117,6 @@ public sealed class CockpitHudState
 	public const float BoostTintActive = 0.55f;
 	public const float BoostTintOverTop = 0.25f;
 	public const float ScreenGlowBase = 0.35f;      // + este mismo valor × fracción de velocidad
-	public const float DisabledDamageBorderOpacity = 0.4f;   // TIME TRIAL: borde azul tenue
 	public const float OverTopMarginKmh = 1f;       // margen del diseño para que la punta exacta no cambie el color
 
 	public const int SlotCount = 3;
@@ -134,10 +132,6 @@ public sealed class CockpitHudState
 	private readonly CockpitFade[] _segmentGlow = NewFades();
 	private readonly CockpitFade _boostTint = new(BoostTintTransitionTime);
 	private float _time;
-
-	public CockpitHudState(Func<CockpitColor, Vector4> palette) : this(palette, CockpitHudLook.Default)
-	{
-	}
 
 	public CockpitHudState(Func<CockpitColor, Vector4> palette, CockpitHudLook look)
 	{
@@ -261,274 +255,19 @@ public sealed class CockpitHudState
 	private static Vector4 WithAlpha(Vector4 color, float factor) => new(color.X, color.Y, color.Z, color.W * factor);
 }
 
-// Piezas vivas del HUD de cabina: su sitio en el diseño (designs/lib.js) y qué valor toman de CockpitHudState. Lógica pura.
-public static class CockpitHudPieces
-{
-	public static void SpeedText(this CockpitCanvas c, float x, float y, float size, CockpitTextAnchor anchor)
-	{
-		c.Text(x, y, "0", size, 0f, anchor, CockpitColor.Cyan, 1f, CockpitSlot.SpeedNumber);
-	}
-
-	public static void BoostOrbs(this CockpitCanvas c, float x, float y, float radius, float gap)
-	{
-		for (int i = 0; i < CockpitHudState.SlotCount; i++)
-		{
-			float cx = x + i * (2f * radius + gap);
-			c.Circle(cx, y, radius + 3f, null, CockpitColor.Blue, 1f, 0.5f);
-			c.Add(new CockpitElement
-			{
-				Kind = CockpitElementKind.Circle,
-				Center = new Vector2(cx, y),
-				Radii = new Vector2(radius, radius),
-				Fill = CockpitColor.Orange,
-				Stroke = CockpitColor.Orange,
-				StrokeWidth = 1.2f,
-				Slot = CockpitSlot.BoostOrb,
-				SlotIndex = i
-			});
-		}
-	}
-
-	public static void DamageSegments(this CockpitCanvas c, float x, float y, float width, float height, float gap)
-	{
-		for (int i = 0; i < CockpitHudState.SlotCount; i++)
-			c.DamageSegment(x + i * (width + gap), y, width, height, i, 1f);
-	}
-
-	public static void DamageSegment(this CockpitCanvas c, float x, float y, float width, float height, int index, float strokeWidth)
-	{
-		c.Add(new CockpitElement
-		{
-			Kind = CockpitElementKind.Rect,
-			Position = new Vector2(x, y),
-			Size = new Vector2(width, height),
-			Fill = CockpitColor.Green,
-			Stroke = CockpitColor.Green,
-			StrokeWidth = strokeWidth,
-			Slot = CockpitSlot.DamageSegment,
-			SlotIndex = index
-		});
-	}
-
-	// Dial: arco de fondo, tramo desde la punta hasta el final, arco de velocidad, 11 marcas, números y aguja.
-	// Los números se colocan según la escala de la nave; el diseño los dibuja con los 496 de Vector.
-	public static readonly int[] GaugeNumbers = { 0, 100, 200, 300, 400 };
-
-	public static void Gauge(this CockpitCanvas c, Vector2 center, float radius, float startAngle, float endAngle)
-	{
-		CockpitElement Arc(CockpitSlot slot, CockpitColor color, float opacity) => new()
-		{
-			Kind = CockpitElementKind.Arc,
-			Center = center,
-			Radii = new Vector2(radius, radius),
-			StartAngle = startAngle,
-			EndAngle = endAngle,
-			Stroke = color,
-			StrokeWidth = 6f,
-			Opacity = opacity,
-			Slot = slot
-		};
-
-		c.Add(Arc(CockpitSlot.GaugeBack, CockpitColor.Blue, 0.35f));
-		c.Add(Arc(CockpitSlot.GaugeTop, CockpitColor.Orange, 0.35f));
-		c.Add(Arc(CockpitSlot.GaugeSpeed, CockpitColor.Cyan, 1f));
-
-		var ticks = new List<Vector2>(22);
-		for (int k = 0; k <= 10; k++)
-		{
-			float a = (startAngle + (endAngle - startAngle) * k / 10f) * MathF.PI / 180f;
-			var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
-			ticks.Add(center + dir * (radius + 9f));
-			ticks.Add(center + dir * (radius + (k % 2 == 0 ? 18f : 13f)));
-		}
-		c.Add(new CockpitElement
-		{
-			Kind = CockpitElementKind.Segments,
-			Points = ticks,
-			Stroke = CockpitColor.BlueGray,
-			Opacity = 0.6f,
-			Slot = CockpitSlot.GaugeTicks
-		});
-
-		foreach (int value in GaugeNumbers)
-		{
-			var number = new CockpitElement
-			{
-				Kind = CockpitElementKind.Text,
-				Center = center,
-				Radii = new Vector2(radius, radius),
-				StartAngle = startAngle,
-				EndAngle = endAngle,
-				Text = value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-				FontSize = 8f,
-				Anchor = CockpitTextAnchor.Middle,
-				Fill = CockpitColor.BlueGray,
-				Opacity = 0.7f,
-				Slot = CockpitSlot.GaugeNumber,
-				SlotIndex = value
-			};
-			c.Add(number with { Position = GaugeNumberPosition(number, 496f) });
-		}
-
-		c.Add(new CockpitElement
-		{
-			Kind = CockpitElementKind.Segments,
-			Center = center,
-			Radii = new Vector2(radius, radius),
-			StartAngle = startAngle,
-			EndAngle = endAngle,
-			Points = NeedlePoints(center, radius, startAngle),
-			Stroke = CockpitColor.GlassReflection,
-			StrokeWidth = 2.4f,
-			Slot = CockpitSlot.GaugeNeedle
-		});
-	}
-
-	// Ángulo de la aguja (grados) con la fracción de velocidad f
-	public static float NeedleAngle(float startAngle, float endAngle, float f) => startAngle + (endAngle - startAngle) * f;
-
-	private static Vector2[] NeedlePoints(Vector2 center, float radius, float angleDegrees)
-	{
-		float a = angleDegrees * MathF.PI / 180f;
-		var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
-		return new[] { center + dir * (radius - 14f), center + dir * (radius + 6f) };
-	}
-
-	private static Vector2 GaugeNumberPosition(CockpitElement e, float maxKmh)
-	{
-		float a = (e.StartAngle + (e.EndAngle - e.StartAngle) * e.SlotIndex / maxKmh) * MathF.PI / 180f;
-		float distance = e.Radii.X + 30f;
-		return new Vector2(e.Center.X + MathF.Cos(a) * distance, e.Center.Y + MathF.Sin(a) * distance + 3f);
-	}
-
-	public static void DamageText(this CockpitCanvas c, float x, float y, CockpitTextAnchor anchor)
-	{
-		c.Text(x, y, "", 10f, 2f, anchor, CockpitColor.Green, 0.9f, CockpitSlot.DamageText);
-	}
-
-	// Barra de velocidad con marcas. La marca naranja va en la punta de la nave; el diseño la dibuja con los 396 / 496 de Vector.
-	public static void SpeedBar(this CockpitCanvas c, float x, float y, float w, float h)
-	{
-		c.Rect(x, y, w, h, CockpitColor.Blue, opacity: 0.3f);
-		c.Add(new CockpitElement
-		{
-			Kind = CockpitElementKind.Rect,
-			Position = new Vector2(x, y),
-			Size = new Vector2(w, h),
-			Fill = CockpitColor.Cyan,
-			Slot = CockpitSlot.SpeedBar
-		});
-
-		var ticks = new List<Vector2>(22);
-		for (int i = 0; i <= 10; i++)
-		{
-			float xx = x + w * i / 10f;
-			ticks.Add(new Vector2(xx, y + h + 2f));
-			ticks.Add(new Vector2(xx, y + h + (i % 5 == 0 ? 7f : 4f)));
-		}
-		c.Segments(ticks, CockpitColor.BlueGray, 1f, 0.6f);
-
-		float markX = x + w * 396f / 496f;
-		c.Add(new CockpitElement
-		{
-			Kind = CockpitElementKind.Polyline,
-			Points = new[] { new Vector2(markX, y - 3f), new Vector2(markX, y + h + 3f) },
-			Size = new Vector2(w, 0f),
-			Position = new Vector2(x, 0f),
-			Stroke = CockpitColor.Orange,
-			Opacity = 0.7f,
-			Slot = CockpitSlot.SpeedBarMark
-		});
-	}
-
-	// El elemento con los valores de ahora. Los fijos no cambian.
-	public static CockpitElement Resolve(CockpitElement e, CockpitHudState hud)
-	{
-		switch (e.Slot)
-		{
-			case CockpitSlot.ScreenGlow:
-				return e with { Opacity = hud.ScreenGlow };
-			case CockpitSlot.BoostTint:
-				return e with { Opacity = hud.BoostTint };
-			case CockpitSlot.DamageTint:
-				return e with { Opacity = hud.DamageTint };
-			case CockpitSlot.BoostOrb:
-				return Paint(e, hud.Orb(e.SlotIndex));
-			case CockpitSlot.DamageSegment:
-				return Paint(e, hud.Segment(e.SlotIndex));
-			case CockpitSlot.DamageText:
-				return e with { Text = hud.DamageText, FillRgba = hud.DamageTextColor };
-			case CockpitSlot.BoostText:
-				return e with { Text = hud.BoostText };
-			case CockpitSlot.SpeedNumber:
-				return e with { Text = hud.SpeedText, FillRgba = hud.SpeedColor, Glow = 1f };
-			case CockpitSlot.SpeedBar:
-			{
-				float width = e.Size.X * hud.SpeedFraction;
-				return e with { Size = new Vector2(width >= MinBarWidth ? width : 0f, e.Size.Y), FillRgba = hud.SpeedColor };
-			}
-			case CockpitSlot.SpeedBarMark:
-			{
-				float x = e.Position.X + e.Size.X * hud.TopFraction;
-				return e with { Points = new[] { new Vector2(x, e.Points[0].Y), new Vector2(x, e.Points[1].Y) } };
-			}
-			case CockpitSlot.GaugeTop:
-				return e with { StartAngle = e.StartAngle + (e.EndAngle - e.StartAngle) * hud.TopFraction };
-			case CockpitSlot.GaugeSpeed:
-				return e with
-				{
-					EndAngle = e.StartAngle + MathF.Max(MinSpeedArcDegrees, (e.EndAngle - e.StartAngle) * hud.SpeedFraction),
-					StrokeRgba = hud.SpeedColor,
-					Glow = 1f
-				};
-			case CockpitSlot.GaugeNumber:
-				return e with { Position = GaugeNumberPosition(e, hud.MaxKmh) };
-			case CockpitSlot.GaugeNeedle:
-				return e with { Points = NeedlePoints(e.Center, e.Radii.X, NeedleAngle(e.StartAngle, e.EndAngle, hud.SpeedFraction)) };
-			default:
-				return e;
-		}
-	}
-
-	// Por debajo no se ve, y un polígono tan fino no se puede triangular
-	private const float MinBarWidth = 0.25f;
-
-	// Se dibuja igual: lo vivo solo se redibuja si cambia algo. Sirve para ahorrar, no para decidir nada del juego.
-	public static bool SameDrawing(CockpitElement a, CockpitElement b)
-	{
-		if (a == b)
-			return true;
-		if (ReferenceEquals(a.Points, b.Points) || a.Points.Count != b.Points.Count)
-			return false;
-		for (int i = 0; i < a.Points.Count; i++)
-		{
-			if (a.Points[i] != b.Points[i])
-				return false;
-		}
-		return (a with { Points = b.Points }) == b;
-	}
-
-	private const float MinSpeedArcDegrees = 0.5f;   // como el diseño: el arco de velocidad nunca desaparece del todo
-
-	private static CockpitElement Paint(CockpitElement e, CockpitHudPaint paint) =>
-		e with { FillRgba = paint.Fill, StrokeRgba = paint.Stroke, Glow = paint.Glow };
-}
-
-// Qué se ve en cada cámara (spec docs/naves-3b-cabinas.md, 4.1, docs/cabinas-3d-1-vector.md, 4.7, y
-// docs/cabinas-3d-2-blade.md, 4.7). Posición, vuelta y tiempos se ven siempre. La cabina 3D lleva en sus pantallas
+// Qué se ve en cada cámara (spec docs/cabinas-3d-1-vector.md, 4.7, docs/cabinas-3d-2-blade.md, 4.7, y
+// docs/cabinas-3d-3-hammer.md, 4.7). Posición, vuelta y tiempos se ven siempre. La cabina 3D lleva en sus pantallas
 // velocidad, boost, daño, radar y minimapa; mientras sus pantallas son de prueba (screensShowHud en false), siguen en
 // el HUD de pantalla para poder conducir.
-public readonly record struct CockpitViewRules(bool CockpitLayer, bool Cockpit3D, bool ScreenDriveHud, bool ScreenRadar)
+public readonly record struct CockpitViewRules(bool Cockpit3D, bool ScreenDriveHud, bool ScreenRadar)
 {
-	public static CockpitViewRules For(CameraView view, bool hasCockpit3D, bool screensShowHud = true)
+	public static CockpitViewRules For(CameraView view, bool screensShowHud = true)
 	{
 		if (view != CameraView.Cockpit)
-			return new CockpitViewRules(false, false, true, true);
-		if (!hasCockpit3D)
-			return new CockpitViewRules(true, false, false, true);
+			return new CockpitViewRules(false, true, true);
 		return screensShowHud
-			? new CockpitViewRules(false, true, false, false)
-			: new CockpitViewRules(false, true, true, true);
+			? new CockpitViewRules(true, false, false)
+			: new CockpitViewRules(true, true, true);
 	}
 }
 
