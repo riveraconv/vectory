@@ -1,5 +1,5 @@
-# Regenera una cabina 3D: art/blender/run.ps1 [vector|blade] (VECTOR si no se dice)
-param([ValidateSet("vector", "blade")][string]$Cockpit = "vector")
+# Regenera una cabina 3D: art/blender/run.ps1 [vector|blade|hammer] (VECTOR si no se dice)
+param([ValidateSet("vector", "blade", "hammer")][string]$Cockpit = "vector")
 
 # Ruta de Blender en este PC, para no preguntarla otra vez
 $Blender = "F:\Programas\Blender\blender.exe"

@@ -1,0 +1,294 @@
+{
+  "blender": "5.2.3 LTS",
+  "exported": "2026-11-13",
+  "root": "CockpitHammer",
+  "environment": "cockpit_blade_env.png",
+  "pieces": [
+    {
+      "name": "Screen_Radar",
+      "width": 0.17,
+      "height": 0.13
+    },
+    {
+      "name": "Screen_Damage",
+      "width": 0.12,
+      "height": 0.12
+    },
+    {
+      "name": "Screen_Map",
+      "width": 0.17,
+      "height": 0.13
+    },
+    {
+      "name": "Screen_Speed",
+      "width": 0.4,
+      "height": 0.075
+    },
+    {
+      "name": "Screen_Radar_Shade"
+    },
+    {
+      "name": "Screen_Damage_Shade"
+    },
+    {
+      "name": "Screen_Map_Shade"
+    },
+    {
+      "name": "Screen_Speed_Shade"
+    },
+    {
+      "name": "Accent_Radar",
+      "emission": "#FFA436",
+      "intensity": 1.4
+    },
+    {
+      "name": "Accent_Damage",
+      "emission": "#FFA436",
+      "intensity": 1.4
+    },
+    {
+      "name": "Accent_Map",
+      "emission": "#FFA436",
+      "intensity": 1.4
+    },
+    {
+      "name": "Led_Nose_L",
+      "emission": "#FF9A1A",
+      "intensity": 3.0
+    },
+    {
+      "name": "Led_Nose_R",
+      "emission": "#FF9A1A",
+      "intensity": 3.0
+    },
+    {
+      "name": "Led_Canard_L",
+      "emission": "#FF9A1A",
+      "intensity": 3.0
+    },
+    {
+      "name": "Led_Canard_R",
+      "emission": "#FF9A1A",
+      "intensity": 3.0
+    },
+    {
+      "name": "Lamp_Boost_1",
+      "emission": "#FFB000",
+      "intensity": 1.7
+    },
+    {
+      "name": "Lamp_Boost_2",
+      "emission": "#FFB000",
+      "intensity": 1.7
+    },
+    {
+      "name": "Lamp_Boost_3",
+      "emission": "#FFB000",
+      "intensity": 1.7
+    },
+    {
+      "name": "Beacon_Boost_Lens",
+      "emission": "#FF9A1A",
+      "intensity": 0.05
+    },
+    {
+      "name": "Beacon_Damage_Lens",
+      "emission": "#FF2A10",
+      "intensity": 0.05
+    },
+    {
+      "name": "Plate",
+      "width": 0.13,
+      "height": 0.016
+    },
+    {
+      "name": "Label_Boost_1",
+      "width": 0.034,
+      "height": 0.01
+    },
+    {
+      "name": "Label_Boost_2",
+      "width": 0.034,
+      "height": 0.01
+    },
+    {
+      "name": "Label_Boost_3",
+      "width": 0.034,
+      "height": 0.01
+    },
+    {
+      "name": "Label_Aux",
+      "width": 0.17,
+      "height": 0.011
+    },
+    {
+      "name": "Led_Panel_1",
+      "emission": "#7CFF3A",
+      "intensity": 1.5
+    },
+    {
+      "name": "Led_Panel_2",
+      "emission": "#FFA020",
+      "intensity": 1.5
+    },
+    {
+      "name": "Led_Panel_3",
+      "emission": "#7CFF3A",
+      "intensity": 1.5
+    },
+    {
+      "name": "Led_Panel_4",
+      "emission": "#7CFF3A",
+      "intensity": 1.5
+    },
+    {
+      "name": "Led_Panel_5",
+      "emission": "#FFA020",
+      "intensity": 1.5
+    },
+    {
+      "name": "Led_Panel_6",
+      "emission": "#7CFF3A",
+      "intensity": 1.5
+    },
+    {
+      "name": "Gauge_Hyd_Face",
+      "width": 0.038,
+      "height": 0.038
+    },
+    {
+      "name": "Gauge_Temp_Face",
+      "width": 0.038,
+      "height": 0.038
+    },
+    {
+      "name": "Glass_Front"
+    },
+    {
+      "name": "Glass_Smudge"
+    },
+    {
+      "name": "Screen_Radar_Glass"
+    },
+    {
+      "name": "Screen_Damage_Glass"
+    },
+    {
+      "name": "Screen_Map_Glass"
+    },
+    {
+      "name": "Screen_Speed_Glass"
+    }
+  ],
+  "noShadow": [
+    "Led_Nose_L",
+    "Led_Nose_R",
+    "Led_Canard_L",
+    "Led_Canard_R",
+    "Plate",
+    "Beacon_Boost_Lens",
+    "Beacon_Damage_Lens",
+    "Glass_Front",
+    "Glass_Smudge",
+    "Screen_Radar",
+    "Screen_Radar_Glass",
+    "Screen_Radar_Shade",
+    "Accent_Radar",
+    "Screen_Damage",
+    "Screen_Damage_Glass",
+    "Screen_Damage_Shade",
+    "Accent_Damage",
+    "Screen_Map",
+    "Screen_Map_Glass",
+    "Screen_Map_Shade",
+    "Accent_Map",
+    "Screen_Speed",
+    "Screen_Speed_Glass",
+    "Screen_Speed_Shade",
+    "Lamp_Boost_1",
+    "Label_Boost_1",
+    "Lamp_Boost_2",
+    "Label_Boost_2",
+    "Lamp_Boost_3",
+    "Label_Boost_3",
+    "Label_Aux",
+    "Led_Panel_1",
+    "Led_Panel_2",
+    "Led_Panel_3",
+    "Led_Panel_4",
+    "Led_Panel_5",
+    "Led_Panel_6",
+    "Gauge_Hyd_Face",
+    "Gauge_Temp_Face",
+    "Nose_M_Dark_NoShadow",
+    "Nose_M_Steel_NoShadow",
+    "Canard_M_Steel_NoShadow",
+    "Dash_M_Dark_NoShadow",
+    "Dash_M_Steel_NoShadow",
+    "Side_L_M_Steel_NoShadow",
+    "Side_L_M_Dark_NoShadow",
+    "Side_R_M_Steel_NoShadow",
+    "Side_R_M_Dark_NoShadow",
+    "Frame_M_Hazard_NoShadow",
+    "Frame_M_Steel_NoShadow",
+    "Frame_M_PlateDark_NoShadow",
+    "Console_M_Steel_NoShadow",
+    "Console_M_Hazard_NoShadow",
+    "Console_M_CrtGlass_NoShadow"
+  ],
+  "lowReflectionMaterials": [
+    "M_PaintNose"
+  ],
+  "lowReflectionFactor": 0.6,
+  "reflections": [
+    {
+      "material": "M_PaintNose",
+      "factor": 0.6
+    },
+    {
+      "material": "M_CrtGlass",
+      "factor": 1.4
+    },
+    {
+      "material": "M_Glass",
+      "factor": 1.3
+    }
+  ],
+  "additiveMaterials": [
+    {
+      "material": "M_GlassSmudge",
+      "opacity": 0.06
+    }
+  ],
+  "transparentMaterials": [
+    {
+      "material": "M_ScreenShade",
+      "opacity": 0.7
+    },
+    {
+      "material": "M_CrtGlass",
+      "opacity": 0.14
+    },
+    {
+      "material": "M_Glass",
+      "opacity": 0.06
+    },
+    {
+      "material": "M_GlassSmudge",
+      "opacity": 0.06
+    }
+  ],
+  "triangles": 41030,
+  "bounds": {
+    "min": [
+      -2.512,
+      -1.132,
+      -2.97
+    ],
+    "max": [
+      2.512,
+      0.4827,
+      0.6032
+    ]
+  }
+}

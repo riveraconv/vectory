@@ -487,3 +487,42 @@ def plane(width, height):
             uvs.append((float(ix), float(1 - iy)))
     indices = [0, 2, 1, 2, 3, 1]
     return _indexed(verts, norms, uvs, indices)
+
+
+# TorusGeometry de three.js (jaulas de las balizas y abrazaderas de HAMMER), con su arco. Sin boxUV: UV 0-1
+def torus(radius, tube, radial, tubular, arc=math.pi * 2):
+    verts, norms, uvs, indices = [], [], [], []
+    for j in range(radial + 1):
+        for i in range(tubular + 1):
+            u = i / tubular * arc
+            v = j / radial * math.pi * 2
+            p = (
+                (radius + tube * math.cos(v)) * math.cos(u),
+                (radius + tube * math.cos(v)) * math.sin(u),
+                tube * math.sin(v),
+            )
+            center = (radius * math.cos(u), radius * math.sin(u), 0.0)
+            verts.append(p)
+            norms.append(_normalize(_sub(p, center)))
+            uvs.append((i / tubular, j / radial))
+    for j in range(1, radial + 1):
+        for i in range(1, tubular + 1):
+            a = (tubular + 1) * j + i - 1
+            b = (tubular + 1) * (j - 1) + i - 1
+            c = (tubular + 1) * (j - 1) + i
+            d = (tubular + 1) * j + i
+            indices += [a, b, d, b, c, d]
+    return _indexed(verts, norms, uvs, indices)
+
+
+# CircleGeometry de three.js (esferas de los relojes pequeños de HAMMER): UV 0-1 entero, normal +Z
+def circle(radius, segments):
+    verts, norms, uvs, indices = [(0.0, 0.0, 0.0)], [(0.0, 0.0, 1.0)], [(0.5, 0.5)], []
+    for s in range(segments + 1):
+        a = s / segments * math.pi * 2
+        verts.append((radius * math.cos(a), radius * math.sin(a), 0.0))
+        norms.append((0.0, 0.0, 1.0))
+        uvs.append(((math.cos(a) + 1) / 2, (math.sin(a) + 1) / 2))
+    for i in range(1, segments + 1):
+        indices += [i, i + 1, 0]
+    return _indexed(verts, norms, uvs, indices)
