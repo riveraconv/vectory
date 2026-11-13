@@ -1,14 +1,21 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 
 namespace Vectory.Ship;
 
 // HAMMER (ship_03): más aceleración abajo, giro y agarre, a cambio de punta y frenada (equilibrio en docs/naves-6-equilibrio.md). Lógica pura.
-// Casco: Vanguard_C de designs/naves-geometria.js. Cabina: BÚNKER, de designs/cabinas-hoja-martillo-def.js.
+// Casco: Vanguard_C de designs/naves-geometria.js. Cabina: 3D industrial, de designs/cabina-3d-hammer.html (el BÚNKER 2D
+// de designs/cabinas-hoja-martillo-def.js ya no se usa).
 public static class HammerShip
 {
 	private const float ChaseFactor = 0.92f;   // 6,6 m de largo frente a los 7,2 de Vector
-	private const float EyeHeightFactor = 1.4f;    // 1,40 m de alto frente al 1,0 de Vector
+	// Ojo de la cabina 3D (spec docs/cabinas-3d-3-hammer.md, 4.5): a 2,03 m de la pista (la nave vuela a 2 m; el de VECTOR,
+	// 1,45 m, × 1,40 de alto), FOV 70 y mirando 4,9° hacia abajo. La misma profundidad que VECTOR y BLADE.
+	private const float EyeY = 0.03f;
+	private const float EyeZ = -1.2f;
+	private const float CockpitFov = 70f;
+	private const float EyePitchRadians = -0.085f;
 
 	private static readonly ShipMultipliers Multipliers = new()
 	{
@@ -27,12 +34,12 @@ public static class HammerShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			BuildCockpit = HammerCockpit.Build,
-			Cockpit3D = null,
-			Cockpit = CockpitFraming.For2DCockpit with
-			{
-				Eye = CockpitFraming.For2DCockpit.Eye * new Vector3(1f, EyeHeightFactor, 1f)
-			},
+			Cockpit3D = new Cockpit3DProfile(
+				"res://assets/cockpits/cockpit_hammer.glb",
+				"res://assets/cockpits/cockpit_hammer.manifest.json",
+				"res://assets/cockpits/cockpit_blade_env.png",   // mismo buildEnv que el prototipo de BLADE
+				Cockpit3DStyle.Industrial),
+			Cockpit = new CockpitFraming(new Vector3(0f, EyeY, EyeZ), CockpitFov, EyePitchRadians * 180f / MathF.PI),
 			ChaseFactor = ChaseFactor,
 			Chase = VectorShip.Definition.Visual.Chase.Scaled(ChaseFactor),
 			CollisionHalfWidth = 2.5f,   // las puntas del canard

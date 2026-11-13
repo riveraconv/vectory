@@ -42,8 +42,6 @@ public partial class Cockpit3DView : CanvasLayer
 	private const float NearPlane = 0.02f;
 	private const float FarPlane = 30f;
 	private const float TonemapExposure = 1.05f / 0.6f;   // el ACES de three.js divide la exposición entre 0,6; el de Godot, no
-	private const float HemisphereStrength = 0.6f;
-	private const float AmbientStrength = 0.45f;
 	private const float ShadowMaxDistance = 6f;
 	private const float LampRange = 1.6f;
 	private const float LampDecay = 1.4f;
@@ -226,8 +224,8 @@ public partial class Cockpit3DView : CanvasLayer
 		_environment.BackgroundEnergyMultiplier = s.Reflections;
 		for (int level = 0; level < GlowWideLevels.Length; level++)
 			_environment.SetGlowLevel(level, GlowWideLevels[level] * s.GlowWide + GlowNarrowLevels[level]);
-		_key.LightEnergy = s.KeyEnergy;
-		_lamp.LightEnergy = s.LampEnergy;
+		_key.LightEnergy = s.KeyEnergy * _layout.Scene.KeyFactor;
+		_lamp.LightEnergy = s.LampEnergy * _layout.Scene.LampFactor;
 		_environment.AmbientLightEnergy = s.AmbientEnergy;
 		_environment.GlowIntensity = s.GlowIntensity;
 		_environment.GlowStrength = s.GlowStrength;
@@ -480,7 +478,7 @@ public partial class Cockpit3DView : CanvasLayer
 		Color sky = ToColor(scene.HemisphereSky).SrgbToLinear();
 		Color ground = ToColor(scene.HemisphereGround).SrgbToLinear();
 		Color ambient = ToColor(scene.Ambient).SrgbToLinear();
-		Color mixed = (sky + ground) * (0.5f * HemisphereStrength) + ambient * AmbientStrength;
+		Color mixed = (sky + ground) * (0.5f * scene.HemisphereStrength) + ambient * scene.AmbientStrength;
 		return new Color(mixed.R, mixed.G, mixed.B).LinearToSrgb();
 	}
 
@@ -549,7 +547,7 @@ public partial class Cockpit3DView : CanvasLayer
 		_viewport.AddChild(_key);
 		_key.LookAtFromPosition(KeySource, KeyTarget, Vector3.Up);
 
-		_lamp = NewOmni("Lamp", LampPosition, scene.KeyLight, LampRange, LampDecay);
+		_lamp = NewOmni("Lamp", LampPosition, scene.Lamp, LampRange, LampDecay);
 		_boostFront = NewOmni("BoostFront", BoostFrontPosition, scene.BoostLight, BoostFrontRange, BoostLightDecay);
 		_boostRear = NewOmni("BoostRear", BoostRearPosition, scene.BoostLight, BoostRearRange, BoostLightDecay);
 		_damageLight = NewOmni("Damage", DamageLightPosition, scene.DamageLight, DamageLightRange, DamageLightDecay);
@@ -763,10 +761,15 @@ public partial class Cockpit3DView : CanvasLayer
 					_mapBase = (RacingScreenCanvas)viewport.GetChild(0);
 					_mapOverlay = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
 					break;
+				case Cockpit3DScreenContent.Test:
+					_paintOnce.Add(viewport);
+					break;
 			}
 		}
 		foreach (Cockpit3DLabel label in _layout.Labels)
 			AddLabel(label);
+		foreach (Cockpit3DGauge gauge in _layout.GaugeFaces)
+			AddGauge(gauge);
 	}
 
 	private static RacingScreenCanvas NewLiveCanvas(SubViewport viewport, Vector2I pixels,
@@ -799,6 +802,9 @@ public partial class Cockpit3DView : CanvasLayer
 				break;
 			case Cockpit3DScreenContent.MilitaryMap:
 				MilitaryScreenDrawing.Base(background.Next, pixels.X, pixels.Y);
+				break;
+			case Cockpit3DScreenContent.Test:
+				IndustrialScreenDrawing.TestImage(background.Next, pixels.X, pixels.Y, screen.TestLabel ?? "");
 				break;
 		}
 		background.Commit();
@@ -868,15 +874,35 @@ public partial class Cockpit3DView : CanvasLayer
 			piece.MaterialOverride = material;
 			_lamps.Add((material, label, MasterLamps.Off));
 		}
-		else if (piece.GetActiveMaterial(0) is StandardMaterial3D plate)
-		{
-			// Placa: el material del modelo (rugosidad y metal), con el texto como color
-			var material = (StandardMaterial3D)plate.Duplicate();
-			material.AlbedoTexture = viewport.GetTexture();
-			material.AlbedoColor = Colors.White;
-			material.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-			piece.MaterialOverride = material;
-		}
+		else
+			PaintOnModel(piece, viewport);
+	}
+
+	// Placa y rótulos: el material del modelo (rugosidad y metal), con el lienzo como color
+	private static void PaintOnModel(MeshInstance3D piece, SubViewport viewport)
+	{
+		if (piece.GetActiveMaterial(0) is not StandardMaterial3D model)
+			return;
+		var material = (StandardMaterial3D)model.Duplicate();
+		material.AlbedoTexture = viewport.GetTexture();
+		material.AlbedoColor = Colors.White;
+		material.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+		piece.MaterialOverride = material;
+	}
+
+	// Esfera de un reloj pequeño (HAMMER): decorativa, se pinta una vez sobre el material del modelo
+	private void AddGauge(Cockpit3DGauge gauge)
+	{
+		var pixels = new Vector2I(IndustrialScreenDrawing.GaugeSize, IndustrialScreenDrawing.GaugeSize);
+		SubViewport viewport = NewCanvasViewport(gauge.Piece + "_Viewport", pixels);
+		var canvas = new RacingScreenCanvas { Name = "Gauge", Size = pixels, FontFamily = _layout.Font };
+		IndustrialScreenDrawing.GaugeFace(canvas.Next, gauge.Label, gauge.Value);
+		canvas.Commit();
+		viewport.AddChild(canvas);
+		_paintOnce.Add(viewport);
+
+		if (_pieces.TryGetValue(gauge.Piece, out MeshInstance3D piece))
+			PaintOnModel(piece, viewport);
 	}
 
 	private SubViewport NewCanvasViewport(string name, Vector2I pixels)

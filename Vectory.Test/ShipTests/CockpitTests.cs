@@ -280,17 +280,8 @@ public class CockpitCaptureTests
 
 public class CockpitProfileTests
 {
-    // BLADE lleva cabina 3D desde docs/cabinas-3d-2-blade.md: su encuadre está en Cockpit3DTests
-    [Theory]
-    [InlineData(ShipCatalog.Ship03)]
-    public void CockpitOf2DShips_PitchedDown(string id)
-    {
-        ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
-        Func<CockpitLayout> expected = HammerCockpit.Build;
-
-        Assert.Equal(expected, visual.BuildCockpit);
-        Assert.Equal(-8f, visual.Cockpit.PitchDegrees);
-    }
+    // Las tres naves llevan cabina 3D desde docs/cabinas-3d-3-hammer.md: sus encuadres están en Cockpit3D*Tests. El BÚNKER
+    // 2D se queda hasta la etapa 3 de esa spec, y sus pruebas lo construyen directamente.
 
     // Decisión del usuario: la cámara del mundo de VECTOR es la del prototipo de la cabina 3D, a 1,45 m de la pista
     [Fact]
@@ -303,19 +294,6 @@ public class CockpitProfileTests
         Assert.Equal(0f, framing.PitchDegrees);
     }
 
-    [Theory]
-    [InlineData(ShipCatalog.Ship03, 1.4f)]
-    public void Eye_ScaledByHeight_SameFovAndDepth(string id, float heightFactor)
-    {
-        CockpitFraming baseFraming = CockpitFraming.For2DCockpit;
-        CockpitFraming framing = ShipDefinitions.Find(id)!.Visual.Cockpit;
-
-        Assert.Equal(baseFraming.Eye.Y * heightFactor, framing.Eye.Y, 4);
-        Assert.Equal(baseFraming.Eye.X, framing.Eye.X);
-        Assert.Equal(baseFraming.Eye.Z, framing.Eye.Z);
-        Assert.Equal(baseFraming.Fov, framing.Fov);
-    }
-
     // El punto de fuga queda donde lo espera el diseño: y ≈ 300 de 720, con la tangente de la mitad del FOV en 360 px
     [Fact]
     public void Pitch_PutsTheVanishingPointNearY300()
@@ -326,11 +304,10 @@ public class CockpitProfileTests
         Assert.InRange(360f - rise, 298f, 302f);
     }
 
-    [Theory]
-    [InlineData(ShipCatalog.Ship03)]
-    public void Flicker_PicksValidEdges_OnlyStrokesOfTheFixedPart(string id)
+    [Fact]
+    public void Flicker_PicksValidEdges_OnlyStrokesOfTheFixedPart()
     {
-        CockpitLayout layout = ShipDefinitions.Find(id)!.Visual.BuildCockpit();
+        CockpitLayout layout = HammerCockpit.Build();
         int[] edges = layout.Elements.Where(e => e.Edge >= 0).Select(e => e.Edge).ToArray();
 
         Assert.Equal(Enumerable.Range(0, layout.EdgeCount), edges);
@@ -349,11 +326,10 @@ public class CockpitProfileTests
     }
 
     // Lo menudo no parpadea: cada arista que cambia obliga a redibujar su trozo de cabina
-    [Theory]
-    [InlineData(ShipCatalog.Ship03)]
-    public void Flicker_NotOnScrewsRivetsOrScratches(string id)
+    [Fact]
+    public void Flicker_NotOnScrewsRivetsOrScratches()
     {
-        CockpitLayout layout = ShipDefinitions.Find(id)!.Visual.BuildCockpit();
+        CockpitLayout layout = HammerCockpit.Build();
 
         Assert.DoesNotContain(layout.Elements, e => e.Edge >= 0 && e.Kind == CockpitElementKind.Circle && e.Radii.X <= 3f);
         Assert.DoesNotContain(layout.Elements, e => e.Edge >= 0 && e.Kind == CockpitElementKind.Curve);
@@ -361,11 +337,10 @@ public class CockpitProfileTests
             && e.Points.Count == 2 && Vector2.Distance(e.Points[0], e.Points[1]) < 5f);
     }
 
-    [Theory]
-    [InlineData(ShipCatalog.Ship03)]
-    public void RunPlan_KeepsTheOrder_SmallFixedRuns_OnlyLiveOrFixed(string id)
+    [Fact]
+    public void RunPlan_KeepsTheOrder_SmallFixedRuns_OnlyLiveOrFixed()
     {
-        CockpitLayout layout = ShipDefinitions.Find(id)!.Visual.BuildCockpit();
+        CockpitLayout layout = HammerCockpit.Build();
 
         List<CockpitRun> runs = CockpitRunPlan.Split(layout.Elements);
 

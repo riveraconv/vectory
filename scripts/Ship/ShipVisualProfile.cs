@@ -36,7 +36,8 @@ public readonly record struct ChaseFraming(float Height, float Distance, float E
 public enum Cockpit3DStyle
 {
 	Racing,     // VECTOR
-	Military    // BLADE
+	Military,   // BLADE
+	Industrial  // HAMMER
 }
 
 // Una cabina 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,

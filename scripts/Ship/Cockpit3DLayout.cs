@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace Vectory.Ship;
@@ -14,7 +15,8 @@ public enum Cockpit3DScreenContent
 	MilitaryCombiner,   // cristal HUD de BLADE: rumbo, velocidad, trayectoria y boost (spec docs/cabinas-3d-2-blade.md, 6.2)
 	MilitarySpeed,      // velocidad, boost y daño (6.3)
 	MilitaryRadar,      // radar grande con cinta de rumbo y contactos (6.4)
-	MilitaryMap         // minimapa con el progreso de la vuelta (6.4)
+	MilitaryMap,        // minimapa con el progreso de la vuelta (6.4)
+	Test                // imagen de prueba con su rótulo, pintada una vez (HAMMER, spec docs/cabinas-3d-3-hammer.md, 4.6)
 }
 
 // Qué piloto MASTER es un texto fijo, si lo es
@@ -41,7 +43,8 @@ public enum Cockpit3DFont
 }
 
 // Una pantalla viva: pieza del modelo, píxeles de su lienzo, contenido y luz. La luz va LightOffset m por delante de la
-// pieza, con la energía del ajuste de su grupo × LightFactor. Additive: va en suma (cristal HUD).
+// pieza, con la energía del ajuste de su grupo × LightFactor. Additive: va en suma (cristal HUD). TestLabel: el rótulo
+// de la imagen de prueba.
 public sealed record Cockpit3DScreen(
 	string Piece,
 	int Width,
@@ -50,7 +53,8 @@ public sealed record Cockpit3DScreen(
 	Cockpit3DScreenLight Light,
 	float LightFactor,
 	float LightOffset,
-	bool Additive = false);
+	bool Additive = false,
+	string TestLabel = null);
 
 // Una línea de un texto fijo: su texto y su línea base, en píxeles del lienzo
 public sealed record Cockpit3DLabelLine(string Text, float Y);
@@ -69,7 +73,14 @@ public sealed record Cockpit3DLabel(
 	uint? LampColor = null,
 	Cockpit3DLamp Lamp = Cockpit3DLamp.None);
 
-// Colores de las luces de la escena de la cabina, y cuánto pesa el tinte de daño en su luz
+// Esfera decorativa de un reloj pequeño (HAMMER, spec docs/cabinas-3d-3-hammer.md, 4.6): se pinta una vez, con la aguja
+// fija en Value (0–1)
+public sealed record Cockpit3DGauge(string Piece, string Label, float Value);
+
+// Colores de las luces de la escena de la cabina, y cuánto pesa el tinte de daño en su luz. Las intensidades de la luz
+// principal y de la lámpara son las del Inspector (las de VECTOR) × su factor, ajustado contra el prototipo de cada
+// cabina; la lámpara tiene el color de la luz principal si no lleva el suyo. Hemisferio y ambiente: sus fuerzas en el
+// prototipo.
 public sealed record Cockpit3DScene(
 	uint KeyLight,
 	uint HemisphereSky,
@@ -78,7 +89,18 @@ public sealed record Cockpit3DScene(
 	uint ScreenLight,
 	uint BoostLight,
 	uint DamageLight,
-	float DamageLightFactor);
+	float DamageLightFactor,
+	uint? LampLight = null,
+	float KeyFactor = 1f,
+	float LampFactor = 1f,
+	float HemisphereStrength = Cockpit3DScene.VectorHemisphereStrength,
+	float AmbientStrength = Cockpit3DScene.VectorAmbientStrength)
+{
+	public const float VectorHemisphereStrength = 0.6f;
+	public const float VectorAmbientStrength = 0.45f;
+
+	public uint Lamp => LampLight ?? KeyLight;
+}
 
 // Disposición viva de una cabina 3D (spec docs/cabinas-3d-2-blade.md, 5): qué piezas busca Godot por nombre, qué pinta
 // cada pantalla, qué luces titilan con daño y con qué colores se ilumina. Cockpit3DView no sabe de ninguna nave: lo lee
@@ -96,12 +118,16 @@ public sealed record Cockpit3DLayout(
 	bool ScreensShowHud,   // si las pantallas llevan velocidad, boost, daño, radar y minimapa (y el HUD de pantalla no)
 	Func<CockpitColor, Vector4> Role,   // colores del estado del HUD de cabina en este estilo
 	CockpitHudLook Look,
-	bool BrightnessFollowsGlow)   // brillo de las pantallas × (0,8 + 0,4 × brillo), como BLADE; VECTOR, fijo
+	bool BrightnessFollowsGlow,   // brillo de las pantallas × (0,8 + 0,4 × brillo), como BLADE; VECTOR, fijo
+	IReadOnlyList<Cockpit3DGauge> Gauges = null)
 {
+	public IReadOnlyList<Cockpit3DGauge> GaugeFaces => Gauges ?? Array.Empty<Cockpit3DGauge>();
+
 	public static Cockpit3DLayout For(Cockpit3DStyle style) => style switch
 	{
 		Cockpit3DStyle.Racing => Cockpit3DLayouts.Racing,
 		Cockpit3DStyle.Military => Cockpit3DLayouts.Military,
+		Cockpit3DStyle.Industrial => Cockpit3DLayouts.Industrial,
 		_ => throw new ArgumentOutOfRangeException(nameof(style))
 	};
 }
@@ -195,6 +221,74 @@ public static class Cockpit3DLayouts
 		MilitaryPalette.Look,
 		true);
 
+	// HAMMER (spec docs/cabinas-3d-3-hammer.md): etapa 2, con imágenes de prueba y el HUD de pantalla todavía visible
+	public static readonly Cockpit3DLayout Industrial = new(
+		Cockpit3DStyle.Industrial,
+		IndustrialPieces.Contract,
+		new[]
+		{
+			IndustrialScreen(IndustrialPieces.ScreenRadar, IndustrialScreenDrawing.RadarWidth, IndustrialScreenDrawing.RadarHeight,
+				0.17f, 0.13f, "RADAR"),
+			IndustrialScreen(IndustrialPieces.ScreenDamage, IndustrialScreenDrawing.DamageSize, IndustrialScreenDrawing.DamageSize,
+				0.12f, 0.12f, "HULL"),
+			IndustrialScreen(IndustrialPieces.ScreenMap, IndustrialScreenDrawing.MapWidth, IndustrialScreenDrawing.MapHeight,
+				0.17f, 0.13f, "MAP"),
+			IndustrialScreen(IndustrialPieces.ScreenSpeed, IndustrialScreenDrawing.SpeedWidth, IndustrialScreenDrawing.SpeedHeight,
+				0.40f, 0.075f, "SPD")
+		},
+		IndustrialPieces.Screens.Select(IndustrialPieces.Shade).ToArray(),
+		IndustrialPieces.FlickerLights,
+		0,
+		new[]
+		{
+			IndustrialLabel(IndustrialPieces.Plate, 0.13f, 0.016f, "HAMMER · HMR-03"),
+			IndustrialLabel(IndustrialPieces.LabelBoost(1), 0.034f, 0.010f, "BST 1"),
+			IndustrialLabel(IndustrialPieces.LabelBoost(2), 0.034f, 0.010f, "BST 2"),
+			IndustrialLabel(IndustrialPieces.LabelBoost(3), 0.034f, 0.010f, "BST 3"),
+			IndustrialLabel(IndustrialPieces.LabelAux, 0.17f, 0.011f, "E-STOP    IGN    MODE")
+		},
+		new Cockpit3DScene(IndustrialPalette.KeyLight, IndustrialPalette.HemisphereSky, IndustrialPalette.HemisphereGround,
+			IndustrialPalette.Ambient, IndustrialPalette.ScreenLight, IndustrialPalette.BoostLight, IndustrialPalette.DamageLight,
+			1.2f, IndustrialPalette.LampLight, IndustrialKeyFactor, IndustrialLampFactor, 0.55f, 0.5f),
+		Cockpit3DFont.Mono,
+		false,
+		IndustrialPalette.Role,
+		IndustrialPalette.Look,
+		true,
+		new[]
+		{
+			new Cockpit3DGauge(IndustrialPieces.GaugeHydFace, "HYD", 0.62f),
+			new Cockpit3DGauge(IndustrialPieces.GaugeTempFace, "TEMP", 0.38f)
+		});
+
+	// Luz principal y lámpara de HAMMER sobre las del Inspector (las de VECTOR), ajustadas midiendo zonas de la cabina
+	// contra el prototipo. Sus proporciones en los prototipos (2,2 / 2,6 y 0,9 / 0,08) dejaban la cabina mucho más clara:
+	// la lámpara, × 11 tal cual, sobre todo en el salpicadero.
+	public const float IndustrialKeyFactor = 0.5f;
+	public const float IndustrialLampFactor = 3f;
+
+	// Textos fijos de HAMMER, como labelPlane del prototipo: lienzo de 256 px de ancho y alto max(16, redondeo(256 × alto /
+	// ancho)), letra del 62 % del alto, centrada. La línea base es la de BLADE: el centro + 1 + 0,3 × la letra.
+	private const int LabelCanvasWidth = 256;
+	private const int LabelMinHeight = 16;
+	private const float LabelFontFraction = 0.62f;
+	private const float LabelBaselineFraction = 0.3f;
+
+	public static Cockpit3DLabel IndustrialLabel(string piece, float widthM, float heightM, string text)
+	{
+		int height = Math.Max(LabelMinHeight, JsRound(LabelCanvasWidth * heightM / widthM));
+		float font = JsRound(height * LabelFontFraction);
+		return new Cockpit3DLabel(piece, LabelCanvasWidth, height, IndustrialPalette.LabelBackground, IndustrialPalette.LabelText,
+			font, false, new[] { new Cockpit3DLabelLine(text, height / 2f + 1f + LabelBaselineFraction * font) });
+	}
+
+	// Math.round de JavaScript: la mitad hacia arriba
+	private static int JsRound(float x) => (int)MathF.Floor(x + 0.5f);
+
+	private static Cockpit3DScreen IndustrialScreen(string piece, int width, int height, float widthM, float heightM, string label) =>
+		new(piece, width, height, Cockpit3DScreenContent.Test, Cockpit3DScreenLight.Large, MilitaryLightFactor(widthM, heightM),
+			ScreenLightDistance - MilitarySurfaceOffset, TestLabel: label);
+
 	// Factor de la luz de una pantalla de BLADE sobre el ajuste LargeScreenLight
 	public static float MilitaryLightFactor(float width, float height) =>
 		MilitaryScreenLight * width * height / MilitaryScreenArea / RacingLargeScreenLight;
@@ -256,6 +350,70 @@ public static class MilitaryPieces
 		names.AddRange(VisorLeds);
 		names.AddRange(Leds);
 		names.AddRange(new[] { LampCaution, LampWarning, Plate, CombinerPlate, GlassCanopy, GlassSmudge });
+		return names;
+	}
+}
+
+// Nombres de las piezas de la cabina 3D de HAMMER: el contrato con el script de Blender
+// (spec docs/cabinas-3d-3-hammer.md, 3.7). Godot las busca así.
+public static class IndustrialPieces
+{
+	public const string ScreenRadar = "Screen_Radar";
+	public const string ScreenDamage = "Screen_Damage";
+	public const string ScreenMap = "Screen_Map";
+	public const string ScreenSpeed = "Screen_Speed";
+	public const string BeaconBoost = "Beacon_Boost_Lens";
+	public const string BeaconDamage = "Beacon_Damage_Lens";
+	public const string Plate = "Plate";
+	public const string LabelAux = "Label_Aux";
+	public const string GaugeHydFace = "Gauge_Hyd_Face";
+	public const string GaugeTempFace = "Gauge_Temp_Face";
+	public const string GlassFront = "Glass_Front";
+	public const string GlassSmudge = "Glass_Smudge";
+	public const int BoostLamps = 3;
+	public const int PanelLeds = 6;
+
+	public static readonly string[] Screens = { ScreenRadar, ScreenDamage, ScreenMap, ScreenSpeed };
+	public static readonly string[] Accents = { "Accent_Radar", "Accent_Damage", "Accent_Map" };
+	public static readonly string[] NavLeds = { "Led_Nose_L", "Led_Nose_R", "Led_Canard_L", "Led_Canard_R" };
+
+	public static string Shade(string screen) => screen + "_Shade";
+	public static string Glass(string screen) => screen + "_Glass";
+	public static string BoostLamp(int i) => $"Lamp_Boost_{i}";      // 1–3, de izquierda a derecha
+	public static string LabelBoost(int i) => $"Label_Boost_{i}";
+	public static string PanelLed(int i) => $"Led_Panel_{i}";        // 1–6, de izquierda a derecha
+
+	// Las luces que titilan con daño (spec, 6.6): acentos y LEDs; ni las pantallas, ni las setas, ni las balizas
+	public static readonly IReadOnlyList<string> FlickerLights = BuildFlickerLights();
+
+	public static readonly IReadOnlyList<string> Contract = BuildContract();
+
+	private static IReadOnlyList<string> BuildFlickerLights()
+	{
+		var names = new List<string>(Accents);
+		names.AddRange(NavLeds);
+		for (int i = 1; i <= PanelLeds; i++)
+			names.Add(PanelLed(i));
+		return names;
+	}
+
+	// En el orden de la tabla 3.7
+	private static IReadOnlyList<string> BuildContract()
+	{
+		var names = new List<string>(Screens);
+		names.AddRange(Screens.Select(Shade));
+		names.AddRange(Accents);
+		names.AddRange(NavLeds);
+		for (int i = 1; i <= BoostLamps; i++)
+			names.Add(BoostLamp(i));
+		names.AddRange(new[] { BeaconBoost, BeaconDamage, Plate });
+		for (int i = 1; i <= BoostLamps; i++)
+			names.Add(LabelBoost(i));
+		names.Add(LabelAux);
+		for (int i = 1; i <= PanelLeds; i++)
+			names.Add(PanelLed(i));
+		names.AddRange(new[] { GaugeHydFace, GaugeTempFace, GlassFront, GlassSmudge });
+		names.AddRange(Screens.Select(Glass));
 		return names;
 	}
 }

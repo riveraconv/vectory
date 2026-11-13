@@ -106,15 +106,7 @@ public class Cockpit3DProfileTests
         Assert.Null(ShipDefinitions.Find(ShipCatalog.Ship01)!.Visual.BuildCockpit);
     }
 
-    // BLADE lleva la cabina 3D militar: Cockpit3DBladeTests
-
-    [Fact]
-    public void Hammer_KeepsTheBunker2D()
-    {
-        ShipVisualProfile visual = ShipDefinitions.Find(ShipCatalog.Ship03)!.Visual;
-        Assert.Null(visual.Cockpit3D);
-        Assert.Equal<Func<CockpitLayout>>(HammerCockpit.Build, visual.BuildCockpit);
-    }
+    // BLADE lleva la cabina 3D militar (Cockpit3DBladeTests) y HAMMER la industrial (Cockpit3DHammerTests)
 }
 
 public class Cockpit3DViewRulesTests

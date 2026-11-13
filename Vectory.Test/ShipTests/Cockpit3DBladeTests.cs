@@ -142,15 +142,6 @@ public class Cockpit3DBladeProfileTests
         Assert.Equal(0f, visual.Cockpit.PitchDegrees);
         Assert.Equal(1.45f, visual.Cockpit.Eye.Y + ShipHover, 4);
     }
-
-    [Fact]
-    public void Hammer_StaysBunker2D_WithItsPitch()
-    {
-        ShipVisualProfile visual = ShipDefinitions.Find(ShipCatalog.Ship03)!.Visual;
-        Assert.Null(visual.Cockpit3D);
-        Assert.Equal<Func<CockpitLayout>>(HammerCockpit.Build, visual.BuildCockpit);
-        Assert.Equal(-8f, visual.Cockpit.PitchDegrees);
-    }
 }
 
 public class Cockpit3DBladeViewRulesTests
