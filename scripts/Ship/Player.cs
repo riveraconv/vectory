@@ -268,6 +268,19 @@ public partial class Player : CharacterBody3D
 	// Hacia dónde apunta el morro, en planta (X, Z del mundo): el frente del radar y el minimapa
 	public System.Numerics.Vector2 PlanForward => Dynamics.Forward;
 
+	// Distancia sobre el eje de la pista desde la meta (m), la de la superficie bajo la nave
+	public float TrackDistance => _physics.HasSurface ? _physics.Surface.Frame.Distance : 0f;
+
+	// Vuelta para las pantallas de la cabina: el texto del HUD y lo recorrido (0–1). Los pone Main.
+	private string _cockpitLapText = "";
+	private float _cockpitLapFraction;
+
+	public void SetCockpitLap(string text, float fraction)
+	{
+		_cockpitLapText = text;
+		_cockpitLapFraction = fraction;
+	}
+
 	public override void _Ready()
 	{
 		MotionMode = MotionModeEnum.Floating;
@@ -658,7 +671,11 @@ public partial class Player : CharacterBody3D
 			Charges = BoostCharges,
 			Cooldown = BoostCooldownActive,
 			DamageLevel = _damageLevel,
-			DamageEnabled = CockpitDamageEnabled
+			DamageEnabled = CockpitDamageEnabled,
+			HeadingDegrees = CockpitInstruments.HeadingDegrees(PlanForward),
+			Turn = -Dynamics.Steer,   // la dinámica gira positivo a la izquierda; la pantalla, a la derecha
+			LapText = _cockpitLapText,
+			LapFraction = _cockpitLapFraction
 		};
 	}
 

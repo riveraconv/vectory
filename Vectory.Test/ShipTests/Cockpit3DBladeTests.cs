@@ -155,16 +155,26 @@ public class Cockpit3DBladeProfileTests
 
 public class Cockpit3DBladeViewRulesTests
 {
-    // Etapa 2: con las pantallas de prueba, BLADE en cabina enseña la cabina 3D y también el HUD de pantalla
+    // Etapa 3: las pantallas llevan velocidad, boost, daño, radar y minimapa, y el HUD de pantalla ya no sale en cabina
     [Fact]
-    public void Blade_InCockpit_Shows3D_AndKeepsTheScreenHudWhileScreensAreTests()
+    public void Blade_InCockpit_Shows3D_AndHidesTheScreenHud()
     {
         bool screensShowHud = Cockpit3DLayouts.Military.ScreensShowHud;
         CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true, screensShowHud);
 
-        Assert.False(screensShowHud);
+        Assert.True(screensShowHud);
         Assert.True(rules.Cockpit3D);
         Assert.False(rules.CockpitLayer);
+        Assert.False(rules.ScreenDriveHud);
+        Assert.False(rules.ScreenRadar);
+    }
+
+    // La regla de las pantallas de prueba sigue en el código para la próxima cabina 3D
+    [Fact]
+    public void ScreensWithoutHud_InCockpit_KeepTheScreenHud()
+    {
+        CockpitViewRules rules = CockpitViewRules.For(CameraView.Cockpit, true, false);
+        Assert.True(rules.Cockpit3D);
         Assert.True(rules.ScreenDriveHud);
         Assert.True(rules.ScreenRadar);
     }
@@ -258,8 +268,13 @@ public class Cockpit3DLayoutTests
         Assert.Equal((300, 400), (screens[1].Width, screens[1].Height));
         Assert.Equal((512, 420), (screens[2].Width, screens[2].Height));
         Assert.Equal((300, 400), (screens[3].Width, screens[3].Height));
-        Assert.All(screens, s => Assert.Equal(Cockpit3DScreenContent.Test, s.Content));
-        Assert.Equal(new[] { "HUD", "SPD", "RADAR", "MAP" }, screens.Select(s => s.TestLabel));
+        Assert.Equal(new[]
+        {
+            Cockpit3DScreenContent.MilitaryCombiner, Cockpit3DScreenContent.MilitarySpeed,
+            Cockpit3DScreenContent.MilitaryRadar, Cockpit3DScreenContent.MilitaryMap
+        }, screens.Select(s => s.Content));
+        Assert.True(Cockpit3DLayouts.Military.BrightnessFollowsGlow);
+        Assert.False(Cockpit3DLayouts.Racing.BrightnessFollowsGlow);
     }
 
     [Fact]
@@ -346,32 +361,16 @@ public class Cockpit3DLayoutTests
 public class MilitaryScreenDrawingTests
 {
     [Fact]
-    public void TestImage_HasBackground_ScanLines_Corners_AndItsLabel()
+    public void Base_HasBackground_ScanLines_AndCorners()
     {
         var output = new List<ScreenPrimitive>();
-        MilitaryScreenDrawing.TestImage(output, 300, 400, "SPD", false);
+        MilitaryScreenDrawing.Base(output, 300, 400);
 
         ScreenPrimitive background = output[0];
         Assert.Equal(MilitaryPalette.Rgba(MilitaryPalette.ScreenBackground), background.Color);
         Assert.Equal(new Vector2(300f, 400f), background.B);
         Assert.Equal(134, output.Count(p => p.Kind == ScreenPrimitiveKind.FillRect && p.B.Y == 1f));   // una cada 3 px
         Assert.Equal(8, output.Count(p => p.Kind == ScreenPrimitiveKind.Line));                        // 4 esquinas
-        ScreenPrimitive label = output.Single(p => p.Kind == ScreenPrimitiveKind.Text);
-        Assert.Equal("SPD", label.Text);
-        Assert.Equal(ScreenTextAlign.Center, label.Align);
-        Assert.Equal(150f, label.A.X);
-    }
-
-    // El cristal HUD va en suma: sin fondo (un negro opaco taparía el mundo) y sin barrido
-    [Fact]
-    public void TestImage_OfTheHudGlass_HasNoBackgroundNorScanLines()
-    {
-        var output = new List<ScreenPrimitive>();
-        MilitaryScreenDrawing.TestImage(output, 512, 302, "HUD", true);
-
-        Assert.Equal(0, output.Count(p => p.Kind == ScreenPrimitiveKind.FillRect));
-        Assert.Equal(8, output.Count(p => p.Kind == ScreenPrimitiveKind.Line));
-        Assert.Equal(MilitaryPalette.Rgba(MilitaryPalette.Main), output.Single(p => p.Kind == ScreenPrimitiveKind.Text).Color);
     }
 
     [Fact]

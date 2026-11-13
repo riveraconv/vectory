@@ -15,14 +15,10 @@ public class CockpitCaptureTests
     private const float PointTolerance = 0.06f;
     private const float ValueTolerance = 0.001f;
 
-    private static CockpitLayout Build(string name) => name switch
-    {
-        "blade" => BladeCockpit.Build(),
-        _ => HammerCockpit.Build()
-    };
+    // La Burbuja 2D de BLADE se quitó con su cabina 3D (docs/cabinas-3d-2-blade.md, 6.8): queda el Búnker de HAMMER
+    private static CockpitLayout Build(string name) => HammerCockpit.Build();
 
     [Theory]
-    [InlineData("blade")]
     [InlineData("hammer")]
     public void Cockpit_MatchesTheCapture_ElementByElement(string name)
     {
@@ -36,7 +32,6 @@ public class CockpitCaptureTests
     }
 
     [Theory]
-    [InlineData("blade")]
     [InlineData("hammer")]
     public void Gradients_MatchTheDesign(string name)
     {
@@ -287,11 +282,11 @@ public class CockpitProfileTests
 {
     // BLADE lleva cabina 3D desde docs/cabinas-3d-2-blade.md: su encuadre está en Cockpit3DTests
     [Theory]
-    [InlineData(ShipCatalog.Ship03, "hammer")]
-    public void CockpitOf2DShips_PitchedDown(string id, string cockpit)
+    [InlineData(ShipCatalog.Ship03)]
+    public void CockpitOf2DShips_PitchedDown(string id)
     {
         ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
-        Func<CockpitLayout> expected = cockpit == "blade" ? BladeCockpit.Build : HammerCockpit.Build;
+        Func<CockpitLayout> expected = HammerCockpit.Build;
 
         Assert.Equal(expected, visual.BuildCockpit);
         Assert.Equal(-8f, visual.Cockpit.PitchDegrees);
@@ -332,7 +327,6 @@ public class CockpitProfileTests
     }
 
     [Theory]
-    [InlineData(ShipCatalog.Ship02)]
     [InlineData(ShipCatalog.Ship03)]
     public void Flicker_PicksValidEdges_OnlyStrokesOfTheFixedPart(string id)
     {
@@ -356,7 +350,6 @@ public class CockpitProfileTests
 
     // Lo menudo no parpadea: cada arista que cambia obliga a redibujar su trozo de cabina
     [Theory]
-    [InlineData(ShipCatalog.Ship02)]
     [InlineData(ShipCatalog.Ship03)]
     public void Flicker_NotOnScrewsRivetsOrScratches(string id)
     {
@@ -369,7 +362,6 @@ public class CockpitProfileTests
     }
 
     [Theory]
-    [InlineData(ShipCatalog.Ship02)]
     [InlineData(ShipCatalog.Ship03)]
     public void RunPlan_KeepsTheOrder_SmallFixedRuns_OnlyLiveOrFixed(string id)
     {
@@ -604,11 +596,19 @@ public class CockpitHudStateTests
         Assert.Equal(0.45f, state.DamageTint, 3);
     }
 
+    // La barra de la Burbuja (510, 694, 260 × 2), pieza común de las cabinas 2D aunque hoy no la use ninguna
+    private static IReadOnlyList<CockpitElement> SpeedBarElements()
+    {
+        var canvas = new CockpitCanvas();
+        canvas.SpeedBar(510f, 694f, 260f, 2f);
+        return canvas.Finish().Elements;
+    }
+
     [Fact]
     public void SpeedBar_WidthTimesFraction_MarkOnTheTopOfTheShip()
     {
-        CockpitElement bar = BladeCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
-        CockpitElement mark = BladeCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBarMark);
+        CockpitElement bar = SpeedBarElements().Single(e => e.Slot == CockpitSlot.SpeedBar);
+        CockpitElement mark = SpeedBarElements().Single(e => e.Slot == CockpitSlot.SpeedBarMark);
         CockpitHudInput other = Input(264f);
         other.TopKmh = 428f;
         other.MaxKmh = 528f;
@@ -618,11 +618,10 @@ public class CockpitHudStateTests
         Assert.Equal(510f + 260f * 428f / 528f, CockpitHudPieces.Resolve(mark, state).Points[0].X, 3);
     }
 
-    // En el lienzo no se rellena por un fallo del archivo: en el juego, con la misma regla que la de Vector
     [Fact]
-    public void SpeedBar_OfBlade_WidthTimesFraction()
+    public void SpeedBar_WidthTimesFraction()
     {
-        CockpitElement bar = BladeCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
+        CockpitElement bar = SpeedBarElements().Single(e => e.Slot == CockpitSlot.SpeedBar);
 
         Assert.Equal(130f, CockpitHudPieces.Resolve(bar, State(Input(248f))).Size.X, 3);
     }
@@ -692,7 +691,7 @@ public class CockpitHudStateTests
     [InlineData(0.0001f, 0f)]
     public void SpeedBar_AlmostEmpty_IsNotDrawn(float speed, float width)
     {
-        CockpitElement bar = BladeCockpit.Build().Elements.Single(e => e.Slot == CockpitSlot.SpeedBar);
+        CockpitElement bar = SpeedBarElements().Single(e => e.Slot == CockpitSlot.SpeedBar);
 
         Assert.Equal(width, CockpitHudPieces.Resolve(bar, State(Input(speed))).Size.X);
     }
@@ -714,7 +713,7 @@ public class CockpitHudStateTests
     [Fact]
     public void Resolve_FixedElementsDoNotChange()
     {
-        CockpitElement element = BladeCockpit.Build().Elements.First(e => !e.IsLive);
+        CockpitElement element = HammerCockpit.Build().Elements.First(e => !e.IsLive);
 
         Assert.Same(element, CockpitHudPieces.Resolve(element, State(Input())));
     }

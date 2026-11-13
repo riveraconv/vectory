@@ -79,9 +79,9 @@ public partial class Cockpit3DView : CanvasLayer
 	private StandardMaterial3D[] _flickerMaterials = System.Array.Empty<StandardMaterial3D>();
 	private float[] _flickerBase = System.Array.Empty<float>();
 	private bool[] _flickerDimmed = System.Array.Empty<bool>();
-	// Da los valores de luz, brillo y tinte, que no dependen del estilo, y el pintado de carreras. El militar llega en la
-	// etapa 3 de su spec.
-	private readonly CockpitHudState _hud = new(RacingPalette.Role, RacingPalette.Look);
+	// Estado del HUD de cabina con los colores del estilo de la cabina (se rehace en Setup)
+	private CockpitHudState _hud = new(RacingPalette.Role, RacingPalette.Look);
+	private readonly List<(StandardMaterial3D Material, Cockpit3DLabel Label, float Factor)> _lamps = new();
 	private readonly CockpitLightMix _lightMix = new();
 	private readonly List<(StandardMaterial3D Material, float Coat)> _coated = new();
 	private readonly List<StandardMaterial3D> _carbon = new();
@@ -110,6 +110,19 @@ public partial class Cockpit3DView : CanvasLayer
 	private RacingScreenCanvas _right;
 	private RadarView _radar;
 	private MinimapView _minimap;
+	private Cockpit3DScreenContent _radarContent;
+	private Cockpit3DScreenContent _mapContent;
+
+	// Pantallas de BLADE: cristal HUD y velocidad, que se pintan si cambian; radar y mapa, con su parte viva encima
+	private SubViewport _combinerViewport;
+	private SubViewport _speedViewport;
+	private RacingScreenCanvas _combiner;
+	private RacingScreenCanvas _speed;
+	private RacingScreenCanvas _radarOverlay;
+	private RacingScreenCanvas _mapBase;
+	private RacingScreenCanvas _mapOverlay;
+	private RadarSweep _sweep;
+	private CockpitHudInput _input;
 
 	private float _time;
 	private bool _shown;
@@ -131,6 +144,7 @@ public partial class Cockpit3DView : CanvasLayer
 		_layout = profile.Layout;
 		_settings = settings;
 		_pitch = pitchRadians;
+		_hud = new CockpitHudState(_layout.Role, _layout.Look);
 
 		int shift = _layout.ShiftLightCount;
 		_shiftMaterials = new StandardMaterial3D[shift];
@@ -229,13 +243,25 @@ public partial class Cockpit3DView : CanvasLayer
 		if (!_built || _radar != null || _radarViewport == null || _mapViewport == null)
 			return;
 
+		_sweep = sweep;
+		bool military = _radarContent == Cockpit3DScreenContent.MilitaryRadar;
 		_radar = new RadarView { Name = "Radar" };
-		_radar.Setup(sweep, RadarStyle.CockpitScreen(RacingPalette.Radar()), RacingScreenCanvas.FontWith(2));
+		_radar.Setup(sweep, military ? RadarStyle.MilitaryScreen(MilitaryPalette.Radar()) : RadarStyle.CockpitScreen(RacingPalette.Radar()),
+			RacingScreenCanvas.FontWith(2));
 		_radarViewport.AddChild(_radar);
+		_radarViewport.MoveChild(_radar, 1);   // encima de la parte fija y debajo de lo vivo de la pantalla
 
+		bool militaryMap = _mapContent == Cockpit3DScreenContent.MilitaryMap;
 		_minimap = new MinimapView { Name = "Minimap" };
-		_minimap.Setup(path, MinimapStyle.CockpitScreen(RacingPalette.Radar()), windowRadius, ships);
+		_minimap.Setup(path, militaryMap ? MinimapStyle.MilitaryScreen(MilitaryPalette.Radar()) : MinimapStyle.CockpitScreen(RacingPalette.Radar()),
+			windowRadius, ships);
 		_mapViewport.AddChild(_minimap);
+		_mapViewport.MoveChild(_minimap, 1);
+		if (_mapBase != null)
+		{
+			MilitaryScreenDrawing.MapBase(_mapBase.Next, windowRadius);
+			_mapBase.Commit();
+		}
 
 		_radar.Visible = _shown;
 		_minimap.Visible = _shown;
@@ -255,11 +281,68 @@ public partial class Cockpit3DView : CanvasLayer
 		if (!_built)
 			return;
 
+		_input = input;
 		UpdateShiftLights(input);
 		UpdateLights(light);
 		UpdateTints(light);
+		UpdateLamps();
 		if (_shown && _leftViewport != null && _rightViewport != null)
 			UpdateLargeScreens();
+		if (_shown)
+			UpdateMilitaryScreens();
+	}
+
+	// Cristal HUD y velocidad: solo se pintan si cambia lo que enseñan. Lo vivo del radar y del mapa, cada frame, como
+	// sus pantallas.
+	private void UpdateMilitaryScreens()
+	{
+		if (_combiner != null)
+		{
+			MilitaryScreenDrawing.Combiner(_combiner.Next, _hud,
+				new CombinerInput(_input.SpeedKmh, _input.TopKmh, _input.HeadingDegrees, _input.Turn));
+			if (_combiner.Commit() || _screensDirty)
+				_combinerViewport.RenderTargetUpdateMode = SubViewport.UpdateMode.Once;
+		}
+		if (_speed != null)
+		{
+			MilitaryScreenDrawing.Speed(_speed.Next, _hud);
+			if (_speed.Commit() || _screensDirty)
+				_speedViewport.RenderTargetUpdateMode = SubViewport.UpdateMode.Once;
+		}
+		if (_radarOverlay != null && _sweep != null)
+		{
+			MilitaryScreenDrawing.RadarLive(_radarOverlay.Next, _input.HeadingDegrees, _sweep.TargetCount, _sweep.NearestDistance,
+				_sweep.NearestIsClose);
+			_radarOverlay.Commit();
+		}
+		if (_mapOverlay != null)
+		{
+			MilitaryScreenDrawing.MapLive(_mapOverlay.Next, _input.LapText, _input.LapFraction);
+			_mapOverlay.Commit();
+		}
+		if (_combiner != null || _speed != null)
+			_screensDirty = false;
+	}
+
+	// Pilotos MASTER: encendidos o apagados según el daño; WARN parpadea con el daño. Con la pausa no se llama.
+	private void UpdateLamps()
+	{
+		for (int i = 0; i < _lamps.Count; i++)
+		{
+			(StandardMaterial3D material, Cockpit3DLabel label, float shown) = _lamps[i];
+			float factor = MasterLamps.For(label.Lamp, _hud.DamageLevel, _hud.DamageEnabled, _hud.BlinkOn);
+			if (factor == shown)
+				continue;
+			material.AlbedoColor = LampColor(label.LampColor ?? 0xFFFFFF, factor);
+			_lamps[i] = (material, label, factor);
+		}
+	}
+
+	// El color del piloto (lineal) × su factor, que puede pasar de 1 para que brille
+	private static Color LampColor(uint rgb, float factor)
+	{
+		Color c = ToColor(rgb).SrgbToLinear() * factor;
+		return new Color(c.R, c.G, c.B).LinearToSrgb();
 	}
 
 	// Daños: las luces apagadas del parpadeo bajan al 20 %. Las shift lights y las pantallas no titilan.
@@ -297,6 +380,14 @@ public partial class Cockpit3DView : CanvasLayer
 		{
 			float energy = group == Cockpit3DScreenLight.Large ? _settings.LargeScreenLightEnergy : _settings.SmallScreenLightEnergy;
 			l.LightEnergy = glow * energy * factor;
+		}
+
+		// BLADE: el brillo de las pantallas sube con la velocidad, × (0,8 + 0,4 × brillo)
+		if (_layout.BrightnessFollowsGlow)
+		{
+			Color tint = ScreenTint(_settings.ScreenBrightness * (0.8f + 0.4f * glow));
+			foreach (StandardMaterial3D material in _screenMaterials)
+				material.AlbedoColor = tint;
 		}
 
 		CockpitLightValues values = _lightMix.Values(_hud.DamageTint, _settings.Lights, _layout.Scene.DamageLightFactor);
@@ -647,12 +738,30 @@ public partial class Cockpit3DView : CanvasLayer
 					break;
 				case Cockpit3DScreenContent.Radar:
 					_radarViewport = viewport;
+					_radarContent = screen.Content;
 					break;
 				case Cockpit3DScreenContent.Minimap:
 					_mapViewport = viewport;
+					_mapContent = screen.Content;
 					break;
-				case Cockpit3DScreenContent.Test:
-					_paintOnce.Add(viewport);
+				case Cockpit3DScreenContent.MilitaryCombiner:
+					_combinerViewport = viewport;
+					_combiner = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
+					break;
+				case Cockpit3DScreenContent.MilitarySpeed:
+					_speedViewport = viewport;
+					_speed = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
+					break;
+				case Cockpit3DScreenContent.MilitaryRadar:
+					_radarViewport = viewport;
+					_radarContent = screen.Content;
+					_radarOverlay = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
+					break;
+				case Cockpit3DScreenContent.MilitaryMap:
+					_mapViewport = viewport;
+					_mapContent = screen.Content;
+					_mapBase = (RacingScreenCanvas)viewport.GetChild(0);
+					_mapOverlay = NewLiveCanvas(viewport, new Vector2I(screen.Width, screen.Height), _layout.Font);
 					break;
 			}
 		}
@@ -660,9 +769,10 @@ public partial class Cockpit3DView : CanvasLayer
 			AddLabel(label);
 	}
 
-	private static RacingScreenCanvas NewLiveCanvas(SubViewport viewport, Vector2I pixels)
+	private static RacingScreenCanvas NewLiveCanvas(SubViewport viewport, Vector2I pixels,
+		Cockpit3DFont font = Cockpit3DFont.Rajdhani)
 	{
-		var canvas = new RacingScreenCanvas { Name = "Live", Size = pixels };
+		var canvas = new RacingScreenCanvas { Name = "Live", Size = pixels, FontFamily = font };
 		viewport.AddChild(canvas);
 		return canvas;
 	}
@@ -674,12 +784,23 @@ public partial class Cockpit3DView : CanvasLayer
 		// En suma, lo que no se pinta no debe tapar nada: fondo transparente
 		screenViewport.TransparentBg = screen.Additive;
 
-		// La parte fija (o la imagen de prueba entera): se pinta una vez
+		// La parte fija: se pinta una vez. El cristal HUD y la pantalla de velocidad de BLADE se pintan enteras cada vez.
 		var background = new RacingScreenCanvas { Name = "Base", Size = pixels, FontFamily = _layout.Font };
-		if (screen.Content == Cockpit3DScreenContent.Test)
-			MilitaryScreenDrawing.TestImage(background.Next, pixels.X, pixels.Y, screen.TestLabel, screen.Additive);
-		else
-			RacingScreenDrawing.Base(background.Next, pixels.X, pixels.Y);
+		switch (screen.Content)
+		{
+			case Cockpit3DScreenContent.RacingLeft:
+			case Cockpit3DScreenContent.RacingRight:
+			case Cockpit3DScreenContent.Radar:
+			case Cockpit3DScreenContent.Minimap:
+				RacingScreenDrawing.Base(background.Next, pixels.X, pixels.Y);
+				break;
+			case Cockpit3DScreenContent.MilitaryRadar:
+				MilitaryScreenDrawing.RadarBase(background.Next, RadarSettings.DefaultSweepPeriod);
+				break;
+			case Cockpit3DScreenContent.MilitaryMap:
+				MilitaryScreenDrawing.Base(background.Next, pixels.X, pixels.Y);
+				break;
+		}
 		background.Commit();
 		screenViewport.AddChild(background);
 
@@ -735,16 +856,17 @@ public partial class Cockpit3DView : CanvasLayer
 			return;
 		if (label.LampColor is uint lamp)
 		{
-			// Piloto: sin luz, multiplicando su color; apagado (los enciende la etapa 3)
-			Color off = ToColor(lamp).SrgbToLinear() * Cockpit3DLayouts.LampOffFactor;
-			piece.MaterialOverride = new StandardMaterial3D
+			// Piloto: sin luz, multiplicando su color; de salida, apagado
+			var material = new StandardMaterial3D
 			{
 				ResourceName = label.Piece,
 				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 				AlbedoTexture = viewport.GetTexture(),
-				AlbedoColor = new Color(off.R, off.G, off.B).LinearToSrgb(),
+				AlbedoColor = LampColor(lamp, MasterLamps.Off),
 				CullMode = BaseMaterial3D.CullModeEnum.Disabled
 			};
+			piece.MaterialOverride = material;
+			_lamps.Add((material, label, MasterLamps.Off));
 		}
 		else if (piece.GetActiveMaterial(0) is StandardMaterial3D plate)
 		{

@@ -48,6 +48,7 @@ public sealed record RadarStyle
 	public float RingWidth { get; init; }
 	public float RingOpacity { get; init; }
 	public float CrossOpacity { get; init; }
+	public float DiagonalOpacity { get; init; }     // 0: sin diagonales
 	public int BeamLines { get; init; }
 	public float BeamStep { get; init; }            // rad entre líneas del haz
 	public float BeamWidth { get; init; }
@@ -65,6 +66,7 @@ public sealed record RadarStyle
 	public float LabelOpacity { get; init; }
 	public Vector2 LabelOffset { get; init; }       // desde el centro: el inicio de la línea base del texto
 	public bool LabelCentered { get; init; }        // LabelOffset es el centro de la línea base, no su inicio
+	// LabelSize 0: sin rótulo de alcance (la pantalla de BLADE rotula sus anillos y el alcance por su cuenta)
 
 	// Estilo de la pantalla pequeña de la cabina 3D, en sus 256 px (spec docs/cabinas-3d-1-vector.md, 6.3)
 	public static RadarStyle CockpitScreen(RadarPalette palette)
@@ -98,6 +100,41 @@ public sealed record RadarStyle
 			LabelOpacity = 0.8f,
 			LabelOffset = new Vector2(0f, 122f),   // 12 px por encima del borde de abajo
 			LabelCentered = true
+		};
+	}
+
+	// Estilo de la pantalla central de la cabina 3D de BLADE, en sus 512 × 420 px: radarCore del prototipo con diag y
+	// scale 1,2 (spec docs/cabinas-3d-2-blade.md, 6.4). Rótulos, cinta de rumbo y contactos los pinta la pantalla.
+	public static RadarStyle MilitaryScreen(RadarPalette palette)
+	{
+		const float scale = 1.2f;
+		return new RadarStyle
+		{
+			Palette = palette,
+			Center = new Vector2(256f, 236f),
+			Radius = 160f,
+			BackgroundOpacity = 0f,
+			BorderWidth = 2f,
+			BorderOpacity = 0.8f,
+			BorderGlow = 0f,
+			RingWidth = 1.5f,
+			RingOpacity = 0.6f,
+			CrossOpacity = 0.4f,
+			DiagonalOpacity = 0.22f,
+			BeamLines = 28,
+			BeamStep = 0.035f,
+			BeamWidth = 2.5f,
+			BeamOpacity = 0.38f,
+			EchoRadius = 5.5f * scale,
+			EchoCloseRadius = 7f * scale,
+			EchoGlow = 8f,
+			WarningOffset = 8f,
+			WarningWidth = 7f,
+			WarningHalfAngle = 0.42f,
+			WarningGlow = 10f,
+			SelfSize = 11f * scale,
+			SelfGlow = 8f,
+			LabelSize = 0f
 		};
 	}
 
@@ -168,9 +205,16 @@ public static class RadarDrawing
 		output.Add(Ring(c, r * 2f / 3f, style.RingWidth, palette.Rings, style.RingOpacity, 0f));
 		output.Add(Line(c - new Vector2(r, 0f), c + new Vector2(r, 0f), style.RingWidth, palette.Rings, style.CrossOpacity));
 		output.Add(Line(c - new Vector2(0f, r), c + new Vector2(0f, r), style.RingWidth, palette.Rings, style.CrossOpacity));
+		if (style.DiagonalOpacity > 0f)
+		{
+			float d = r * 0.707f;
+			output.Add(Line(c + new Vector2(-d, -d), c + new Vector2(d, d), style.RingWidth, palette.Rings, style.DiagonalOpacity));
+			output.Add(Line(c + new Vector2(-d, d), c + new Vector2(d, -d), style.RingWidth, palette.Rings, style.DiagonalOpacity));
+		}
 
-		output.Add(new RadarPrimitive(style.LabelCentered ? RadarPrimitiveKind.CenteredText : RadarPrimitiveKind.Text, c + style.LabelOffset, default, style.LabelSize, 0f, 0f, 0f,
-			WithOpacity(palette.Label, style.LabelOpacity), 0f, RangeLabel(range)));
+		if (style.LabelSize > 0f)
+			output.Add(new RadarPrimitive(style.LabelCentered ? RadarPrimitiveKind.CenteredText : RadarPrimitiveKind.Text, c + style.LabelOffset, default, style.LabelSize, 0f, 0f, 0f,
+				WithOpacity(palette.Label, style.LabelOpacity), 0f, RangeLabel(range)));
 	}
 
 	// Haz, ecos, avisos de nave pegada y la nave del jugador. No guarda nada: se llama cada frame.

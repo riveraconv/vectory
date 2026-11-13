@@ -81,6 +81,9 @@ public partial class RacingScreenCanvas : Control
 				case ScreenPrimitiveKind.Text:
 					DrawText(p, color);
 					break;
+				case ScreenPrimitiveKind.Triangle:
+					DrawColoredPolygon(new[] { ToGodot(p.A), ToGodot(p.B), ToGodot(p.C) }, color);
+					break;
 			}
 		}
 	}

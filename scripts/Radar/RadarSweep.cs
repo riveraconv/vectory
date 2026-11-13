@@ -75,6 +75,12 @@ public sealed class RadarSweep
 	public IReadOnlyList<RadarEcho> Echoes => _echoes;
 	public IReadOnlyList<RadarWarning> Warnings => _warnings;
 
+	// Naves que se ven en el radar (dentro del alcance y en el mismo nivel) y la distancia a la más cercana, en planta.
+	// Sin ninguna, NearestDistance es null. Las usa la pantalla de BLADE (TGT y NRST).
+	public int TargetCount { get; private set; }
+	public float? NearestDistance { get; private set; }
+	public bool NearestIsClose => NearestDistance < Settings.CloseDistance;
+
 	public RadarSweep(RadarSettings settings = null)
 	{
 		Settings = settings ?? new RadarSettings();
@@ -94,12 +100,18 @@ public sealed class RadarSweep
 		Angle = angle;
 
 		_warnings.Clear();
+		int targets = 0;
+		float? nearest = null;
 		for (int i = 0; i < ships.Count; i++)
 		{
 			Vector3 position = ships[i].Position;
 			RadarContact contact = RadarProjection.Project(self, planForward, position);
 			if (!RadarProjection.IsVisible(in contact, position.Y - self.Y, Settings))
 				continue;
+
+			targets++;
+			if (nearest == null || contact.Distance < nearest)
+				nearest = contact.Distance;
 
 			bool isClose = contact.Distance < Settings.CloseDistance;
 			if (isClose)
@@ -109,6 +121,8 @@ public sealed class RadarSweep
 			if (Crossed(contact.SweepAngle, previous, angle, swept))
 				_echoes.Add(new RadarEcho(contact.X, contact.Y, isClose, 0f));
 		}
+		TargetCount = targets;
+		NearestDistance = nearest;
 	}
 
 	private void AgeEchoes(float delta)

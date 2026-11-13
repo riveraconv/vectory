@@ -447,11 +447,14 @@ public partial class Main : Node3D
 	{
 		RaceTracker tracker = _race.Tracker;
 
+		float lapFraction = CockpitInstruments.LapFraction(_player.TrackDistance, _track.LapLength);
+
 		if (_mode == GameMode.TimeTrial)
 		{
 			bool outLap = tracker == null || tracker.State == RaceState.PreStart;
 			string lapText = outLap ? "OUT LAP" : $"LAP {tracker.CurrentLap}";
 			_hud.SetLapInfo(lapText, outLap ? 0 : tracker.CurrentLapTime, TimeTrialRecord()?.LapTime);
+			_player.SetCockpitLap(lapText, lapFraction);
 			return;
 		}
 
@@ -460,7 +463,9 @@ public partial class Main : Node3D
 
 		// Antes de arrancar CurrentLap vale 0; se muestra como vuelta 1
 		int lap = Math.Max(1, tracker.CurrentLap);
-		_hud.SetLapInfo($"LAP {lap}/{tracker.TotalLaps}", tracker.CurrentLapTime, tracker.BestLapTime);
+		string text = $"LAP {lap}/{tracker.TotalLaps}";
+		_hud.SetLapInfo(text, tracker.CurrentLapTime, tracker.BestLapTime);
+		_player.SetCockpitLap(text, lapFraction);
 	}
 
 	private TimeTrialRecord TimeTrialRecord() => _records.Book.GetTimeTrial(_track.CircuitId);

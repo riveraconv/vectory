@@ -15,6 +15,12 @@ public struct CockpitHudInput
 	public bool Cooldown;
 	public int DamageLevel;        // 0–3
 	public bool DamageEnabled;     // false en TIME TRIAL
+
+	// Lo que piden las pantallas de la cabina 3D de BLADE (spec docs/cabinas-3d-2-blade.md, 6.1)
+	public float HeadingDegrees;   // rumbo: 0 hacia −Z del mundo, en sentido horario visto desde arriba, de 0 a 360
+	public float Turn;             // entrada de giro suavizada, de −1 a 1, positiva a la derecha
+	public string LapText;         // LAP 2/3, LAP 4, OUT LAP: el texto del HUD de pantalla
+	public float LapFraction;      // lo recorrido de la vuelta, de 0 a 1
 }
 
 // Intensidad de cada efecto de luz: multiplica el valor del diseño. A 0, se apaga.
@@ -79,6 +85,8 @@ public readonly record struct CockpitHudLook
 	public float SegmentOffStroke { get; init; }
 	public CockpitColor DisabledSegmentColor { get; init; }
 	public float DisabledSegmentStroke { get; init; }
+	public CockpitColor FullOrbColor { get; init; }       // carga lista
+	public CockpitColor CooldownOrbColor { get; init; }   // carga en cooldown
 
 	// El de las cabinas 2D (spec docs/naves-3b-cabinas.md)
 	public static readonly CockpitHudLook Default = new()
@@ -89,7 +97,9 @@ public readonly record struct CockpitHudLook
 		SegmentOffColor = null,
 		SegmentOffStroke = 0.6f,
 		DisabledSegmentColor = CockpitColor.Blue,
-		DisabledSegmentStroke = CockpitHudState.DisabledDamageBorderOpacity
+		DisabledSegmentStroke = CockpitHudState.DisabledDamageBorderOpacity,
+		FullOrbColor = CockpitColor.Orange,
+		CooldownOrbColor = CockpitColor.Orange
 	};
 }
 
@@ -151,11 +161,16 @@ public sealed class CockpitHudState
 	public float DamageTint { get; private set; }
 	public bool SegmentsBlinking { get; private set; }
 
+	// Fase del parpadeo del daño a 2 Hz: encendido la primera mitad de cada medio segundo
+	public bool BlinkOn => _time % BlinkPeriod < BlinkPeriod * 0.5f;
+	public int DamageLevel { get; private set; }
+	public bool DamageEnabled { get; private set; }
+
 	public CockpitHudPaint Orb(int i) => new(_orbFill[i].Value, _orbStroke[i].Value, _orbGlow[i].Value.X);
 
 	public CockpitHudPaint Segment(int i)
 	{
-		float blink = SegmentsBlinking && _time % BlinkPeriod >= BlinkPeriod * 0.5f ? BlinkDimOpacity : 1f;
+		float blink = SegmentsBlinking && !BlinkOn ? BlinkDimOpacity : 1f;
 		return new CockpitHudPaint(WithAlpha(_segmentFill[i].Value, blink), WithAlpha(_segmentStroke[i].Value, blink), _segmentGlow[i].Value.X * blink);
 	}
 
@@ -190,8 +205,8 @@ public sealed class CockpitHudState
 			bool has = i < input.Charges;
 			(CockpitColor color, float fill, float stroke, float glow) =
 				has && blocked ? (CockpitColor.Red, 0.3f, 0.55f, 0f)
-				: has && input.Cooldown ? (CockpitColor.Orange, 0.3f, 0.55f, 0f)
-				: has ? (CockpitColor.Orange, 1f, 1f, 1f)
+				: has && input.Cooldown ? (_look.CooldownOrbColor, 0.3f, 0.55f, 0f)
+				: has ? (_look.FullOrbColor, 1f, 1f, 1f)
 				: (_look.EmptyOrbColor, _look.EmptyOrbFill, _look.EmptyOrbStroke, 0f);
 			_orbFill[i].Update(WithAlpha(_palette(color), fill), dt);
 			_orbStroke[i].Update(WithAlpha(_palette(color), stroke), dt);
@@ -208,6 +223,8 @@ public sealed class CockpitHudState
 	private void UpdateDamage(in CockpitHudInput input, in CockpitLightSettings light, float dt)
 	{
 		int level = input.DamageEnabled ? Math.Clamp(input.DamageLevel, 0, DamageModel.MaxLevel) : 0;
+		DamageLevel = level;
+		DamageEnabled = input.DamageEnabled;
 		CockpitColor color = level == 0 ? CockpitColor.Green : level == 1 ? CockpitColor.Yellow : CockpitColor.Red;
 
 		for (int i = 0; i < SlotCount; i++)
@@ -513,4 +530,23 @@ public readonly record struct CockpitViewRules(bool CockpitLayer, bool Cockpit3D
 			? new CockpitViewRules(false, true, false, false)
 			: new CockpitViewRules(false, true, true, true);
 	}
+}
+
+// Datos de navegación de las pantallas de la cabina 3D de BLADE (spec docs/cabinas-3d-2-blade.md, 6.1). Lógica pura.
+public static class CockpitInstruments
+{
+	// Rumbo en grados (0–360) del frente en planta (X, Z del mundo): 0 hacia −Z y creciendo hacia la derecha, como el
+	// prototipo (atan2(frente.x, −frente.z))
+	public static float HeadingDegrees(Vector2 planForward)
+	{
+		float degrees = MathF.Atan2(planForward.X, -planForward.Y) * 180f / MathF.PI;
+		return degrees < 0f ? degrees + 360f : degrees;
+	}
+
+	// Lo recorrido de la vuelta (0–1): la distancia sobre el eje desde la meta entre la longitud de la vuelta
+	public static float LapFraction(float distance, float lapLength) =>
+		lapLength > 0f ? Math.Clamp(distance / lapLength, 0f, 1f) : 0f;
+
+	// Porcentaje entero, redondeando las mitades hacia arriba, como Math.round
+	public static int LapPercent(float fraction) => (int)MathF.Floor(fraction * 100f + 0.5f);
 }

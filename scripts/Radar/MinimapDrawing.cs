@@ -166,6 +166,14 @@ public sealed record MinimapStyle
 		};
 	}
 
+	// Estilo de la pantalla derecha de la cabina 3D de BLADE, en sus 300 × 400 px: mapCore del prototipo, ventana en
+	// (150, 182) con radio 128 (spec docs/cabinas-3d-2-blade.md, 6.4). Las medidas de las líneas, las de VECTOR.
+	public static MinimapStyle MilitaryScreen(RadarPalette palette) => CockpitScreen(palette) with
+	{
+		Center = new Vector2(150f, 182f),
+		Radius = 128f
+	};
+
 	// Estilo del HUD de pantalla: radius en px de 1280×720 y scale el factor hasta los px reales. Centrado en el origen.
 	public static MinimapStyle Hud(RadarPalette palette, float radius, float scale)
 	{

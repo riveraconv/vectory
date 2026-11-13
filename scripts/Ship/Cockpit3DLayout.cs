@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace Vectory.Ship;
 
@@ -10,7 +11,18 @@ public enum Cockpit3DScreenContent
 	RacingRight,   // boost y velocidad (VECTOR)
 	Radar,
 	Minimap,
-	Test           // imagen de prueba: fondo, barrido, esquinas y un rótulo (spec docs/cabinas-3d-2-blade.md, 4.6)
+	MilitaryCombiner,   // cristal HUD de BLADE: rumbo, velocidad, trayectoria y boost (spec docs/cabinas-3d-2-blade.md, 6.2)
+	MilitarySpeed,      // velocidad, boost y daño (6.3)
+	MilitaryRadar,      // radar grande con cinta de rumbo y contactos (6.4)
+	MilitaryMap         // minimapa con el progreso de la vuelta (6.4)
+}
+
+// Qué piloto MASTER es un texto fijo, si lo es
+public enum Cockpit3DLamp
+{
+	None,
+	Caution,
+	Warning
 }
 
 // De qué ajuste del Inspector sale la luz de una pantalla (las de VECTOR, que son la referencia)
@@ -38,14 +50,13 @@ public sealed record Cockpit3DScreen(
 	Cockpit3DScreenLight Light,
 	float LightFactor,
 	float LightOffset,
-	bool Additive = false,
-	string TestLabel = "");
+	bool Additive = false);
 
 // Una línea de un texto fijo: su texto y su línea base, en píxeles del lienzo
 public sealed record Cockpit3DLabelLine(string Text, float Y);
 
 // Texto fijo pintado una vez al cargar (pilotos MASTER y placa). Con LampColor, la pieza es un piloto: sin luz y
-// multiplicando su color, apagado de salida.
+// multiplicando su color, que enciende y apaga MasterLamps.
 public sealed record Cockpit3DLabel(
 	string Piece,
 	int Width,
@@ -55,7 +66,8 @@ public sealed record Cockpit3DLabel(
 	float FontSize,
 	bool Bold,
 	IReadOnlyList<Cockpit3DLabelLine> Lines,
-	uint? LampColor = null);
+	uint? LampColor = null,
+	Cockpit3DLamp Lamp = Cockpit3DLamp.None);
 
 // Colores de las luces de la escena de la cabina, y cuánto pesa el tinte de daño en su luz
 public sealed record Cockpit3DScene(
@@ -81,7 +93,10 @@ public sealed record Cockpit3DLayout(
 	IReadOnlyList<Cockpit3DLabel> Labels,
 	Cockpit3DScene Scene,
 	Cockpit3DFont Font,
-	bool ScreensShowHud)   // si las pantallas llevan velocidad, boost, daño, radar y minimapa (y el HUD de pantalla no)
+	bool ScreensShowHud,   // si las pantallas llevan velocidad, boost, daño, radar y minimapa (y el HUD de pantalla no)
+	Func<CockpitColor, Vector4> Role,   // colores del estado del HUD de cabina en este estilo
+	CockpitHudLook Look,
+	bool BrightnessFollowsGlow)   // brillo de las pantallas × (0,8 + 0,4 × brillo), como BLADE; VECTOR, fijo
 {
 	public static Cockpit3DLayout For(Cockpit3DStyle style) => style switch
 	{
@@ -138,18 +153,24 @@ public static class Cockpit3DLayouts
 			RacingPalette.Ambient, RacingPalette.LightWhite, RacingPalette.BoostLight, RacingPalette.DamageLight,
 			CockpitLightMix.DamageFactor),
 		Cockpit3DFont.Rajdhani,
-		true);
+		true,
+		RacingPalette.Role,
+		RacingPalette.Look,
+		false);
 
 	public static readonly Cockpit3DLayout Military = new(
 		Cockpit3DStyle.Military,
 		MilitaryPieces.Contract,
 		new[]
 		{
-			new Cockpit3DScreen(MilitaryPieces.ScreenHud, 512, 302, Cockpit3DScreenContent.Test, Cockpit3DScreenLight.None, 0f,
-				0f, Additive: true, TestLabel: "HUD"),
-			MilitaryScreen(MilitaryPieces.ScreenSpeed, 300, 400, 0.105f, 0.14f, "SPD"),
-			MilitaryScreen(MilitaryPieces.ScreenRadar, 512, 420, 0.17f, 0.14f, "RADAR"),
-			MilitaryScreen(MilitaryPieces.ScreenMap, 300, 400, 0.105f, 0.14f, "MAP")
+			new Cockpit3DScreen(MilitaryPieces.ScreenHud, MilitaryScreenDrawing.CombinerWidth, MilitaryScreenDrawing.CombinerHeight,
+				Cockpit3DScreenContent.MilitaryCombiner, Cockpit3DScreenLight.None, 0f, 0f, Additive: true),
+			MilitaryScreen(MilitaryPieces.ScreenSpeed, MilitaryScreenDrawing.SpeedWidth, MilitaryScreenDrawing.SpeedHeight,
+				0.105f, 0.14f, Cockpit3DScreenContent.MilitarySpeed),
+			MilitaryScreen(MilitaryPieces.ScreenRadar, MilitaryScreenDrawing.RadarWidth, MilitaryScreenDrawing.RadarHeight,
+				0.17f, 0.14f, Cockpit3DScreenContent.MilitaryRadar),
+			MilitaryScreen(MilitaryPieces.ScreenMap, MilitaryScreenDrawing.MapWidth, MilitaryScreenDrawing.MapHeight,
+				0.105f, 0.14f, Cockpit3DScreenContent.MilitaryMap)
 		},
 		new[]
 		{
@@ -160,8 +181,8 @@ public static class Cockpit3DLayouts
 		0,
 		new[]
 		{
-			Lamp(MilitaryPieces.LampCaution, "CAUTION", MilitaryPalette.Caution),
-			Lamp(MilitaryPieces.LampWarning, "WARN", MilitaryPalette.Warning),
+			Lamp(MilitaryPieces.LampCaution, "CAUTION", MilitaryPalette.Caution, Cockpit3DLamp.Caution),
+			Lamp(MilitaryPieces.LampWarning, "WARN", MilitaryPalette.Warning, Cockpit3DLamp.Warning),
 			new Cockpit3DLabel(MilitaryPieces.Plate, 256, 32, MilitaryPalette.PlateBackground, MilitaryPalette.PlateText, 20f, false,
 				new[] { new Cockpit3DLabelLine("BLADE · BLD-02", 23f) })
 		},
@@ -169,7 +190,10 @@ public static class Cockpit3DLayouts
 			MilitaryPalette.Ambient, MilitaryPalette.ScreenLight, MilitaryPalette.BoostLight, MilitaryPalette.DamageLight,
 			1.2f),
 		Cockpit3DFont.Mono,
-		false);   // etapa 2: pantallas de prueba, y el HUD de pantalla sigue a la vista
+		true,
+		MilitaryPalette.Role,
+		MilitaryPalette.Look,
+		true);
 
 	// Factor de la luz de una pantalla de BLADE sobre el ajuste LargeScreenLight
 	public static float MilitaryLightFactor(float width, float height) =>
@@ -177,13 +201,14 @@ public static class Cockpit3DLayouts
 
 	private static float RacingLightOffset(float depth) => depth - RacingSurfaceOffset + ScreenLightDistance;
 
-	private static Cockpit3DScreen MilitaryScreen(string piece, int width, int height, float widthM, float heightM, string label) =>
-		new(piece, width, height, Cockpit3DScreenContent.Test, Cockpit3DScreenLight.Large, MilitaryLightFactor(widthM, heightM),
-			ScreenLightDistance - MilitarySurfaceOffset, TestLabel: label);
+	private static Cockpit3DScreen MilitaryScreen(string piece, int width, int height, float widthM, float heightM,
+		Cockpit3DScreenContent content) =>
+		new(piece, width, height, content, Cockpit3DScreenLight.Large, MilitaryLightFactor(widthM, heightM),
+			ScreenLightDistance - MilitarySurfaceOffset);
 
-	private static Cockpit3DLabel Lamp(string piece, string second, uint color) =>
+	private static Cockpit3DLabel Lamp(string piece, string second, uint color, Cockpit3DLamp lamp) =>
 		new(piece, 256, 112, MilitaryPalette.LampBackground, MilitaryPalette.LampText, 40f, true,
-			new[] { new Cockpit3DLabelLine("MASTER", 50f), new Cockpit3DLabelLine(second, 94f) }, color);
+			new[] { new Cockpit3DLabelLine("MASTER", 50f), new Cockpit3DLabelLine(second, 94f) }, color, lamp);
 }
 
 // Nombres de las piezas de la cabina 3D de BLADE: el contrato con el script de Blender (spec docs/cabinas-3d-2-blade.md,
@@ -233,4 +258,27 @@ public static class MilitaryPieces
 		names.AddRange(new[] { LampCaution, LampWarning, Plate, CombinerPlate, GlassCanopy, GlassSmudge });
 		return names;
 	}
+}
+
+// Pilotos MASTER de BLADE (spec docs/cabinas-3d-2-blade.md, 6.5): cuánto se multiplica el color de cada uno. CAUTION se
+// enciende con daño 1 o más; WARN parpadea con daño 3, con el mismo parpadeo del daño. En TIME TRIAL, los dos apagados.
+// No titilan con el parpadeo de las luces. Lógica pura.
+public static class MasterLamps
+{
+	public const float CautionOn = 2.2f;
+	public const float WarningOn = 2.6f;
+	public const float Off = Cockpit3DLayouts.LampOffFactor;
+
+	public static float Caution(int damageLevel, bool damageEnabled) =>
+		damageEnabled && damageLevel >= 1 ? CautionOn : Off;
+
+	public static float Warning(int damageLevel, bool damageEnabled, bool blinkOn) =>
+		damageEnabled && damageLevel >= DamageModel.MaxLevel && blinkOn ? WarningOn : Off;
+
+	public static float For(Cockpit3DLamp lamp, int damageLevel, bool damageEnabled, bool blinkOn) => lamp switch
+	{
+		Cockpit3DLamp.Caution => Caution(damageLevel, damageEnabled),
+		Cockpit3DLamp.Warning => Warning(damageLevel, damageEnabled, blinkOn),
+		_ => 1f
+	};
 }

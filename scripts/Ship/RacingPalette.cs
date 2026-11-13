@@ -67,7 +67,9 @@ public static class RacingPalette
 		SegmentOffColor = CockpitColor.BlueGray,
 		SegmentOffStroke = 0.55f,
 		DisabledSegmentColor = CockpitColor.BlueGray,
-		DisabledSegmentStroke = 0.55f
+		DisabledSegmentStroke = 0.55f,
+		FullOrbColor = CockpitColor.Orange,
+		CooldownOrbColor = CockpitColor.Orange
 	};
 
 	// Los colores de la sección 6.3, para las clases del radar y el minimapa

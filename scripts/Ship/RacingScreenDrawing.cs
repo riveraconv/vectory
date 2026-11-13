@@ -4,7 +4,7 @@ using System.Numerics;
 
 namespace Vectory.Ship;
 
-public enum ScreenPrimitiveKind { FillRect, StrokeRect, Line, Disc, Ring, Text }
+public enum ScreenPrimitiveKind { FillRect, StrokeRect, Line, Disc, Ring, Text, Triangle }
 
 public enum ScreenTextAlign { Left, Right, Center }
 
@@ -13,9 +13,10 @@ public enum ScreenTextAlign { Left, Right, Center }
 //   Line: de A a B con Width
 //   Disc y Ring: centro A y Radius (Width: el grueso)
 //   Text: línea base en A, tamaño Radius y Spacing entre letras
+//   Triangle: relleno, vértices A, B y C
 public readonly record struct ScreenPrimitive(
 	ScreenPrimitiveKind Kind, Vector2 A, Vector2 B, float Radius, float Width, Vector4 Color, float Glow,
-	string Text = null, float Spacing = 0f, ScreenTextAlign Align = ScreenTextAlign.Left);
+	string Text = null, float Spacing = 0f, ScreenTextAlign Align = ScreenTextAlign.Left, Vector2 C = default);
 
 // Dibujo de las pantallas en estilo carreras, sin Godot: drawLeft, drawRight y screenBase del prototipo, con las mismas
 // posiciones, tamaños, grosores, opacidades y textos (spec docs/cabinas-3d-1-vector.md, 6.2). El estado sale de

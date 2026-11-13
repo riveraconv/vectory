@@ -6,7 +6,7 @@ namespace Vectory.Ship;
 
 // BLADE (ship_02): más punta, a cambio de giro y agarre (equilibrio en docs/naves-6-equilibrio.md). Lógica pura.
 // Casco: Interceptor_E de designs/naves-geometria.js. Cabina: 3D militar, de designs/cabina-3d-blade.html (la BURBUJA 2D
-// de designs/cabinas-hoja-martillo-def.js sigue en el código hasta la etapa 3 de docs/cabinas-3d-2-blade.md).
+// de designs/cabinas-hoja-martillo-def.js se quitó en la etapa 3 de docs/cabinas-3d-2-blade.md; el diseño sigue allí).
 public static class BladeShip
 {
 	private const float ChaseFactor = 1.22f;   // 8,8 m de largo frente a los 7,2 de Vector
@@ -35,7 +35,6 @@ public static class BladeShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			BuildCockpit = BladeCockpit.Build,   // la Burbuja 2D: ya no se usa, se quita en la etapa 3
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_blade.glb",
 				"res://assets/cockpits/cockpit_blade.manifest.json",

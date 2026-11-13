@@ -1,4 +1,5 @@
 using System.Numerics;
+using Vectory.Radar;
 
 namespace Vectory.Ship;
 
@@ -45,4 +46,44 @@ public static class MilitaryPalette
 	public const uint Sensor = 0x7CFF5A;
 
 	public static Vector4 Rgba(uint rgb, float alpha = 1f) => RacingPalette.Rgba(rgb, alpha);
+
+	private static Vector3 Rgb(uint rgb)
+	{
+		Vector4 c = Rgba(rgb);
+		return new Vector3(c.X, c.Y, c.Z);
+	}
+
+	// Los roles del estado del HUD de cabina (CockpitHudState) en este estilo. PanelDark es el apagado tenue (dim).
+	public static Vector4 Role(CockpitColor role) => role switch
+	{
+		CockpitColor.Cyan => Rgba(Main),
+		CockpitColor.Orange => Rgba(Over),
+		CockpitColor.Red => Rgba(Crit),
+		CockpitColor.Green => Rgba(Ok),
+		CockpitColor.Yellow => Rgba(Warn),
+		CockpitColor.Blue => Rgba(OrbOff),
+		CockpitColor.PanelDark => Rgba(Dim),
+		_ => Rgba(Label)
+	};
+
+	// Tabla 6.1 de la spec: la carga llena va en fósforo verde y la de cooldown en ámbar; lo apagado de la columna de
+	// daño, con el borde de las rotulaciones al 60 %, o tenue en TIME TRIAL
+	public static readonly CockpitHudLook Look = new()
+	{
+		EmptyOrbColor = CockpitColor.Blue,
+		EmptyOrbFill = 0.5f,
+		EmptyOrbStroke = 0.9f,
+		SegmentOffColor = CockpitColor.BlueGray,
+		SegmentOffStroke = 0.6f,
+		DisabledSegmentColor = CockpitColor.PanelDark,
+		DisabledSegmentStroke = 0.6f,
+		FullOrbColor = CockpitColor.Cyan,
+		CooldownOrbColor = CockpitColor.Orange
+	};
+
+	// Los colores de la sección 6.4, para las clases del radar y el minimapa
+	public static RadarPalette Radar() => new(
+		Rgb(ScreenBackground), Rgb(Label), Rgb(Dim), Rgb(Main),
+		Rgb(Rival), Rgb(Crit), Rgb(Main), Rgb(Label),
+		Rgb(Main), Rgb(Label), Rgb(Crit));
 }
