@@ -13,6 +13,7 @@ namespace Vectory.Menu;
 // ScreenCenter. La distancia de la cámara sale del ancho de Vector en pantalla, que fija la escala común a todas las
 // naves (HologramFraming), y el suelo, la rejilla y los anillos, de las medidas en píxeles de la spec. Al cambiar de
 // nave solo cambian su centro y la profundidad de las aristas lejanas. Medidas de pantalla sobre 1280×720.
+// VECTOR se ve con su casco 3D (spec docs/cascos-3d-1-vector.md, 7), sin aristas lejanas tenues, daño ni levitación.
 public partial class ShipHologram : Node3D
 {
 	private const float ReferenceHalfHeight = 360f;
@@ -71,13 +72,13 @@ void fragment() {
 		_pivot = new Node3D { Name = "Pivot" };
 		AddChild(_pivot);
 
-		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual };
+		// Con casco 3D (VECTOR), ese; sus luces quedan fijas respecto a la pantalla para que se vea el volumen al girar
+		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual, Use3DHull = true, Hull3DLightsFollowShip = false };
 		_pivot.AddChild(_ship);
 
 		// Píxeles por unidad de tangente: a la distancia d, una unidad mide focal / d píxeles
 		float focal = ReferenceHalfHeight / Mathf.Tan(Mathf.DegToRad(CameraFov) * 0.5f);
-		HologramBounds reference = HologramFraming.BoundsOf(ShipDefinitions.Default.Visual.BuildHull());
-		_distance = HologramFraming.CameraDistance(focal, HologramFraming.PixelsPerMeter(reference, ShipScreenWidth));
+		_distance = HologramFraming.CameraDistance(focal, HologramFraming.PixelsPerMeter(ShipScreenWidth));
 
 		_camera = new Camera3D { Name = "Camera3D", Near = 0.1f, Far = 200f, Position = new Vector3(0f, 0f, _distance) };
 		AddChild(_camera);
@@ -121,7 +122,8 @@ void fragment() {
 	// Gira alrededor del centro de su caja, y sus aristas se atenúan a lo largo de la esfera que la envuelve
 	private void FitShip(ShipVisualProfile visual)
 	{
-		HologramBounds bounds = HologramFraming.BoundsOf(visual.BuildHull());
+		HullManifest manifest = visual.Hull3D != null ? ShipHull3D.LoadManifest(visual.Hull3D) : null;
+		HologramBounds bounds = manifest != null ? HologramFraming.BoundsOf(manifest) : HologramFraming.BoundsOf(visual.BuildHull());
 		_ship.Position = -ShipLineMesh.ToGodot(bounds.Center);
 		_material.SetShaderParameter("depth_near", _distance - bounds.SphereRadius);
 		_material.SetShaderParameter("depth_far", _distance + bounds.SphereRadius);

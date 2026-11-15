@@ -18,6 +18,27 @@ public readonly record struct HologramBounds(Vector3 Center, Vector3 Size)
 // referencia se saldría más al girar: lo avisa una prueba, no se corrige aquí.
 public static class HologramFraming
 {
+	// Ancho de referencia de la escala común: VECTOR de punta a punta de las alas del wireframe (2 × 3,4 m). Se queda fijo
+	// aunque el casco 3D de VECTOR sea más estrecho (spec docs/cascos-3d-1-vector.md, 7)
+	public const float ReferenceWidth = 6.8f;
+
+	// La esfera que cabe en el encuadre: la del VECTOR wireframe. Ninguna nave debe pasar de aquí
+	public const float MaxSphereDiameter = 10f;
+
+	// Px por metro comunes a todas las naves
+	public static float PixelsPerMeter(float screenWidth) => screenWidth / ReferenceWidth;
+
+	// Caja del casco 3D sin librea, la de su manifiesto
+	public static HologramBounds BoundsOf(HullManifest manifest)
+	{
+		float[] min = manifest.Bounds.Min, max = manifest.Bounds.Max;
+		if (min.Length != 3 || max.Length != 3)
+			return new HologramBounds(Vector3.Zero, Vector3.Zero);
+		var lo = new Vector3(min[0], min[1], min[2]);
+		var hi = new Vector3(max[0], max[1], max[2]);
+		return new HologramBounds((lo + hi) * 0.5f, hi - lo);
+	}
+
 	public static HologramBounds BoundsOf(IReadOnlyList<ShipLine> hull)
 	{
 		if (hull.Count == 0)

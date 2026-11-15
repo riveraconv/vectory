@@ -19,6 +19,9 @@ public partial class Spaceship : Node3D
 	// el menú y las naves de prueba siguen con el wireframe (spec docs/cascos-3d-1-vector.md, 4.7). Antes de _Ready.
 	public bool Use3DHull { get; set; }
 
+	// Las luces del casco 3D giran con la nave (carrera) o quedan fijas en el mundo (holograma del selector)
+	public bool Hull3DLightsFollowShip { get; set; } = true;
+
 	// Pintura y daño del casco 3D: se guardan para volver a ponerlos si F10 lo rehace
 	private HullPaintChoice _hullPaint = HullPaintCatalog.Default;
 	private int _hullDamage;
@@ -81,7 +84,7 @@ public partial class Spaceship : Node3D
 		}
 		if (profile != null && _hull3D == null)
 		{
-			_hull3D = new ShipHull3D { Name = "Hull3D", Profile = profile };
+			_hull3D = new ShipHull3D { Name = "Hull3D", Profile = profile, LightsFollowShip = Hull3DLightsFollowShip };
 			_hull3D.ApplySettings(_hullSettings);
 			_hull3D.SetPaint(_hullPaint);
 			AddChild(_hull3D);

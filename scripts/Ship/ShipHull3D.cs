@@ -94,6 +94,16 @@ void fragment() {
 
 	public ShipHull3DProfile Profile { get; set; }
 
+	// En carrera las luces van colgadas de la nave; en el holograma, fijas en el mundo (respecto a la pantalla)
+	public bool LightsFollowShip { get; set; } = true;
+
+	// Manifiesto de un casco 3D; null si no se puede leer
+	public static HullManifest LoadManifest(ShipHull3DProfile profile)
+	{
+		string json = FileAccess.GetFileAsString(profile.ManifestPath);
+		return string.IsNullOrEmpty(json) ? null : HullManifest.Parse(json);
+	}
+
 	public bool IsLoaded { get; private set; }
 
 	public override void _Ready()
@@ -362,8 +372,7 @@ void fragment() {
 	private bool LoadModel()
 	{
 		var scene = GD.Load<PackedScene>(Profile.ModelPath);
-		string json = FileAccess.GetFileAsString(Profile.ManifestPath);
-		HullManifest manifest = string.IsNullOrEmpty(json) ? null : HullManifest.Parse(json);
+		HullManifest manifest = LoadManifest(Profile);
 		if (scene == null || manifest == null)
 		{
 			GD.PushError($"[Hull3D] Cannot load {Profile.ModelPath} or {Profile.ManifestPath}");
@@ -504,8 +513,13 @@ void fragment() {
 			DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal,
 			DirectionalShadowMaxDistance = ShadowMaxDistance
 		};
+		// Fijas en el mundo: no siguen el giro de la nave. La cámara del holograma mira hacia −Z, así que el juego de luces
+		// del prototipo se gira media vuelta para que la principal llegue del lado de la cámara
+		light.TopLevel = !LightsFollowShip;
+		if (!LightsFollowShip)
+			source = new Vector3(-source.X, source.Y, -source.Z);
 		AddChild(light);
-		// Mira desde la fuente hacia el centro, en el espacio de la nave
+		// Mira desde la fuente hacia el centro, en el espacio de la nave (o del mundo, si no la sigue)
 		light.Transform = Transform3D.Identity.LookingAt(-source, Vector3.Up);
 		return light;
 	}

@@ -260,9 +260,21 @@ public class ShipSelectLogicTests
 
 public class HologramFramingTests
 {
-    private static HologramBounds Bounds(ShipDefinition ship) => HologramFraming.BoundsOf(ship.Visual.BuildHull());
+    // Lo que se ve en el holograma: el casco 3D si la nave lo tiene (VECTOR), si no el wireframe
+    private static HologramBounds Bounds(ShipDefinition ship) => ship.Visual.Hull3D != null
+        ? HologramFraming.BoundsOf(Vectory.Test.ShipTests.Hull3DTests.Manifest)
+        : HologramFraming.BoundsOf(ship.Visual.BuildHull());
 
-    private static float Scale => HologramFraming.PixelsPerMeter(Bounds(VectorShip.Definition), 480f);
+    private static float Scale => HologramFraming.PixelsPerMeter(480f);
+
+    [Fact]
+    public void Scale_IsFixed_FromTheWireframeVectorOf34M()
+    {
+        Assert.Equal(6.8f, HologramFraming.ReferenceWidth);
+        float wire = HologramFraming.BoundsOf(VectorShip.Definition.Visual.BuildHull()).Size.X;
+        Assert.Equal(HologramFraming.ReferenceWidth, wire, 4);
+        Assert.Equal(480f / 6.8f, Scale, 4);
+    }
 
     [Fact]
     public void BoundsOf_CenterAndSize()
@@ -287,7 +299,7 @@ public class HologramFramingTests
 
     // Misma escala: el tamaño en pantalla es el ancho real de cada nave por los mismos px por metro
     [Theory]
-    [InlineData(ShipCatalog.Ship01, 480f)]
+    [InlineData(ShipCatalog.Ship01, 371.8f)]   // casco 3D: alas más cortas, se ve más estrecho que antes
     [InlineData(ShipCatalog.Ship02, 225.9f)]
     [InlineData(ShipCatalog.Ship03, 352.9f)]
     public void CommonScale_WidthOnScreen(string id, float expected)
@@ -302,11 +314,11 @@ public class HologramFramingTests
 
         float distance = HologramFraming.CameraDistance(Focal, Scale);
 
-        Assert.Equal(480f, Bounds(VectorShip.Definition).Size.X * Focal / distance, 0.01f);
+        Assert.Equal(480f, HologramFraming.ReferenceWidth * Focal / distance, 0.01f);
     }
 
     [Theory]
-    [InlineData(ShipCatalog.Ship01, 9.95f)]
+    [InlineData(ShipCatalog.Ship01, 9.07f)]
     [InlineData(ShipCatalog.Ship02, 9.38f)]
     [InlineData(ShipCatalog.Ship03, 8.40f)]
     public void SphereDiameter_OfEachShip(string id, float expected)
@@ -314,14 +326,15 @@ public class HologramFramingTests
         Assert.Equal(expected, Bounds(ShipDefinitions.Find(id)).SphereDiameter, 0.02f);
     }
 
-    // Aviso: si una nave nueva lo pasa, se saldrá más que Vector al girar y habrá que calcular la escala con la más grande
+    // Aviso: si una nave lo pasa, se saldrá del encuadre al girar y habrá que calcular la escala con la más grande.
+    // El límite es la esfera del VECTOR wireframe de antes (spec docs/cascos-3d-1-vector.md, 7)
     [Fact]
-    public void NoShipHasASphereLargerThanVector()
+    public void NoShipHasASphereLargerThan10M()
     {
-        float vector = Bounds(VectorShip.Definition).SphereDiameter;
-
+        Assert.Equal(10f, HologramFraming.MaxSphereDiameter);
+        Assert.True(HologramFraming.BoundsOf(VectorShip.Definition.Visual.BuildHull()).SphereDiameter <= HologramFraming.MaxSphereDiameter);
         foreach (ShipDefinition ship in ShipDefinitions.All)
-            Assert.True(Bounds(ship).SphereDiameter <= vector, $"{ship.Id} no cabe donde cabe Vector");
+            Assert.True(Bounds(ship).SphereDiameter <= HologramFraming.MaxSphereDiameter, $"{ship.Id} no cabe en el encuadre");
     }
 }
 
