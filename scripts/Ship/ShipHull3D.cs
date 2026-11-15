@@ -16,6 +16,8 @@ public sealed class Hull3DSettings
 	// Brillo de levitación (1 = el del prototipo, 0 = apagado) y fuerza del cambio de color de perla y camaleón
 	public float HoverGlowIntensity { get; init; } = 1f;
 	public float IridescenceStrength { get; init; } = 1f;
+	// Anticolisión (solo los cascos que la tienen: BLADE)
+	public StrobeSettings Strobe { get; init; } = new();
 }
 
 // Casco 3D de una nave (specs docs/cascos-3d-1-vector.md y docs/cascos-3d-2-blade.md, 4, 5 y 6): carga el .glb, aplica
@@ -90,6 +92,11 @@ void fragment() {
 	private DirectionalLight3D _fill;
 	private Hull3DSettings _settings = new();
 	private HullPaintChoice _paint = HullPaintCatalog.Default;
+	// Combinación de pintura del catálogo de su estilo; -1 = la de por defecto
+	private int _paintIndex = -1;
+	// Puntas traseras de BLADE pintadas (sin marcas): copia de la pintura con la repetición de sus UV, que van
+	// horneadas con la de las franjas de aviso
+	private readonly Dictionary<string, (StandardMaterial3D Hazard, StandardMaterial3D Paint)> _tips = new();
 	private int _paintVersion;
 	private CpuParticles3D _smoke;
 	private MeshInstance3D _glow;
@@ -121,7 +128,7 @@ void fragment() {
 		BuildGlow();
 		ApplySettings(_settings);
 		if (IsLoaded)
-			SetPaint(_paint);
+			SetPaint(_paintIndex);
 		// Las máscaras se preparan ya: así el primer golpe de la carrera no da un tirón
 		for (int level = 1; level <= DamageModel.MaxLevel; level++)
 			ScorchTexture(level);
@@ -148,19 +155,21 @@ void fragment() {
 	// Pintura y librea (spec 6.2 y 6.3)
 	// ---------------------------------------------------------------
 
-	// Pintura de VECTOR. BLADE lleva por ahora su pintura de por defecto, BOSQUE con marcas (sus 40 combinaciones
-	// llegan en la etapa 3 de su spec): la elección se guarda pero no le cambia nada.
-	public void SetPaint(HullPaintChoice choice)
+	// Una de las 40 combinaciones del catálogo de su estilo (HullPaints); -1 = la de por defecto
+	public void SetPaint(int combination)
 	{
-		_paint = choice;
-		if (!IsLoaded)
-			return;
+		int index = combination < 0 ? HullPaints.DefaultIndex(Profile.Style) : HullPaints.Step(Profile.Style, combination, 0);
+		_paintIndex = index;
 		if (Profile.Style == HullStyle.Military)
 		{
-			ApplyMilitaryPaint(MilitaryHullPaint.Woodland);
+			if (IsLoaded)
+				ApplyMilitaryPaint(MilitaryPaintCatalog.Combinations[index]);
 			return;
 		}
-		HullPaintLook look = HullPaintLook.For(choice);
+		_paint = HullPaintCatalog.Combinations[index];
+		if (!IsLoaded)
+			return;
+		HullPaintLook look = HullPaintLook.For(_paint);
 
 		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
 			ApplyFinish(MaterialOf(name), look.PaintColor, look.PaintFinish);
@@ -185,7 +194,7 @@ void fragment() {
 		}
 		ApplyIridescence();
 		if (look.LiveryVisible)
-			PaintDecals(look);
+			PaintDecals(HullDecalDrawing.For(look));
 	}
 
 	private static void ApplyFinish(StandardMaterial3D material, uint color, HullFinish finish)
@@ -202,11 +211,11 @@ void fragment() {
 	}
 
 	// Las calcomanías se pintan una vez por pintura; las de los dos lados comparten textura
-	private void PaintDecals(HullPaintLook look)
+	private void PaintDecals(IReadOnlyDictionary<string, DecalCanvas> decals)
 	{
 		int version = ++_paintVersion;
 		var done = new Dictionary<DecalCanvas, List<string>>();
-		foreach ((string piece, DecalCanvas canvas) in HullDecalDrawing.For(look))
+		foreach ((string piece, DecalCanvas canvas) in decals)
 		{
 			if (!done.TryGetValue(canvas, out List<string> pieces))
 				done[canvas] = pieces = new List<string>();
@@ -231,40 +240,81 @@ void fragment() {
 		}
 	}
 
-	// Camuflaje de BLADE: el color sale de la máscara de cada material con los tonos de la pintura (spec 6.2); la panza
-	// y el suelo de la cabina, de color liso. Antirreflejos, metal, titanio, cristal, sensores y luces no cambian.
-	private void ApplyMilitaryPaint(MilitaryPaint paint)
+	// Pintura de BLADE (spec 6.2 y 6.3): el camuflaje sale de la máscara de cada material con los tonos de la pintura,
+	// con su acabado; la panza y el suelo de la cabina, de color liso. Con marcas se ven las calcomanías y las puntas
+	// llevan las franjas de aviso. Antirreflejos, metal, titanio, cristal, sensores y luces no cambian.
+	private void ApplyMilitaryPaint(MilitaryPaintChoice choice)
 	{
+		MilitaryHullLook look = MilitaryHullLook.For(choice);
 		foreach (string name in MilitaryHullPieces.Floor)
 		{
 			StandardMaterial3D material = MaterialOf(name);
 			if (material != null)
-				material.AlbedoColor = HullDecalPainter.ToColor(paint.Base);
+				material.AlbedoColor = HullDecalPainter.ToColor(look.Floor);
 		}
-		SetAlbedoTexture(MilitaryHullPieces.Painted, CamoTexture("M_Paint", MilitaryHullPaint.Tones(paint)));
-		SetAlbedoTexture(MilitaryHullPieces.Armor, CamoTexture("M_PaintArmor", MilitaryHullPaint.ArmorTones(paint)));
+		Texture2D camo = CamoTexture("M_Paint", look.Tones);
+		foreach (string name in MilitaryHullPieces.Painted)
+			ApplyCamo(MaterialOf(name), camo, look.Finish, look.Finish.Metal);
+		Texture2D armor = CamoTexture("M_PaintArmor", look.ArmorTones);
+		foreach (string name in MilitaryHullPieces.Armor)
+			ApplyCamo(MaterialOf(name), armor, look.Finish, look.ArmorMetal);
 		foreach (string name in MilitaryHullPieces.Bottom)
 		{
 			StandardMaterial3D material = MaterialOf(name);
 			if (material == null)
 				continue;
-			material.AlbedoColor = HullDecalPainter.ToColor(MilitaryHullPaint.Bottom(paint));
+			material.AlbedoColor = HullDecalPainter.ToColor(look.Bottom);
 			material.RoughnessTexture = null;
 			material.Roughness = MilitaryHullPaint.BottomRoughness;
 		}
+		foreach (KeyValuePair<string, (StandardMaterial3D Hazard, StandardMaterial3D Paint)> tip in _tips)
+		{
+			ApplyCamo(tip.Value.Paint, camo, look.Finish, look.Finish.Metal);
+			_pieces[tip.Key].SetSurfaceOverrideMaterial(0, look.TipsHazard ? tip.Value.Hazard : tip.Value.Paint);
+		}
+		foreach (string name in MilitaryHullPieces.Decals)
+		{
+			if (_pieces.TryGetValue(name, out MeshInstance3D mesh))
+				mesh.Visible = look.MarkingsVisible;
+		}
+		if (look.MarkingsVisible)
+			PaintDecals(MilitaryDecalDrawing.For(look));
 	}
 
-	private void SetAlbedoTexture(IEnumerable<string> pieces, Texture2D texture)
+	private static void ApplyCamo(StandardMaterial3D material, Texture2D camo, MilitaryFinish finish, float metal)
 	{
-		if (texture == null)
+		if (material == null)
 			return;
-		foreach (string name in pieces)
+		if (camo != null)
 		{
-			StandardMaterial3D material = MaterialOf(name);
-			if (material == null)
-				continue;
-			material.AlbedoTexture = texture;
+			material.AlbedoTexture = camo;
 			material.AlbedoColor = Colors.White;
+		}
+		material.Metallic = metal;
+		material.Roughness = finish.RoughnessFactor;
+		material.ClearcoatEnabled = finish.Coat > 0f;
+		material.Clearcoat = finish.Coat;
+		material.ClearcoatRoughness = finish.CoatRoughness;
+	}
+
+	// Copia de la pintura para cada punta, con las UV pasadas de la repetición de las franjas a la de la pintura
+	private void PrepareTips(HullManifest manifest)
+	{
+		if (Profile.Style != HullStyle.Military)
+			return;
+		StandardMaterial3D paint = MaterialOf(MilitaryHullPieces.Painted[0]);
+		float paintRepeat = manifest.RepeatOf("M_Paint");
+		foreach (string name in MilitaryHullPieces.Tips)
+		{
+			StandardMaterial3D hazard = MaterialOf(name);
+			if (paint == null || hazard == null)
+				continue;
+			var copy = (StandardMaterial3D)paint.Duplicate();
+			copy.ResourceName = paint.ResourceName;
+			float k = paintRepeat / manifest.RepeatOf(hazard.ResourceName);
+			copy.Uv1Scale = new Vector3(k, k, 1f);
+			_scorchMaterials.Add(copy);
+			_tips[name] = (hazard, copy);
 		}
 	}
 
@@ -399,9 +449,17 @@ void fragment() {
 		_smoke.Emitting = emitting;
 	}
 
-	// Cada frame: brillo bajo la nave (sobre la pista, con su inclinación) y tamaño del humo según la velocidad
-	public void UpdateEffects(Transform3D glowTransform, float glowStrength, float speed)
+	// Cada frame: brillo bajo la nave (sobre la pista, con su inclinación), tamaño del humo según la velocidad y
+	// anticolisión (time: el de la nave, que la pausa congela)
+	public void UpdateEffects(Transform3D glowTransform, float glowStrength, float speed, float time)
 	{
+		IReadOnlyList<string> strobes = Profile.Contract.Strobes;
+		for (int i = 0; i < strobes.Count; i++)
+		{
+			StandardMaterial3D material = MaterialOf(strobes[i]);
+			if (material != null)
+				material.EmissionEnergyMultiplier = StrobeLights.Intensity(time, i, _settings.Strobe);
+		}
 		if (_glow != null)
 		{
 			_glow.GlobalTransform = glowTransform;
@@ -477,6 +535,7 @@ void fragment() {
 			GD.PushError("[Hull3D] Missing hull pieces: " + string.Join(", ", missing));
 
 		ApplyManifest(manifest);
+		PrepareTips(manifest);
 		return missing.Count == 0;
 	}
 

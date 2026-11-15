@@ -12,11 +12,13 @@ public static class MenuFonts
 
 	private const string RajdhaniPath = "res://assets/fonts/Rajdhani-Bold.ttf";
 	private const string Vt323Path = "res://assets/fonts/VT323-Regular.ttf";
+	private const string BlackOpsPath = "res://assets/fonts/BlackOpsOne-Regular.ttf";
 
 	private static FontFile _orbitron;
 	private static FontFile _mono;
 	private static FontFile _rajdhani;
 	private static FontFile _vt323;
+	private static FontFile _blackOps;
 	private static bool _loaded;
 
 	// La de las pantallas de la cabina 3D, en estilo carreras
@@ -29,6 +31,12 @@ public static class MenuFonts
 	public static FontFile Vt323
 	{
 		get { EnsureLoaded(); return _vt323; }
+	}
+
+	// La del número de las calcomanías del casco de BLADE
+	public static FontFile BlackOps
+	{
+		get { EnsureLoaded(); return _blackOps; }
 	}
 
 	public static FontFile Orbitron
@@ -84,6 +92,7 @@ public static class MenuFonts
 		_mono = Load(MonoPath);
 		_rajdhani = Load(RajdhaniPath);
 		_vt323 = Load(Vt323Path);
+		_blackOps = Load(BlackOpsPath);
 		_loaded = true;
 	}
 

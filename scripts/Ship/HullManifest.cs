@@ -62,6 +62,7 @@ public sealed class HullManifest
 	[JsonPropertyName("flickerLights")] public List<string> FlickerLights { get; set; } = new();
 	[JsonPropertyName("probe")] public string Probe { get; set; } = "";
 	[JsonPropertyName("floor")] public List<string> Floor { get; set; } = new();
+	[JsonPropertyName("repeats")] public List<HullManifestRepeat> Repeats { get; set; } = new();
 	[JsonPropertyName("camoMasks")] public List<HullManifestCamoMask> CamoMasks { get; set; } = new();
 	[JsonPropertyName("boundsWithoutProbe")] public CockpitManifestBounds BoundsWithoutProbe { get; set; } = new();
 
@@ -86,6 +87,9 @@ public sealed class HullManifest
 
 	public HullManifestCoat CoatOf(string material) => Coat.FirstOrDefault(c => c.Material == material);
 
+	// Repetición de la textura de un material, ya multiplicada en sus UV (1 si no está)
+	public float RepeatOf(string material) => Repeats.FirstOrDefault(r => r.Material == material)?.Repeat ?? 1f;
+
 	public float IridescenceFactor(string material) => Iridescence.FirstOrDefault(i => i.Material == material)?.Factor ?? 0f;
 
 	// Piezas del contrato de VECTOR que no aparecen entre estos nombres
@@ -98,13 +102,16 @@ public sealed class HullManifest
 
 // Contrato de un casco 3D con su script de Blender: raíz, piezas que Godot busca por nombre y luces que titilan con el
 // daño. Sale del estilo del casco. Lógica pura.
-public sealed record HullContract(string Root, IReadOnlyList<string> Pieces, IReadOnlyList<string> FlickerLights)
+public sealed record HullContract(string Root, IReadOnlyList<string> Pieces, IReadOnlyList<string> FlickerLights,
+	IReadOnlyList<string> Strobes)
 {
 	// Los puntos vacíos son los mismos en todos los cascos
 	public static IReadOnlyList<string> Empties => HullPieces.Empties;
 
-	public static readonly HullContract Racing = new(HullPieces.Root, HullPieces.Contract, HullPieces.FlickerLights.ToList());
-	public static readonly HullContract Military = new(MilitaryHullPieces.Root, MilitaryHullPieces.Contract, MilitaryHullPieces.FlickerLights);
+	public static readonly HullContract Racing = new(HullPieces.Root, HullPieces.Contract, HullPieces.FlickerLights.ToList(),
+		System.Array.Empty<string>());
+	public static readonly HullContract Military = new(MilitaryHullPieces.Root, MilitaryHullPieces.Contract,
+		MilitaryHullPieces.FlickerLights, MilitaryHullPieces.Strobes);
 
 	public static HullContract For(HullStyle style) => style == HullStyle.Military ? Military : Racing;
 }
@@ -114,6 +121,13 @@ public sealed class HullManifestIridescence
 {
 	[JsonPropertyName("material")] public string Material { get; set; } = "";
 	[JsonPropertyName("factor")] public float Factor { get; set; }
+}
+
+// Repetición de la textura de un material (BLADE), ya multiplicada en sus UV
+public sealed class HullManifestRepeat
+{
+	[JsonPropertyName("material")] public string Material { get; set; } = "";
+	[JsonPropertyName("repeat")] public float Repeat { get; set; } = 1f;
 }
 
 // Máscara del camuflaje de un material (BLADE): archivo junto al manifiesto

@@ -27,7 +27,8 @@ public partial class TuningLabPanel : CanvasLayer
 	private static TuningLab _lab;
 	private static string _lastChosenId;
 	// Pintura del casco 3D (F5 / Mayúsculas + F5): dura hasta cerrar el juego, también con RESTART; no se guarda
-	private static int _paintIndex;
+	// Pintura elegida con F5 en cada estilo de casco 3D (combinación de su catálogo); dura hasta cerrar el juego
+	private static readonly Dictionary<HullStyle, int> _paintIndices = new();
 
 	// La nave que se conduce de verdad, para guardarla con los récords y el fantasma
 	public static string DrivenShipId(string chosenId) => _lab?.DrivenShipId(chosenId) ?? chosenId;
@@ -69,18 +70,27 @@ public partial class TuningLabPanel : CanvasLayer
 		// Con el panel ya usado, la nave sigue con lo que hubiera en él (también tras RESTART)
 		if (_lab.Touched)
 			ApplyToPlayer();
-		if (_paintIndex != 0)
-			Player?.SetHullPaint(HullPaintCatalog.Combinations[_paintIndex]);
+		foreach (KeyValuePair<HullStyle, int> paint in _paintIndices)
+			Player?.SetHullPaint(paint.Key, paint.Value);
 	}
 
-	// Recorre las 40 combinaciones de pintura del casco 3D (spec docs/cascos-3d-1-vector.md, 6.2)
+	// Estilo del casco 3D de la nave que se conduce; null si no tiene (HAMMER)
+	private HullStyle? CurrentHullStyle => _lab.Current.Visual.Hull3D?.Style;
+
+	private static int PaintIndex(HullStyle style) =>
+		_paintIndices.TryGetValue(style, out int index) ? index : HullPaints.DefaultIndex(style);
+
+	// Recorre las 40 combinaciones de pintura del casco 3D de la nave que se conduce (specs docs/cascos-3d-1-vector.md
+	// y docs/cascos-3d-2-blade.md, 6.2). Sin casco 3D no hace nada.
 	private void StepPaint(int delta)
 	{
-		_paintIndex = HullPaintCatalog.Step(_paintIndex, delta);
-		HullPaintChoice choice = HullPaintCatalog.Combinations[_paintIndex];
-		Player?.SetHullPaint(choice);
+		if (CurrentHullStyle is not HullStyle style)
+			return;
+		int index = HullPaints.Step(style, PaintIndex(style), delta);
+		_paintIndices[style] = index;
+		Player?.SetHullPaint(style, index);
 		Refresh();
-		GD.Print($"[TuningLab] Paint: {choice.DisplayName} ({_paintIndex + 1}/{HullPaintCatalog.Combinations.Count})");
+		GD.Print($"[TuningLab] Paint: {HullPaints.DisplayName(style, index)} ({index + 1}/{HullPaints.Count(style)})");
 	}
 
 	public override void _Input(InputEvent @event)
@@ -169,8 +179,9 @@ public partial class TuningLabPanel : CanvasLayer
 		string id = _lab.Current.Id;
 		string halfWidth = _lab.Current.Visual.CollisionHalfWidth.ToString("0.00", CultureInfo.InvariantCulture);
 		_shipLabel.Text = $"{ShipCatalog.Find(id).Name} · COLLISION {halfWidth} M";
-		HullPaintChoice paint = HullPaintCatalog.Combinations[_paintIndex];
-		_paintLabel.Text = $"PAINT {paint.DisplayName} · {_paintIndex + 1}/{HullPaintCatalog.Combinations.Count} · F5";
+		_paintLabel.Text = CurrentHullStyle is HullStyle style
+			? $"PAINT {HullPaints.DisplayName(style, PaintIndex(style))} · {PaintIndex(style) + 1}/{HullPaints.Count(style)} · F5"
+			: "PAINT — · F5";
 		_linearCheck.SetPressedNoSignal(_lab.LinearAcceleration);
 
 		// Mismo orden que ShipMultipliers.Parameters. La referencia es Vector tal como está en el panel.

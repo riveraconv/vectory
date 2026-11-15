@@ -22,8 +22,9 @@ public partial class Spaceship : Node3D
 	// Las luces del casco 3D giran con la nave (carrera) o quedan fijas en el mundo (holograma del selector)
 	public bool Hull3DLightsFollowShip { get; set; } = true;
 
-	// Pintura y daño del casco 3D: se guardan para volver a ponerlos si F10 lo rehace
-	private HullPaintChoice _hullPaint = HullPaintCatalog.Default;
+	// Pintura (por estilo de casco: combinación de su catálogo) y daño del casco 3D: se guardan para volver a ponerlos
+	// si F10 lo rehace
+	private readonly System.Collections.Generic.Dictionary<HullStyle, int> _hullPaints = new();
 	private int _hullDamage;
 	private bool _hullTimeTrial;
 	private int _wireEdgeCount;
@@ -47,11 +48,13 @@ public partial class Spaceship : Node3D
 		_hull3D?.ApplySettings(settings);
 	}
 
-	// Pintura del casco 3D (sin casco 3D no hace nada)
-	public void SetHullPaint(HullPaintChoice choice)
+	// Pintura de los cascos 3D de un estilo: una combinación de su catálogo (HullPaints). Se aplica si el casco actual es
+	// de ese estilo; si no, se guarda para cuando lo sea.
+	public void SetHullPaint(HullStyle style, int combination)
 	{
-		_hullPaint = choice;
-		_hull3D?.SetPaint(choice);
+		_hullPaints[style] = combination;
+		if (_hull3D != null && _hull3D.Profile.Style == style)
+			_hull3D.SetPaint(combination);
 	}
 
 	// Daño visible del casco 3D: quemaduras y humo (en TIME TRIAL, nada)
@@ -67,10 +70,11 @@ public partial class Spaceship : Node3D
 		_hull3D?.ClearSmoke();
 	}
 
-	// Brillo de levitación (transformación sobre la pista y fuerza) y velocidad para el tamaño del humo
-	public void UpdateHullEffects(Transform3D glow, float glowStrength, float speed)
+	// Brillo de levitación (transformación sobre la pista y fuerza), velocidad para el tamaño del humo y tiempo de la
+	// nave para la anticolisión
+	public void UpdateHullEffects(Transform3D glow, float glowStrength, float speed, float time)
 	{
-		_hull3D?.UpdateEffects(glow, glowStrength, speed);
+		_hull3D?.UpdateEffects(glow, glowStrength, speed, time);
 	}
 
 	// Pone o quita el casco 3D según el perfil actual; el wireframe se oculta mientras haya uno
@@ -86,7 +90,7 @@ public partial class Spaceship : Node3D
 		{
 			_hull3D = new ShipHull3D { Name = "Hull3D", Profile = profile, LightsFollowShip = Hull3DLightsFollowShip };
 			_hull3D.ApplySettings(_hullSettings);
-			_hull3D.SetPaint(_hullPaint);
+			_hull3D.SetPaint(_hullPaints.TryGetValue(profile.Style, out int paint) ? paint : -1);
 			AddChild(_hull3D);
 			_hull3D.SetDamage(_hullDamage, _hullTimeTrial);
 		}

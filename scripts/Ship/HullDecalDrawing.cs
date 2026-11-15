@@ -2,7 +2,11 @@ using System.Collections.Generic;
 
 namespace Vectory.Ship;
 
-public enum DecalShape { RoundRect, Circle, Rect, Text }
+// Ring: circunferencia de radio Radius y W px de grueso. Polygon: relleno con Points.
+public enum DecalShape { RoundRect, Circle, Rect, Text, Ring, Polygon }
+
+// Fuente de un texto: Orbitron Black (VECTOR) o Black Ops One (BLADE)
+public enum DecalFont { Orbitron, BlackOps }
 
 // Línea base del texto, como textBaseline del lienzo del prototipo
 public enum DecalBaseline { Middle, Alphabetic }
@@ -17,7 +21,9 @@ public readonly record struct DecalPrimitive(
 	float FontSize = 0f,
 	bool Italic = false,
 	DecalBaseline Baseline = DecalBaseline.Alphabetic,
-	float MaxWidth = 0f);
+	float MaxWidth = 0f,
+	DecalFont Font = DecalFont.Orbitron,
+	System.Numerics.Vector2[] Points = null);
 
 // Lienzo de una calcomanía: tamaño en píxeles (fondo transparente) y lo que se pinta, en orden
 public sealed record DecalCanvas(int Width, int Height, IReadOnlyList<DecalPrimitive> Primitives);

@@ -36,9 +36,11 @@ public static partial class HullDecalPainter
 	public static Color ToColor(uint rgb, float alpha = 1f) =>
 		new(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, alpha);
 
-	private static Font FontFor(float size, bool italic)
+	private static Font FontFor(float size, bool italic, DecalFont which)
 	{
-		var font = (FontVariation)MenuFonts.Make(MenuFonts.Orbitron, OrbitronBlack, size, 0f);
+		var font = which == DecalFont.BlackOps
+			? (FontVariation)MenuFonts.Make(MenuFonts.BlackOps, 400, size, 0f)
+			: (FontVariation)MenuFonts.Make(MenuFonts.Orbitron, OrbitronBlack, size, 0f);
 		if (italic)
 			font.VariationTransform = new Transform2D(new Vector2(1f, 0f), new Vector2(-ItalicSkew, 1f), Vector2.Zero);
 		return font;
@@ -75,6 +77,15 @@ public static partial class HullDecalPainter
 					case DecalShape.Text:
 						DrawCenteredText(p, color);
 						break;
+					case DecalShape.Ring:
+						DrawArc(new Vector2(p.X, p.Y), p.Radius, 0f, Mathf.Tau, 128, color, p.W, true);
+						break;
+					case DecalShape.Polygon:
+						var points = new Vector2[p.Points.Length];
+						for (int i = 0; i < points.Length; i++)
+							points[i] = new Vector2(p.Points[i].X, p.Points[i].Y);
+						DrawColoredPolygon(points, color);
+						break;
 				}
 			}
 		}
@@ -83,7 +94,7 @@ public static partial class HullDecalPainter
 		private void DrawCenteredText(DecalPrimitive p, Color color)
 		{
 			int size = Mathf.RoundToInt(p.FontSize);
-			Font font = FontFor(p.FontSize, p.Italic);
+			Font font = FontFor(p.FontSize, p.Italic, p.Font);
 			float width = font.GetStringSize(p.Text, HorizontalAlignment.Left, -1f, size).X;
 			float scale = p.MaxWidth > 0f && width > p.MaxWidth ? p.MaxWidth / width : 1f;
 			float baseline = p.Baseline == DecalBaseline.Middle

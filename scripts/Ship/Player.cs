@@ -198,6 +198,11 @@ public partial class Player : CharacterBody3D
 	[Export] public float HullAmbientEnergy = Hull3DDefaults.AmbientEnergy;
 	[Export(PropertyHint.Range, "0,3,0.01")] public float HullHoverGlow = Hull3DDefaults.HoverGlowIntensity;   // brillo de levitación: 1 = 0,32 ± 0,06; 0 = apagado
 	[Export(PropertyHint.Range, "0,3,0.01")] public float HullIridescence = Hull3DDefaults.IridescenceStrength; // perla, camaleón y cúpula
+	// Anticolisión de BLADE (spec docs/cascos-3d-2-blade.md, 6.4): destello de Duration s cada Period s; la de abajo, Offset s después
+	[Export] public float HullStrobePeriod = Hull3DDefaults.Strobe.Period;
+	[Export] public float HullStrobeDuration = Hull3DDefaults.Strobe.Duration;
+	[Export] public float HullStrobeOffset = Hull3DDefaults.Strobe.Offset;
+	[Export] public float HullStrobeIntensity = Hull3DDefaults.Strobe.Intensity;
 
 	private static readonly Hull3DSettings Hull3DDefaults = new();
 
@@ -320,7 +325,14 @@ public partial class Player : CharacterBody3D
 			FillEnergy = HullFillEnergy,
 			AmbientEnergy = HullAmbientEnergy,
 			HoverGlowIntensity = HullHoverGlow,
-			IridescenceStrength = HullIridescence
+			IridescenceStrength = HullIridescence,
+			Strobe = new StrobeSettings
+			{
+				Period = HullStrobePeriod,
+				Duration = HullStrobeDuration,
+				Offset = HullStrobeOffset,
+				Intensity = HullStrobeIntensity
+			}
 		});
 		AddChild(_ship);
 
@@ -658,9 +670,9 @@ public partial class Player : CharacterBody3D
 	}
 
 	// Pintura del casco 3D (depuración: F5 del panel de ajuste). Sin casco 3D no hace nada.
-	public void SetHullPaint(HullPaintChoice choice)
+	public void SetHullPaint(HullStyle style, int combination)
 	{
-		_ship.SetHullPaint(choice);
+		_ship.SetHullPaint(style, combination);
 	}
 
 	// Brillo de levitación sobre la pista bajo la nave, con la inclinación de la pista (no la de la nave) y apagándose
@@ -679,7 +691,7 @@ public partial class Player : CharacterBody3D
 		Vector3 position = GlobalPosition;
 		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * ShipHull3D.GlowLiftAboveTrack + back * _ship.Visual.Hull3D.Glow.CenterZ;
 		float strength = HoverGlow.Strength(_hoverTime, HullHoverGlow) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
-		_ship.UpdateHullEffects(new Transform3D(new Basis(right, up, back), origin), strength, Dynamics.RealSpeed);
+		_ship.UpdateHullEffects(new Transform3D(new Basis(right, up, back), origin), strength, Dynamics.RealSpeed, _hoverTime);
 	}
 
 	private float _hoverTime;
