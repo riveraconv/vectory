@@ -44,9 +44,10 @@ def empty(name, parent, collection, rotation=None):
 
 # Crea un objeto con la sopa de triángulos. Suelda vértices por posición: normales y UV van por esquina,
 # así que el aspecto no cambia y el modelo pesa mucho menos.
-def mesh_object(name, soup, material, parent, collection, matrix=None, uv_scale=1.0):
+# uv2_scale: si se da, una segunda capa de UV ("UV2") con las mismas UV × ese factor (quemaduras del casco)
+def mesh_object(name, soup, material, parent, collection, matrix=None, uv_scale=1.0, uv2_scale=None):
     index = {}
-    verts, faces, normals, uvs = [], [], [], []
+    verts, faces, normals, uvs, uvs2 = [], [], [], [], []
     p = soup.positions
     for i in range(0, len(p), 3):
         face = []
@@ -63,10 +64,14 @@ def mesh_object(name, soup, material, parent, collection, matrix=None, uv_scale=
         for j in (i, i + 1, i + 2):
             normals.append(soup.normals[j])
             uvs += [soup.uvs[j][0] * uv_scale, soup.uvs[j][1] * uv_scale]
+            if uv2_scale is not None:
+                uvs2 += [soup.uvs[j][0] * uv2_scale, soup.uvs[j][1] * uv2_scale]
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts, [], faces)
     layer = mesh.uv_layers.new(name="UVMap")
     layer.data.foreach_set("uv", uvs)
+    if uv2_scale is not None:
+        mesh.uv_layers.new(name="UV2").data.foreach_set("uv", uvs2)
     mesh.update()
     mesh.normals_split_custom_set(normals)
     mesh.materials.append(material)

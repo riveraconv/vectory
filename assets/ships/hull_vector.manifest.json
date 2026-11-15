@@ -1,0 +1,450 @@
+{
+  "blender": "5.2.3 LTS",
+  "exported": "2026-11-15",
+  "root": "HullVector",
+  "environment": "cockpit_blade_env.png",
+  "pieces": [
+    {
+      "name": "Fuselage_Upper"
+    },
+    {
+      "name": "Endplate_L"
+    },
+    {
+      "name": "Endplate_R"
+    },
+    {
+      "name": "Pod_L_Cowl"
+    },
+    {
+      "name": "Pod_R_Cowl"
+    },
+    {
+      "name": "Accent_Chine_L",
+      "emission": "#FF2D2D",
+      "intensity": 0.9
+    },
+    {
+      "name": "Accent_Chine_R",
+      "emission": "#FF2D2D",
+      "intensity": 0.9
+    },
+    {
+      "name": "Accent_WingLE_L",
+      "emission": "#FF2D2D",
+      "intensity": 1.0
+    },
+    {
+      "name": "Accent_WingLE_R",
+      "emission": "#FF2D2D",
+      "intensity": 1.0
+    },
+    {
+      "name": "Accent_Endplate_L",
+      "emission": "#FF2D2D",
+      "intensity": 1.0
+    },
+    {
+      "name": "Accent_Endplate_R",
+      "emission": "#FF2D2D",
+      "intensity": 1.0
+    },
+    {
+      "name": "Accent_PodBand_L",
+      "emission": "#FF2D2D",
+      "intensity": 1.0
+    },
+    {
+      "name": "Accent_PodBand_R",
+      "emission": "#FF2D2D",
+      "intensity": 1.0
+    },
+    {
+      "name": "Light_Nose_L",
+      "emission": "#FF2D2D",
+      "intensity": 3.0
+    },
+    {
+      "name": "Light_Nose_R",
+      "emission": "#FF2D2D",
+      "intensity": 3.0
+    },
+    {
+      "name": "Light_Fin_L",
+      "emission": "#FF2D2D",
+      "intensity": 3.5
+    },
+    {
+      "name": "Light_Fin_R",
+      "emission": "#FF2D2D",
+      "intensity": 3.5
+    },
+    {
+      "name": "Light_Tail_L",
+      "emission": "#FF1A1A",
+      "intensity": 3.5
+    },
+    {
+      "name": "Light_Tail_R",
+      "emission": "#FF1A1A",
+      "intensity": 3.5
+    },
+    {
+      "name": "Nozzle_Glow_L",
+      "emission": "#245BFF",
+      "intensity": 2.2
+    },
+    {
+      "name": "Nozzle_Glow_R",
+      "emission": "#245BFF",
+      "intensity": 2.2
+    },
+    {
+      "name": "Nozzle_Core_L",
+      "emission": "#7FA6FF",
+      "intensity": 3.5
+    },
+    {
+      "name": "Nozzle_Core_R",
+      "emission": "#7FA6FF",
+      "intensity": 3.5
+    },
+    {
+      "name": "Canopy_Glass"
+    },
+    {
+      "name": "Livery_TwinStripe_R_Front"
+    },
+    {
+      "name": "Livery_TwinStripe_R_Rear"
+    },
+    {
+      "name": "Livery_TwinStripe_L_Front"
+    },
+    {
+      "name": "Livery_TwinStripe_L_Rear"
+    },
+    {
+      "name": "Livery_WingBand_L"
+    },
+    {
+      "name": "Livery_WingBand_R"
+    },
+    {
+      "name": "Livery_WingPin_L"
+    },
+    {
+      "name": "Livery_WingPin_R"
+    },
+    {
+      "name": "Decal_Number_Nose"
+    },
+    {
+      "name": "Decal_Number_Pod_L",
+      "width": 0.34,
+      "height": 0.204
+    },
+    {
+      "name": "Decal_Number_Pod_R",
+      "width": 0.34,
+      "height": 0.204
+    },
+    {
+      "name": "Decal_Sponsor_L"
+    },
+    {
+      "name": "Decal_Sponsor_R"
+    },
+    {
+      "name": "Decal_Sponsor_Pod_L",
+      "width": 0.42,
+      "height": 0.105
+    },
+    {
+      "name": "Decal_Sponsor_Pod_R",
+      "width": 0.42,
+      "height": 0.105
+    },
+    {
+      "name": "Decal_Checker_L",
+      "width": 0.56,
+      "height": 0.14
+    },
+    {
+      "name": "Decal_Checker_R",
+      "width": 0.56,
+      "height": 0.14
+    }
+  ],
+  "empties": [
+    {
+      "name": "Exhaust_L",
+      "position": [
+        -0.75,
+        0.1,
+        3.2
+      ]
+    },
+    {
+      "name": "Exhaust_R",
+      "position": [
+        0.75,
+        0.1,
+        3.2
+      ]
+    },
+    {
+      "name": "Trail_L",
+      "position": [
+        -2.6,
+        -0.05,
+        2.72
+      ]
+    },
+    {
+      "name": "Trail_R",
+      "position": [
+        2.6,
+        -0.05,
+        2.72
+      ]
+    },
+    {
+      "name": "Smoke",
+      "position": [
+        0.75,
+        0.5,
+        2.2
+      ]
+    }
+  ],
+  "painted": [
+    "Fuselage_Upper",
+    "Endplate_L",
+    "Endplate_R",
+    "Pod_L_Cowl",
+    "Pod_R_Cowl"
+  ],
+  "accents": [
+    "Accent_Chine_L",
+    "Accent_Chine_R",
+    "Accent_WingLE_L",
+    "Accent_WingLE_R",
+    "Accent_Endplate_L",
+    "Accent_Endplate_R",
+    "Accent_PodBand_L",
+    "Accent_PodBand_R",
+    "Light_Nose_L",
+    "Light_Nose_R",
+    "Light_Fin_L",
+    "Light_Fin_R"
+  ],
+  "tailLights": [
+    "Light_Tail_L",
+    "Light_Tail_R"
+  ],
+  "nozzleLights": [
+    "Nozzle_Glow_L",
+    "Nozzle_Glow_R",
+    "Nozzle_Core_L",
+    "Nozzle_Core_R"
+  ],
+  "stripes": [
+    "Livery_TwinStripe_R_Front",
+    "Livery_TwinStripe_R_Rear",
+    "Livery_TwinStripe_L_Front",
+    "Livery_TwinStripe_L_Rear",
+    "Livery_WingBand_L",
+    "Livery_WingBand_R"
+  ],
+  "pins": [
+    "Livery_WingPin_L",
+    "Livery_WingPin_R"
+  ],
+  "decals": [
+    "Decal_Number_Nose",
+    "Decal_Number_Pod_L",
+    "Decal_Number_Pod_R",
+    "Decal_Sponsor_L",
+    "Decal_Sponsor_R",
+    "Decal_Sponsor_Pod_L",
+    "Decal_Sponsor_Pod_R",
+    "Decal_Checker_L",
+    "Decal_Checker_R"
+  ],
+  "livery": [
+    "Decal_Checker_L",
+    "Decal_Checker_R",
+    "Decal_Number_Nose",
+    "Decal_Number_Pod_L",
+    "Decal_Number_Pod_R",
+    "Decal_Sponsor_L",
+    "Decal_Sponsor_Pod_L",
+    "Decal_Sponsor_Pod_R",
+    "Decal_Sponsor_R",
+    "Livery_TwinStripe_L_Front",
+    "Livery_TwinStripe_L_Rear",
+    "Livery_TwinStripe_R_Front",
+    "Livery_TwinStripe_R_Rear",
+    "Livery_WingBand_L",
+    "Livery_WingBand_R",
+    "Livery_WingPin_L",
+    "Livery_WingPin_R"
+  ],
+  "noShadow": [
+    "Accent_Chine_R",
+    "Accent_Chine_L",
+    "Light_Nose_R",
+    "Light_Nose_L",
+    "Light_Tail_L",
+    "Light_Tail_R",
+    "Canopy_Glass",
+    "Accent_WingLE_L",
+    "Accent_Endplate_L",
+    "Light_Fin_L",
+    "Accent_PodBand_L",
+    "Nozzle_Glow_L",
+    "Nozzle_Core_L",
+    "Accent_WingLE_R",
+    "Accent_Endplate_R",
+    "Light_Fin_R",
+    "Accent_PodBand_R",
+    "Nozzle_Glow_R",
+    "Nozzle_Core_R",
+    "Decal_Number_Nose",
+    "Decal_Sponsor_R",
+    "Decal_Sponsor_L",
+    "Decal_Number_Pod_L",
+    "Decal_Sponsor_Pod_L",
+    "Decal_Checker_L",
+    "Decal_Number_Pod_R",
+    "Decal_Sponsor_Pod_R",
+    "Decal_Checker_R",
+    "Pod_L_M_Dark_NoShadow",
+    "Pod_R_M_Dark_NoShadow"
+  ],
+  "coat": [
+    {
+      "material": "M_Paint",
+      "coat": 0.5,
+      "roughness": 0.22
+    },
+    {
+      "material": "M_Carbon",
+      "coat": 1.0,
+      "roughness": 0.05
+    },
+    {
+      "material": "M_CarbonSatin",
+      "coat": 0.3,
+      "roughness": 0.35
+    },
+    {
+      "material": "M_CanopyIris",
+      "coat": 1.0,
+      "roughness": 0.0
+    },
+    {
+      "material": "M_LiveryStripe",
+      "coat": 1.0,
+      "roughness": 0.04
+    },
+    {
+      "material": "M_LiveryPin",
+      "coat": 1.0,
+      "roughness": 0.04
+    },
+    {
+      "material": "M_Decal_Number",
+      "coat": 1.0,
+      "roughness": 0.05
+    },
+    {
+      "material": "M_Decal_Sponsor",
+      "coat": 1.0,
+      "roughness": 0.05
+    },
+    {
+      "material": "M_Decal_Checker",
+      "coat": 1.0,
+      "roughness": 0.05
+    }
+  ],
+  "roughnessFactors": [
+    {
+      "material": "M_Paint",
+      "factor": 1.7
+    }
+  ],
+  "iridescence": [
+    {
+      "material": "M_CanopyIris",
+      "factor": 1.0,
+      "ior": 1.6,
+      "thickness": [
+        220,
+        620
+      ]
+    }
+  ],
+  "reflections": [
+    {
+      "material": "M_CanopyIris",
+      "factor": 1.8
+    }
+  ],
+  "transparentMaterials": [
+    {
+      "material": "M_CanopyIris",
+      "opacity": 0.7
+    }
+  ],
+  "decalMaterials": [
+    "M_Decal_Number",
+    "M_Decal_Sponsor",
+    "M_Decal_Checker"
+  ],
+  "scorchMaterials": [
+    "M_Paint",
+    "M_Carbon",
+    "M_CarbonSatin",
+    "M_Alu",
+    "M_Titanium",
+    "M_LiveryStripe",
+    "M_LiveryPin"
+  ],
+  "scorchMasks": [
+    "hull_scorch_1.png",
+    "hull_scorch_2.png",
+    "hull_scorch_3.png"
+  ],
+  "uv2Scale": 1.1,
+  "triangles": 23588,
+  "trianglesWithLivery": 27392,
+  "bounds": {
+    "min": [
+      -2.634,
+      -0.31,
+      -4.0
+    ],
+    "max": [
+      2.634,
+      0.7054,
+      3.31
+    ]
+  },
+  "boundsWithLivery": {
+    "min": [
+      -2.634,
+      -0.31,
+      -4.0
+    ],
+    "max": [
+      2.634,
+      0.7054,
+      3.31
+    ]
+  },
+  "halfWidth": 2.634,
+  "halfWidthWithLivery": 2.634
+}
