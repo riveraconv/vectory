@@ -289,11 +289,12 @@ public class BalanceTests
     };
 
     [Fact]
-    public void Rule_1_passes_at_029_and_fails_at_031()
+    public void Rule_1_passes_at_049_and_fails_at_051()
     {
-        Assert.True(BalanceRules.CheckCircuit(Fair(bladeGap: 0.29)).Rule1);
-        Assert.False(BalanceRules.CheckCircuit(Fair(bladeGap: 0.31)).Rule1);
-        Assert.False(BalanceRules.CheckCircuit(Fair(bladeGap: -0.31)).Rule1);
+        Assert.Equal(0.5, BalanceRules.Rule1Margin);
+        Assert.True(BalanceRules.CheckCircuit(Fair(bladeGap: 0.49)).Rule1);
+        Assert.False(BalanceRules.CheckCircuit(Fair(bladeGap: 0.51)).Rule1);
+        Assert.False(BalanceRules.CheckCircuit(Fair(bladeGap: -0.51)).Rule1);
     }
 
     [Fact]

@@ -26,6 +26,8 @@ public partial class TuningLabPanel : CanvasLayer
 
 	private static TuningLab _lab;
 	private static string _lastChosenId;
+	// Pintura del casco 3D (F5 / Mayúsculas + F5): dura hasta cerrar el juego, también con RESTART; no se guarda
+	private static int _paintIndex;
 
 	// La nave que se conduce de verdad, para guardarla con los récords y el fantasma
 	public static string DrivenShipId(string chosenId) => _lab?.DrivenShipId(chosenId) ?? chosenId;
@@ -44,6 +46,7 @@ public partial class TuningLabPanel : CanvasLayer
 	private Label _shipLabel;
 	private CheckBox _linearCheck;
 	private Label _testShipsLabel;
+	private Label _paintLabel;
 	private LabelSettings _percentSettings;
 	private LabelSettings _percentOverSettings;
 
@@ -66,6 +69,18 @@ public partial class TuningLabPanel : CanvasLayer
 		// Con el panel ya usado, la nave sigue con lo que hubiera en él (también tras RESTART)
 		if (_lab.Touched)
 			ApplyToPlayer();
+		if (_paintIndex != 0)
+			Player?.SetHullPaint(HullPaintCatalog.Combinations[_paintIndex]);
+	}
+
+	// Recorre las 40 combinaciones de pintura del casco 3D (spec docs/cascos-3d-1-vector.md, 6.2)
+	private void StepPaint(int delta)
+	{
+		_paintIndex = HullPaintCatalog.Step(_paintIndex, delta);
+		HullPaintChoice choice = HullPaintCatalog.Combinations[_paintIndex];
+		Player?.SetHullPaint(choice);
+		Refresh();
+		GD.Print($"[TuningLab] Paint: {choice.DisplayName} ({_paintIndex + 1}/{HullPaintCatalog.Combinations.Count})");
 	}
 
 	public override void _Input(InputEvent @event)
@@ -80,6 +95,15 @@ public partial class TuningLabPanel : CanvasLayer
 			ApplyToPlayer();
 			Refresh();
 			GD.Print($"[TuningLab] Ship: {ShipCatalog.Find(_lab.Current.Id).Name}");
+		}
+		// Mayúsculas + F5 antes que F5: las dos con las teclas exactas
+		else if (@event.IsActionPressed("debug_hull_paint_previous", false, true))
+		{
+			StepPaint(-1);
+		}
+		else if (@event.IsActionPressed("debug_hull_paint_next", false, true))
+		{
+			StepPaint(1);
 		}
 		else if (@event.IsActionPressed("debug_tuning_dump"))
 		{
@@ -143,8 +167,10 @@ public partial class TuningLabPanel : CanvasLayer
 	private void Refresh()
 	{
 		string id = _lab.Current.Id;
-		string halfWidth = _lab.Current.Visual.CollisionHalfWidth.ToString("0.0", CultureInfo.InvariantCulture);
+		string halfWidth = _lab.Current.Visual.CollisionHalfWidth.ToString("0.00", CultureInfo.InvariantCulture);
 		_shipLabel.Text = $"{ShipCatalog.Find(id).Name} · COLLISION {halfWidth} M";
+		HullPaintChoice paint = HullPaintCatalog.Combinations[_paintIndex];
+		_paintLabel.Text = $"PAINT {paint.DisplayName} · {_paintIndex + 1}/{HullPaintCatalog.Combinations.Count} · F5";
 		_linearCheck.SetPressedNoSignal(_lab.LinearAcceleration);
 
 		// Mismo orden que ShipMultipliers.Parameters. La referencia es Vector tal como está en el panel.
@@ -248,6 +274,8 @@ public partial class TuningLabPanel : CanvasLayer
 
 		_testShipsLabel = new Label { LabelSettings = value };
 		column.AddChild(_testShipsLabel);
+		_paintLabel = new Label { LabelSettings = value };
+		column.AddChild(_paintLabel);
 
 		column.AddChild(new Label { Text = "F9 PANEL · F10 SHIP · F11 DUMP · F12 RESET", LabelSettings = label });
 	}

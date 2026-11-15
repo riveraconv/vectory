@@ -292,6 +292,7 @@ public partial class Main : Node3D
 			var tuningPanel = new TuningLabPanel { Name = "TuningLabPanel", Player = _player };
 			AddChild(tuningPanel);
 			AddChild(new AutopilotToggle { Name = "AutopilotToggle", Player = _player });
+			AddChild(new DebugOrbitCamera { Name = "DebugOrbitCamera", Player = _player });
 
 			var testShips = new TestShips { Name = "TestShips" };
 			AddChild(testShips);

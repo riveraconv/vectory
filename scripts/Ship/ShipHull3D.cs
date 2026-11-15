@@ -13,19 +13,28 @@ public sealed class Hull3DSettings
 	public float RimEnergy { get; init; } = 1.3f / Mathf.Pi;
 	public float FillEnergy { get; init; } = 0.55f / Mathf.Pi;
 	public float AmbientEnergy { get; init; } = 0.3f;
+	// Brillo de levitación (1 = el del prototipo, 0 = apagado) y fuerza del cambio de color de perla y camaleón
+	public float HoverGlowIntensity { get; init; } = 1f;
+	public float IridescenceStrength { get; init; } = 1f;
 }
 
-// Casco 3D de una nave (spec docs/cascos-3d-1-vector.md, 4 y 5): carga el .glb, aplica lo que dice su manifiesto y
-// lo ilumina con sus propias luces, que solo tocan su capa visual. Sin reglas: no sabe de carrera ni de daño. Cada
-// instancia lleva sus propios materiales, así dos naves pueden ir pintadas distinto a la vez.
+// Casco 3D de una nave (spec docs/cascos-3d-1-vector.md, 4, 5 y 6): carga el .glb, aplica lo que dice su manifiesto y
+// lo ilumina con sus propias luces, que solo tocan su capa visual. Recibe pintura, daño, parpadeo y levitación y los
+// pinta; sin reglas. Cada instancia lleva sus propios materiales, así dos naves pueden ir pintadas distinto a la vez.
 public partial class ShipHull3D : Node3D
 {
 	// Capa visual propia del casco: sus luces solo afectan a ella y solo ella proyecta su sombra
 	public const uint HullLayer = 1u << 10;
 
-	// Rugosidad final de GRAFITO (SATINADO): Godot no admite el factor 1,7 sobre la textura (spec, 6.1)
-	private const float PaintRoughness = 0.42f;
 	private const float ShadowMaxDistance = 40f;
+	private const float GlowLift = 0.03f;   // m por encima de la pista
+	private const int SmokeMaxParticles = 40;
+
+	private static readonly string[] ScorchPaths =
+	{
+		"res://assets/ships/hull_scorch_1.png", "res://assets/ships/hull_scorch_2.png", "res://assets/ships/hull_scorch_3.png"
+	};
+	private static readonly Texture2D[] ScorchTextures = new Texture2D[3];
 
 	// Luces del prototipo: desde dónde llegan (hacia el centro de la nave), color y grosor de la sombra
 	private static readonly Vector3 KeySource = new(4f, 10f, -5f);
@@ -37,12 +46,51 @@ public partial class ShipHull3D : Node3D
 	private static readonly Color HemisphereSky = Color.FromHtml("#B0B8C8");
 	private static readonly Color HemisphereGround = Color.FromHtml("#101010");
 
+	// Cambio de color con el ángulo de vista (capa fina): una pasada que suma sobre el material, atenuada en lo quemado
+	private const string IridescenceShader = @"
+shader_type spatial;
+render_mode blend_add, unshaded, cull_disabled, depth_draw_never;
+uniform float strength = 0.0;
+uniform sampler2D scorch : hint_default_transparent, filter_linear_mipmap, repeat_enable;
+varying vec2 uv_scorch;
+void vertex() { uv_scorch = UV2; }
+void fragment() {
+	float c = clamp(abs(dot(normalize(NORMAL), normalize(VIEW))), 0.0, 1.0);
+	float t = 1.0 - c;
+	vec3 film = 0.5 + 0.5 * cos(6.28318 * (vec3(0.0, 0.33, 0.67) + t * 1.6 + 0.12));
+	float edge = 0.08 + 0.92 * pow(t, 2.0);
+	ALBEDO = film * edge * strength * (1.0 - texture(scorch, uv_scorch).a);
+}";
+
+	// Brillo bajo la nave: aditivo, caída radial (1 − d²)²
+	private const string GlowShader = @"
+shader_type spatial;
+render_mode blend_add, unshaded, cull_disabled, depth_draw_never, shadows_disabled;
+uniform float strength = 0.32;
+uniform vec3 tint = vec3(0.14, 0.36, 1.0);
+void fragment() {
+	vec2 d = (UV - 0.5) * 2.0;
+	float k = max(0.0, 1.0 - dot(d, d));
+	ALBEDO = tint * k * k * strength;
+}";
+
 	private readonly Dictionary<string, MeshInstance3D> _pieces = new();
 	private readonly Dictionary<string, Node3D> _empties = new();
+	private readonly Dictionary<string, float> _lightBase = new();
+	private readonly List<StandardMaterial3D> _scorchMaterials = new();
+	private readonly List<ShaderMaterial> _irisPasses = new();
+	private HullManifest _manifest;
 	private DirectionalLight3D _key;
 	private DirectionalLight3D _rim;
 	private DirectionalLight3D _fill;
 	private Hull3DSettings _settings = new();
+	private HullPaintChoice _paint = HullPaintCatalog.Default;
+	private int _paintVersion;
+	private ShaderMaterial _canopyIris;
+	private CpuParticles3D _smoke;
+	private MeshInstance3D _glow;
+	private ShaderMaterial _glowMaterial;
+	private int _scorchLevel;
 
 	public ShipHull3DProfile Profile { get; set; }
 
@@ -52,7 +100,14 @@ public partial class ShipHull3D : Node3D
 	{
 		IsLoaded = LoadModel();
 		BuildLights();
+		BuildSmoke();
+		BuildGlow();
 		ApplySettings(_settings);
+		if (IsLoaded)
+			SetPaint(_paint);
+		// Las máscaras se preparan ya: así el primer golpe de la carrera no da un tirón
+		for (int level = 1; level <= DamageModel.MaxLevel; level++)
+			ScorchTexture(level);
 		// Al final del árbol: la WorldEnvironment de la escena se crea en el _Ready de Main, después de este nodo
 		CallDeferred(MethodName.SetUpWorldReflections);
 	}
@@ -66,10 +121,243 @@ public partial class ShipHull3D : Node3D
 		_rim.LightEnergy = settings.RimEnergy;
 		_fill.LightEnergy = settings.FillEnergy;
 		ApplyAmbient();
+		ApplyIridescence();
 	}
 
 	// Punto vacío del modelo (bocas, estelas, humo) en coordenadas de la nave; cero si no está
 	public Vector3 EmptyPosition(string name) => _empties.TryGetValue(name, out Node3D node) ? node.Position : Vector3.Zero;
+
+	// ---------------------------------------------------------------
+	// Pintura y librea (spec 6.2 y 6.3)
+	// ---------------------------------------------------------------
+
+	public void SetPaint(HullPaintChoice choice)
+	{
+		_paint = choice;
+		if (!IsLoaded)
+			return;
+		HullPaintLook look = HullPaintLook.For(choice);
+
+		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
+			ApplyFinish(MaterialOf(name), look.PaintColor, look.PaintFinish);
+		foreach (string name in new[] { "Endplate_L", "Endplate_R" })
+			ApplyFinish(MaterialOf(name), look.EndplateColor, look.EndplateFinish);
+		foreach (string name in HullPieces.Stripes)
+			ApplyFinish(MaterialOf(name), look.StripeColor, HullPaintLook.StripeFinish);
+		foreach (string name in HullPieces.Pins)
+			ApplyFinish(MaterialOf(name), look.PinColor, HullPaintLook.StripeFinish);
+
+		foreach (string name in HullPieces.AccentEdges.Concat(HullPieces.AccentLights).Concat(HullPieces.TailLights).Concat(HullPieces.NozzleLights))
+		{
+			StandardMaterial3D material = MaterialOf(name);
+			if (material != null)
+				material.Emission = HullDecalPainter.ToColor(look.LightColor(name));
+		}
+
+		foreach (string name in HullPieces.LiveryPieces)
+		{
+			if (_pieces.TryGetValue(name, out MeshInstance3D mesh))
+				mesh.Visible = look.LiveryVisible;
+		}
+		ApplyIridescence();
+		if (look.LiveryVisible)
+			PaintDecals(look);
+	}
+
+	private static void ApplyFinish(StandardMaterial3D material, uint color, HullFinish finish)
+	{
+		if (material == null)
+			return;
+		material.AlbedoColor = HullDecalPainter.ToColor(color);
+		material.Metallic = finish.Metal;
+		material.RoughnessTexture = null;
+		material.Roughness = finish.Roughness;
+		material.ClearcoatEnabled = finish.Coat > 0f;
+		material.Clearcoat = finish.Coat;
+		material.ClearcoatRoughness = finish.CoatRoughness;
+	}
+
+	// Las calcomanías se pintan una vez por pintura; las de los dos lados comparten textura
+	private void PaintDecals(HullPaintLook look)
+	{
+		int version = ++_paintVersion;
+		var done = new Dictionary<DecalCanvas, List<string>>();
+		foreach ((string piece, DecalCanvas canvas) in HullDecalDrawing.For(look))
+		{
+			if (!done.TryGetValue(canvas, out List<string> pieces))
+				done[canvas] = pieces = new List<string>();
+			pieces.Add(piece);
+		}
+		foreach ((DecalCanvas canvas, List<string> pieces) in done)
+		{
+			HullDecalPainter.Paint(this, canvas, texture =>
+			{
+				if (version != _paintVersion)
+					return;   // llegó tarde: ya hay otra pintura
+				foreach (string piece in pieces)
+				{
+					StandardMaterial3D material = MaterialOf(piece);
+					if (material != null)
+					{
+						material.AlbedoTexture = texture;
+						material.AlbedoColor = Colors.White;
+					}
+				}
+			});
+		}
+	}
+
+	// Perla, camaleón y la cúpula: cambio de color con el ángulo (StandardMaterial3D no tiene iridiscencia)
+	private void ApplyIridescence()
+	{
+		if (!IsLoaded)
+			return;
+		float paint = _paint.Paint.Finish.Iridescence * _settings.IridescenceStrength;
+		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
+			SetIridescence(MaterialOf(name), paint);
+		bool endplatesPainted = !_paint.WithLivery;
+		foreach (string name in new[] { "Endplate_L", "Endplate_R" })
+			SetIridescence(MaterialOf(name), endplatesPainted ? paint : 0f);
+		_canopyIris?.SetShaderParameter("strength", IridescenceOfCanopy * _settings.IridescenceStrength);
+	}
+
+	// Fuerza de la pasada sobre la pintura y sobre la cúpula, a ojo con el prototipo
+	private const float IridescenceOfPaint = 0.16f;
+	private const float IridescenceOfCanopy = 0.18f;
+
+	private void SetIridescence(StandardMaterial3D material, float amount)
+	{
+		if (material == null)
+			return;
+		if (amount <= 0f)
+		{
+			material.NextPass = null;
+			return;
+		}
+		if (material.NextPass is not ShaderMaterial pass)
+		{
+			pass = NewIridescencePass();
+			material.NextPass = pass;
+		}
+		pass.SetShaderParameter("strength", amount * IridescenceOfPaint);
+		pass.SetShaderParameter("scorch", ScorchTexture(_scorchLevel));
+	}
+
+	private ShaderMaterial NewIridescencePass()
+	{
+		var pass = new ShaderMaterial { Shader = new Shader { Code = IridescenceShader } };
+		_irisPasses.Add(pass);
+		return pass;
+	}
+
+	// ---------------------------------------------------------------
+	// Daño visible (spec 6.5)
+	// ---------------------------------------------------------------
+
+	// Nivel de daño (0–3; en TIME TRIAL, 0): quemaduras y humo
+	public void SetDamage(int level, bool timeTrial)
+	{
+		_scorchLevel = HullDamage.ScorchMask(level, timeTrial);
+		Texture2D scorch = ScorchTexture(_scorchLevel);
+		foreach (StandardMaterial3D material in _scorchMaterials)
+		{
+			material.DetailEnabled = scorch != null;
+			material.DetailAlbedo = scorch;
+		}
+		foreach (ShaderMaterial pass in _irisPasses)
+			pass.SetShaderParameter("scorch", scorch);
+
+		float rate = HullDamage.SmokePerSecond(level, timeTrial);
+		if (_smoke != null)
+		{
+			_smoke.Emitting = rate > 0f;
+			if (rate > 0f)
+			{
+				_smoke.Amount = Mathf.Clamp(Mathf.CeilToInt(rate * HullDamage.SmokeLifetime) + 1, 1, SmokeMaxParticles);
+				_smoke.Color = HullDecalPainter.ToColor(HullDamage.SmokeColor(level));
+			}
+		}
+	}
+
+	// Parpadeo de las 14 luces: el mismo EdgeFlicker de los daños, con una "arista" por luz
+	public void ShowLightFlicker(EdgeFlicker flicker)
+	{
+		int i = 0;
+		foreach (string name in HullPieces.FlickerLights)
+		{
+			StandardMaterial3D material = MaterialOf(name);
+			if (material != null && _lightBase.TryGetValue(name, out float baseEnergy))
+				material.EmissionEnergyMultiplier = baseEnergy * (flicker.IsDimmed(i) ? HullDamage.DimFactor : 1f);
+			i++;
+		}
+	}
+
+	// La recolocación borra el humo que había
+	public void ClearSmoke()
+	{
+		if (_smoke == null)
+			return;
+		bool emitting = _smoke.Emitting;
+		_smoke.Restart();
+		_smoke.Emitting = emitting;
+	}
+
+	// Cada frame: brillo bajo la nave (sobre la pista, con su inclinación) y tamaño del humo según la velocidad
+	public void UpdateEffects(Transform3D glowTransform, float glowStrength, float speed)
+	{
+		if (_glow != null)
+		{
+			_glow.GlobalTransform = glowTransform;
+			_glow.Visible = glowStrength > 0.001f;
+			_glowMaterial.SetShaderParameter("strength", glowStrength);
+		}
+		if (_smoke != null)
+		{
+			float final = HullDamage.SmokeFinalSize(speed);
+			_smoke.ScaleAmountMin = final;
+			_smoke.ScaleAmountMax = final;
+		}
+	}
+
+	private static Texture2D ScorchTexture(int level)
+	{
+		if (level <= 0)
+			return null;
+		int i = level - 1;
+		if (ScorchTextures[i] != null)
+			return ScorchTextures[i];
+		// Color casi negro con la máscara en el alfa: el detalle de Godot mezcla con el alfa de su textura por la UV2
+		var source = GD.Load<Texture2D>(ScorchPaths[i]);
+		if (source == null)
+			return null;
+		Image mask = source.GetImage();
+		if (mask.IsCompressed())
+			mask.Decompress();
+		if (mask.HasMipmaps())
+			mask.ClearMipmaps();
+		mask.Convert(Image.Format.L8);
+		byte[] gray = mask.GetData();
+		var rgba = new byte[gray.Length * 4];
+		uint dark = HullDamage.ScorchColor;
+		for (int p = 0; p < gray.Length; p++)
+		{
+			rgba[p * 4] = (byte)((dark >> 16) & 0xFF);
+			rgba[p * 4 + 1] = (byte)((dark >> 8) & 0xFF);
+			rgba[p * 4 + 2] = (byte)(dark & 0xFF);
+			rgba[p * 4 + 3] = gray[p];
+		}
+		Image image = Image.CreateFromData(mask.GetWidth(), mask.GetHeight(), false, Image.Format.Rgba8, rgba);
+		image.GenerateMipmaps();
+		ScorchTextures[i] = ImageTexture.CreateFromImage(image);
+		return ScorchTextures[i];
+	}
+
+	// ---------------------------------------------------------------
+	// Carga
+	// ---------------------------------------------------------------
+
+	private StandardMaterial3D MaterialOf(string piece) =>
+		_pieces.TryGetValue(piece, out MeshInstance3D mesh) ? mesh.GetSurfaceOverrideMaterial(0) as StandardMaterial3D : null;
 
 	private bool LoadModel()
 	{
@@ -81,6 +369,7 @@ public partial class ShipHull3D : Node3D
 			GD.PushError($"[Hull3D] Cannot load {Profile.ModelPath} or {Profile.ManifestPath}");
 			return false;
 		}
+		_manifest = manifest;
 
 		Node model = scene.Instantiate();
 		AddChild(model);
@@ -108,6 +397,8 @@ public partial class ShipHull3D : Node3D
 	private void ApplyManifest(HullManifest manifest)
 	{
 		var noShadow = new HashSet<string>(manifest.NoShadow);
+		var scorch = new HashSet<string>(manifest.ScorchMaterials);
+		var decals = new HashSet<string>(manifest.DecalMaterials);
 		foreach (MeshInstance3D mesh in _pieces.Values)
 		{
 			mesh.Layers = HullLayer;
@@ -121,23 +412,31 @@ public partial class ShipHull3D : Node3D
 				var material = (StandardMaterial3D)source.Duplicate();
 				material.ResourceName = source.ResourceName;
 				Prepare(material, manifest);
+				if (scorch.Contains(material.ResourceName))
+				{
+					material.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mix;
+					material.DetailUVLayer = BaseMaterial3D.DetailUV.UV2;
+					_scorchMaterials.Add(material);
+				}
+				if (decals.Contains(material.ResourceName))
+					MakeDecal(material);
+				if (material.ResourceName == "M_CanopyIris")
+				{
+					_canopyIris = NewIridescencePass();
+					material.NextPass = _canopyIris;
+				}
 				mesh.SetSurfaceOverrideMaterial(i, material);
 			}
 		}
 
-		// Sin librea, sus piezas no se dibujan (la librea y las calcomanías llegan con las pinturas)
-		foreach (string name in HullPieces.LiveryPieces)
-		{
-			if (_pieces.TryGetValue(name, out MeshInstance3D mesh))
-				mesh.Visible = false;
-		}
-
 		foreach (CockpitManifestPiece piece in manifest.Pieces.Where(p => p.Intensity.HasValue))
 		{
-			if (_pieces.TryGetValue(piece.Name, out MeshInstance3D mesh) && mesh.GetActiveMaterial(0) is StandardMaterial3D material)
+			StandardMaterial3D material = MaterialOf(piece.Name);
+			if (material != null)
 			{
 				material.EmissionEnabled = true;
 				material.EmissionEnergyMultiplier = piece.Intensity.Value;
+				_lightBase[piece.Name] = piece.Intensity.Value;
 			}
 		}
 	}
@@ -156,12 +455,6 @@ public partial class ShipHull3D : Node3D
 			material.ClearcoatRoughness = coat.Roughness;
 		}
 
-		if (name == "M_Paint")
-		{
-			material.RoughnessTexture = null;
-			material.Roughness = PaintRoughness;
-		}
-
 		float reflection = manifest.ReflectionFactor(name);
 		if (reflection != 1f)
 		{
@@ -176,8 +469,18 @@ public partial class ShipHull3D : Node3D
 			material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
 			material.DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled;
 			Color albedo = material.AlbedoColor;
-			material.AlbedoColor = new Color(albedo.R, albedo.G, albedo.B, transparent.Opacity);
+			material.AlbedoColor = new Color(albedo.R, albedo.G, albedo.B, albedo.A < 1f ? albedo.A : transparent.Opacity);
 		}
+	}
+
+	// Calcomanía: su dibujo con alfa, sin escribir profundidad, por encima de la pintura. Invisible hasta que llega
+	// su dibujo (se pinta en el frame siguiente).
+	private static void MakeDecal(StandardMaterial3D material)
+	{
+		material.AlbedoColor = new Color(1f, 1f, 1f, 0f);
+		material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+		material.DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled;
+		material.RenderPriority = 1;
 	}
 
 	// Colgadas de la nave: giran con ella, así el casco se ve igual en cualquier curva
@@ -206,6 +509,77 @@ public partial class ShipHull3D : Node3D
 		light.Transform = Transform3D.Identity.LookingAt(-source, Vector3.Up);
 		return light;
 	}
+
+	// Humo con daño, desde Smoke, en el espacio del mundo: se queda atrás al avanzar. La pausa lo congela.
+	private void BuildSmoke()
+	{
+		var texture = new GradientTexture2D
+		{
+			Width = 64,
+			Height = 64,
+			Fill = GradientTexture2D.FillEnum.Radial,
+			FillFrom = new Vector2(0.5f, 0.5f),
+			FillTo = new Vector2(1f, 0.5f),
+			Gradient = new Gradient { Colors = new[] { new Color(1f, 1f, 1f, 0.9f), new Color(1f, 1f, 1f, 0f) }, Offsets = new[] { 0f, 1f } }
+		};
+		var material = new StandardMaterial3D
+		{
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
+			VertexColorUseAsAlbedo = true,
+			AlbedoTexture = texture,
+			DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled
+		};
+		var scale = new Curve();
+		scale.AddPoint(new Vector2(0f, HullDamage.SmokeStartSize / HullDamage.SmokeEndSize));
+		scale.AddPoint(new Vector2(1f, 1f));
+		var fade = new Gradient
+		{
+			Colors = new[] { new Color(1f, 1f, 1f, HullDamage.SmokeStartOpacity), new Color(1f, 1f, 1f, 0f) },
+			Offsets = new[] { 0f, 1f }
+		};
+		float spread = Mathf.RadToDeg(Mathf.Atan2(HullDamage.SmokeSideSpread, (HullDamage.SmokeRiseMin + HullDamage.SmokeRiseMax) / 2f));
+		_smoke = new CpuParticles3D
+		{
+			Name = "Smoke",
+			Emitting = false,
+			Amount = 1,
+			Lifetime = HullDamage.SmokeLifetime,
+			LocalCoords = false,
+			Mesh = new QuadMesh { Size = Vector2.One, Material = material },
+			Direction = Vector3.Up,
+			Spread = spread,
+			Gravity = Vector3.Zero,
+			InitialVelocityMin = HullDamage.SmokeRiseMin,
+			InitialVelocityMax = HullDamage.SmokeRiseMax,
+			ScaleAmountMin = HullDamage.SmokeEndSize,
+			ScaleAmountMax = HullDamage.SmokeEndSize,
+			ScaleAmountCurve = scale,
+			ColorRamp = fade,
+			Position = EmptyPosition(HullPieces.Smoke)
+		};
+		AddChild(_smoke);
+	}
+
+	// Brillo de levitación: un plano sobre la pista; lo coloca la nave cada frame (no sigue su inclinación)
+	private void BuildGlow()
+	{
+		_glowMaterial = new ShaderMaterial { Shader = new Shader { Code = GlowShader } };
+		_glowMaterial.SetShaderParameter("tint", new Vector3(HoverGlow.ColorR, HoverGlow.ColorG, HoverGlow.ColorB));
+		var mesh = new PlaneMesh { Size = new Vector2(HoverGlow.Width, HoverGlow.Length), Material = _glowMaterial };
+		_glow = new MeshInstance3D
+		{
+			Name = "HoverGlow",
+			Mesh = mesh,
+			TopLevel = true,
+			Visible = false,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+		};
+		AddChild(_glow);
+	}
+
+	public static float GlowLiftAboveTrack => GlowLift;
 
 	// Reflejos y luz ambiente del casco: el cielo del entorno, solo para reflejos, con el fondo de color de siempre.
 	// El resto del mundo de carrera no recibe luz (todo es unshaded), así que no cambia.

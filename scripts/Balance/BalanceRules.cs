@@ -27,7 +27,8 @@ public sealed class CircuitCheck
 // Lógica pura: no depende de Godot.
 public static class BalanceRules
 {
-	public const double Rule1Margin = 0.3;   // s
+	// s. La spec dice 0,3; decisión del usuario con el casco 3D de VECTOR (alas más cortas, HAMMER a +0,333)
+	public const double Rule1Margin = 0.5;
 	public const string ReferenceShipId = "ship_01";
 
 	private const double TieTolerance = 1e-6;

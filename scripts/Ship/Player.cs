@@ -196,6 +196,8 @@ public partial class Player : CharacterBody3D
 	[Export] public float HullRimEnergy = Hull3DDefaults.RimEnergy;
 	[Export] public float HullFillEnergy = Hull3DDefaults.FillEnergy;
 	[Export] public float HullAmbientEnergy = Hull3DDefaults.AmbientEnergy;
+	[Export(PropertyHint.Range, "0,3,0.01")] public float HullHoverGlow = Hull3DDefaults.HoverGlowIntensity;   // brillo de levitación: 1 = 0,32 ± 0,06; 0 = apagado
+	[Export(PropertyHint.Range, "0,3,0.01")] public float HullIridescence = Hull3DDefaults.IridescenceStrength; // perla, camaleón y cúpula
 
 	private static readonly Hull3DSettings Hull3DDefaults = new();
 
@@ -316,7 +318,9 @@ public partial class Player : CharacterBody3D
 			KeyEnergy = HullKeyEnergy,
 			RimEnergy = HullRimEnergy,
 			FillEnergy = HullFillEnergy,
-			AmbientEnergy = HullAmbientEnergy
+			AmbientEnergy = HullAmbientEnergy,
+			HoverGlowIntensity = HullHoverGlow,
+			IridescenceStrength = HullIridescence
 		});
 		AddChild(_ship);
 
@@ -447,6 +451,7 @@ public partial class Player : CharacterBody3D
 	{
 		GlobalPosition = position;
 		_physics.Respawn(ToNumerics(GlobalPosition), yaw);
+		_ship.ClearHullSmoke();
 		_bank.Reset();
 		ResetCameraEffects();
 		SettleOnSurface();
@@ -481,6 +486,7 @@ public partial class Player : CharacterBody3D
 	public void SetFlickerLevel(int level)
 	{
 		_damageLevel = level;
+		_ship.SetHullDamage(level, !CockpitDamageEnabled);
 		if (level <= 0 && _shipFlicker == null)
 			return;
 
@@ -532,6 +538,7 @@ public partial class Player : CharacterBody3D
 			DamageTint = CockpitDamageTintIntensity,
 			ScreenGlow = CockpitScreenGlowIntensity
 		}, dt);
+		UpdateHullEffects(dt);
 
 		if (_shipFlicker == null)
 			return;
@@ -649,6 +656,33 @@ public partial class Player : CharacterBody3D
 		_ship.Position = new Vector3(0f, -drop, 0f);
 		_cockpit.Position = new Vector3(0f, -drop, 0f);
 	}
+
+	// Pintura del casco 3D (depuración: F5 del panel de ajuste). Sin casco 3D no hace nada.
+	public void SetHullPaint(HullPaintChoice choice)
+	{
+		_ship.SetHullPaint(choice);
+	}
+
+	// Brillo de levitación sobre la pista bajo la nave, con la inclinación de la pista (no la de la nave) y apagándose
+	// en el aire; y la velocidad, que agranda el humo. Con la pausa no avanza: queda congelado.
+	private void UpdateHullEffects(float dt)
+	{
+		if (!_ship.HasHull3D || !_physics.HasSurface)
+			return;
+		_hoverTime += dt;
+		SurfacePoint surface = _physics.Surface;
+		Vector3 up = ShipLineMesh.ToGodot(surface.Frame.Normal).Normalized();
+		float yaw = Dynamics.Yaw;
+		var back = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+		back = (back - up * back.Dot(up)).Normalized();
+		Vector3 right = up.Cross(back).Normalized();
+		Vector3 position = GlobalPosition;
+		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * ShipHull3D.GlowLiftAboveTrack + back * HoverGlow.CenterZ;
+		float strength = HoverGlow.Strength(_hoverTime, HullHoverGlow) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
+		_ship.UpdateHullEffects(new Transform3D(new Basis(right, up, back), origin), strength, Dynamics.RealSpeed);
+	}
+
+	private float _hoverTime;
 
 	// "Arriba" para la cámara exterior: el de la superficie en el suelo, el del mundo en el aire
 	private Vector3 SurfaceUp()

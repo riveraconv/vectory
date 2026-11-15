@@ -19,8 +19,17 @@ public partial class Spaceship : Node3D
 	// el menú y las naves de prueba siguen con el wireframe (spec docs/cascos-3d-1-vector.md, 4.7). Antes de _Ready.
 	public bool Use3DHull { get; set; }
 
-	// Número de aristas (líneas) de la nave: cada una puede parpadear por su cuenta con los daños
-	public int EdgeCount { get; private set; }
+	// Pintura y daño del casco 3D: se guardan para volver a ponerlos si F10 lo rehace
+	private HullPaintChoice _hullPaint = HullPaintCatalog.Default;
+	private int _hullDamage;
+	private bool _hullTimeTrial;
+	private int _wireEdgeCount;
+
+	// Número de aristas que pueden parpadear por su cuenta con los daños: las líneas del wireframe o, con casco 3D,
+	// sus 14 luces
+	public int EdgeCount => _hull3D != null ? HullDamage.FlickerLightCount : _wireEdgeCount;
+
+	public bool HasHull3D => _hull3D != null;
 
 	public override void _Ready()
 	{
@@ -35,6 +44,32 @@ public partial class Spaceship : Node3D
 		_hull3D?.ApplySettings(settings);
 	}
 
+	// Pintura del casco 3D (sin casco 3D no hace nada)
+	public void SetHullPaint(HullPaintChoice choice)
+	{
+		_hullPaint = choice;
+		_hull3D?.SetPaint(choice);
+	}
+
+	// Daño visible del casco 3D: quemaduras y humo (en TIME TRIAL, nada)
+	public void SetHullDamage(int level, bool timeTrial)
+	{
+		_hullDamage = level;
+		_hullTimeTrial = timeTrial;
+		_hull3D?.SetDamage(level, timeTrial);
+	}
+
+	public void ClearHullSmoke()
+	{
+		_hull3D?.ClearSmoke();
+	}
+
+	// Brillo de levitación (transformación sobre la pista y fuerza) y velocidad para el tamaño del humo
+	public void UpdateHullEffects(Transform3D glow, float glowStrength, float speed)
+	{
+		_hull3D?.UpdateEffects(glow, glowStrength, speed);
+	}
+
 	// Pone o quita el casco 3D según el perfil actual; el wireframe se oculta mientras haya uno
 	private void RebuildHull3D()
 	{
@@ -47,8 +82,10 @@ public partial class Spaceship : Node3D
 		if (profile != null && _hull3D == null)
 		{
 			_hull3D = new ShipHull3D { Name = "Hull3D", Profile = profile };
-			AddChild(_hull3D);
 			_hull3D.ApplySettings(_hullSettings);
+			_hull3D.SetPaint(_hullPaint);
+			AddChild(_hull3D);
+			_hull3D.SetDamage(_hullDamage, _hullTimeTrial);
 		}
 		ApplyVisibility();
 	}
@@ -94,6 +131,12 @@ public partial class Spaceship : Node3D
 	// de la nave por el de parpadeo; sin llamarla (menú, fantasma) la nave conserva su material de siempre.
 	public void ShowEdgeFlicker(EdgeFlicker flicker, float dimOpacity)
 	{
+		// Con casco 3D titilan sus luces (bajan al 20 %, spec docs/cascos-3d-1-vector.md, 6.5)
+		if (_hull3D != null)
+		{
+			_hull3D.ShowLightFlicker(flicker);
+			return;
+		}
 		if (_flickerMaterial == null)
 		{
 			_flickerMaterial = new EdgeFlickerMaterial(EdgeCount);
@@ -106,7 +149,7 @@ public partial class Spaceship : Node3D
 	private ArrayMesh BuildMesh()
 	{
 		ArrayMesh mesh = ShipLineMesh.Build(Visual.BuildHull(), out int edgeCount);
-		EdgeCount = edgeCount;
+		_wireEdgeCount = edgeCount;
 		return mesh;
 	}
 }
