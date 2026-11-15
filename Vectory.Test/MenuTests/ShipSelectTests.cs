@@ -260,10 +260,13 @@ public class ShipSelectLogicTests
 
 public class HologramFramingTests
 {
-    // Lo que se ve en el holograma: el casco 3D si la nave lo tiene (VECTOR), si no el wireframe
-    private static HologramBounds Bounds(ShipDefinition ship) => ship.Visual.Hull3D != null
-        ? HologramFraming.BoundsOf(Vectory.Test.ShipTests.Hull3DTests.Manifest)
-        : HologramFraming.BoundsOf(ship.Visual.BuildHull());
+    // Lo que se ve en el holograma: el casco 3D si la nave lo tiene (VECTOR y BLADE, con su sonda), si no el wireframe
+    private static HologramBounds Bounds(ShipDefinition ship) => ship.Visual.Hull3D switch
+    {
+        null => HologramFraming.BoundsOf(ship.Visual.BuildHull()),
+        { Style: HullStyle.Military } => HologramFraming.BoundsOf(Vectory.Test.ShipTests.Hull3DBladeTests.Manifest),
+        _ => HologramFraming.BoundsOf(Vectory.Test.ShipTests.Hull3DTests.Manifest)
+    };
 
     private static float Scale => HologramFraming.PixelsPerMeter(480f);
 
@@ -300,7 +303,7 @@ public class HologramFramingTests
     // Misma escala: el tamaño en pantalla es el ancho real de cada nave por los mismos px por metro
     [Theory]
     [InlineData(ShipCatalog.Ship01, 371.8f)]   // casco 3D: alas más cortas, se ve más estrecho que antes
-    [InlineData(ShipCatalog.Ship02, 225.9f)]
+    [InlineData(ShipCatalog.Ship02, 227.6f)]   // casco 3D: el bisel de las puntas traseras
     [InlineData(ShipCatalog.Ship03, 352.9f)]
     public void CommonScale_WidthOnScreen(string id, float expected)
     {
@@ -319,7 +322,7 @@ public class HologramFramingTests
 
     [Theory]
     [InlineData(ShipCatalog.Ship01, 9.07f)]
-    [InlineData(ShipCatalog.Ship02, 9.38f)]
+    [InlineData(ShipCatalog.Ship02, 9.93f)]    // casco 3D con la sonda (spec docs/cascos-3d-2-blade.md, 7)
     [InlineData(ShipCatalog.Ship03, 8.40f)]
     public void SphereDiameter_OfEachShip(string id, float expected)
     {

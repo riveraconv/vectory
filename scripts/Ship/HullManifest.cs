@@ -23,7 +23,8 @@ public sealed class HullManifestCoat
 	[JsonPropertyName("roughness")] public float Roughness { get; set; }
 }
 
-// Lo que el script de Blender del casco apunta y glTF no lleva (spec docs/cascos-3d-1-vector.md, 3.8). Lógica pura.
+// Lo que el script de Blender del casco apunta y glTF no lleva (spec docs/cascos-3d-1-vector.md, 3.8, y
+// docs/cascos-3d-2-blade.md, 3.8). Lógica pura.
 public sealed class HullManifest
 {
 	[JsonPropertyName("blender")] public string Blender { get; set; } = "";
@@ -50,6 +51,19 @@ public sealed class HullManifest
 	[JsonPropertyName("bounds")] public CockpitManifestBounds Bounds { get; set; } = new();
 	[JsonPropertyName("boundsWithLivery")] public CockpitManifestBounds BoundsWithLivery { get; set; } = new();
 	[JsonPropertyName("halfWidth")] public float HalfWidth { get; set; }
+	[JsonPropertyName("iridescence")] public List<HullManifestIridescence> Iridescence { get; set; } = new();
+
+	// Solo BLADE: grupos de pintura, luces, sonda, máscaras del camuflaje y caja sin la sonda
+	[JsonPropertyName("tips")] public List<string> Tips { get; set; } = new();
+	[JsonPropertyName("armor")] public List<string> Armor { get; set; } = new();
+	[JsonPropertyName("bottom")] public List<string> Bottom { get; set; } = new();
+	[JsonPropertyName("navLights")] public List<string> NavLights { get; set; } = new();
+	[JsonPropertyName("strobes")] public List<string> Strobes { get; set; } = new();
+	[JsonPropertyName("flickerLights")] public List<string> FlickerLights { get; set; } = new();
+	[JsonPropertyName("probe")] public string Probe { get; set; } = "";
+	[JsonPropertyName("floor")] public List<string> Floor { get; set; } = new();
+	[JsonPropertyName("camoMasks")] public List<HullManifestCamoMask> CamoMasks { get; set; } = new();
+	[JsonPropertyName("boundsWithoutProbe")] public CockpitManifestBounds BoundsWithoutProbe { get; set; } = new();
 
 	// Null si el texto no se puede leer
 	public static HullManifest Parse(string json)
@@ -72,11 +86,44 @@ public sealed class HullManifest
 
 	public HullManifestCoat CoatOf(string material) => Coat.FirstOrDefault(c => c.Material == material);
 
-	// Piezas del contrato que no aparecen entre estos nombres
+	public float IridescenceFactor(string material) => Iridescence.FirstOrDefault(i => i.Material == material)?.Factor ?? 0f;
+
+	// Piezas del contrato de VECTOR que no aparecen entre estos nombres
 	public static IEnumerable<string> Missing(IEnumerable<string> present) => CockpitManifest.Missing(present, HullPieces.Contract);
+
+	// Piezas de un contrato que no aparecen entre estos nombres
+	public static IEnumerable<string> Missing(IEnumerable<string> present, HullContract contract) =>
+		CockpitManifest.Missing(present, contract.Pieces);
 }
 
-// Nombres de las piezas del casco 3D: el contrato con el script de Blender (spec, 3.8). Godot las busca así.
+// Contrato de un casco 3D con su script de Blender: raíz, piezas que Godot busca por nombre y luces que titilan con el
+// daño. Sale del estilo del casco. Lógica pura.
+public sealed record HullContract(string Root, IReadOnlyList<string> Pieces, IReadOnlyList<string> FlickerLights)
+{
+	// Los puntos vacíos son los mismos en todos los cascos
+	public static IReadOnlyList<string> Empties => HullPieces.Empties;
+
+	public static readonly HullContract Racing = new(HullPieces.Root, HullPieces.Contract, HullPieces.FlickerLights.ToList());
+	public static readonly HullContract Military = new(MilitaryHullPieces.Root, MilitaryHullPieces.Contract, MilitaryHullPieces.FlickerLights);
+
+	public static HullContract For(HullStyle style) => style == HullStyle.Military ? Military : Racing;
+}
+
+// Iridiscencia de un material (cúpula de VECTOR, bola de sensores de BLADE): Godot no la tiene
+public sealed class HullManifestIridescence
+{
+	[JsonPropertyName("material")] public string Material { get; set; } = "";
+	[JsonPropertyName("factor")] public float Factor { get; set; }
+}
+
+// Máscara del camuflaje de un material (BLADE): archivo junto al manifiesto
+public sealed class HullManifestCamoMask
+{
+	[JsonPropertyName("material")] public string Material { get; set; } = "";
+	[JsonPropertyName("mask")] public string Mask { get; set; } = "";
+}
+
+// Nombres de las piezas del casco 3D de VECTOR: el contrato con el script de Blender (spec, 3.8). Godot las busca así.
 public static class HullPieces
 {
 	public const string Root = "HullVector";

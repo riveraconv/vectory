@@ -43,9 +43,25 @@ public sealed record Cockpit3DProfile(string ModelPath, string ManifestPath, str
 	public Cockpit3DLayout Layout => Cockpit3DLayout.For(Style);
 }
 
-// Un casco 3D (spec docs/cascos-3d-1-vector.md): su modelo exportado de Blender, lo que el modelo no puede llevar y
-// su panorama de reflejos
-public sealed record ShipHull3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath);
+// Estilo de un casco 3D: de él salen su contrato de piezas y cómo se pinta
+public enum HullStyle
+{
+	Racing,   // VECTOR (spec docs/cascos-3d-1-vector.md)
+	Military  // BLADE (spec docs/cascos-3d-2-blade.md)
+}
+
+// Brillo de levitación bajo la nave: plano de Width × Length m centrado CenterZ m por detrás del origen
+public readonly record struct HoverGlowShape(float Width, float Length, float CenterZ);
+
+// Un casco 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
+// del que sale su contrato de piezas
+public sealed record ShipHull3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath, HullStyle Style)
+{
+	public HullContract Contract => HullContract.For(Style);
+
+	// El de VECTOR por defecto
+	public HoverGlowShape Glow { get; init; } = new(HoverGlow.Width, HoverGlow.Length, HoverGlow.CenterZ);
+}
 
 // Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco es un constructor: devuelve sus líneas,
 // sin nodos de Godot. Lógica pura.

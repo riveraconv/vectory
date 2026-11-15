@@ -137,6 +137,9 @@
       "name": "Sensor_Ball"
     },
     {
+      "name": "Canopy_Floor"
+    },
+    {
       "name": "Decal_Number_L"
     },
     {
@@ -261,6 +264,9 @@
     "Decal_Insignia_L",
     "Decal_Insignia_R"
   ],
+  "floor": [
+    "Canopy_Floor"
+  ],
   "livery": [
     "Decal_Insignia_L",
     "Decal_Insignia_R",
@@ -277,6 +283,7 @@
     "Light_Strobe_Top",
     "Light_Strobe_Bottom",
     "Canopy_Glass",
+    "Canopy_Floor",
     "Accent_FormProng_L",
     "Light_Tip_L",
     "Nozzle_Glow_L",
@@ -396,8 +403,8 @@
     "hull_scorch_3.png"
   ],
   "uv2Scale": 1.1,
-  "triangles": 28872,
-  "trianglesWithLivery": 29416,
+  "triangles": 32148,
+  "trianglesWithLivery": 32692,
   "bounds": {
     "min": [
       -1.612,

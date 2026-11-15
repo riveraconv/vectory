@@ -5,7 +5,8 @@ using System.Numerics;
 namespace Vectory.Ship;
 
 // BLADE (ship_02): más punta, a cambio de giro y agarre (equilibrio en docs/naves-6-equilibrio.md). Lógica pura.
-// Casco: Interceptor_E de designs/naves-geometria.js. Cabina: 3D militar, de designs/cabina-3d-blade.html (la BURBUJA 2D
+// Casco: 3D militar ASALTO, de designs/casco-3d-blade.html (spec docs/cascos-3d-2-blade.md); el wireframe Interceptor_E
+// de designs/naves-geometria.js lo siguen usando el fantasma y el menú. Cabina: 3D militar, de designs/cabina-3d-blade.html (la BURBUJA 2D
 // de designs/cabinas-hoja-martillo-def.js se quitó en la etapa 3 de docs/cabinas-3d-2-blade.md; el diseño sigue allí).
 public static class BladeShip
 {
@@ -35,7 +36,13 @@ public static class BladeShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			Hull3D = null,   // sin casco 3D todavía: no hereda el de Vector
+			// Casco 3D ASALTO; su panorama es el de su cabina (mismo buildEnv). Brillo de levitación de 3 × 9 m, centrado
+			// 0,7 m por delante del origen
+			Hull3D = new ShipHull3DProfile(
+				"res://assets/ships/hull_blade.glb",
+				"res://assets/ships/hull_blade.manifest.json",
+				"res://assets/cockpits/cockpit_blade_env.png",
+				HullStyle.Military) { Glow = new HoverGlowShape(3.0f, 9.0f, -0.7f) },
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_blade.glb",
 				"res://assets/cockpits/cockpit_blade.manifest.json",
@@ -44,7 +51,9 @@ public static class BladeShip
 			Cockpit = new CockpitFraming(new Vector3(0f, EyeY, EyeZ), CockpitFov, EyePitchRadians * 180f / MathF.PI),
 			ChaseFactor = ChaseFactor,
 			Chase = VectorShip.Definition.Visual.Chase.Scaled(ChaseFactor),
-			CollisionHalfWidth = 1.6f,   // las puntas traseras en flecha
+			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): las puntas traseras en flecha con su
+			// bisel. El wireframe, que siguen usando el fantasma y el menú, llega a 1,6.
+			CollisionHalfWidth = 1.61f,
 			NoseDistance = 5.2f,
 			PhysicsBoxSize = new Vector3(3.2f, 0.62f, 8.8f),
 			PhysicsBoxCenter = new Vector3(0f, 0.17f, -0.8f)

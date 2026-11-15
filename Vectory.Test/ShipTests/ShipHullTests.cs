@@ -103,10 +103,13 @@ public class ShipHullTests
     {
         ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
 
-        // Con casco 3D, el semiancho real es el de su manifiesto (spec docs/cascos-3d-1-vector.md, 4.5)
-        float hull = visual.Hull3D != null
-            ? Hull3DTests.Manifest.HalfWidth
-            : Points(visual.BuildHull()).Max(p => MathF.Abs(p.X));
+        // Con casco 3D, el semiancho real es el de su manifiesto (specs docs/cascos-3d-1-vector.md y
+        // docs/cascos-3d-2-blade.md, 4.5): VECTOR y BLADE; HAMMER, el de su wireframe
+        float hull = visual.Hull3D == null
+            ? Points(visual.BuildHull()).Max(p => MathF.Abs(p.X))
+            : visual.Hull3D.Style == HullStyle.Military
+                ? Hull3DBladeTests.Manifest.HalfWidth
+                : Hull3DTests.Manifest.HalfWidth;
 
         Assert.InRange(MathF.Abs(hull - visual.CollisionHalfWidth), 0f, 0.01f);
     }

@@ -131,7 +131,7 @@ public class ShipCollisionWidthTests
     public void CollisionHalfWidth_OfEachShip()
     {
         Assert.Equal(2.63f, VectorShip.Definition.Visual.CollisionHalfWidth);
-        Assert.Equal(1.6f, BladeShip.Definition.Visual.CollisionHalfWidth);
+        Assert.Equal(1.61f, BladeShip.Definition.Visual.CollisionHalfWidth);
         Assert.Equal(2.5f, HammerShip.Definition.Visual.CollisionHalfWidth);
     }
 

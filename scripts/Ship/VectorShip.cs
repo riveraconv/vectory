@@ -23,7 +23,8 @@ public static class VectorShip
 			Hull3D = new ShipHull3DProfile(
 				"res://assets/ships/hull_vector.glb",
 				"res://assets/ships/hull_vector.manifest.json",
-				"res://assets/cockpits/cockpit_blade_env.png"),
+				"res://assets/cockpits/cockpit_blade_env.png",
+				HullStyle.Racing),
 			// El de la cabina 3D, decisión del usuario: ojo a 1,45 m de la pista (la nave vuela a 2 m), FOV 70 y sin inclinar
 			Cockpit = new CockpitFraming(new Vector3(0f, -0.55f, -1.2f), 70f, 0f),
 			Chase = new ChaseFraming(1.8f, 7f, 3f, new Vector3(0f, 0.3f, -10f)),

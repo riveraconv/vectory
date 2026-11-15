@@ -18,9 +18,10 @@ public sealed class Hull3DSettings
 	public float IridescenceStrength { get; init; } = 1f;
 }
 
-// Casco 3D de una nave (spec docs/cascos-3d-1-vector.md, 4, 5 y 6): carga el .glb, aplica lo que dice su manifiesto y
-// lo ilumina con sus propias luces, que solo tocan su capa visual. Recibe pintura, daño, parpadeo y levitación y los
-// pinta; sin reglas. Cada instancia lleva sus propios materiales, así dos naves pueden ir pintadas distinto a la vez.
+// Casco 3D de una nave (specs docs/cascos-3d-1-vector.md y docs/cascos-3d-2-blade.md, 4, 5 y 6): carga el .glb, aplica
+// lo que dice su manifiesto y lo ilumina con sus propias luces, que solo tocan su capa visual. Las piezas que busca salen
+// del contrato de su estilo (HullContract). Recibe pintura, daño, parpadeo y levitación y los pinta; sin reglas. Cada
+// instancia lleva sus propios materiales, así dos naves pueden ir pintadas distinto a la vez.
 public partial class ShipHull3D : Node3D
 {
 	// Capa visual propia del casco: sus luces solo afectan a ella y solo ella proyecta su sombra
@@ -79,6 +80,10 @@ void fragment() {
 	private readonly Dictionary<string, float> _lightBase = new();
 	private readonly List<StandardMaterial3D> _scorchMaterials = new();
 	private readonly List<ShaderMaterial> _irisPasses = new();
+	// Pasadas de iridiscencia de los materiales que la llevan en el manifiesto, con su factor
+	private readonly List<(ShaderMaterial Pass, float Factor)> _materialIris = new();
+	// Camuflaje ya horneado por máscara y tonos: lo comparten todas las instancias con la misma pintura
+	private static readonly Dictionary<string, ImageTexture> CamoTextures = new();
 	private HullManifest _manifest;
 	private DirectionalLight3D _key;
 	private DirectionalLight3D _rim;
@@ -86,7 +91,6 @@ void fragment() {
 	private Hull3DSettings _settings = new();
 	private HullPaintChoice _paint = HullPaintCatalog.Default;
 	private int _paintVersion;
-	private ShaderMaterial _canopyIris;
 	private CpuParticles3D _smoke;
 	private MeshInstance3D _glow;
 	private ShaderMaterial _glowMaterial;
@@ -105,6 +109,9 @@ void fragment() {
 	}
 
 	public bool IsLoaded { get; private set; }
+
+	// Número de luces que titilan con el daño (14 en VECTOR, 9 en BLADE)
+	public int FlickerLightCount => Profile.Contract.FlickerLights.Count;
 
 	public override void _Ready()
 	{
@@ -141,11 +148,18 @@ void fragment() {
 	// Pintura y librea (spec 6.2 y 6.3)
 	// ---------------------------------------------------------------
 
+	// Pintura de VECTOR. BLADE lleva por ahora su pintura de por defecto, BOSQUE con marcas (sus 40 combinaciones
+	// llegan en la etapa 3 de su spec): la elección se guarda pero no le cambia nada.
 	public void SetPaint(HullPaintChoice choice)
 	{
 		_paint = choice;
 		if (!IsLoaded)
 			return;
+		if (Profile.Style == HullStyle.Military)
+		{
+			ApplyMilitaryPaint(MilitaryHullPaint.Woodland);
+			return;
+		}
 		HullPaintLook look = HullPaintLook.For(choice);
 
 		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
@@ -217,10 +231,84 @@ void fragment() {
 		}
 	}
 
-	// Perla, camaleón y la cúpula: cambio de color con el ángulo (StandardMaterial3D no tiene iridiscencia)
+	// Camuflaje de BLADE: el color sale de la máscara de cada material con los tonos de la pintura (spec 6.2); la panza
+	// y el suelo de la cabina, de color liso. Antirreflejos, metal, titanio, cristal, sensores y luces no cambian.
+	private void ApplyMilitaryPaint(MilitaryPaint paint)
+	{
+		foreach (string name in MilitaryHullPieces.Floor)
+		{
+			StandardMaterial3D material = MaterialOf(name);
+			if (material != null)
+				material.AlbedoColor = HullDecalPainter.ToColor(paint.Base);
+		}
+		SetAlbedoTexture(MilitaryHullPieces.Painted, CamoTexture("M_Paint", MilitaryHullPaint.Tones(paint)));
+		SetAlbedoTexture(MilitaryHullPieces.Armor, CamoTexture("M_PaintArmor", MilitaryHullPaint.ArmorTones(paint)));
+		foreach (string name in MilitaryHullPieces.Bottom)
+		{
+			StandardMaterial3D material = MaterialOf(name);
+			if (material == null)
+				continue;
+			material.AlbedoColor = HullDecalPainter.ToColor(MilitaryHullPaint.Bottom(paint));
+			material.RoughnessTexture = null;
+			material.Roughness = MilitaryHullPaint.BottomRoughness;
+		}
+	}
+
+	private void SetAlbedoTexture(IEnumerable<string> pieces, Texture2D texture)
+	{
+		if (texture == null)
+			return;
+		foreach (string name in pieces)
+		{
+			StandardMaterial3D material = MaterialOf(name);
+			if (material == null)
+				continue;
+			material.AlbedoTexture = texture;
+			material.AlbedoColor = Colors.White;
+		}
+	}
+
+	// Textura de color horneada una vez desde la máscara sin pérdidas que hay junto al manifiesto (con mipmaps: así
+	// los bordes duros del camuflaje no centellean de lejos)
+	private Texture2D CamoTexture(string material, uint[] tones)
+	{
+		HullManifestCamoMask entry = _manifest.CamoMasks.FirstOrDefault(m => m.Material == material);
+		if (entry == null)
+		{
+			GD.PushError($"[Hull3D] No camo mask for {material} in {Profile.ManifestPath}");
+			return null;
+		}
+		string path = Profile.ManifestPath.GetBaseDir().PathJoin(entry.Mask);
+		string key = path + ":" + string.Join(",", tones);
+		if (CamoTextures.TryGetValue(key, out ImageTexture cached))
+			return cached;
+		var source = GD.Load<Texture2D>(path);
+		if (source == null)
+		{
+			GD.PushError($"[Hull3D] Cannot load camo mask {path}");
+			return null;
+		}
+		Image mask = source.GetImage();
+		if (mask.IsCompressed())
+			mask.Decompress();
+		if (mask.HasMipmaps())
+			mask.ClearMipmaps();
+		mask.Convert(Image.Format.Rgb8);
+		byte[] color = MilitaryHullPaint.BakeCamo(mask.GetData(), tones);
+		Image image = Image.CreateFromData(mask.GetWidth(), mask.GetHeight(), false, Image.Format.Rgb8, color);
+		image.GenerateMipmaps();
+		return CamoTextures[key] = ImageTexture.CreateFromImage(image);
+	}
+
+	// Perla, camaleón, la cúpula de VECTOR y la bola de sensores de BLADE: cambio de color con el ángulo
+	// (StandardMaterial3D no tiene iridiscencia)
 	private void ApplyIridescence()
 	{
 		if (!IsLoaded)
+			return;
+		foreach ((ShaderMaterial pass, float factor) in _materialIris)
+			pass.SetShaderParameter("strength", IridescenceOfCanopy * factor * _settings.IridescenceStrength);
+		if (Profile.Style != HullStyle.Racing)
 			return;
 		float paint = _paint.Paint.Finish.Iridescence * _settings.IridescenceStrength;
 		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
@@ -228,7 +316,6 @@ void fragment() {
 		bool endplatesPainted = !_paint.WithLivery;
 		foreach (string name in new[] { "Endplate_L", "Endplate_R" })
 			SetIridescence(MaterialOf(name), endplatesPainted ? paint : 0f);
-		_canopyIris?.SetShaderParameter("strength", IridescenceOfCanopy * _settings.IridescenceStrength);
 	}
 
 	// Fuerza de la pasada sobre la pintura y sobre la cúpula, a ojo con el prototipo
@@ -289,11 +376,11 @@ void fragment() {
 		}
 	}
 
-	// Parpadeo de las 14 luces: el mismo EdgeFlicker de los daños, con una "arista" por luz
+	// Parpadeo de las luces de su contrato: el mismo EdgeFlicker de los daños, con una "arista" por luz
 	public void ShowLightFlicker(EdgeFlicker flicker)
 	{
 		int i = 0;
-		foreach (string name in HullPieces.FlickerLights)
+		foreach (string name in Profile.Contract.FlickerLights)
 		{
 			StandardMaterial3D material = MaterialOf(name);
 			if (material != null && _lightBase.TryGetValue(name, out float baseEnergy))
@@ -384,7 +471,8 @@ void fragment() {
 		AddChild(model);
 		Collect(model);
 
-		List<string> missing = HullManifest.Missing(_pieces.Keys).Concat(HullPieces.Empties.Where(e => !_empties.ContainsKey(e))).ToList();
+		List<string> missing = HullManifest.Missing(_pieces.Keys, Profile.Contract)
+			.Concat(HullContract.Empties.Where(e => !_empties.ContainsKey(e))).ToList();
 		if (missing.Count > 0)
 			GD.PushError("[Hull3D] Missing hull pieces: " + string.Join(", ", missing));
 
@@ -396,7 +484,7 @@ void fragment() {
 	{
 		if (node is MeshInstance3D mesh)
 			_pieces[mesh.Name] = mesh;
-		else if (node is Node3D n && HullPieces.Empties.Contains((string)node.Name))
+		else if (node is Node3D n && HullContract.Empties.Contains((string)node.Name))
 			_empties[node.Name] = n;
 		foreach (Node child in node.GetChildren())
 			Collect(child);
@@ -429,10 +517,12 @@ void fragment() {
 				}
 				if (decals.Contains(material.ResourceName))
 					MakeDecal(material);
-				if (material.ResourceName == "M_CanopyIris")
+				float iris = manifest.IridescenceFactor(material.ResourceName);
+				if (iris > 0f)
 				{
-					_canopyIris = NewIridescencePass();
-					material.NextPass = _canopyIris;
+					ShaderMaterial pass = NewIridescencePass();
+					material.NextPass = pass;
+					_materialIris.Add((pass, iris));
 				}
 				mesh.SetSurfaceOverrideMaterial(i, material);
 			}
@@ -444,6 +534,8 @@ void fragment() {
 			if (material != null)
 			{
 				material.EmissionEnabled = true;
+				if (!string.IsNullOrEmpty(piece.Emission))
+					material.Emission = Color.FromHtml(piece.Emission);
 				material.EmissionEnergyMultiplier = piece.Intensity.Value;
 				_lightBase[piece.Name] = piece.Intensity.Value;
 			}
@@ -581,7 +673,7 @@ void fragment() {
 	{
 		_glowMaterial = new ShaderMaterial { Shader = new Shader { Code = GlowShader } };
 		_glowMaterial.SetShaderParameter("tint", new Vector3(HoverGlow.ColorR, HoverGlow.ColorG, HoverGlow.ColorB));
-		var mesh = new PlaneMesh { Size = new Vector2(HoverGlow.Width, HoverGlow.Length), Material = _glowMaterial };
+		var mesh = new PlaneMesh { Size = new Vector2(Profile.Glow.Width, Profile.Glow.Length), Material = _glowMaterial };
 		_glow = new MeshInstance3D
 		{
 			Name = "HoverGlow",

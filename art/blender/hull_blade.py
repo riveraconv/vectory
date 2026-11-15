@@ -89,6 +89,8 @@ TAIL_LIGHTS = ["Light_Tail"]
 STROBES = ["Light_Strobe_Top", "Light_Strobe_Bottom"]
 NOZZLE_LIGHTS = ["Nozzle_Glow_L", "Nozzle_Glow_R", "Nozzle_Core_L", "Nozzle_Core_R"]
 GLASS = ["Canopy_Glass", "Sensor_Ball"]
+# Suelo de la cabina: el color base de la pintura, liso (el camuflaje no se ve a través del cristal)
+FLOOR = ["Canopy_Floor"]
 DECALS = ["Decal_Number_L", "Decal_Number_R", "Decal_Insignia_L", "Decal_Insignia_R"]
 # Luces que titilan con el daño (6.5): la anticolisión y las toberas no
 FLICKER_LIGHTS = ACCENTS + NAV_LIGHTS + TAIL_LIGHTS
@@ -98,7 +100,7 @@ PROBE = "Nose_Pitot"
 
 
 def contract_names():
-    return (PAINTED + TIPS + ARMOR + BOTTOM + ACCENTS + NAV_LIGHTS + TAIL_LIGHTS + STROBES + NOZZLE_LIGHTS + GLASS
+    return (PAINTED + TIPS + ARMOR + BOTTOM + ACCENTS + NAV_LIGHTS + TAIL_LIGHTS + STROBES + NOZZLE_LIGHTS + GLASS + FLOOR
             + DECALS + [PROBE])
 
 
@@ -185,6 +187,7 @@ class Materials:
         self.ti = pbr("M_Titanium", ti, None, 1.0)
         self.dark = io.material("M_Dark", base=io.hex_color(0x0B0B0D), metallic=0.2, roughness=0.7)
         self.intake = io.material("M_Intake", base=io.hex_color(0x050506), metallic=0.1, roughness=0.9)
+        self.floor = io.material("M_CanopyFloor", base=io.hex_color(rgb_hex(WOODLAND[0])), metallic=0.1, roughness=0.7)
         self.glass = io.material("M_CanopyArmor", base=io.hex_color(0x0A0D0A), metallic=0.1, roughness=0.06,
                                  coat=1.0, coat_roughness=0.0, alpha=0.72)
         self.sensor = io.material("M_SensorGlass", base=io.hex_color(0x05070A), metallic=0.3, roughness=0.05,
@@ -273,6 +276,8 @@ def build_canopy(b, m):
         b.add(g.tube(pts, 0.012, 40, 8), m.gun, name=f"Canopy_Bar_{i}")
     # carenado detrás de la cúpula
     b.add(bg.fairing(), m.paint, name="Fairing")
+    # suelo de la cabina, del color base de la pintura (sin camuflaje)
+    b.add(bg.canopy_floor(), m.floor, name="Canopy_Floor", no_shadow=True)
 
 
 NAC = [[0.55, 0.26, 0.05, 0.03, 0.0], [1.30, 0.28, 0.15, 0.06, 0.0], [2.20, 0.28, 0.17, 0.07, 0.0],
@@ -510,6 +515,7 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name):
         "nozzleLights": NOZZLE_LIGHTS,
         "flickerLights": FLICKER_LIGHTS,
         "decals": DECALS,
+        "floor": FLOOR,
         # "livery": las piezas que solo se ven con marcas (mismo campo que VECTOR)
         "livery": sorted(o.name for o in markings),
         "probe": PROBE,

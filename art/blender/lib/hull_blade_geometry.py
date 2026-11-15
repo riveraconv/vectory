@@ -298,6 +298,31 @@ def fairing():
     return hg.indexed(pos, uv, idx)
 
 
+# Suelo de la cabina (canopyFloorGeo): la planta de la cúpula pegada a la piel 1,5 mm por encima, y por encima del
+# arranque del carenado que queda bajo el cristal, sin pasar de 1 mm por debajo del cristal
+def canopy_floor():
+    nr, np_ = 20, 84
+    pos, uv, idx = [], [], []
+    for i in range(nr + 1):
+        for j in range(np_ + 1):
+            r = i / nr
+            f = j / np_ * math.pi * 2
+            x = CAN["A"] * r * math.sin(f)
+            d = -r * math.cos(f)
+            z = CAN["zc"] + d * (CAN["Bf"] if d < 0 else CAN["Br"])
+            skin = fus_top_y(x, z)
+            fair = fair_y(x, z) if FAIR["z0"] <= z <= FAIR["z1"] and abs(x) < fair_w(z) else skin
+            glass = skin + 0.002 + CAN["H"] * math.sqrt(max(0.0, 1 - r * r))
+            pos.append((x, min(max(skin, fair) + 0.0015, glass - 0.001), z))
+            uv.append((z, x))
+    for i in range(nr):
+        for j in range(np_):
+            a = i * (np_ + 1) + j
+            b = a + np_ + 1
+            idx += [a, b, a + 1, a + 1, b, b + 1]
+    return hg.indexed(pos, uv, idx)
+
+
 # ---------- Puntas traseras en flecha: el triángulo del wireframe con grosor real ----------
 
 PRONG_BASE = [(1.10, 2.75), (1.55, 2.75), (1.579, 3.25), (1.394, 3.25)]

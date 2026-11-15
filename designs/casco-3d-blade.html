@@ -489,6 +489,20 @@ const FAIR = { z0: 0.85, z1: 2.15, w0: 0.30, w1: 0.10, h0: 0.10 };
 const fairW = z => FAIR.w0 + (FAIR.w1 - FAIR.w0) * clamp01((z - FAIR.z0) / (FAIR.z1 - FAIR.z0));
 const fairH = z => 0.004 + FAIR.h0 * (1 - clamp01((z - FAIR.z0) / (FAIR.z1 - FAIR.z0))) ** 1.2;
 function fairY(x, z) { const w = fairW(z); return fusTopY(x, z) + 0.001 + fairH(z) * Math.max(0, 1 - (x / w) ** 2) ** 0.7; }
+// Suelo de la cabina (ASALTO): la planta de la cúpula pegada a la piel, 1,5 mm por encima, del color base de la pintura,
+// liso: así el camuflaje no se ve a través del cristal. Tapa también el arranque del carenado que queda bajo el cristal;
+// donde el carenado lo atraviesa, el suelo se queda 1 mm por debajo del cristal.
+function canopyFloorGeo() {
+  const NR = 20, NP = 84, pos = [], uv = [], idx = [];
+  for (let i = 0; i <= NR; i++) for (let j = 0; j <= NP; j++) {
+    const r = i / NR, f = j / NP * Math.PI * 2, x = CAN.A * r * Math.sin(f), d = -r * Math.cos(f), z = CAN.zc + d * (d < 0 ? CAN.Bf : CAN.Br);
+    const skin = fusTopY(x, z), fair = z >= FAIR.z0 && z <= FAIR.z1 && Math.abs(x) < fairW(z) ? fairY(x, z) : skin;
+    const glass = skin + 0.002 + CAN.H * Math.sqrt(Math.max(0, 1 - r * r));
+    pos.push(x, Math.min(Math.max(skin, fair) + 0.0015, glass - 0.001), z); uv.push(z, x);
+  }
+  for (let i = 0; i < NR; i++) for (let j = 0; j < NP; j++) { const a = i * (NP + 1) + j, b = a + NP + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  return geoFrom(pos, uv, idx);
+}
 function fairingGeo() {
   const NZ = 26, NX = 20, pos = [], uv = [], idx = [];
   for (let i = 0; i <= NZ; i++) { const z = FAIR.z0 + (FAIR.z1 - FAIR.z0) * i / NZ, w = fairW(z); for (let j = 0; j <= NX; j++) { const x = -w + 2 * w * j / NX; pos.push(x, fairY(x, z), z); uv.push(z, x); } }
@@ -731,6 +745,8 @@ function buildHull() {
   if (Vd.bars) [-0.13, 0, 0.13].forEach((x, i) => { const hz = canopyHalfZ(x), pts = []; for (let j = 0; j <= 18; j++) { const d = -1 + 2 * j / 18, z = CAN.zc + d * hz * (d < 0 ? CAN.Bf : CAN.Br) * 0.97; pts.push([x, canopyY(x, z) + 0.008, z]); } tube(pts, 0.012, 40, L.frame, can, 'Canopy_Bar_' + i, false, 8); });
   // carenado detrás de la cúpula
   mesh(fairingGeo(), L.fair, can, 'Fairing');
+  // suelo de la cabina, del color base de la pintura (sin camuflaje)
+  if (Vd.catalog) mesh(canopyFloorGeo(), new THREE.MeshStandardMaterial({ color: hex(pcols(PAINT)[0]), roughness: 0.7, metalness: 0.1, side: DS, name: 'M_CanopyFloor' }), can, 'Canopy_Floor', { noShadow: true });
 
   // ---------------- Puntas traseras, jorobas de los motores y toberas ----------------
   const form = Vd.form;

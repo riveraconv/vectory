@@ -677,7 +677,7 @@ public partial class Player : CharacterBody3D
 		back = (back - up * back.Dot(up)).Normalized();
 		Vector3 right = up.Cross(back).Normalized();
 		Vector3 position = GlobalPosition;
-		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * ShipHull3D.GlowLiftAboveTrack + back * HoverGlow.CenterZ;
+		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * ShipHull3D.GlowLiftAboveTrack + back * _ship.Visual.Hull3D.Glow.CenterZ;
 		float strength = HoverGlow.Strength(_hoverTime, HullHoverGlow) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
 		_ship.UpdateHullEffects(new Transform3D(new Basis(right, up, back), origin), strength, Dynamics.RealSpeed);
 	}

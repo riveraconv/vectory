@@ -29,8 +29,8 @@ public partial class Spaceship : Node3D
 	private int _wireEdgeCount;
 
 	// Número de aristas que pueden parpadear por su cuenta con los daños: las líneas del wireframe o, con casco 3D,
-	// sus 14 luces
-	public int EdgeCount => _hull3D != null ? HullDamage.FlickerLightCount : _wireEdgeCount;
+	// sus luces (14 en VECTOR, 9 en BLADE)
+	public int EdgeCount => _hull3D != null ? _hull3D.FlickerLightCount : _wireEdgeCount;
 
 	public bool HasHull3D => _hull3D != null;
 

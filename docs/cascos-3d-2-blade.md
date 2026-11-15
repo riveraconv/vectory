@@ -201,7 +201,8 @@ Partes del casco (detalle en el prototipo):
   - junta (`Canopy_Seal`, tubo de 0,014 m y 8 lados sobre el borde, 5 mm por encima de la piel);
   - arco (`Canopy_Bow`, en z −1,15);
   - 3 barras (`Canopy_Bar_0/1/2`, en x −0,13, 0 y 0,13);
-  - carenado (`Fairing`).
+  - carenado (`Fairing`);
+  - suelo de la cabina (`Canopy_Floor`): la planta de la cúpula pegada a la piel, 1,5 mm por encima (y por encima del arranque del carenado, sin pasar de 1 mm por debajo del cristal), del **color base de la pintura, liso**: el camuflaje no se ve a través del cristal. Decisión del usuario, añadida también al prototipo.
 - **`Prong_L` / `Prong_R`**:
   - base (`Prong_*_Base`, pintura);
   - punta (`Prong_*_Tip`: franjas de aviso con marcas, pintura sin ellas);
@@ -277,6 +278,7 @@ Resto de texturas (color, rugosidad y normal, como VECTOR):
 | `M_CanopyArmor` | `#0A0D0A` al 72 % | 0,1 | 0,06 | — | Transparente, barniz 1, reflejos ×1,4 |
 | `M_SensorGlass` | `#05070A` | 0,3 | 0,05 | — | Barniz 1, **iridiscencia 0,6** (IOR 1,5, grosor 300–600 nm), con el shader de VECTOR |
 | `M_Decal_*` | negro (la textura la pone Godot) | 0 | 0,6 | — | Transparente con alfa |
+| `M_CanopyFloor` | color base de la pintura (lo pone Godot) | 0,1 | 0,7 | — | Suelo de la cabina, sin textura |
 | `M_Emissive_*` | negro + emisión | 0 | 0,4 | — | **Una instancia por pieza viva** (sección 3.8) |
 | `M_Emissive_NozzleGlow` / `_NozzleCore` | `#245BFF` · 2,2 / `#7FA6FF` · 3,5 | 0 | 0,4 | — | Los de VECTOR |
 
@@ -325,6 +327,7 @@ Godot busca estas piezas **por nombre**. El script comprueba antes de exportar q
 | `Light_Strobe_Top`, `Light_Strobe_Bottom` | Anticolisión | 2 |
 | `Nozzle_Glow_L/R`, `Nozzle_Core_L/R` | Fondo luminoso de las toberas | 4 |
 | `Canopy_Glass` | Cúpula | 1 |
+| `Canopy_Floor` | Suelo de la cabina (`M_CanopyFloor`, color base de la pintura) | 1 |
 | `Sensor_Ball` | Bola de sensores (iridiscente) | 1 |
 | `Decal_Number_L/R` | Número, UV 0–1 | 2 |
 | `Decal_Insignia_L/R` | Distintivo, UV 0–1 | 2 |
@@ -474,6 +477,8 @@ Los camuflajes son todos MATE.
 1. media = (2·c0 + c1 + c2) / 4;
 2. panza = media + ((150, 150, 145) − media) × 0,35, redondeado.
 
+**Suelo de la cabina** (`M_CanopyFloor`): el tono base (`c0`) de la pintura, liso y mate, con y sin marcas.
+
 **No cambian** con la pintura: antirreflejos, metal pavonado, titanio, cristal, sensores y luces.
 
 **Depuración**: la tecla de pinturas de VECTOR (**F6** / **Mayúsculas + F6**) recorre las 40 combinaciones de la nave que se lleve. El nombre (y `· MARCAS`) sale en el panel (F9). Solo en compilaciones de depuración.
@@ -587,6 +592,7 @@ El tamaño va en el perfil visual de cada nave.
    - panza (`botOf`): BOSQUE → (107, 112, 93); ARENA → (179, 163, 131);
    - blindaje = tonos × 0,85;
    - con marcas se ven `Decal_*` y las puntas son `M_Hazard`; sin marcas, no se ven y las puntas son `M_Paint`;
+   - el suelo de la cabina lleva el tono base de la pintura;
    - color de las marcas: BOSQUE → `#DEDECE`, ÁRTICO → `#141612`, CAQUI → `#141612`, NOCHE → `#DEDECE`.
 7. **Shader del camuflaje**: para unos cuantos píxeles de la máscara (tono, desconchón y grano), el color reconstruido con BOSQUE es igual al del prototipo (±1 en 0–255).
 8. **Calcomanías**: el número es `B-02` con el color de las marcas al 90 %, centrado; el distintivo, centrado en el lienzo.
