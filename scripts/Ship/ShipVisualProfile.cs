@@ -46,8 +46,9 @@ public sealed record Cockpit3DProfile(string ModelPath, string ManifestPath, str
 // Estilo de un casco 3D: de él salen su contrato de piezas y cómo se pinta
 public enum HullStyle
 {
-	Racing,   // VECTOR (spec docs/cascos-3d-1-vector.md)
-	Military  // BLADE (spec docs/cascos-3d-2-blade.md)
+	Racing,     // VECTOR (spec docs/cascos-3d-1-vector.md)
+	Military,   // BLADE (spec docs/cascos-3d-2-blade.md)
+	Industrial  // HAMMER (spec docs/cascos-3d-3-hammer.md)
 }
 
 // Brillo de levitación bajo la nave: plano de Width × Length m centrado CenterZ m por detrás del origen

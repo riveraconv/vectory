@@ -265,6 +265,7 @@ public class HologramFramingTests
     {
         null => HologramFraming.BoundsOf(ship.Visual.BuildHull()),
         { Style: HullStyle.Military } => HologramFraming.BoundsOf(Vectory.Test.ShipTests.Hull3DBladeTests.Manifest),
+        { Style: HullStyle.Industrial } => HologramFraming.BoundsOf(Vectory.Test.ShipTests.Hull3DHammerTests.Manifest),
         _ => HologramFraming.BoundsOf(Vectory.Test.ShipTests.Hull3DTests.Manifest)
     };
 
@@ -304,7 +305,7 @@ public class HologramFramingTests
     [Theory]
     [InlineData(ShipCatalog.Ship01, 371.8f)]   // casco 3D: alas más cortas, se ve más estrecho que antes
     [InlineData(ShipCatalog.Ship02, 227.6f)]   // casco 3D: el bisel de las puntas traseras
-    [InlineData(ShipCatalog.Ship03, 352.9f)]
+    [InlineData(ShipCatalog.Ship03, 353.2f)]   // casco 3D: las balizas de las puntas caídas
     public void CommonScale_WidthOnScreen(string id, float expected)
     {
         Assert.Equal(expected, Bounds(ShipDefinitions.Find(id)).Size.X * Scale, 0.1f);
@@ -323,7 +324,7 @@ public class HologramFramingTests
     [Theory]
     [InlineData(ShipCatalog.Ship01, 9.07f)]
     [InlineData(ShipCatalog.Ship02, 9.93f)]    // casco 3D con la sonda (spec docs/cascos-3d-2-blade.md, 7)
-    [InlineData(ShipCatalog.Ship03, 8.40f)]
+    [InlineData(ShipCatalog.Ship03, 8.67f)]    // casco 3D con todo (spec docs/cascos-3d-3-hammer.md, 7)
     public void SphereDiameter_OfEachShip(string id, float expected)
     {
         Assert.Equal(expected, Bounds(ShipDefinitions.Find(id)).SphereDiameter, 0.02f);

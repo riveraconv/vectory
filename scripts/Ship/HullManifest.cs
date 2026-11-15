@@ -66,6 +66,18 @@ public sealed class HullManifest
 	[JsonPropertyName("camoMasks")] public List<HullManifestCamoMask> CamoMasks { get; set; } = new();
 	[JsonPropertyName("boundsWithoutProbe")] public CockpitManifestBounds BoundsWithoutProbe { get; set; } = new();
 
+	// Solo HAMMER: grupos de pintura (casco y cabina), bordes del canard, luces, balizas, cristales, máscaras de la
+	// pintura y caja sin los extras del techo
+	[JsonPropertyName("paintedBody")] public List<string> PaintedBody { get; set; } = new();
+	[JsonPropertyName("paintedCab")] public List<string> PaintedCab { get; set; } = new();
+	[JsonPropertyName("leadingEdges")] public HullManifestLeadingEdges LeadingEdges { get; set; } = new();
+	[JsonPropertyName("amberLights")] public List<string> AmberLights { get; set; } = new();
+	[JsonPropertyName("workLights")] public List<string> WorkLights { get; set; } = new();
+	[JsonPropertyName("beacons")] public List<HullManifestBeacon> Beacons { get; set; } = new();
+	[JsonPropertyName("glass")] public List<string> Glass { get; set; } = new();
+	[JsonPropertyName("paintMasks")] public List<HullManifestPaintMask> PaintMasks { get; set; } = new();
+	[JsonPropertyName("boundsWithoutRoofExtras")] public CockpitManifestBounds BoundsWithoutRoofExtras { get; set; } = new();
+
 	// Null si el texto no se puede leer
 	public static HullManifest Parse(string json)
 	{
@@ -113,7 +125,15 @@ public sealed record HullContract(string Root, IReadOnlyList<string> Pieces, IRe
 	public static readonly HullContract Military = new(MilitaryHullPieces.Root, MilitaryHullPieces.Contract,
 		MilitaryHullPieces.FlickerLights, MilitaryHullPieces.Strobes);
 
-	public static HullContract For(HullStyle style) => style == HullStyle.Military ? Military : Racing;
+	public static readonly HullContract Industrial = new(IndustrialHullPieces.Root, IndustrialHullPieces.Contract,
+		IndustrialHullPieces.FlickerLights, System.Array.Empty<string>());
+
+	public static HullContract For(HullStyle style) => style switch
+	{
+		HullStyle.Military => Military,
+		HullStyle.Industrial => Industrial,
+		_ => Racing
+	};
 }
 
 // Iridiscencia de un material (cúpula de VECTOR, bola de sensores de BLADE): Godot no la tiene
@@ -135,6 +155,36 @@ public sealed class HullManifestCamoMask
 {
 	[JsonPropertyName("material")] public string Material { get; set; } = "";
 	[JsonPropertyName("mask")] public string Mask { get; set; } = "";
+}
+
+// Bordes del canard de HAMMER: con marcas un material, sin marcas otro, con la escala de UV que pasa de la repetición
+// de las franjas (con la que van horneadas sus UV) a la del otro
+public sealed class HullManifestLeadingEdges
+{
+	[JsonPropertyName("pieces")] public List<string> Pieces { get; set; } = new();
+	[JsonPropertyName("withLivery")] public string WithLivery { get; set; } = "";
+	[JsonPropertyName("withoutLivery")] public string WithoutLivery { get; set; } = "";
+	[JsonPropertyName("uvScaleWithoutLivery")] public float UvScaleWithoutLivery { get; set; } = 1f;
+}
+
+// Baliza del techo de HAMMER: su lente, para qué sirve (boost o daño) y su color
+public sealed class HullManifestBeacon
+{
+	[JsonPropertyName("name")] public string Name { get; set; } = "";
+	[JsonPropertyName("role")] public string Role { get; set; } = "";
+	[JsonPropertyName("color")] public string Color { get; set; } = "";
+}
+
+// Máscaras de un grupo de pintura de HAMMER (casco o cabina): color = pintura × MUL × mulScale + ADD. Archivos junto
+// al manifiesto
+public sealed class HullManifestPaintMask
+{
+	[JsonPropertyName("group")] public string Group { get; set; } = "";
+	[JsonPropertyName("mulScale")] public float MulScale { get; set; } = 1f;
+	[JsonPropertyName("seed")] public int Seed { get; set; }
+	[JsonPropertyName("mul")] public string Mul { get; set; } = "";
+	[JsonPropertyName("add")] public string Add { get; set; } = "";
+	[JsonPropertyName("materials")] public List<string> Materials { get; set; } = new();
 }
 
 // Nombres de las piezas del casco 3D de VECTOR: el contrato con el script de Blender (spec, 3.8). Godot las busca así.

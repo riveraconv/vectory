@@ -125,7 +125,7 @@ public class Hull3DTests
     // ---------- 3. Perfil visual ----------
 
     [Fact]
-    public void Vector_HasThe3DHull_HammerKeepsTheWireframe()
+    public void Vector_HasThe3DHull()
     {
         ShipHull3DProfile hull = VectorShip.Definition.Visual.Hull3D!;
         Assert.EndsWith("hull_vector.glb", hull.ModelPath);
@@ -133,7 +133,6 @@ public class Hull3DTests
         Assert.EndsWith(Manifest.Environment, hull.EnvironmentPath);
         Assert.Same(HullContract.Racing, hull.Contract);
         Assert.Equal(14, hull.Contract.FlickerLights.Count);
-        Assert.Null(HammerShip.Definition.Visual.Hull3D);
     }
 
     [Fact]

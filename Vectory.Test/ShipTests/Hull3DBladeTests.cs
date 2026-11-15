@@ -126,7 +126,7 @@ public class Hull3DBladeTests
     // ---------- 3. Perfil visual ----------
 
     [Fact]
-    public void Blade_HasTheMilitary3DHull_VectorTheRacingOne_HammerTheWireframe()
+    public void Blade_HasTheMilitary3DHull_VectorTheRacingOne_HammerTheIndustrialOne()
     {
         ShipHull3DProfile hull = BladeShip.Definition.Visual.Hull3D!;
         Assert.EndsWith("hull_blade.glb", hull.ModelPath);
@@ -138,7 +138,7 @@ public class Hull3DBladeTests
 
         Assert.Equal(HullStyle.Racing, VectorShip.Definition.Visual.Hull3D!.Style);
         Assert.Equal(new HoverGlowShape(HoverGlow.Width, HoverGlow.Length, HoverGlow.CenterZ), VectorShip.Definition.Visual.Hull3D!.Glow);
-        Assert.Null(HammerShip.Definition.Visual.Hull3D);
+        Assert.Equal(HullStyle.Industrial, HammerShip.Definition.Visual.Hull3D!.Style);
     }
 
     [Fact]

@@ -20,7 +20,7 @@ public sealed class Hull3DSettings
 	public StrobeSettings Strobe { get; init; } = new();
 }
 
-// Casco 3D de una nave (specs docs/cascos-3d-1-vector.md y docs/cascos-3d-2-blade.md, 4, 5 y 6): carga el .glb, aplica
+// Casco 3D de una nave (specs docs/cascos-3d-1-vector.md, docs/cascos-3d-2-blade.md y docs/cascos-3d-3-hammer.md, 4, 5 y 6): carga el .glb, aplica
 // lo que dice su manifiesto y lo ilumina con sus propias luces, que solo tocan su capa visual. Las piezas que busca salen
 // del contrato de su estilo (HullContract). Recibe pintura, daño, parpadeo y levitación y los pinta; sin reglas. Cada
 // instancia lleva sus propios materiales, así dos naves pueden ir pintadas distinto a la vez.
@@ -86,6 +86,8 @@ void fragment() {
 	private readonly List<(ShaderMaterial Pass, float Factor)> _materialIris = new();
 	// Camuflaje ya horneado por máscara y tonos: lo comparten todas las instancias con la misma pintura
 	private static readonly Dictionary<string, ImageTexture> CamoTextures = new();
+	// Pintura de HAMMER ya horneada por máscara y color: igual, compartida
+	private static readonly Dictionary<string, ImageTexture> PlateTextures = new();
 	private HullManifest _manifest;
 	private DirectionalLight3D _key;
 	private DirectionalLight3D _rim;
@@ -117,7 +119,7 @@ void fragment() {
 
 	public bool IsLoaded { get; private set; }
 
-	// Número de luces que titilan con el daño (14 en VECTOR, 9 en BLADE)
+	// Número de luces que titilan con el daño (14 en VECTOR, 9 en BLADE, 12 en HAMMER)
 	public int FlickerLightCount => Profile.Contract.FlickerLights.Count;
 
 	public override void _Ready()
@@ -164,6 +166,13 @@ void fragment() {
 		{
 			if (IsLoaded)
 				ApplyMilitaryPaint(MilitaryPaintCatalog.Combinations[index]);
+			return;
+		}
+		if (Profile.Style == HullStyle.Industrial)
+		{
+			// Por ahora, AMARILLO OBRA con marcas en casco y cabina (el catálogo, en la etapa 3 de su spec)
+			if (IsLoaded)
+				ApplyIndustrialPaint(IndustrialHullPaint.SiteYellow, IndustrialHullPaint.SiteYellow);
 			return;
 		}
 		_paint = HullPaintCatalog.Combinations[index];
@@ -348,6 +357,62 @@ void fragment() {
 		Image image = Image.CreateFromData(mask.GetWidth(), mask.GetHeight(), false, Image.Format.Rgb8, color);
 		image.GenerateMipmaps();
 		return CamoTextures[key] = ImageTexture.CreateFromImage(image);
+	}
+
+	// Pintura de HAMMER (spec 6.2): el color del casco y el de la cabina salen de sus máscaras (casco: M_Paint*;
+	// cabina: M_PaintCab). La rugosidad y la normal son las del modelo, que no dependen del color.
+	private void ApplyIndustrialPaint(uint body, uint cab)
+	{
+		foreach (HullManifestPaintMask entry in _manifest.PaintMasks)
+		{
+			bool isCab = entry.Group == "cab";
+			Texture2D texture = PlateTexture(entry, isCab ? cab : body);
+			if (texture == null)
+				continue;
+			foreach (string name in isCab ? IndustrialHullPieces.PaintedCab : IndustrialHullPieces.PaintedBody)
+			{
+				StandardMaterial3D material = MaterialOf(name);
+				if (material == null)
+					continue;
+				material.AlbedoTexture = texture;
+				material.AlbedoColor = Colors.White;
+			}
+		}
+	}
+
+	// Textura de color horneada una vez desde las dos máscaras sin pérdidas que hay junto al manifiesto
+	private Texture2D PlateTexture(HullManifestPaintMask entry, uint paint)
+	{
+		string dir = Profile.ManifestPath.GetBaseDir();
+		string mulPath = dir.PathJoin(entry.Mul), addPath = dir.PathJoin(entry.Add);
+		string key = mulPath + ":" + paint.ToString("X6");
+		if (PlateTextures.TryGetValue(key, out ImageTexture cached))
+			return cached;
+		Image mul = MaskImage(mulPath, Image.Format.L8);
+		Image add = MaskImage(addPath, Image.Format.Rgb8);
+		if (mul == null || add == null || mul.GetSize() != add.GetSize())
+		{
+			GD.PushError($"[Hull3D] Cannot use paint masks {mulPath} and {addPath}");
+			return null;
+		}
+		byte[] color = IndustrialHullPaint.Bake(mul.GetData(), add.GetData(), paint);
+		Image image = Image.CreateFromData(mul.GetWidth(), mul.GetHeight(), false, Image.Format.Rgb8, color);
+		image.GenerateMipmaps();
+		return PlateTextures[key] = ImageTexture.CreateFromImage(image);
+	}
+
+	private static Image MaskImage(string path, Image.Format format)
+	{
+		var source = GD.Load<Texture2D>(path);
+		if (source == null)
+			return null;
+		Image image = source.GetImage();
+		if (image.IsCompressed())
+			image.Decompress();
+		if (image.HasMipmaps())
+			image.ClearMipmaps();
+		image.Convert(format);
+		return image;
 	}
 
 	// Perla, camaleón, la cúpula de VECTOR y la bola de sensores de BLADE: cambio de color con el ángulo

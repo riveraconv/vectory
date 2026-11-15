@@ -291,16 +291,28 @@ public static class StrobeLights
 // Las pinturas de los cascos 3D por estilo, como índices de sus 40 combinaciones (spec 6.2, depuración con F5)
 public static class HullPaints
 {
-	public static int Count(HullStyle style) =>
-		style == HullStyle.Military ? MilitaryPaintCatalog.Combinations.Count : HullPaintCatalog.Combinations.Count;
+	// HAMMER, por ahora, solo con su pintura de por defecto (su catálogo entra en la etapa 3 de su spec)
+	public static int Count(HullStyle style) => style switch
+	{
+		HullStyle.Military => MilitaryPaintCatalog.Combinations.Count,
+		HullStyle.Industrial => 1,
+		_ => HullPaintCatalog.Combinations.Count
+	};
 
-	// VECTOR: GRAFITO lisa; BLADE: BOSQUE con marcas
-	public static int DefaultIndex(HullStyle style) =>
-		style == HullStyle.Military ? MilitaryPaintCatalog.DefaultIndex : HullPaintCatalog.IndexOf(HullPaintCatalog.Default);
+	// VECTOR: GRAFITO lisa; BLADE: BOSQUE con marcas; HAMMER: AMARILLO OBRA con marcas
+	public static int DefaultIndex(HullStyle style) => style switch
+	{
+		HullStyle.Military => MilitaryPaintCatalog.DefaultIndex,
+		HullStyle.Industrial => 0,
+		_ => HullPaintCatalog.IndexOf(HullPaintCatalog.Default)
+	};
 
-	public static string DisplayName(HullStyle style, int index) => style == HullStyle.Military
-		? MilitaryPaintCatalog.Combinations[Wrap(style, index)].DisplayName
-		: HullPaintCatalog.Combinations[Wrap(style, index)].DisplayName;
+	public static string DisplayName(HullStyle style, int index) => style switch
+	{
+		HullStyle.Military => MilitaryPaintCatalog.Combinations[Wrap(style, index)].DisplayName,
+		HullStyle.Industrial => IndustrialHullPaint.SiteYellowName,
+		_ => HullPaintCatalog.Combinations[Wrap(style, index)].DisplayName
+	};
 
 	// Siguiente o anterior combinación, con vuelta
 	public static int Step(HullStyle style, int index, int delta) => Wrap(style, index + delta);

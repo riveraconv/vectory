@@ -5,11 +5,12 @@ using System.Numerics;
 namespace Vectory.Ship;
 
 // HAMMER (ship_03): más aceleración abajo, giro y agarre, a cambio de punta y frenada (equilibrio en docs/naves-6-equilibrio.md). Lógica pura.
-// Casco: Vanguard_C de designs/naves-geometria.js. Cabina: 3D industrial, de designs/cabina-3d-hammer.html (el BÚNKER 2D
-// de designs/cabinas-hoja-martillo-def.js ya no se usa).
+// Casco: 3D industrial MINERO, de designs/casco-3d-hammer.html (spec docs/cascos-3d-3-hammer.md); el wireframe Vanguard_C
+// de designs/naves-geometria.js lo siguen usando el fantasma y el menú. Cabina: 3D industrial, de designs/cabina-3d-hammer.html
+// (el BÚNKER 2D de designs/cabinas-hoja-martillo-def.js ya no se usa).
 public static class HammerShip
 {
-	private const float ChaseFactor = 0.92f;   // 6,6 m de largo frente a los 7,2 de Vector
+	private const float ChaseFactor = 0.92f;   // 6,6 m de largo frente a los 7,2 de Vector (el casco 3D, 6,83: se mantiene)
 	// Ojo de la cabina 3D (spec docs/cabinas-3d-3-hammer.md, 4.5): a 2,03 m de la pista (la nave vuela a 2 m; el de VECTOR,
 	// 1,45 m, × 1,40 de alto), FOV 70 y mirando 4,9° hacia abajo. La misma profundidad que VECTOR y BLADE.
 	private const float EyeY = 0.03f;
@@ -34,7 +35,13 @@ public static class HammerShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			Hull3D = null,   // sin casco 3D todavía: no hereda el de Vector
+			// Casco 3D MINERO; su panorama es el de BLADE (mismo buildEnv). Brillo de levitación de 3,4 × 7,4 m, centrado
+			// 0,5 m por delante del origen
+			Hull3D = new ShipHull3DProfile(
+				"res://assets/ships/hull_hammer.glb",
+				"res://assets/ships/hull_hammer.manifest.json",
+				"res://assets/cockpits/cockpit_blade_env.png",
+				HullStyle.Industrial) { Glow = new HoverGlowShape(3.4f, 7.4f, -0.5f) },
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_hammer.glb",
 				"res://assets/cockpits/cockpit_hammer.manifest.json",
@@ -43,7 +50,9 @@ public static class HammerShip
 			Cockpit = new CockpitFraming(new Vector3(0f, EyeY, EyeZ), CockpitFov, EyePitchRadians * 180f / MathF.PI),
 			ChaseFactor = ChaseFactor,
 			Chase = VectorShip.Definition.Visual.Chase.Scaled(ChaseFactor),
-			CollisionHalfWidth = 2.5f,   // las puntas del canard
+			// El semiancho del casco 3D (halfWidth del manifiesto, 2,502, al centímetro): las balizas de las puntas caídas
+			// del canard. Es el mismo del wireframe, que siguen usando el fantasma y el menú.
+			CollisionHalfWidth = 2.5f,
 			NoseDistance = 3.6f,
 			PhysicsBoxSize = new Vector3(5f, 1.4f, 6.6f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.3f)
