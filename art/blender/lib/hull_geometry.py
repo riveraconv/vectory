@@ -281,8 +281,9 @@ def _signed_area(pts):
     return a / 2
 
 
-# Desplazamiento en inglete hacia fuera de un contorno convexo en sentido antihorario (getBevelVec)
-def _bevel_vectors(pts):
+# Desplazamiento en inglete hacia fuera de un contorno convexo en sentido antihorario (getBevelVec). Con capped, como
+# three.js: un inglete de más de √2 se acorta a √2 (esquinas agudas). VECTOR no lo usa, así su deriva no cambia.
+def _bevel_vectors(pts, capped=False):
     out = []
     n = len(pts)
     for i in range(n):
@@ -293,17 +294,22 @@ def _bevel_vectors(pts):
         n1 = (d1[1] / l1, -d1[0] / l1)
         n2 = (d2[1] / l2, -d2[0] / l2)
         k = 1 + n1[0] * n2[0] + n1[1] * n2[1]
-        out.append(((n1[0] + n2[0]) / k, (n1[1] + n2[1]) / k))
+        v = ((n1[0] + n2[0]) / k, (n1[1] + n2[1]) / k)
+        lensq = v[0] * v[0] + v[1] * v[1]
+        if capped and lensq > 2:
+            shrink = math.sqrt(lensq / 2)
+            v = (v[0] / shrink, v[1] / shrink)
+        out.append(v)
     return out
 
 
 # ExtrudeGeometry de un polígono convexo: tapas en abanico y paredes; con bisel, las capas de three.js
 # (cos / sen de t con t = b / segmentos). Normales planas por triángulo y UV de WorldUVGenerator (metros de la forma).
-def extrude(shape, depth, bevel_thickness=0.0, bevel_size=0.0, bevel_segments=0):
+def extrude(shape, depth, bevel_thickness=0.0, bevel_size=0.0, bevel_segments=0, capped_bevel=False):
     pts = list(shape)
     if _signed_area(pts) < 0:
         pts.reverse()
-    vec = _bevel_vectors(pts)
+    vec = _bevel_vectors(pts, capped_bevel)
     layers = []
     if bevel_segments > 0:
         for b in range(bevel_segments):

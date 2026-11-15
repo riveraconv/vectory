@@ -1,0 +1,439 @@
+{
+  "blender": "5.2.3 LTS",
+  "exported": "2026-11-15",
+  "root": "HullBlade",
+  "environment": "cockpit_blade_env.png",
+  "pieces": [
+    {
+      "name": "Fuselage_Upper"
+    },
+    {
+      "name": "Prong_L_Base"
+    },
+    {
+      "name": "Prong_R_Base"
+    },
+    {
+      "name": "Pod_L_Hump"
+    },
+    {
+      "name": "Pod_R_Hump"
+    },
+    {
+      "name": "Fairing"
+    },
+    {
+      "name": "Prong_L_Tip"
+    },
+    {
+      "name": "Prong_R_Tip"
+    },
+    {
+      "name": "Armor_0_L_Plate"
+    },
+    {
+      "name": "Armor_0_R_Plate"
+    },
+    {
+      "name": "Armor_1_L_Plate"
+    },
+    {
+      "name": "Armor_1_R_Plate"
+    },
+    {
+      "name": "Armor_2_L_Plate"
+    },
+    {
+      "name": "Armor_2_R_Plate"
+    },
+    {
+      "name": "Armor_3_L_Plate"
+    },
+    {
+      "name": "Armor_3_R_Plate"
+    },
+    {
+      "name": "Fuselage_Lower"
+    },
+    {
+      "name": "Accent_FormNose_L",
+      "emission": "#B6FF6A",
+      "intensity": 0.8
+    },
+    {
+      "name": "Accent_FormNose_R",
+      "emission": "#B6FF6A",
+      "intensity": 0.8
+    },
+    {
+      "name": "Accent_FormProng_L",
+      "emission": "#B6FF6A",
+      "intensity": 0.8
+    },
+    {
+      "name": "Accent_FormProng_R",
+      "emission": "#B6FF6A",
+      "intensity": 0.8
+    },
+    {
+      "name": "Light_Nav_L",
+      "emission": "#FF2A1E",
+      "intensity": 2.4
+    },
+    {
+      "name": "Light_Nav_R",
+      "emission": "#3DFF6A",
+      "intensity": 2.4
+    },
+    {
+      "name": "Light_Tip_L",
+      "emission": "#FF2A1E",
+      "intensity": 2.4
+    },
+    {
+      "name": "Light_Tip_R",
+      "emission": "#3DFF6A",
+      "intensity": 2.4
+    },
+    {
+      "name": "Light_Tail",
+      "emission": "#F4F7FF",
+      "intensity": 2.88
+    },
+    {
+      "name": "Light_Strobe_Top",
+      "emission": "#FF2A1E",
+      "intensity": 0.0
+    },
+    {
+      "name": "Light_Strobe_Bottom",
+      "emission": "#FF2A1E",
+      "intensity": 0.0
+    },
+    {
+      "name": "Nozzle_Glow_L",
+      "emission": "#245BFF",
+      "intensity": 2.2
+    },
+    {
+      "name": "Nozzle_Glow_R",
+      "emission": "#245BFF",
+      "intensity": 2.2
+    },
+    {
+      "name": "Nozzle_Core_L",
+      "emission": "#7FA6FF",
+      "intensity": 3.5
+    },
+    {
+      "name": "Nozzle_Core_R",
+      "emission": "#7FA6FF",
+      "intensity": 3.5
+    },
+    {
+      "name": "Canopy_Glass"
+    },
+    {
+      "name": "Sensor_Ball"
+    },
+    {
+      "name": "Decal_Number_L"
+    },
+    {
+      "name": "Decal_Number_R"
+    },
+    {
+      "name": "Decal_Insignia_L"
+    },
+    {
+      "name": "Decal_Insignia_R"
+    },
+    {
+      "name": "Nose_Pitot"
+    }
+  ],
+  "empties": [
+    {
+      "name": "Exhaust_L",
+      "position": [
+        -0.6,
+        0.08,
+        3.3
+      ]
+    },
+    {
+      "name": "Exhaust_R",
+      "position": [
+        0.6,
+        0.08,
+        3.3
+      ]
+    },
+    {
+      "name": "Trail_L",
+      "position": [
+        -1.6,
+        -0.0,
+        3.6
+      ]
+    },
+    {
+      "name": "Trail_R",
+      "position": [
+        1.6,
+        -0.0,
+        3.6
+      ]
+    },
+    {
+      "name": "Smoke",
+      "position": [
+        0.6,
+        0.35,
+        2.4
+      ]
+    }
+  ],
+  "painted": [
+    "Fuselage_Upper",
+    "Prong_L_Base",
+    "Prong_R_Base",
+    "Pod_L_Hump",
+    "Pod_R_Hump",
+    "Fairing"
+  ],
+  "tips": [
+    "Prong_L_Tip",
+    "Prong_R_Tip"
+  ],
+  "armor": [
+    "Armor_0_L_Plate",
+    "Armor_0_R_Plate",
+    "Armor_1_L_Plate",
+    "Armor_1_R_Plate",
+    "Armor_2_L_Plate",
+    "Armor_2_R_Plate",
+    "Armor_3_L_Plate",
+    "Armor_3_R_Plate"
+  ],
+  "bottom": [
+    "Fuselage_Lower"
+  ],
+  "accents": [
+    "Accent_FormNose_L",
+    "Accent_FormNose_R",
+    "Accent_FormProng_L",
+    "Accent_FormProng_R"
+  ],
+  "navLights": [
+    "Light_Nav_L",
+    "Light_Nav_R",
+    "Light_Tip_L",
+    "Light_Tip_R"
+  ],
+  "tailLights": [
+    "Light_Tail"
+  ],
+  "strobes": [
+    "Light_Strobe_Top",
+    "Light_Strobe_Bottom"
+  ],
+  "nozzleLights": [
+    "Nozzle_Glow_L",
+    "Nozzle_Glow_R",
+    "Nozzle_Core_L",
+    "Nozzle_Core_R"
+  ],
+  "flickerLights": [
+    "Accent_FormNose_L",
+    "Accent_FormNose_R",
+    "Accent_FormProng_L",
+    "Accent_FormProng_R",
+    "Light_Nav_L",
+    "Light_Nav_R",
+    "Light_Tip_L",
+    "Light_Tip_R",
+    "Light_Tail"
+  ],
+  "decals": [
+    "Decal_Number_L",
+    "Decal_Number_R",
+    "Decal_Insignia_L",
+    "Decal_Insignia_R"
+  ],
+  "livery": [
+    "Decal_Insignia_L",
+    "Decal_Insignia_R",
+    "Decal_Number_L",
+    "Decal_Number_R"
+  ],
+  "probe": "Nose_Pitot",
+  "noShadow": [
+    "Light_Nav_L",
+    "Light_Nav_R",
+    "Accent_FormNose_L",
+    "Accent_FormNose_R",
+    "Light_Tail",
+    "Light_Strobe_Top",
+    "Light_Strobe_Bottom",
+    "Canopy_Glass",
+    "Accent_FormProng_L",
+    "Light_Tip_L",
+    "Nozzle_Glow_L",
+    "Nozzle_Core_L",
+    "Accent_FormProng_R",
+    "Light_Tip_R",
+    "Nozzle_Glow_R",
+    "Nozzle_Core_R",
+    "Decal_Number_L",
+    "Decal_Number_R",
+    "Decal_Insignia_L",
+    "Decal_Insignia_R",
+    "Fuselage_M_Dark_NoShadow",
+    "Pod_L_M_Dark_NoShadow",
+    "Pod_R_M_Dark_NoShadow",
+    "Armor_M_Gunmetal_NoShadow"
+  ],
+  "camoMasks": [
+    {
+      "material": "M_Paint",
+      "mask": "hull_blade_camo_mask.png",
+      "seed": 55
+    },
+    {
+      "material": "M_PaintArmor",
+      "mask": "hull_blade_armor_mask.png",
+      "seed": 57
+    }
+  ],
+  "repeats": [
+    {
+      "material": "M_Paint",
+      "repeat": 0.35
+    },
+    {
+      "material": "M_PaintArmor",
+      "repeat": 0.6
+    },
+    {
+      "material": "M_PaintBottom",
+      "repeat": 1.0
+    },
+    {
+      "material": "M_AntiSlip",
+      "repeat": 6.0
+    },
+    {
+      "material": "M_Hazard",
+      "repeat": 3.0
+    },
+    {
+      "material": "M_Gunmetal",
+      "repeat": 2.0
+    },
+    {
+      "material": "M_Titanium",
+      "repeat": 2.0
+    }
+  ],
+  "coat": [
+    {
+      "material": "M_CanopyArmor",
+      "coat": 1.0,
+      "roughness": 0.0
+    },
+    {
+      "material": "M_SensorGlass",
+      "coat": 1.0,
+      "roughness": 0.0
+    }
+  ],
+  "roughnessFactors": [
+    {
+      "material": "M_PaintBottom",
+      "factor": 2.6
+    }
+  ],
+  "iridescence": [
+    {
+      "material": "M_SensorGlass",
+      "factor": 0.6,
+      "ior": 1.5,
+      "thickness": [
+        300,
+        600
+      ]
+    }
+  ],
+  "reflections": [
+    {
+      "material": "M_CanopyArmor",
+      "factor": 1.4
+    }
+  ],
+  "transparentMaterials": [
+    {
+      "material": "M_CanopyArmor",
+      "opacity": 0.72
+    }
+  ],
+  "decalMaterials": [
+    "M_Decal_Number",
+    "M_Decal_Insignia"
+  ],
+  "scorchMaterials": [
+    "M_Paint",
+    "M_PaintArmor",
+    "M_PaintBottom",
+    "M_AntiSlip",
+    "M_Hazard",
+    "M_Gunmetal",
+    "M_Titanium"
+  ],
+  "scorchMasks": [
+    "hull_scorch_1.png",
+    "hull_scorch_2.png",
+    "hull_scorch_3.png"
+  ],
+  "uv2Scale": 1.1,
+  "triangles": 28872,
+  "trianglesWithLivery": 29416,
+  "bounds": {
+    "min": [
+      -1.612,
+      -0.2343,
+      -5.75
+    ],
+    "max": [
+      1.612,
+      0.5193,
+      3.6081
+    ]
+  },
+  "boundsWithLivery": {
+    "min": [
+      -1.612,
+      -0.2343,
+      -5.75
+    ],
+    "max": [
+      1.612,
+      0.5193,
+      3.6081
+    ]
+  },
+  "boundsWithoutProbe": {
+    "min": [
+      -1.612,
+      -0.2343,
+      -5.2
+    ],
+    "max": [
+      1.612,
+      0.5193,
+      3.6081
+    ]
+  },
+  "halfWidth": 1.612,
+  "halfWidthWithLivery": 1.612
+}
