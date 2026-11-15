@@ -191,6 +191,14 @@ public partial class Player : CharacterBody3D
 	[Export] public float HammerDamageBeaconOn = IndustrialLampSettings.Default.DamageBeaconOn;
 	[Export] public float HammerBeaconOff = IndustrialLampSettings.Default.BeaconOff;
 
+	[ExportGroup("Casco 3D")]   // luces propias del casco 3D (spec docs/cascos-3d-1-vector.md, 4.3)
+	[Export] public float HullKeyEnergy = Hull3DDefaults.KeyEnergy;
+	[Export] public float HullRimEnergy = Hull3DDefaults.RimEnergy;
+	[Export] public float HullFillEnergy = Hull3DDefaults.FillEnergy;
+	[Export] public float HullAmbientEnergy = Hull3DDefaults.AmbientEnergy;
+
+	private static readonly Hull3DSettings Hull3DDefaults = new();
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -302,7 +310,14 @@ public partial class Player : CharacterBody3D
 			Position = ShipLineMesh.ToGodot(Definition.Visual.PhysicsBoxCenter)
 		});
 
-		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual };
+		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual, Use3DHull = true };
+		_ship.SetHull3DSettings(new Hull3DSettings
+		{
+			KeyEnergy = HullKeyEnergy,
+			RimEnergy = HullRimEnergy,
+			FillEnergy = HullFillEnergy,
+			AmbientEnergy = HullAmbientEnergy
+		});
 		AddChild(_ship);
 
 		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual, Settings3D = BuildCockpit3DSettings() };

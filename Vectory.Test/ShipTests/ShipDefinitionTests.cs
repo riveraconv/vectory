@@ -118,11 +118,12 @@ public class VectorDefinitionTests
     }
 
     [Fact]
-    public void CollisionHalfWidth_IsTheWingTip()
+    public void WireframeHalfWidth_IsTheWingTipOfTheCapture()
     {
-        Assert.Equal(3.4f, Visual.CollisionHalfWidth);
-        Assert.Equal(Reference.Number("collisionHalfWidth"), Visual.CollisionHalfWidth, 5);
-        Assert.Equal(Visual.CollisionHalfWidth, Visual.BuildHull().Max(l => MathF.Max(MathF.Abs(l.A.X), MathF.Abs(l.B.X))), 5);
+        // El casco 3D tiene las alas más cortas (2,63 m, Hull3DTests); el wireframe, que sigue usándose, no cambia
+        float wire = Visual.BuildHull().Max(l => MathF.Max(MathF.Abs(l.A.X), MathF.Abs(l.B.X)));
+        Assert.Equal(Reference.Number("collisionHalfWidth"), wire, 5);
+        Assert.Equal(3.4f, wire, 5);
     }
 
     [Fact]

@@ -19,10 +19,17 @@ public static class VectorShip
 				"res://assets/cockpits/cockpit_vector.manifest.json",
 				"res://assets/cockpits/cockpit_env.png",
 				Cockpit3DStyle.Racing),
+			// Casco 3D NOCTURNA; su panorama es el de BLADE (mismo buildEnv en los dos prototipos)
+			Hull3D = new ShipHull3DProfile(
+				"res://assets/ships/hull_vector.glb",
+				"res://assets/ships/hull_vector.manifest.json",
+				"res://assets/cockpits/cockpit_blade_env.png"),
 			// El de la cabina 3D, decisión del usuario: ojo a 1,45 m de la pista (la nave vuela a 2 m), FOV 70 y sin inclinar
 			Cockpit = new CockpitFraming(new Vector3(0f, -0.55f, -1.2f), 70f, 0f),
 			Chase = new ChaseFraming(1.8f, 7f, 3f, new Vector3(0f, 0.3f, -10f)),
-			CollisionHalfWidth = 3.4f,   // las puntas de las alas
+			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): el filo luminoso de la deriva.
+			// El wireframe, que siguen usando el fantasma y el menú, llega a 3,4.
+			CollisionHalfWidth = 2.63f,
 			NoseDistance = 4f,
 			PhysicsBoxSize = new Vector3(6.8f, 1.2f, 7.2f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.4f)

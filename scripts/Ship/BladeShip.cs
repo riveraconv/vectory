@@ -35,6 +35,7 @@ public static class BladeShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
+			Hull3D = null,   // sin casco 3D todavía: no hereda el de Vector
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_blade.glb",
 				"res://assets/cockpits/cockpit_blade.manifest.json",

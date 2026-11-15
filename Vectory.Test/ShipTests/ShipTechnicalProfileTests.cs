@@ -130,7 +130,7 @@ public class ShipCollisionWidthTests
     [Fact]
     public void CollisionHalfWidth_OfEachShip()
     {
-        Assert.Equal(3.4f, VectorShip.Definition.Visual.CollisionHalfWidth);
+        Assert.Equal(2.63f, VectorShip.Definition.Visual.CollisionHalfWidth);
         Assert.Equal(1.6f, BladeShip.Definition.Visual.CollisionHalfWidth);
         Assert.Equal(2.5f, HammerShip.Definition.Visual.CollisionHalfWidth);
     }
@@ -138,7 +138,8 @@ public class ShipCollisionWidthTests
     [Fact]
     public void WiderShip_TouchesTheBarrierEarlier()
     {
-        const float Lateral = 17.5f;
+        // VECTOR sigue siendo la más ancha (2,63 m), por poco: HAMMER llega a 2,5
+        const float Lateral = 17.9f;
 
         Assert.True(Touches(VectorShip.Definition, Lateral));
         Assert.False(Touches(HammerShip.Definition, Lateral));

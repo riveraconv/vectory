@@ -43,6 +43,10 @@ public sealed record Cockpit3DProfile(string ModelPath, string ManifestPath, str
 	public Cockpit3DLayout Layout => Cockpit3DLayout.For(Style);
 }
 
+// Un casco 3D (spec docs/cascos-3d-1-vector.md): su modelo exportado de Blender, lo que el modelo no puede llevar y
+// su panorama de reflejos
+public sealed record ShipHull3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath);
+
 // Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco es un constructor: devuelve sus líneas,
 // sin nodos de Godot. Lógica pura.
 public sealed record ShipVisualProfile
@@ -50,6 +54,9 @@ public sealed record ShipVisualProfile
 	public required Func<IReadOnlyList<ShipLine>> BuildHull { get; init; }
 	// Cabina 3D (spec docs/cabinas-3d-1-vector.md): la tienen todas las naves
 	public required Cockpit3DProfile Cockpit3D { get; init; }
+	// Casco 3D de la nave del jugador (null: el wireframe de BuildHull). El fantasma, el menú y las naves de prueba
+	// siguen con el wireframe aunque la nave lo tenga.
+	public ShipHull3DProfile Hull3D { get; init; }
 
 	public required CockpitFraming Cockpit { get; init; }
 	public required ChaseFraming Chase { get; init; }

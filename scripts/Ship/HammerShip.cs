@@ -34,6 +34,7 @@ public static class HammerShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
+			Hull3D = null,   // sin casco 3D todavía: no hereda el de Vector
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_hammer.glb",
 				"res://assets/cockpits/cockpit_hammer.manifest.json",

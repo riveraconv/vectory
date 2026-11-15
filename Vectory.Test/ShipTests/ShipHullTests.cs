@@ -103,7 +103,10 @@ public class ShipHullTests
     {
         ShipVisualProfile visual = ShipDefinitions.Find(id)!.Visual;
 
-        float hull = Points(visual.BuildHull()).Max(p => MathF.Abs(p.X));
+        // Con casco 3D, el semiancho real es el de su manifiesto (spec docs/cascos-3d-1-vector.md, 4.5)
+        float hull = visual.Hull3D != null
+            ? Hull3DTests.Manifest.HalfWidth
+            : Points(visual.BuildHull()).Max(p => MathF.Abs(p.X));
 
         Assert.InRange(MathF.Abs(hull - visual.CollisionHalfWidth), 0f, 0.01f);
     }
