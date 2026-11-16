@@ -6,78 +6,159 @@ using NVec3 = System.Numerics.Vector3;
 
 namespace Vectory.Rivals;
 
-// Nave de un rival (spec docs/rivales-1-parrilla.md, 3.2 y 3.3): su casco 3D con su pintura, en la capa de los rivales
-// (ShipHull3D.RivalLayer, iluminada por un juego de luces común), colocada en su marca como el jugador: centrada, con el
-// morro detrás de la línea, mirando en el sentido de la marcha, parada, en el suelo y alineada con la superficie. Nada de
-// lo que es solo del jugador: ni cámaras, ni cabina, ni HUD, ni sacudida. Etapa 1: se queda quieta.
-// Este nodo solo conecta piezas: la colocación es la de ShipPhysics y la orientación, la de ShipAttitude.
+// Lo que la nave de un rival toma de la del jugador, para verse igual: casco 3D, inclinación, orientación, parpadeo del
+// daño y balizas de HAMMER (con los valores del Inspector del Player)
+public sealed record RivalLook(Hull3DSettings Hull, BankSettings Bank, AttitudeSettings Attitude, EdgeFlickerSettings Flicker,
+	IndustrialLampSettings Lamps);
+
+// Nave de un rival (spec docs/rivales-1-parrilla.md, 3.3 y 4): pinta la carrera de su RivalCar, que lleva toda la lógica.
+// Su casco 3D con su pintura, en la capa de los rivales (ShipHull3D.RivalLayer, iluminada por un juego de luces común),
+// con la inclinación al girar y la orientación con la pista del jugador, el daño visible (quemaduras, humo y luces que
+// titilan), el brillo de levitación, la anticolisión de BLADE y las balizas de HAMMER. Nada de lo que es solo del jugador:
+// ni cámaras, ni cabina, ni HUD, ni sacudida. Se apunta en la lista de naves en carrera en cada paso.
 public partial class RivalShip : Node3D
 {
-	private readonly ShipPhysics _physics = new();
+	private readonly ShipBank _bank = new();
+	private readonly ShipAttitude _attitude = new();
+	private readonly System.Random _flickerRandom = new();
 	private Spaceship _ship;
-	private float _hoverTime;
-	private Hull3DSettings _hullSettings = new();
+	private RivalCar _car;
+	private RaceSession _race;
+	private RaceShipList _raceShips;
+	private RivalLook _look;
+	private EdgeFlicker _flicker;
+	private float _flickerOpacity;
+	private float _time;
+	private int _damageLevel;
+	private int _respawns;
 
-	public RivalEntry Entry { get; private set; }
-	public ShipDefinition Definition { get; private set; }
+	public RivalCar Car => _car;
 
 	// Antes de añadirlo al árbol
-	public void Setup(RivalEntry entry, Hull3DSettings hullSettings)
+	public void Setup(RivalCar car, RaceSession race, RaceShipList raceShips, RivalLook look, float flickerOpacity)
 	{
-		Entry = entry;
-		Definition = ShipDefinitions.Resolve(entry.ShipDesignId, message => GD.PushWarning(message));
-		_hullSettings = hullSettings;
-		Name = entry.Id;
+		_car = car;
+		_race = race;
+		_raceShips = raceShips;
+		_look = look;
+		_flickerOpacity = flickerOpacity;
+		Name = car.Entry.Id;
 	}
 
 	public override void _Ready()
 	{
+		// Después de la nave del jugador (prioridad 0), que es la que da el GO en su paso
+		ProcessPhysicsPriority = 1;
+
+		ShipDefinition definition = _car.Ship;
 		_ship = new Spaceship
 		{
 			Name = "Spaceship",
-			Visual = Definition.Visual,
+			Visual = definition.Visual,
 			Use3DHull = true,
 			Hull3DLayer = ShipHull3D.RivalLayer,
 			Hull3DOwnLights = false
 		};
-		_ship.SetHull3DSettings(_hullSettings);
-		if (Definition.Visual.Hull3D != null)
-			_ship.SetHullPaint(Definition.Visual.Hull3D.Style, Entry.PaintIndex);
+		_ship.SetHull3DSettings(_look.Hull);
+		if (definition.Visual.Hull3D != null)
+			_ship.SetHullPaint(definition.Visual.Hull3D.Style, _car.Entry.PaintIndex);
 		AddChild(_ship);
+
+		_car.Damage.LevelChanged += OnDamageLevelChanged;
+		string id = _car.Entry.Id;
+		_car.Tracker.LapCompleted += (lap, time, _) => GD.Print($"[Race] {id} lap {lap}: {Core.TimeFormat.Format(time)}");
+		_car.Tracker.RaceFinished += total => GD.Print($"[Race] {id} finished: {Core.TimeFormat.Format(total)}");
+		SettleOnSurface();
+		Publish();
 	}
 
-	// En su marca de parrilla, parada y sin daño
-	public void PlaceOnGrid(Track track)
+	public override void _PhysicsProcess(double delta)
 	{
-		track.GetGridStart(Entry.GridPosition, Definition.Visual.NoseDistance, out Vector3 position, out float yaw);
-		_physics.SetTrack(track.Frame, track.BarrierOffset);
-		_physics.Place(ToNumerics(position), yaw, 0f, ShipPhysicsSettings.Default.Boost);
-		GlobalPosition = position;
+		_car.Step(_race.State != RaceState.PreStart);
 
-		float pitch = 0f, roll = 0f;
-		if (_physics.HasSurface)
-			ShipAttitude.SurfaceAngles(_physics.Surface.Frame.Normal, yaw, out pitch, out roll);
-		// Rumbo, cabeceo y ladeo en el orden YXZ de Godot, como el cuerpo del jugador
-		Rotation = new Vector3(pitch, yaw, roll);
+		if (_car.Respawns != _respawns)
+		{
+			_respawns = _car.Respawns;
+			_ship.ClearHullSmoke();
+			_bank.Reset();
+			SettleOnSurface();
+		}
+		else
+		{
+			ShipDynamics d = _car.Dynamics;
+			float top = _car.Ship.Technical.MaxSpeed * _car.Damage.TopSpeedFactor;
+			float speedRatio = top > 0f ? d.RealSpeed / top : 0f;
+			_bank.Update(d.Steer, speedRatio, d.Drifting, _look.Bank, (float)delta);
+			ShipPhysics physics = _car.Physics;
+			if (physics.HasSurface)
+			{
+				_attitude.Update(physics.Vertical.Grounded, physics.Vertical.Landed, physics.Surface.Frame.Normal, d.Yaw,
+					physics.Vertical.VerticalSpeed, d.RealSpeed, _look.Attitude, (float)delta);
+			}
+			ApplyTransform();
+		}
+		Publish();
+	}
+
+	// Efectos del casco: brillo de levitación, anticolisión, balizas y parpadeo. Con la pausa no avanzan.
+	public override void _Process(double delta)
+	{
+		float dt = (float)delta;
+		_time += dt;
+		ShipPhysics physics = _car.Physics;
+		if (_ship.HasHull3D && physics.HasSurface)
+		{
+			SurfacePoint surface = physics.Surface;
+			Transform3D glow = ShipHull3D.GlowTransform(surface, GlobalPosition, _car.Dynamics.Yaw, _ship.Visual.Hull3D.Glow.CenterZ);
+			float strength = HoverGlow.Strength(_time, _look.Hull.HoverGlowIntensity) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
+			_ship.UpdateHullEffects(glow, strength, _car.Dynamics.RealSpeed, _time);
+			(float boost, float damage) = IndustrialHullBeacons.Intensities(_car.Boost.IsImpulseActive, _damageLevel, true, _time, _look.Lamps);
+			_ship.SetHullBeacons(boost, damage);
+		}
+
+		if (_flicker != null && _flicker.Update(dt))
+			_ship.ShowEdgeFlicker(_flicker, _flickerOpacity);
+	}
+
+	private void OnDamageLevelChanged(int level)
+	{
+		_damageLevel = level;
+		_ship.SetHullDamage(level, false);
+		_flicker ??= new EdgeFlicker(_ship.EdgeCount, _look.Flicker, _flickerRandom);
+		_flicker.SetLevel(level);
+		_ship.ShowEdgeFlicker(_flicker, _flickerOpacity);
+	}
+
+	// En el suelo y con la orientación de la superficie al momento (al colocarla y al recolocarla)
+	private void SettleOnSurface()
+	{
+		ShipPhysics physics = _car.Physics;
+		if (physics.HasSurface)
+		{
+			ShipAttitude.SurfaceAngles(physics.Surface.Frame.Normal, _car.Dynamics.Yaw, out float pitch, out float roll);
+			_attitude.Reset(pitch, roll);
+		}
+		else
+		{
+			_attitude.Reset();
+		}
+		ApplyTransform();
+	}
+
+	// Cuerpo con rumbo, cabeceo y ladeo (orden YXZ de Godot, como el del jugador) e inclinación al girar en el casco
+	private void ApplyTransform()
+	{
+		NVec3 p = _car.Position;
+		GlobalPosition = new Vector3(p.X, p.Y, p.Z);
+		Rotation = new Vector3(_attitude.Pitch, _car.Dynamics.Yaw, _attitude.Roll);
+		_ship.Rotation = new Vector3(0f, 0f, _bank.Angle);
 	}
 
 	// Para la lista de naves en carrera (radar y minimapa)
-	public RaceShip ToRaceShip()
+	private void Publish()
 	{
 		Basis basis = GlobalBasis;
-		return new RaceShip(Entry.Number, ToNumerics(GlobalPosition), ToNumerics(-basis.Z), ToNumerics(basis.Y));
-	}
-
-	// Brillo de levitación y tiempo de la nave (anticolisión de BLADE). Con la pausa no avanza.
-	public override void _Process(double delta)
-	{
-		if (!_ship.HasHull3D || !_physics.HasSurface)
-			return;
-		_hoverTime += (float)delta;
-		SurfacePoint surface = _physics.Surface;
-		Transform3D glow = ShipHull3D.GlowTransform(surface, GlobalPosition, _physics.Dynamics.Yaw, _ship.Visual.Hull3D.Glow.CenterZ);
-		float strength = HoverGlow.Strength(_hoverTime, _hullSettings.HoverGlowIntensity) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
-		_ship.UpdateHullEffects(glow, strength, _physics.Dynamics.RealSpeed, _hoverTime);
+		_raceShips.Set(new RaceShip(_car.Entry.Number, ToNumerics(GlobalPosition), ToNumerics(-basis.Z), ToNumerics(basis.Y)));
 	}
 
 	private static NVec3 ToNumerics(Vector3 v) => new(v.X, v.Y, v.Z);

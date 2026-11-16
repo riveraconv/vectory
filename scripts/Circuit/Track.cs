@@ -192,8 +192,9 @@ render_mode unshaded, cull_disabled, blend_mix;
 uniform float lap_length = 1.0;
 uniform vec3 flash_color = vec3(1.0, 0.6, 0.2);
 uniform float flash_glow = 1.5;
-uniform vec3 left_flash = vec3(0.0);   // x: punto de impacto, y: radio, z: intensidad
-uniform vec3 right_flash = vec3(0.0);
+// Un destello por nave y lado (x: punto de impacto, y: radio, z: intensidad); se pinta el más fuerte
+uniform vec3 left_flash[8];
+uniform vec3 right_flash[8];
 uniform float crest_beat = 1.0;        // brillo del tramo naranja de las crestas (UV2.x = 1)
 
 float flash_at(float d, vec3 f) {
@@ -205,7 +206,9 @@ float flash_at(float d, vec3 f) {
 }
 
 void fragment() {
-	float k = UV.y < 0.5 ? flash_at(UV.x, left_flash) : flash_at(UV.x, right_flash);
+	float k = 0.0;
+	for (int i = 0; i < 8; i++)
+		k = max(k, UV.y < 0.5 ? flash_at(UV.x, left_flash[i]) : flash_at(UV.x, right_flash[i]));
 	vec3 base = UV2.x > 0.5 ? COLOR.rgb * crest_beat : COLOR.rgb;
 	ALBEDO = mix(base, flash_color * (1.0 + flash_glow * k), k);
 	ALPHA = mix(COLOR.a, 1.0, k);
@@ -317,13 +320,29 @@ void fragment() {
 	}
 
 	// Pasa el destello actual al shader de la barrera (no rehace la malla)
-	public void SetBarrierFlash(BarrierFlash flash)
+	// Destellos de la barrera de todas las naves (la del jugador y las de los rivales): como mucho MaxBarrierFlashes
+	public const int MaxBarrierFlashes = 8;
+	private readonly Vector3[] _leftFlashes = new Vector3[MaxBarrierFlashes];
+	private readonly Vector3[] _rightFlashes = new Vector3[MaxBarrierFlashes];
+
+	public void SetBarrierFlashes(System.Collections.Generic.IEnumerable<BarrierFlash> flashes)
 	{
 		if (_barrierMaterial == null)
 			return;
 
-		_barrierMaterial.SetShaderParameter("left_flash", FlashUniform(flash, BarrierSide.Left));
-		_barrierMaterial.SetShaderParameter("right_flash", FlashUniform(flash, BarrierSide.Right));
+		System.Array.Clear(_leftFlashes);
+		System.Array.Clear(_rightFlashes);
+		int i = 0;
+		foreach (BarrierFlash flash in flashes)
+		{
+			if (i == MaxBarrierFlashes)
+				break;
+			_leftFlashes[i] = FlashUniform(flash, BarrierSide.Left);
+			_rightFlashes[i] = FlashUniform(flash, BarrierSide.Right);
+			i++;
+		}
+		_barrierMaterial.SetShaderParameter("left_flash", _leftFlashes);
+		_barrierMaterial.SetShaderParameter("right_flash", _rightFlashes);
 	}
 
 	private static Vector3 FlashUniform(BarrierFlash flash, BarrierSide side)
@@ -339,7 +358,7 @@ void fragment() {
 	// Parrilla de salida
 	// ---------------------------------------------------------------
 
-	private GridSettings GridSettings => new()
+	public GridSettings GridSettings => new()
 	{
 		FirstDistance = GridFirstDistance,
 		RowSpacing = GridRowSpacing,

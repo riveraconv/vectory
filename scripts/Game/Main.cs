@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 using Vectory.Circuit;
 using Vectory.Core;
 using Vectory.Ghost;
@@ -98,6 +99,8 @@ public partial class Main : Node3D
 
 	[ExportGroup("Rivales")]
 	[Export] public int RivalCount = 7;   // como mucho, una por marca libre de la parrilla (participantes − 1)
+	[Export(PropertyHint.Range, "0.5,1,0.01")] public float RivalPace = RivalDriver.DefaultPace;   // margen de velocidad del piloto en las curvas
+	[Export(PropertyHint.Range, "0.1,1,0.01")] public float RivalCooldownPace = RivalDriver.DefaultCooldownPace;   // vuelta de enfriamiento: fracción de su objetivo
 
 	[ExportGroup("Recolocación")]
 	[Export] public float StuckSpeed = RespawnSettings.DefaultStuckSpeedKmh;          // km/h: por debajo, y tocando la barrera, la nave está atascada
@@ -129,8 +132,9 @@ public partial class Main : Node3D
 	// Las demás naves de la carrera (rivales y naves de prueba; el fantasma no entra) y el radar que las lee
 	private readonly RaceShipList _raceShips = new();
 
-	// Alineación de los rivales (solo RACE; null en TIME TRIAL)
+	// Alineación de los rivales y sus naves (solo RACE; null en TIME TRIAL)
 	private IReadOnlyList<RivalEntry> _lineup;
+	private RivalField _rivals;
 	private RadarSweep _radar;
 
 	// Fantasma (solo TIME TRIAL; null en RACE)
@@ -218,7 +222,7 @@ public partial class Main : Node3D
 			// jugador y las demás, de los rivales, que salen del mismo generador (alineación: nave y pintura)
 			var rng = new System.Random();
 			int[] gridOrder = GridLayout.RandomOrder(participants, rng);
-			_lineup = RivalLineup.Build(gridOrder, rng, Math.Max(0, RivalCount));
+			_lineup = RivalLineup.Build(gridOrder, rng, RivalLineup.CountFor(_mode, participants, RivalCount));
 			float noseDistance = _player.Definition.Visual.NoseDistance;
 			_track.GetGridStart(gridOrder[0], noseDistance, out Vector3 startPosition, out float startYaw);
 			_player.PlaceAt(startPosition, startYaw);
@@ -237,13 +241,7 @@ public partial class Main : Node3D
 		_race.SectorTimed += OnSectorTimed;
 
 		_barrierFlash = new BarrierFlash(_track.LapLength, _track.BarrierFlashSettings);
-		_respawn = new RespawnDetector(new RespawnSettings
-		{
-			BarrierOffset = _track.BarrierOffset,
-			StuckSpeed = StuckSpeed / 3.6f,
-			StuckTime = StuckTime,
-			OutsideMargin = OutsideTrackMargin
-		});
+		_respawn = new RespawnDetector(BuildRespawnSettings());
 
 		_race.CheckpointPassed += OnCheckpointPassed;
 		_race.LapCompleted += OnLapCompleted;
@@ -298,17 +296,17 @@ public partial class Main : Node3D
 		}
 
 		// Rivales (solo RACE): en su marca, en el radar y en el minimapa
-		if (_lineup != null)
+		if (_lineup != null && _lineup.Count > 0)
 		{
-			var rivals = new RivalField { Name = "Rivals" };
-			AddChild(rivals);
-			rivals.Setup(_lineup, _track, _player, _raceShips);
+			_rivals = new RivalField { Name = "Rivals" };
+			AddChild(_rivals);
+			_rivals.Setup(_lineup, _track, _player, _race, _raceShips, BuildRivalContext(), RivalPace, RivalCooldownPace);
 		}
 
 		// Panel de ajuste para pruebas: no existe en una exportación de release
 		if (OS.IsDebugBuild())
 		{
-			var tuningPanel = new TuningLabPanel { Name = "TuningLabPanel", Player = _player };
+			var tuningPanel = new TuningLabPanel { Name = "TuningLabPanel", Player = _player, Rivals = _rivals };
 			AddChild(tuningPanel);
 			AddChild(new AutopilotToggle { Name = "AutopilotToggle", Player = _player });
 			AddChild(new DebugOrbitCamera { Name = "DebugOrbitCamera", Player = _player });
@@ -393,7 +391,8 @@ public partial class Main : Node3D
 				_barrierFlash.Graze(touch.Side, touch.AxisDistance);
 			}
 		}
-		_track.SetBarrierFlash(_barrierFlash);
+		// El del jugador y los de los rivales (que van un paso por detrás: se mueven después de Main)
+		_track.SetBarrierFlashes(_rivals == null ? new[] { _barrierFlash } : _rivals.Flashes.Prepend(_barrierFlash));
 
 		bool canRespawn = _race.CanDrive && _race.State != RaceState.Finished;
 		if (!canRespawn)
@@ -592,7 +591,16 @@ public partial class Main : Node3D
 	// Cada carrera empieza sin daño (RESTART recarga la escena y crea un modelo nuevo)
 	private void SetupDamage()
 	{
-		_damage = new DamageModel(new DamageSettings
+		_damage = new DamageModel(BuildDamageSettings());
+		_damage.LevelChanged += OnDamageLevelChanged;
+		_hud.ShowDamageIndicator();
+		_player.CockpitDamageEnabled = true;
+	}
+
+	// Reglas del daño del grupo Daños: las del jugador y las de los rivales
+	private DamageSettings BuildDamageSettings()
+	{
+		return new DamageSettings
 		{
 			MediumPoints = DamageMediumPoints,
 			StrongPoints = DamageStrongPoints,
@@ -602,10 +610,39 @@ public partial class Main : Node3D
 			Level2TopSpeedFactor = DamageLevel2TopSpeed,
 			Level3TopSpeedFactor = DamageLevel3TopSpeed,
 			Level3TurnFactor = DamageLevel3Turn
-		});
-		_damage.LevelChanged += OnDamageLevelChanged;
-		_hud.ShowDamageIndicator();
-		_player.CockpitDamageEnabled = true;
+		};
+	}
+
+	private RespawnSettings BuildRespawnSettings()
+	{
+		return new RespawnSettings
+		{
+			BarrierOffset = _track.BarrierOffset,
+			StuckSpeed = StuckSpeed / 3.6f,
+			StuckTime = StuckTime,
+			OutsideMargin = OutsideTrackMargin
+		};
+	}
+
+	// Lo que comparten los rivales: el circuito y las mismas reglas que el jugador (física, daño, recolocación y destello)
+	private RivalRaceContext BuildRivalContext()
+	{
+		return new RivalRaceContext
+		{
+			Frame = _track.Frame,
+			TrackWidth = _track.TrackWidth,
+			BarrierOffset = _track.BarrierOffset,
+			LapLength = _track.LapLength,
+			CheckpointIndices = _track.CheckpointIndices,
+			Laps = RaceSession.RaceLaps,
+			Grid = _track.GridSettings,
+			Hover = Track.ShipHover,
+			Physics = _player.BuildPhysicsSettings(),
+			Damage = BuildDamageSettings(),
+			Respawn = BuildRespawnSettings(),
+			Flash = _track.BarrierFlashSettings,
+			StepTime = 1f / Engine.PhysicsTicksPerSecond
+		};
 	}
 
 	// Reparte el nivel nuevo: factores y boost a la nave, parpadeo de sus aristas e indicador del HUD

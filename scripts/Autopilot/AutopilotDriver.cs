@@ -55,6 +55,10 @@ public sealed class AutopilotDriver
 	public RacingLine Line => _line;
 	public SpeedProfile Profile => _profile;
 
+	// Fracción del perfil de velocidad que persigue (1 = el perfil entero). Los rivales la bajan en la vuelta de
+	// enfriamiento (spec docs/rivales-1-parrilla.md, 4.4).
+	public float TargetScale { get; set; } = 1f;
+
 	// boostAt: m desde la meta en los que gasta una carga (negativo = nunca)
 	public AutopilotDriver(RacingLine line, SpeedProfile profile, in ShipTuning tuning, in BankGripSettings bankGrip, float stepTime, float boostAt = -1f)
 	{
@@ -105,7 +109,7 @@ public sealed class AutopilotDriver
 	}
 
 	private float TargetAhead(in PilotState state) =>
-		_profile.Target[_line.IndexAt(state.Distance + state.MotorSpeed * _lag)];
+		_profile.Target[_line.IndexAt(state.Distance + state.MotorSpeed * _lag)] * TargetScale;
 
 	// Giro de -1 a 1 (izquierda positivo) que hace falta para llegar al punto de delante
 	private float RequiredSteer(in PilotState state)
@@ -170,7 +174,7 @@ public sealed class AutopilotDriver
 
 		for (int k = 0; k <= points; k++)
 		{
-			float target = _profile.Target[_line.Wrap(start + k)] + BrakeTolerance;
+			float target = _profile.Target[_line.Wrap(start + k)] * TargetScale + BrakeTolerance;
 			float braking = MathF.Max(0f, k * _line.PointSpacing - lead);
 			if (speed * speed - 2f * brake * braking > target * target)
 				return true;

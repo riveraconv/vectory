@@ -4,6 +4,7 @@ using Godot;
 using Vectory.Core;
 using Vectory.Game;
 using Vectory.Menu;
+using Vectory.Rivals;
 using Vectory.Ship;
 
 namespace Vectory.UI;
@@ -13,6 +14,8 @@ namespace Vectory.UI;
 // vive en un campo estático para sobrevivir a RESTART y dura hasta cerrar el juego. Al entrar a una carrera con una nave
 // distinta de la elegida la última vez, pasa a ella; RESTART no la cambia (spec docs/naves-4-integracion.md, 4.1).
 // F9 panel · F10 cambiar de nave · F11 volcar a la consola · F12 valores de arranque.
+// En RACE, bloque RIVALS (spec docs/rivales-1-parrilla.md, 4.5): una fila por rival y el ritmo de todos (85–100 %), que
+// se aplica al momento y dura hasta cerrar el juego, sin guardarse en disco.
 // Sigue funcionando con la pausa (por encima de ella), para poder ajustar con la carrera parada.
 public partial class TuningLabPanel : CanvasLayer
 {
@@ -35,6 +38,17 @@ public partial class TuningLabPanel : CanvasLayer
 
 	// La nave a la que se aplican los cambios
 	public Player Player { get; set; }
+
+	// Los rivales de la carrera (null en TIME TRIAL: sin bloque RIVALS)
+	public RivalField Rivals { get; set; }
+
+	private const int MinRivalPace = 85;
+	private const int MaxRivalPace = 100;
+	private const float RivalsRefreshTime = 0.25f;   // s entre repasos de las filas
+	private static float? _rivalPace;   // el del deslizador, si se ha movido
+	private Row _rivalPaceRow;
+	private Label _rivalsLabel;
+	private float _rivalsRefresh;
 
 	private const float SecondSpeedKmh = 300f;   // la segunda velocidad de la fila ACCEL CURVE
 
@@ -63,9 +77,13 @@ public partial class TuningLabPanel : CanvasLayer
 			_lastChosenId = GameSession.ShipDesignId;
 		}
 
+		if (_rivalPace is float pace)
+			Rivals?.SetPace(pace);
+
 		Build();
 		_root.Visible = false;
 		Refresh();
+		RefreshRivals();
 
 		// Con el panel ya usado, la nave sigue con lo que hubiera en él (también tras RESTART)
 		if (_lab.Touched)
@@ -133,6 +151,50 @@ public partial class TuningLabPanel : CanvasLayer
 			return;
 		}
 		GetViewport().SetInputAsHandled();
+	}
+
+	// Filas de los rivales, unas veces por segundo con el panel abierto (también con la pausa: no cambian)
+	public override void _Process(double delta)
+	{
+		if (Rivals == null || !_root.Visible)
+			return;
+		_rivalsRefresh -= (float)delta;
+		if (_rivalsRefresh > 0f)
+			return;
+		_rivalsRefresh = RivalsRefreshTime;
+		RefreshRivals();
+	}
+
+	private void OnRivalPaceChanged(double value)
+	{
+		float pace = Mathf.RoundToInt(value) / 100f;
+		_rivalPace = pace;
+		Rivals?.SetPace(pace);
+		RefreshRivals();
+		GD.Print($"[TuningLab] Rival pace: {Mathf.RoundToInt(value)} %");
+	}
+
+	private void RefreshRivals()
+	{
+		if (Rivals == null)
+			return;
+		int pace = Mathf.RoundToInt(Rivals.Pace * 100f);
+		_rivalPaceRow.Slider.SetValueNoSignal(pace);
+		_rivalPaceRow.Percent.Text = pace.ToString(CultureInfo.InvariantCulture) + " %";
+
+		var text = new System.Text.StringBuilder();
+		foreach (RivalShip ship in Rivals.Ships)
+		{
+			RivalCar car = ship.Car;
+			HullStyle style = HullPaints.StyleOf(car.Ship.Id) ?? HullStyle.Racing;
+			string lap = car.Tracker.State == Circuit.RaceState.Finished ? "FIN"
+				: $"{car.Tracker.CurrentLap}/{car.Tracker.TotalLaps}";
+			if (text.Length > 0)
+				text.Append('\n');
+			text.Append($"{car.Entry.Id,-8}{ShipCatalog.Find(car.Ship.Id)?.Name ?? car.Ship.Id,-7}{HullPaints.DisplayName(style, car.Entry.PaintIndex),-30}"
+				+ $"LAP {lap,-4} DMG {car.Damage.Level}  HIT {car.Contacts,-3} RSP {car.Respawns}");
+		}
+		_rivalsLabel.Text = text.ToString();
 	}
 
 	// Cuántas naves de prueba hay (F6): las lleva TestShips, aquí solo se enseña
@@ -288,6 +350,18 @@ public partial class TuningLabPanel : CanvasLayer
 		column.AddChild(_testShipsLabel);
 		_paintLabel = new Label { LabelSettings = value };
 		column.AddChild(_paintLabel);
+
+		if (Rivals != null)
+		{
+			column.AddChild(new Label { Text = "RIVALS", LabelSettings = header });
+			var rivalGrid = new GridContainer { Columns = 4 };
+			rivalGrid.AddThemeConstantOverride("h_separation", Mathf.RoundToInt(8f * scale));
+			column.AddChild(rivalGrid);
+			_rivalPaceRow = BuildRow(rivalGrid, MinRivalPace, MaxRivalPace, 1, OnRivalPaceChanged, label, value, scale);
+			_rivalPaceRow.Name.Text = "PACE";
+			_rivalsLabel = new Label { LabelSettings = value };
+			column.AddChild(_rivalsLabel);
+		}
 
 		column.AddChild(new Label { Text = "F9 PANEL · F10 SHIP · F11 DUMP · F12 RESET", LabelSettings = label });
 	}

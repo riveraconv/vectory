@@ -652,14 +652,20 @@ public partial class Player : CharacterBody3D
 			return;
 
 		_attitude.Update(Vertical.Grounded, Vertical.Landed, _physics.Surface.Frame.Normal, Dynamics.Yaw,
-			Vertical.VerticalSpeed, Dynamics.RealSpeed, new AttitudeSettings
-			{
-				GroundSmoothTime = GroundAttitudeSmoothing,
-				AirSmoothTime = AirAttitudeSmoothing,
-				LandingSmoothTime = LandingAlignTime,
-				AirMaxPitch = Mathf.DegToRad(AirMaxPitch)
-			}, dt);
+			Vertical.VerticalSpeed, Dynamics.RealSpeed, BuildAttitudeSettings(), dt);
 		ApplyBodyRotation();
+	}
+
+	// Orientación con la pista y en el aire (grupos Vuelo y Pendiente y peralte): también la de los rivales
+	public AttitudeSettings BuildAttitudeSettings()
+	{
+		return new AttitudeSettings
+		{
+			GroundSmoothTime = GroundAttitudeSmoothing,
+			AirSmoothTime = AirAttitudeSmoothing,
+			LandingSmoothTime = LandingAlignTime,
+			AirMaxPitch = Mathf.DegToRad(AirMaxPitch)
+		};
 	}
 
 	// Rumbo, cabeceo y ladeo del cuerpo (orden YXZ de Godot): la nave visible y la cabina van con él
@@ -787,7 +793,7 @@ public partial class Player : CharacterBody3D
 		};
 	}
 
-	private BankSettings BuildBankSettings()
+	public BankSettings BuildBankSettings()
 	{
 		return new BankSettings
 		{
@@ -797,8 +803,8 @@ public partial class Player : CharacterBody3D
 		};
 	}
 
-	// Parámetros de la física de un paso, con los valores del Inspector (m/s y radianes)
-	private ShipPhysicsSettings BuildPhysicsSettings()
+	// Parámetros de la física de un paso, con los valores del Inspector (m/s y radianes): también los de los rivales
+	public ShipPhysicsSettings BuildPhysicsSettings()
 	{
 		return new ShipPhysicsSettings
 		{
@@ -844,7 +850,7 @@ public partial class Player : CharacterBody3D
 		};
 	}
 
-	private EdgeFlickerSettings BuildFlickerSettings()
+	public EdgeFlickerSettings BuildFlickerSettings()
 	{
 		return new EdgeFlickerSettings
 		{
@@ -986,7 +992,7 @@ public partial class Player : CharacterBody3D
 	}
 
 	// Setas y balizas de HAMMER: las de la cabina 3D y las del techo del casco 3D comparten ajustes
-	private IndustrialLampSettings BuildIndustrialLampSettings() =>
+	public IndustrialLampSettings BuildIndustrialLampSettings() =>
 		new(HammerSetaFull, HammerSetaCooldown, HammerSetaLocked, HammerSetaEmpty,
 			HammerBoostBeaconOn, HammerBoostBeaconPulse, HammerDamageBeaconOn, HammerBeaconOff);
 

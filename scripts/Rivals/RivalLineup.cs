@@ -18,6 +18,10 @@ public static class RivalLineup
 {
 	public const string IdPrefix = "rival_";
 
+	// Cuántos rivales hay en una carrera: los pedidos, como mucho uno por marca libre; en TIME TRIAL, ninguno
+	public static int CountFor(Vectory.Game.GameMode mode, int participants, int requested) =>
+		mode == Vectory.Game.GameMode.Race ? Math.Clamp(requested, 0, Math.Max(0, participants - 1)) : 0;
+
 	// Las naves que pueden llevar los rivales: las elegibles del catálogo, en su orden
 	public static IReadOnlyList<string> Ships => ShipCatalog.Entries.Where(e => e.Selectable && HullPaints.StyleOf(e.Id) != null).Select(e => e.Id).ToArray();
 
