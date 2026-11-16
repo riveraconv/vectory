@@ -191,7 +191,7 @@ public partial class TuningLabPanel : CanvasLayer
 				: $"{car.Tracker.CurrentLap}/{car.Tracker.TotalLaps}";
 			if (text.Length > 0)
 				text.Append('\n');
-			text.Append($"{car.Entry.Id,-8}{ShipCatalog.Find(car.Ship.Id)?.Name ?? car.Ship.Id,-7}{HullPaints.DisplayName(style, car.Entry.PaintIndex),-30}"
+			text.Append($"{car.Entry.Pilot.Nickname,-8}{ShipCatalog.Find(car.Ship.Id)?.Name ?? car.Ship.Id,-7}{HullPaints.DisplayName(style, car.Entry.PaintIndex),-30}"
 				+ $"LAP {lap,-4} DMG {car.Damage.Level}  HIT {car.Contacts,-3} RSP {car.Respawns}");
 		}
 		_rivalsLabel.Text = text.ToString();

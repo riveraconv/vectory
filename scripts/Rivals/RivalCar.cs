@@ -55,6 +55,9 @@ public sealed class RivalCar
 	public ShipBoost Boost => _physics.Boost;
 	public BarrierTouch LastTouch => _physics.LastBarrierTouch;
 
+	// Distancia sobre el eje desde la meta (0..largo de la vuelta), para la clasificación
+	public float TrackDistance => _physics.HasSurface ? _physics.Surface.Frame.Distance : 0f;
+
 	public RivalPhase Phase => Tracker.State switch
 	{
 		RaceState.Running => RivalPhase.Running,

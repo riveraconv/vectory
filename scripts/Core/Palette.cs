@@ -182,4 +182,9 @@ public static class Palette
 	public static readonly Color DamageNoneOff = new Color(Green, 0.6f);    // borde de un segmento apagado, según el nivel
 	public static readonly Color DamageLightOff = new Color(Yellow, 0.6f);
 	public static readonly Color DamageHeavyOff = new Color(Red, 0.6f);
+
+	// --- Clasificación del HUD (spec docs/rivales-2-clasificacion.md, 3.4): puesto del jugador y PLAYER en Cyan, puesto
+	// de los rivales en Magenta, /8 e intervalo en BlueGray, fondo Background ---
+	public static readonly Color StandingsName = new Color(0xE9F6FFFF);             // apodo de un rival (blanco azulado)
+	public static readonly Color StandingsPlayerStrip = new Color(Cyan, 0.12f);     // franja detrás de la fila del jugador
 }

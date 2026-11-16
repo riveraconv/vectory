@@ -11,9 +11,10 @@ namespace Vectory.UI;
 // HUD de la demo. Solo MUESTRA datos: no calcula reglas de conducción ni de carrera.
 // Se crea por código desde Main, que le pasa los datos cada frame. Colores de Palette.
 //
-//   Arriba izquierda:  posición / participantes (TIME TRIAL: TIME TRIAL y el circuito) y, debajo, el minimapa
+//   Arriba izquierda:  RACE: panel de clasificación (StandingsPanelView); TIME TRIAL: TIME TRIAL y el circuito
 //   Arriba derecha:    vuelta (LAP 2/3, LAP 4, OUT LAP), tiempo de vuelta, mejor tiempo y, 2 s tras cerrar un
-//                      sector, su tiempo y la diferencia con el mejor anterior (S1  0:23.456  -0.214)
+//                      sector, su tiempo y la diferencia con el mejor anterior (S1  0:23.456  -0.214); debajo,
+//                      centrado con ese bloque, el minimapa
 //   Abajo izquierda:   radar
 //   Abajo derecha:     indicador de daño (solo RACE) y cargas de boost (esferas), velocidad (km/h) y su barra
 //   Arriba centro:     RACE: cuenta atrás y GO! (el semáforo está en la meta); TIME TRIAL: READY? / GO!, delta por
@@ -53,13 +54,19 @@ public partial class Hud : CanvasLayer
 	public float RadarDiameter = 120f;
 	private const float RadarBottomMargin = 40f;
 
-	// Minimapa: diámetro y margen a la parte de arriba (px sobre 1280×720). Justo debajo de la posición, alineado con ella.
-	public float MinimapDiameter = 156f;
-	private const float MinimapTopMargin = 78f;
+	// Minimapa: diámetro y hueco entre la línea de BEST y su borde de arriba (px sobre 1280×720). Debajo del cronómetro,
+	// centrado con el bloque de LAP, tiempo y BEST (spec docs/rivales-2-clasificacion.md, 3.4).
+	public float MinimapDiameter = 112f;
+	public float MinimapGap = 32f;
+
+	// Panel de clasificación (px sobre 1280×720 y opacidades). Se fijan antes de añadir el HUD.
+	public float StandingsRowHeight = 22f;
+	public float StandingsFadeOne = 0.62f;
+	public float StandingsFadeTwo = 0.30f;
 
 	private enum Corner { TopLeft, TopRight, BottomRight }
 
-	private Label _positionLabel;
+	private StandingsPanelView _standings;
 	private Label _lapLabel;
 	private Label _lapTimeLabel;
 	private Label _bestLapLabel;
@@ -176,7 +183,7 @@ public partial class Hud : CanvasLayer
 	// TIME TRIAL: arriba a la izquierda, TIME TRIAL y el nombre del circuito en lugar de la posición
 	public void SetTimeTrialHeader(string circuitName)
 	{
-		_positionLabel.Visible = false;
+		_standings.Visible = false;
 		_timeTrialHeader.Visible = true;
 		_circuitLabel.Text = circuitName.ToUpperInvariant();
 	}
@@ -284,10 +291,10 @@ public partial class Hud : CanvasLayer
 		_results.RefreshOptions();
 	}
 
-	// Posición del jugador y total de participantes
-	public void SetRacePosition(int position, int total)
+	// Clasificación: los cinco huecos del panel (null = vacío) y cuántos participantes hay
+	public void SetStandings(StandingsRow?[] rows, int total)
 	{
-		_positionLabel.Text = $"POSITION {position}/{total}";
+		_standings.SetRows(rows, total);
 	}
 
 	// ---------------------------------------------------------------
@@ -296,9 +303,16 @@ public partial class Hud : CanvasLayer
 
 	private void BuildPositionBlock(Control root)
 	{
-		_positionLabel = AddLabel(root, "POSITION 1/1", 40, Palette.Cyan,
-			HorizontalAlignment.Left, VerticalAlignment.Center,
-			Corner.TopLeft, Margin, 30f, 400f, 50f);
+		// RACE: panel de clasificación (dibuja en coordenadas de pantalla desde el origen)
+		_standings = new StandingsPanelView
+		{
+			Name = "Standings",
+			RowHeight = StandingsRowHeight,
+			FadeOne = StandingsFadeOne,
+			FadeTwo = StandingsFadeTwo
+		};
+		_standings.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		root.AddChild(_standings);
 
 		// TIME TRIAL: en el mismo sitio, oculto en RACE (Share Tech Mono, medidas sobre 1280×720)
 		float scale = UiScale.Factor;
@@ -448,13 +462,50 @@ public partial class Hud : CanvasLayer
 		root.AddChild(_radar);
 	}
 
-	// Arriba a la izquierda, debajo de la posición. El origen del nodo es el centro del círculo (ver MinimapView).
+	// Arriba a la derecha, debajo del cronómetro: centrado en horizontal con la línea más ancha posible del bloque de
+	// LAP, tiempo y BEST (calculada una vez, así no se mueve) y con el borde de arriba MinimapGap por debajo de la línea
+	// de base de BEST. El origen del nodo es el centro del círculo (ver MinimapView).
 	private void BuildMinimap(Control root)
 	{
-		float radius = MinimapDiameter * 0.5f * UiScale.Factor;
-		var center = new Vector2(Margin + radius, MinimapTopMargin * UiScale.Factor + radius);
-		_minimap = new MinimapView { Name = "Minimap", Position = center };
+		float scale = UiScale.Factor;
+		float radius = MinimapDiameter * 0.5f * scale;
+		float blockWidth = Mathf.Max(
+			WidestText(_lapLabel, "LAP 8/8", "OUT LAP", "LAP 88"),
+			Mathf.Max(WidestText(_lapTimeLabel, "8:88.888"), WidestText(_bestLapLabel, "BEST 8:88.888", $"BEST {NoTime}")));
+		float bestBaseline = BaselineOf(_bestLapLabel);
+		_minimap = new MinimapView
+		{
+			Name = "Minimap",
+			AnchorLeft = 1f,
+			AnchorRight = 1f,
+			AnchorTop = 0f,
+			AnchorBottom = 0f,
+			OffsetLeft = -Margin - blockWidth * 0.5f,
+			OffsetRight = -Margin - blockWidth * 0.5f,
+			OffsetTop = bestBaseline + MinimapGap * scale + radius,
+			OffsetBottom = bestBaseline + MinimapGap * scale + radius
+		};
 		root.AddChild(_minimap);
+	}
+
+	// Ancho del texto más ancho de los posibles con la fuente de esa etiqueta
+	private static float WidestText(Label label, params string[] texts)
+	{
+		Font font = label.LabelSettings.Font ?? label.GetThemeFont("font");
+		int size = label.LabelSettings.FontSize;
+		float widest = 0f;
+		foreach (string text in texts)
+			widest = Mathf.Max(widest, font.GetStringSize(text, HorizontalAlignment.Left, -1, size).X);
+		return widest;
+	}
+
+	// Línea de base de una etiqueta de una línea centrada en vertical en su caja (y desde arriba de la pantalla)
+	private static float BaselineOf(Label label)
+	{
+		Font font = label.LabelSettings.Font ?? label.GetThemeFont("font");
+		int size = label.LabelSettings.FontSize;
+		float boxHeight = label.OffsetBottom - label.OffsetTop;
+		return label.OffsetTop + (boxHeight - font.GetHeight(size)) * 0.5f + font.GetAscent(size);
 	}
 
 	private void BuildStartLights(Control root)

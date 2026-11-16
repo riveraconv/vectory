@@ -95,7 +95,15 @@ public partial class Main : Node3D
 
 	[ExportGroup("Minimapa")]
 	[Export] public float MinimapWindowRadius = 450f;   // metros de circuito del centro al borde
-	[Export] public float MinimapDiameter = 156f;       // diámetro en el HUD (px sobre 1280×720)
+	[Export] public float MinimapDiameter = 112f;       // diámetro en el HUD (px sobre 1280×720)
+	[Export] public float MinimapGap = 32f;             // de la línea de BEST al borde de arriba del minimapa (px sobre 1280×720)
+
+	[ExportGroup("Clasificación")]
+	[Export] public float StandingsRowHeight = 22f;                                     // alto de fila del panel (px sobre 1280×720)
+	[Export(PropertyHint.Range, "0,1,0.01")] public float StandingsFadeOne = 0.62f;     // opacidad de las filas a un puesto
+	[Export(PropertyHint.Range, "0,1,0.01")] public float StandingsFadeTwo = 0.30f;     // y a dos
+	[Export] public float IntervalRefresh = 0.25f;                                      // segundos entre refrescos de los intervalos
+	[Export] public float StandingsMarkStep = TimeMarks.DefaultStep;                    // metros entre marcas de tiempo de cada nave
 
 	[ExportGroup("Rivales")]
 	[Export] public int RivalCount = 7;   // como mucho, una por marca libre de la parrilla (participantes − 1)
@@ -136,6 +144,15 @@ public partial class Main : Node3D
 	private IReadOnlyList<RivalEntry> _lineup;
 	private RivalField _rivals;
 	private RadarSweep _radar;
+
+	// Clasificación (solo RACE; null en TIME TRIAL): el jugador es el 0 y cada rival, su número
+	private const int PlayerStandingsId = 0;
+	private RaceStandings _standings;
+	private int _playerGridPosition;
+	private readonly List<StandingsShip> _standingsShips = new();
+	private readonly Dictionary<int, string> _standingsNames = new();
+	private readonly Dictionary<int, string> _intervalTexts = new();
+	private float _intervalRefreshLeft;
 
 	// Fantasma (solo TIME TRIAL; null en RACE)
 	private GhostShip _ghostShip;
@@ -222,6 +239,7 @@ public partial class Main : Node3D
 			// jugador y las demás, de los rivales, que salen del mismo generador (alineación: nave y pintura)
 			var rng = new System.Random();
 			int[] gridOrder = GridLayout.RandomOrder(participants, rng);
+			_playerGridPosition = gridOrder[0];
 			_lineup = RivalLineup.Build(gridOrder, rng, RivalLineup.CountFor(_mode, participants, RivalCount));
 			float noseDistance = _player.Definition.Visual.NoseDistance;
 			_track.GetGridStart(gridOrder[0], noseDistance, out Vector3 startPosition, out float startYaw);
@@ -257,7 +275,11 @@ public partial class Main : Node3D
 			DamageIndicatorGap = DamageIndicatorGap,
 			DamageBlinkFrequency = DamageBlinkFrequency,
 			RadarDiameter = RadarDiameter,
-			MinimapDiameter = MinimapDiameter
+			MinimapDiameter = MinimapDiameter,
+			MinimapGap = MinimapGap,
+			StandingsRowHeight = StandingsRowHeight,
+			StandingsFadeOne = StandingsFadeOne,
+			StandingsFadeTwo = StandingsFadeTwo
 		};
 		AddChild(_hud);
 		_hud.ResultsOptionChosen += ExecuteResultsOption;
@@ -290,8 +312,6 @@ public partial class Main : Node3D
 		}
 		else
 		{
-			// Todavía no hay rivales ni posición en vivo: el jugador va primero de todos los participantes
-			_hud.SetRacePosition(1, participants);
 			SetupDamage();
 		}
 
@@ -302,6 +322,8 @@ public partial class Main : Node3D
 			AddChild(_rivals);
 			_rivals.Setup(_lineup, _track, _player, _race, _raceShips, BuildRivalContext(), RivalPace, RivalCooldownPace);
 		}
+		if (_mode == GameMode.Race)
+			SetupStandings();
 
 		// Panel de ajuste para pruebas: no existe en una exportación de release
 		if (OS.IsDebugBuild())
@@ -336,6 +358,7 @@ public partial class Main : Node3D
 			_hud.SetStartSequence(_race.StartSequence);
 			_hud.SetReadySequence(_race.ReadySequence);
 			UpdateLapInfo();
+			UpdateStandings((float)delta);
 			UpdateGhost();
 			_radar.Update((float)delta, ToNumerics(_player.GlobalPosition), _player.PlanForward, _raceShips.Ships);
 			var self = new System.Numerics.Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z);
@@ -488,6 +511,61 @@ public partial class Main : Node3D
 	}
 
 	private TimeTrialRecord TimeTrialRecord() => _records.Book.GetTimeTrial(_track.CircuitId);
+
+	// Clasificación de RACE (spec docs/rivales-2-clasificacion.md, 3): el jugador y los rivales; ni las naves de prueba
+	// ni el fantasma
+	private void SetupStandings()
+	{
+		_standings = new RaceStandings(_track.CheckpointDistances, _track.LapLength, PlayerStandingsId, StandingsMarkStep);
+		_standingsNames[PlayerStandingsId] = PilotCatalog.PlayerName;
+		if (_rivals != null)
+		{
+			foreach (RivalShip ship in _rivals.Ships)
+				_standingsNames[ship.Car.Entry.Number] = ship.Car.Entry.Pilot.Nickname;
+		}
+		UpdateStandings(0f);
+	}
+
+	// Cada frame: el orden cambia al momento; los intervalos, cada IntervalRefresh s, para que no tiemblen
+	private void UpdateStandings(float delta)
+	{
+		if (_standings == null)
+			return;
+
+		_standingsShips.Clear();
+		RaceTracker tracker = _race.Tracker;
+		if (tracker != null)
+			_standingsShips.Add(ToStandings(PlayerStandingsId, _playerGridPosition, tracker, _player.TrackDistance));
+		if (_rivals != null)
+		{
+			foreach (RivalShip ship in _rivals.Ships)
+			{
+				RivalCar car = ship.Car;
+				_standingsShips.Add(ToStandings(car.Entry.Number, car.Entry.GridPosition, car.Tracker, car.TrackDistance));
+			}
+		}
+		_standings.Update(_standingsShips);
+
+		_intervalRefreshLeft -= delta;
+		if (_intervalRefreshLeft <= 0f || _intervalTexts.Count == 0)
+		{
+			_intervalRefreshLeft = IntervalRefresh;
+			foreach (int id in _standings.Order)
+			{
+				if (id != PlayerStandingsId)
+					_intervalTexts[id] = StandingsFormat.Interval(_standings.IntervalOf(id));
+			}
+		}
+
+		StandingsRow?[] rows = StandingsFormat.Slots(_standings.Order, PlayerStandingsId,
+			id => _standingsNames.TryGetValue(id, out string name) ? name : "",
+			id => _intervalTexts.TryGetValue(id, out string text) ? text : StandingsFormat.NoData);
+		_hud.SetStandings(rows, _standings.Count);
+	}
+
+	private static StandingsShip ToStandings(int id, int grid, RaceTracker tracker, float trackDistance) =>
+		new(id, grid, tracker.CurrentLap, tracker.NextCheckpointIndex, trackDistance,
+			tracker.State == RaceState.Running, tracker.State == RaceState.Finished, tracker.TotalTime);
 
 	// Sector cerrado: tiempo y diferencia con el mejor anterior de la nave, en el panel del checkpoint (si el sector
 	// termina en uno; el último termina en la meta) y en el HUD

@@ -55,7 +55,7 @@ public partial class RivalField : Node3D
 			ship.Setup(car, race, raceShips, look, player.FlickerOpacity);
 			AddChild(ship);
 			_ships.Add(ship);
-			GD.Print($"[Race] {entry.Id}: grid {entry.GridPosition}, {ShipCatalog.Find(entry.ShipDesignId)?.Name ?? entry.ShipDesignId}, "
+			GD.Print($"[Race] {entry.Id} {entry.Pilot.Nickname}: grid {entry.GridPosition}, {ShipCatalog.Find(entry.ShipDesignId)?.Name ?? entry.ShipDesignId}, "
 				+ $"{HullPaints.DisplayName(HullPaints.StyleOf(entry.ShipDesignId) ?? HullStyle.Racing, entry.PaintIndex)}");
 		}
 		GD.Print($"[Race] Rival pilots ready: {pilots.ComputedShips.Count} ships in {(Time.GetTicksUsec() - start) / 1000.0:0} ms");

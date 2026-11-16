@@ -61,7 +61,8 @@ public class RivalDriverTests
 	}
 
 	private static RivalEntry Entry(int number, int grid) =>
-		new($"rival_{number}", number, grid, ShipCatalog.Ship01, 0, HullPaints.ChoiceAt(HullStyle.Racing, 0));
+		new($"rival_{number}", number, grid, ShipCatalog.Ship01, 0, HullPaints.ChoiceAt(HullStyle.Racing, 0),
+			PilotCatalog.All[number - 1]);
 
 	// 5
 	[Fact]
