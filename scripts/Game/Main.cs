@@ -151,6 +151,7 @@ public partial class Main : Node3D
 	private int _playerGridPosition;
 	private readonly List<StandingsShip> _standingsShips = new();
 	private readonly Dictionary<int, string> _standingsNames = new();
+	private readonly Dictionary<int, string> _standingsShipNames = new();
 	private readonly Dictionary<int, string> _intervalTexts = new();
 	private float _intervalRefreshLeft;
 
@@ -366,6 +367,9 @@ public partial class Main : Node3D
 			_player.SetCockpitMinimapPose(self, _player.PlanForward);
 			_pause.RaceFinished = _race.State == RaceState.Finished;
 			UpdateResults((float)delta);
+			// Si una opción de los resultados ha cambiado de escena, esta ya no está en el árbol
+			if (!IsInsideTree())
+				return;
 		}
 
 		// La rejilla se recoloca de 10 en 10 m siguiendo a la nave: parece infinita. Va 2 m por debajo del
@@ -447,7 +451,9 @@ public partial class Main : Node3D
 				return;
 
 			_resultsMenu = new MenuModel(ResultsOptions);
-			_hud.ShowResults(_race.Tracker.Result, _resultsMenu, ResultsBandHeight, ResultsOptionFontSize, ResultsShipNameFontSize,
+			// La posición sale de la clasificación final (la misma del panel); sin ella, la del propio tracker
+			RaceResult result = _race.Tracker.Result?.WithClassification(_standings?.Final, PlayerStandingsId);
+			_hud.ShowResults(result, _resultsMenu, ResultsBandHeight, ResultsOptionFontSize, ResultsShipNameFontSize,
 				_raceRecords.NewTotalTime, _raceRecords.NewBestLap);
 			_resultsShown = true;
 			return;   // el Enter de este frame no elige todavía
@@ -516,12 +522,19 @@ public partial class Main : Node3D
 	// ni el fantasma
 	private void SetupStandings()
 	{
-		_standings = new RaceStandings(_track.CheckpointDistances, _track.LapLength, PlayerStandingsId, StandingsMarkStep);
+		_standings = new RaceStandings(_track.CheckpointDistances, _track.LapLength, PlayerStandingsId, StandingsMarkStep,
+			RaceSession.RaceLaps);
+		_standings.FinalChanged += OnFinalClassificationChanged;
 		_standingsNames[PlayerStandingsId] = PilotCatalog.PlayerName;
+		// La nave de la sesión, como en los resultados (F10 no la cambia)
+		_standingsShipNames[PlayerStandingsId] = ShipCatalog.Find(_player.Definition.Id)?.Name ?? "";
 		if (_rivals != null)
 		{
 			foreach (RivalShip ship in _rivals.Ships)
+			{
 				_standingsNames[ship.Car.Entry.Number] = ship.Car.Entry.Pilot.Nickname;
+				_standingsShipNames[ship.Car.Entry.Number] = ShipCatalog.Find(ship.Car.Ship.Id)?.Name ?? ship.Car.Ship.Id;
+			}
 		}
 		UpdateStandings(0f);
 	}
@@ -563,9 +576,34 @@ public partial class Main : Node3D
 		_hud.SetStandings(rows, _standings.Count);
 	}
 
-	private static StandingsShip ToStandings(int id, int grid, RaceTracker tracker, float trackDistance) =>
+	private StandingsShip ToStandings(int id, int grid, RaceTracker tracker, float trackDistance) =>
 		new(id, grid, tracker.CurrentLap, tracker.NextCheckpointIndex, trackDistance,
-			tracker.State == RaceState.Running, tracker.State == RaceState.Finished, tracker.TotalTime);
+			tracker.State == RaceState.Running, tracker.State == RaceState.Finished, tracker.TotalTime,
+			tracker.LastLapTime, tracker.BestLapTime, _standingsNames.GetValueOrDefault(id, ""), _standingsShipNames.GetValueOrDefault(id, ""));
+
+	// Clasificación final (spec docs/rivales-2-clasificacion.md, 4): en la consola al fijarla con tu llegada y con cada
+	// llegada de un rival, que pasa de estimado a real. Hasta la etapa 3 los resultados solo enseñan la posición.
+	private void OnFinalClassificationChanged(RaceClassification final, int outOfOrderId)
+	{
+		if (outOfOrderId >= 0)
+		{
+			GD.Print($"[Race] {_standingsNames.GetValueOrDefault(outOfOrderId, outOfOrderId.ToString())} arrived out of order; "
+				+ "the track order at your arrival is kept");
+		}
+		var text = new System.Text.StringBuilder();
+		text.Append($"[Race] Classification ({final.EstimatedCount} estimated):");
+		foreach (ClassificationRow row in final.Rows)
+		{
+			string best = row.BestLapTime is double lap ? TimeFormat.Format(lap) : NoTimeText;
+			string gap = row.Position == 1 ? "" : $"  +{TimeFormat.Format(final.GapToLeader(row.Position))}";
+			text.Append('\n');
+			text.Append($"  {row.Position}  {row.Name,-8}{row.ShipName,-7}{TimeFormat.Format(row.TotalTime)}"
+				+ $"{(row.IsEstimated ? " EST" : "    ")}{gap}  best {best}");
+		}
+		GD.Print(text.ToString());
+	}
+
+	private const string NoTimeText = "--:--.---";
 
 	// Sector cerrado: tiempo y diferencia con el mejor anterior de la nave, en el panel del checkpoint (si el sector
 	// termina en uno; el último termina en la meta) y en el HUD

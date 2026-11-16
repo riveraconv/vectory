@@ -6,10 +6,13 @@ namespace Vectory.Circuit
 	/// <summary>
 	/// Estado de una nave para la clasificación, tal como lo dan su RaceTracker y su posición sobre el eje.
 	/// Id: 0 el jugador, 1–7 los rivales (su número de la lista de naves). GridPosition: su marca (1 = la de delante).
-	/// Running / Finished: estado de su carrera. RaceTime: su cronómetro de carrera (TotalTime).
+	/// Running / Finished: estado de su carrera. RaceTime: su cronómetro de carrera (TotalTime). LastLapTime y BestLapTime:
+	/// los de su RaceTracker (para la estimación y la clasificación final). Name y ShipName: piloto y nave, para la
+	/// clasificación final.
 	/// </summary>
 	public readonly record struct StandingsShip(int Id, int GridPosition, int Lap, int NextCheckpoint, float TrackDistance,
-		bool Running, bool Finished, double RaceTime);
+		bool Running, bool Finished, double RaceTime, double? LastLapTime = null, double? BestLapTime = null,
+		string Name = "", string ShipName = "");
 
 	/// <summary>
 	/// Distancia de carrera (spec docs/rivales-2-clasificacion.md, 3.2): vueltas completadas × largo + distancia desde la
@@ -215,8 +218,10 @@ namespace Vectory.Circuit
 	/// Clasificación de la carrera en directo (spec docs/rivales-2-clasificacion.md, 3.2 y 3.3): con el estado de cada
 	/// nave da el orden —primero las terminadas, en orden de llegada; después, de más a menos distancia de carrera; con
 	/// empate, la que salió más adelante en la parrilla— y lleva las marcas de tiempo de cada una para los intervalos con
-	/// el jugador. El intervalo de un rival queda fijo al llegar él, y todos al llegar el jugador. La misma posición para
-	/// el HUD y los resultados. Lógica pura: sin nodos.
+	/// el jugador. El intervalo de un rival queda fijo al llegar él, y todos al llegar el jugador. Al llegar el jugador fija
+	/// la clasificación final (Final, 4.2) con las estimaciones de los demás, y desde entonces el orden es el suyo; las
+	/// llegadas siguientes pasan sus tiempos a reales (4.3). La misma posición para el HUD y los resultados. Lógica pura:
+	/// sin nodos.
 	/// </summary>
 	public sealed class RaceStandings
 	{
@@ -226,6 +231,13 @@ namespace Vectory.Circuit
 			public int Grid;
 			public double Distance;
 			public double Time;
+			public bool Started;
+			public double StartDistance;
+			public double StartTime;
+			public double? LastLapTime;
+			public double? BestLapTime;
+			public string Name = "";
+			public string ShipName = "";
 			public bool Finished;
 			public int FinishIndex = -1;
 			public TimeMarks Marks;
@@ -241,8 +253,11 @@ namespace Vectory.Circuit
 		private int _finishedCount;
 
 		public RaceStandings(IReadOnlyList<float> checkpointDistances, float lapLength, int playerId = 0,
-			float markStep = TimeMarks.DefaultStep)
+			float markStep = TimeMarks.DefaultStep, int totalLaps = 3)
 		{
+			if (totalLaps < 1)
+				throw new ArgumentOutOfRangeException(nameof(totalLaps), "Debe haber al menos 1 vuelta.");
+			TotalLaps = totalLaps;
 			ArgumentNullException.ThrowIfNull(checkpointDistances);
 			if (lapLength <= 0f)
 				throw new ArgumentOutOfRangeException(nameof(lapLength), "La vuelta debe medir algo.");
@@ -254,6 +269,16 @@ namespace Vectory.Circuit
 
 		public int PlayerId { get; }
 		public float LapLength => _lapLength;
+		public int TotalLaps { get; }
+
+		/// <summary>Clasificación final: null hasta que llega el jugador.</summary>
+		public RaceClassification Final { get; private set; }
+
+		/// <summary>
+		/// Se lanza cuando cambia la clasificación final: al fijarla y con cada llegada real (también si la llegada
+		/// contradice el orden: el segundo argumento es la nave que llegó fuera de orden, o -1).
+		/// </summary>
+		public event Action<RaceClassification, int> FinalChanged;
 
 		/// <summary>Ids de las naves, de la primera a la última.</summary>
 		public IReadOnlyList<int> Order => _order;
@@ -281,13 +306,25 @@ namespace Vectory.Circuit
 					_ordered.Add(entry);
 				}
 				entry.Grid = ship.GridPosition;
+				entry.Name = ship.Name ?? "";
+				entry.ShipName = ship.ShipName ?? "";
 				if (entry.Finished)
 					continue;   // terminada: distancia y tiempo quedan los de su llegada
 
 				entry.Distance = RaceDistance.Compute(ship.Lap, ship.NextCheckpoint, ship.TrackDistance, _checkpointDistances, _lapLength);
 				entry.Time = ship.RaceTime;
+				entry.LastLapTime = ship.LastLapTime;
+				entry.BestLapTime = ship.BestLapTime;
 				if (ship.Running || ship.Finished)
+				{
+					if (!entry.Started)
+					{
+						entry.Started = true;
+						entry.StartDistance = entry.Distance;
+						entry.StartTime = entry.Time;
+					}
 					entry.Marks.Record(entry.Distance, entry.Time);
+				}
 				if (ship.Finished)
 				{
 					entry.Finished = true;
@@ -311,9 +348,57 @@ namespace Vectory.Circuit
 			}
 
 			_ordered.Sort(Compare);
+			if (Final == null && playerArrived)
+				FixFinal();
+			else if (Final != null)
+				UpdateFinal(arrivals);
+
 			_order.Clear();
-			foreach (Entry entry in _ordered)
-				_order.Add(entry.Id);
+			if (Final != null)
+			{
+				foreach (ClassificationRow row in Final.Rows)
+					_order.Add(row.Id);
+			}
+			else
+			{
+				foreach (Entry entry in _ordered)
+					_order.Add(entry.Id);
+			}
+		}
+
+		// Llega el jugador: el orden de pista de este momento queda fijo y los que no han terminado reciben su estimación
+		private void FixFinal()
+		{
+			Entry player = _entries[PlayerId];
+			double totalDistance = (double)TotalLaps * _lapLength;
+			var entries = new List<ClassificationEntry>(_ordered.Count);
+			var estimates = new Dictionary<int, double>();
+			foreach (Entry e in _ordered)
+			{
+				entries.Add(new ClassificationEntry(e.Id, e.Name, e.ShipName, e.Finished, e.Time, e.BestLapTime));
+				if (!e.Finished)
+				{
+					estimates[e.Id] = RaceClassification.Estimate(player.Time, totalDistance - e.Distance, _lapLength, e.LastLapTime,
+						e.Started ? e.Distance - e.StartDistance : 0, e.Started ? e.Time - e.StartTime : 0);
+				}
+			}
+			Final = new RaceClassification(entries, estimates);
+			FinalChanged?.Invoke(Final, -1);
+		}
+
+		// Después de la llegada del jugador: llegadas reales y mejores vueltas de los que siguen en pista
+		private void UpdateFinal(List<Entry> arrivals)
+		{
+			foreach (Entry arrival in arrivals)
+			{
+				bool consistent = Final.Arrive(arrival.Id, arrival.Time, arrival.BestLapTime);
+				FinalChanged?.Invoke(Final, consistent ? -1 : arrival.Id);
+			}
+			foreach (Entry e in _ordered)
+			{
+				if (!e.Finished)
+					Final.UpdateBestLap(e.Id, e.BestLapTime);
+			}
 		}
 
 		/// <summary>Intervalo de una nave con el jugador (None para el propio jugador o si no hay dato).</summary>
