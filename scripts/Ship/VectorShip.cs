@@ -25,8 +25,10 @@ public static class VectorShip
 				"res://assets/ships/hull_vector.manifest.json",
 				"res://assets/cockpits/cockpit_blade_env.png",
 				HullStyle.Racing),
-			// El de la cabina 3D, decisión del usuario: ojo a 1,45 m de la pista (la nave vuela a 2 m), FOV 70 y sin inclinar
-			Cockpit = new CockpitFraming(new Vector3(0f, -0.55f, -1.2f), 70f, 0f),
+			// El de la cabina 3D: FOV 70 y sin inclinar (encuadre B, decisión del usuario), con el ojo dentro de la cúpula del
+			// casco 3D (y 0,38–0,71), a 2,55 m de la pista: así los rivales se ven a la altura a la que van (spec
+			// docs/rivales-1-parrilla.md). Antes iba a 1,45 m, por debajo del propio casco.
+			Cockpit = new CockpitFraming(new Vector3(0f, 0.55f, -1.2f), 70f, 0f),
 			Chase = new ChaseFraming(1.8f, 7f, 3f, new Vector3(0f, 0.3f, -10f)),
 			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): el filo luminoso de la deriva.
 			// El wireframe, que siguen usando el fantasma y el menú, llega a 3,4.

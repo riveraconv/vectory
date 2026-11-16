@@ -11,9 +11,10 @@ namespace Vectory.Ship;
 public static class HammerShip
 {
 	private const float ChaseFactor = 0.92f;   // 6,6 m de largo frente a los 7,2 de Vector (el casco 3D, 6,83: se mantiene)
-	// Ojo de la cabina 3D (spec docs/cabinas-3d-3-hammer.md, 4.5): a 2,03 m de la pista (la nave vuela a 2 m; el de VECTOR,
-	// 1,45 m, × 1,40 de alto), FOV 70 y mirando 4,9° hacia abajo. La misma profundidad que VECTOR y BLADE.
-	private const float EyeY = 0.03f;
+	// Ojo de la cabina 3D (spec docs/cabinas-3d-3-hammer.md, 4.5): FOV 70 y mirando 4,9° hacia abajo, dentro de la cabina
+	// del casco 3D (ventanas en y 0,76–0,98), a 2,87 m de la pista: así los rivales se ven a la altura a la que van (spec
+	// docs/rivales-1-parrilla.md). Antes iba a 2,03 m. La misma profundidad que VECTOR y BLADE.
+	private const float EyeY = 0.87f;
 	private const float EyeZ = -1.2f;
 	private const float CockpitFov = 70f;
 	private const float EyePitchRadians = -0.085f;

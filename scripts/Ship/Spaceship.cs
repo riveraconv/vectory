@@ -22,6 +22,11 @@ public partial class Spaceship : Node3D
 	// Las luces del casco 3D giran con la nave (carrera) o quedan fijas en el mundo (holograma del selector)
 	public bool Hull3DLightsFollowShip { get; set; } = true;
 
+	// Capa del casco 3D y si lleva sus propias luces: los rivales van en ShipHull3D.RivalLayer, con un juego de luces
+	// común (HullLightRig). Antes de _Ready.
+	public uint Hull3DLayer { get; set; } = ShipHull3D.HullLayer;
+	public bool Hull3DOwnLights { get; set; } = true;
+
 	// Pintura (por estilo de casco: combinación de su catálogo) y daño del casco 3D: se guardan para volver a ponerlos
 	// si F10 lo rehace
 	private readonly System.Collections.Generic.Dictionary<HullStyle, int> _hullPaints = new();
@@ -98,7 +103,14 @@ public partial class Spaceship : Node3D
 		}
 		if (profile != null && _hull3D == null)
 		{
-			_hull3D = new ShipHull3D { Name = "Hull3D", Profile = profile, LightsFollowShip = Hull3DLightsFollowShip };
+			_hull3D = new ShipHull3D
+			{
+				Name = "Hull3D",
+				Profile = profile,
+				LightsFollowShip = Hull3DLightsFollowShip,
+				Layer = Hull3DLayer,
+				OwnLights = Hull3DOwnLights
+			};
 			_hull3D.ApplySettings(_hullSettings);
 			_hull3D.SetPaint(_hullPaints.TryGetValue(profile.Style, out int paint) ? paint : -1);
 			AddChild(_hull3D);

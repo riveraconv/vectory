@@ -7,6 +7,7 @@ using Vectory.Ghost;
 using Vectory.Menu;
 using Vectory.Radar;
 using Vectory.Records;
+using Vectory.Rivals;
 using Vectory.Ship;
 using Vectory.UI;
 
@@ -95,6 +96,9 @@ public partial class Main : Node3D
 	[Export] public float MinimapWindowRadius = 450f;   // metros de circuito del centro al borde
 	[Export] public float MinimapDiameter = 156f;       // diámetro en el HUD (px sobre 1280×720)
 
+	[ExportGroup("Rivales")]
+	[Export] public int RivalCount = 7;   // como mucho, una por marca libre de la parrilla (participantes − 1)
+
 	[ExportGroup("Recolocación")]
 	[Export] public float StuckSpeed = RespawnSettings.DefaultStuckSpeedKmh;          // km/h: por debajo, y tocando la barrera, la nave está atascada
 	[Export] public float StuckTime = RespawnSettings.DefaultStuckTime;               // segundos seguidos atascada antes de recolocarla
@@ -122,8 +126,11 @@ public partial class Main : Node3D
 	// Daños (solo RACE; null en TIME TRIAL)
 	private DamageModel _damage;
 
-	// Las demás naves de la carrera (hoy solo las de prueba; el fantasma no entra) y el radar que las lee
+	// Las demás naves de la carrera (rivales y naves de prueba; el fantasma no entra) y el radar que las lee
 	private readonly RaceShipList _raceShips = new();
+
+	// Alineación de los rivales (solo RACE; null en TIME TRIAL)
+	private IReadOnlyList<RivalEntry> _lineup;
 	private RadarSweep _radar;
 
 	// Fantasma (solo TIME TRIAL; null en RACE)
@@ -207,9 +214,11 @@ public partial class Main : Node3D
 		}
 		else
 		{
-			// Una marca de parrilla por participante. Las posiciones se reparten al azar sin repetir;
-			// sin rivales todavía, solo se usa la del jugador (la primera del reparto).
-			int[] gridOrder = GridLayout.RandomOrder(participants, new System.Random());
+			// Una marca de parrilla por participante. Las posiciones se reparten al azar sin repetir: la primera es la del
+			// jugador y las demás, de los rivales, que salen del mismo generador (alineación: nave y pintura)
+			var rng = new System.Random();
+			int[] gridOrder = GridLayout.RandomOrder(participants, rng);
+			_lineup = RivalLineup.Build(gridOrder, rng, Math.Max(0, RivalCount));
 			float noseDistance = _player.Definition.Visual.NoseDistance;
 			_track.GetGridStart(gridOrder[0], noseDistance, out Vector3 startPosition, out float startYaw);
 			_player.PlaceAt(startPosition, startYaw);
@@ -286,6 +295,14 @@ public partial class Main : Node3D
 			// Todavía no hay rivales ni posición en vivo: el jugador va primero de todos los participantes
 			_hud.SetRacePosition(1, participants);
 			SetupDamage();
+		}
+
+		// Rivales (solo RACE): en su marca, en el radar y en el minimapa
+		if (_lineup != null)
+		{
+			var rivals = new RivalField { Name = "Rivals" };
+			AddChild(rivals);
+			rivals.Setup(_lineup, _track, _player, _raceShips);
 		}
 
 		// Panel de ajuste para pruebas: no existe en una exportación de release

@@ -30,8 +30,9 @@ public partial class ShipHull3D : Node3D
 {
 	// Capa visual propia del casco: sus luces solo afectan a ella y solo ella proyecta su sombra
 	public const uint HullLayer = 1u << 10;
+	// Capa de los cascos de los rivales, con su propio juego de luces común (spec docs/rivales-1-parrilla.md)
+	public const uint RivalLayer = 1u << 11;
 
-	private const float ShadowMaxDistance = 40f;
 	private const float GlowLift = 0.03f;   // m por encima de la pista
 	private const int SmokeMaxParticles = 40;
 
@@ -41,13 +42,6 @@ public partial class ShipHull3D : Node3D
 	};
 	private static readonly Texture2D[] ScorchTextures = new Texture2D[3];
 
-	// Luces del prototipo: desde dónde llegan (hacia el centro de la nave), color y grosor de la sombra
-	private static readonly Vector3 KeySource = new(4f, 10f, -5f);
-	private static readonly Vector3 RimSource = new(-6f, 2.5f, 9f);
-	private static readonly Vector3 FillSource = new(8f, 3f, 2f);
-	private static readonly Color KeyColor = Color.FromHtml("#FFF1E0");
-	private static readonly Color RimColor = Color.FromHtml("#FF9D50");
-	private static readonly Color FillColor = Color.FromHtml("#5F8CFF");
 	private static readonly Color HemisphereSky = Color.FromHtml("#B0B8C8");
 	private static readonly Color HemisphereGround = Color.FromHtml("#101010");
 
@@ -91,9 +85,8 @@ void fragment() {
 	// Pintura de HAMMER ya horneada por máscara y color: igual, compartida
 	private static readonly Dictionary<string, ImageTexture> PlateTextures = new();
 	private HullManifest _manifest;
-	private DirectionalLight3D _key;
-	private DirectionalLight3D _rim;
-	private DirectionalLight3D _fill;
+	private HullLightRig _lights;
+	private bool _built;   // ya pasó por _Ready: luces creadas
 	private Hull3DSettings _settings = new();
 	private HullPaintChoice _paint = HullPaintCatalog.Default;
 	// Combinación de pintura del catálogo de su estilo; -1 = la de por defecto
@@ -114,6 +107,11 @@ void fragment() {
 	// En carrera las luces van colgadas de la nave; en el holograma, fijas en el mundo (respecto a la pantalla)
 	public bool LightsFollowShip { get; set; } = true;
 
+	// Capa visual de sus piezas y si lleva sus propias luces (los rivales no: comparten un HullLightRig en RivalLayer).
+	// Antes de _Ready.
+	public uint Layer { get; set; } = HullLayer;
+	public bool OwnLights { get; set; } = true;
+
 	// Manifiesto de un casco 3D; null si no se puede leer
 	public static HullManifest LoadManifest(ShipHull3DProfile profile)
 	{
@@ -130,6 +128,7 @@ void fragment() {
 	{
 		IsLoaded = LoadModel();
 		BuildLights();
+		_built = true;
 		BuildSmoke();
 		BuildGlow();
 		ApplySettings(_settings);
@@ -145,11 +144,9 @@ void fragment() {
 	public void ApplySettings(Hull3DSettings settings)
 	{
 		_settings = settings;
-		if (_key == null)
+		if (!_built)
 			return;
-		_key.LightEnergy = settings.KeyEnergy;
-		_rim.LightEnergy = settings.RimEnergy;
-		_fill.LightEnergy = settings.FillEnergy;
+		_lights?.Apply(settings);
 		ApplyAmbient();
 		ApplyIridescence();
 	}
@@ -762,7 +759,7 @@ void fragment() {
 		var decals = new HashSet<string>(manifest.DecalMaterials);
 		foreach (MeshInstance3D mesh in _pieces.Values)
 		{
-			mesh.Layers = HullLayer;
+			mesh.Layers = Layer;
 			mesh.CastShadow = noShadow.Contains(mesh.Name)
 				? GeometryInstance3D.ShadowCastingSetting.Off
 				: GeometryInstance3D.ShadowCastingSetting.On;
@@ -848,36 +845,14 @@ void fragment() {
 		material.RenderPriority = 1;
 	}
 
-	// Colgadas de la nave: giran con ella, así el casco se ve igual en cualquier curva
+	// Colgadas de la nave: giran con ella, así el casco se ve igual en cualquier curva. Sin luces propias, nada.
 	private void BuildLights()
 	{
-		_key = NewLight("Key", KeySource, KeyColor, true);
-		_rim = NewLight("Rim", RimSource, RimColor, false);
-		_fill = NewLight("Fill", FillSource, FillColor, false);
-	}
-
-	private DirectionalLight3D NewLight(string name, Vector3 source, Color color, bool shadow)
-	{
-		var light = new DirectionalLight3D
-		{
-			Name = name,
-			LightColor = color,
-			LightCullMask = HullLayer,
-			ShadowCasterMask = HullLayer,
-			ShadowEnabled = shadow,
-			ShadowBlur = 1.5f,
-			DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal,
-			DirectionalShadowMaxDistance = ShadowMaxDistance
-		};
-		// Fijas en el mundo: no siguen el giro de la nave. La cámara del holograma mira hacia −Z, así que el juego de luces
-		// del prototipo se gira media vuelta para que la principal llegue del lado de la cámara
-		light.TopLevel = !LightsFollowShip;
-		if (!LightsFollowShip)
-			source = new Vector3(-source.X, source.Y, -source.Z);
-		AddChild(light);
-		// Mira desde la fuente hacia el centro, en el espacio de la nave (o del mundo, si no la sigue)
-		light.Transform = Transform3D.Identity.LookingAt(-source, Vector3.Up);
-		return light;
+		if (!OwnLights)
+			return;
+		_lights = new HullLightRig { Name = "Lights", Layer = Layer, FollowParent = LightsFollowShip };
+		_lights.Apply(_settings);
+		AddChild(_lights);
 	}
 
 	// Humo con daño, desde Smoke, en el espacio del mundo: se queda atrás al avanzar. La pausa lo congela.
@@ -949,7 +924,16 @@ void fragment() {
 		AddChild(_glow);
 	}
 
-	public static float GlowLiftAboveTrack => GlowLift;
+	// Dónde va el brillo de levitación: sobre la pista bajo la nave, con la inclinación de la pista (no la de la nave)
+	public static Transform3D GlowTransform(Vectory.Circuit.SurfacePoint surface, Vector3 position, float yaw, float centerZ)
+	{
+		Vector3 up = ShipLineMesh.ToGodot(surface.Frame.Normal).Normalized();
+		var back = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+		back = (back - up * back.Dot(up)).Normalized();
+		Vector3 right = up.Cross(back).Normalized();
+		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * GlowLift + back * centerZ;
+		return new Transform3D(new Basis(right, up, back), origin);
+	}
 
 	// Reflejos y luz ambiente del casco: el cielo del entorno, solo para reflejos, con el fondo de color de siempre.
 	// El resto del mundo de carrera no recibe luz (todo es unshaded), así que no cambia.

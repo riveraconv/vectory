@@ -20,7 +20,7 @@ public readonly struct RaceShip
 	}
 }
 
-// Las demás naves de la carrera (spec docs/radar-minimapa.md, 3.1): hoy las de prueba; mañana, los rivales. No sabe nada
+// Las demás naves de la carrera (spec docs/radar-minimapa.md, 3.1): los rivales (Id 1–7) y las de prueba (desde 1000). No sabe nada
 // del HUD. El fantasma no entra nunca, ni la nave del jugador. Cada nave se identifica por su Id, así varias fuentes
 // pueden escribir en la misma lista sin pisarse.
 public sealed class RaceShipList

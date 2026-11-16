@@ -125,10 +125,10 @@ public class Cockpit3DBladeProfileTests
     }
 
     [Fact]
-    public void Blade_EyeAt090m_Fov70_LookingDown57Degrees()
+    public void Blade_EyeAt242m_Fov70_LookingDown57Degrees()
     {
         CockpitFraming framing = ShipDefinitions.Find(ShipCatalog.Ship02)!.Visual.Cockpit;
-        Assert.Equal(0.90f, framing.Eye.Y + ShipHover, 4);
+        Assert.Equal(2.42f, framing.Eye.Y + ShipHover, 4);
         Assert.Equal(70f, framing.Fov);
         Assert.Equal(-5.7f, framing.PitchDegrees, 1);
         Assert.Equal(-0.10f, framing.PitchRadians, 5);
@@ -140,7 +140,7 @@ public class Cockpit3DBladeProfileTests
         ShipVisualProfile visual = ShipDefinitions.Find(ShipCatalog.Ship01)!.Visual;
         Assert.Same(Cockpit3DLayouts.Racing, visual.Cockpit3D!.Layout);
         Assert.Equal(0f, visual.Cockpit.PitchDegrees);
-        Assert.Equal(1.45f, visual.Cockpit.Eye.Y + ShipHover, 4);
+        Assert.Equal(2.55f, visual.Cockpit.Eye.Y + ShipHover, 4);
     }
 }
 

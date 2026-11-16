@@ -208,6 +208,27 @@ public partial class Player : CharacterBody3D
 
 	private static readonly Hull3DSettings Hull3DDefaults = new();
 
+	// Luces, brillo de levitación, iridiscencia y anticolisión del casco 3D (grupo Casco 3D): también los de los rivales
+	public Hull3DSettings BuildHull3DSettings()
+	{
+		return new Hull3DSettings
+		{
+			KeyEnergy = HullKeyEnergy,
+			RimEnergy = HullRimEnergy,
+			FillEnergy = HullFillEnergy,
+			AmbientEnergy = HullAmbientEnergy,
+			HoverGlowIntensity = HullHoverGlow,
+			IridescenceStrength = HullIridescence,
+			Strobe = new StrobeSettings
+			{
+				Period = HullStrobePeriod,
+				Duration = HullStrobeDuration,
+				Offset = HullStrobeOffset,
+				Intensity = HullStrobeIntensity
+			}
+		};
+	}
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -320,22 +341,7 @@ public partial class Player : CharacterBody3D
 		});
 
 		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual, Use3DHull = true };
-		_ship.SetHull3DSettings(new Hull3DSettings
-		{
-			KeyEnergy = HullKeyEnergy,
-			RimEnergy = HullRimEnergy,
-			FillEnergy = HullFillEnergy,
-			AmbientEnergy = HullAmbientEnergy,
-			HoverGlowIntensity = HullHoverGlow,
-			IridescenceStrength = HullIridescence,
-			Strobe = new StrobeSettings
-			{
-				Period = HullStrobePeriod,
-				Duration = HullStrobeDuration,
-				Offset = HullStrobeOffset,
-				Intensity = HullStrobeIntensity
-			}
-		});
+		_ship.SetHull3DSettings(BuildHull3DSettings());
 		AddChild(_ship);
 
 		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual, Settings3D = BuildCockpit3DSettings() };
@@ -688,15 +694,9 @@ public partial class Player : CharacterBody3D
 			return;
 		_hoverTime += dt;
 		SurfacePoint surface = _physics.Surface;
-		Vector3 up = ShipLineMesh.ToGodot(surface.Frame.Normal).Normalized();
-		float yaw = Dynamics.Yaw;
-		var back = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
-		back = (back - up * back.Dot(up)).Normalized();
-		Vector3 right = up.Cross(back).Normalized();
-		Vector3 position = GlobalPosition;
-		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * ShipHull3D.GlowLiftAboveTrack + back * _ship.Visual.Hull3D.Glow.CenterZ;
+		Transform3D glow = ShipHull3D.GlowTransform(surface, GlobalPosition, Dynamics.Yaw, _ship.Visual.Hull3D.Glow.CenterZ);
 		float strength = HoverGlow.Strength(_hoverTime, HullHoverGlow) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
-		_ship.UpdateHullEffects(new Transform3D(new Basis(right, up, back), origin), strength, Dynamics.RealSpeed, _hoverTime);
+		_ship.UpdateHullEffects(glow, strength, Dynamics.RealSpeed, _hoverTime);
 		// Balizas del techo (HAMMER): las mismas reglas y ajustes que las de su cabina 3D
 		(float boostBeacon, float damageBeacon) = IndustrialHullBeacons.Intensities(Boost.IsImpulseActive, _damageLevel,
 			CockpitDamageEnabled, _hoverTime, BuildIndustrialLampSettings());
