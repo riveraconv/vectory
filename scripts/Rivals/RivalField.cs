@@ -30,6 +30,9 @@ public partial class RivalField : Node3D
 	// Golpes medios y fuertes entre dos rivales en esta carrera (para ver si se comen por detrás)
 	public int RivalHits { get; private set; }
 
+	// Tu nave: tipo de roce de este paso y lo perdido por roce en los últimos 5 s (panel de pruebas)
+	public GrazeLossMeter PlayerGraze { get; } = new();
+
 	public IReadOnlyList<RivalShip> Ships => _ships;
 
 	// Ritmo de todos los rivales: el margen de velocidad del piloto en las curvas
@@ -95,6 +98,7 @@ public partial class RivalField : Node3D
 			ship.Car.Move(raceStarted, _traffic);
 
 		Contacts.Solve(_contactShips, dt);
+		UpdatePlayerGraze(dt);
 		foreach (ShipContactEvent e in Contacts.Events)
 		{
 			if (!e.IsNewImpact)
@@ -108,6 +112,21 @@ public partial class RivalField : Node3D
 
 		foreach (RivalShip ship in _ships)
 			ship.Car.AfterContacts(Contacts.Touched(ship.Car.Id));
+	}
+
+	private void UpdatePlayerGraze(float dt)
+	{
+		float loss = 0f;
+		GrazeKind kind = GrazeKind.None;
+		foreach (ShipContactEvent e in Contacts.Events)
+		{
+			if (e.Graze == GrazeKind.None || (e.A != _player.Id && e.B != _player.Id))
+				continue;
+			loss += e.A == _player.Id ? e.GrazeLossA : e.GrazeLossB;
+			if (kind != GrazeKind.Side)
+				kind = e.Graze;
+		}
+		PlayerGraze.Add(dt, loss, kind);
 	}
 
 	// Puntos de un golpe para una nave, según su papel (los del jugador los suma Main)

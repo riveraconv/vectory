@@ -132,6 +132,7 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export] public float ShipContactMaxHeight = ShipContactSettings.DefaultMaxHeightDifference;   // m de diferencia de altura sobre la pista desde los que no chocan
 	[Export] public float ShipContactCullDistance = ShipContactSettings.DefaultCullDistance;       // m entre naves desde los que no se miran
 	[Export(PropertyHint.Range, "0,1,0.01")] public float ShipContactMutualMargin = ShipContactSettings.DefaultMutualMargin;   // golpe mutuo si la aportación menor llega a esta fracción de la mayor
+	[Export(PropertyHint.Range, "0,90,1")] public float ShipContactSideGrazeAngle = ShipContactSettings.DefaultSideGrazeAngle;   // grados entre la normal y la marcha: por encima, roce de lado (frena); si no, por detrás (no frena)
 	[Export] public float ShipContactCooldown = ShipPhysicsDefaults.ImpactCooldown;   // segundos sin contar otro golpe medio o fuerte de la misma pareja
 
 	[ExportGroup("Recolocación")]
@@ -975,6 +976,7 @@ public partial class Player : CharacterBody3D, IContactShip
 			MediumSpeedLoss = MediumSpeedLoss,
 			StrongSpeedLoss = StrongSpeedLoss,
 			MutualMargin = ShipContactMutualMargin,
+			SideGrazeAngle = Mathf.DegToRad(ShipContactSideGrazeAngle),
 			PairCooldown = ShipContactCooldown,
 			RecoveryDuration = RecoveryDuration,
 			RecoveryControl = RecoveryControl

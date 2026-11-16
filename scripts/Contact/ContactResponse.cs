@@ -13,6 +13,7 @@ public struct ShipContactSettings
 	public const float DefaultMaxHeightDifference = 1.5f;
 	public const float DefaultCullDistance = 20f;
 	public const float DefaultMutualMargin = 0.7f;
+	public const float DefaultSideGrazeAngle = 45f;   // grados
 
 	public float MaxHeightDifference;  // m de diferencia de altura sobre la superficie desde los que no chocan
 	public float CullDistance;         // m entre naves (en planta) desde los que no se miran
@@ -26,6 +27,7 @@ public struct ShipContactSettings
 	public float StrongSpeedLoss;      // ídem en un fuerte
 	public float MutualMargin;         // la aportación menor desde esta fracción de la mayor: golpe mutuo
 	public float PairCooldown;         // s sin contar otro golpe medio o fuerte de la misma pareja
+	public float SideGrazeAngle;       // rad: entre la normal y la marcha, por encima es roce de lado y si no, por detrás
 	public float RecoveryDuration;     // corrección tras un golpe fuerte (la de la barrera)
 	public float RecoveryControl;
 
@@ -43,9 +45,18 @@ public struct ShipContactSettings
 		StrongSpeedLoss = ShipPhysicsDefaults.StrongSpeedLoss,
 		MutualMargin = DefaultMutualMargin,
 		PairCooldown = ShipPhysicsDefaults.ImpactCooldown,
+		SideGrazeAngle = DefaultSideGrazeAngle * MathF.PI / 180f,
 		RecoveryDuration = ShipPhysicsDefaults.RecoveryDuration,
 		RecoveryControl = ShipPhysicsDefaults.RecoveryControl
 	};
+}
+
+// Tipo de roce (spec docs/rivales-3-contacto.md v1.1, 3.3): de lado (puerta con puerta) o por detrás (morro contra cola)
+public enum GrazeKind
+{
+	None,   // no hay roce (golpe medio o fuerte, o ya se separaban)
+	Side,
+	Rear
 }
 
 // Papel de una nave en un golpe
@@ -74,6 +85,7 @@ public struct ContactResult
 	public ImpactLevel Level;        // Graze también si un medio o fuerte cae en la espera de la pareja
 	public bool IsNewImpact;         // golpe medio o fuerte que cuenta (daño, sacudida, consola)
 	public float ClosingSpeed;       // m/s con las que se acercaban por la normal (0 si ya se separaban)
+	public GrazeKind Graze;          // en un roce, de lado o por detrás
 	public ContactShipEffect A;
 	public ContactShipEffect B;
 }
@@ -82,13 +94,15 @@ public struct ContactResult
 // separación a medias por la normal (entera para la otra si una no puede moverse por la barrera), nivel por la velocidad
 // de cierre con los umbrales de la barrera, empujón de la mitad del cambio de velocidad para cada una con la restitución
 // del nivel, pérdidas según el papel y corrección para las dos en un fuerte. No gira el morro: el empujón deja velocidad
-// de lado y el agarre la corrige. Lógica pura: no depende de Godot.
+// de lado y el agarre la corrige. El roce solo frena si es de lado: por detrás (v1.1), únicamente el empujón, así ir
+// pegado a otra nave no para a ninguna. Lógica pura: no depende de Godot.
 public static class ContactResponse
 {
 	// continuing: la pareja ya estaba en contacto en el paso anterior; inCooldown: dentro de la espera de la pareja.
 	// aBlocked / bBlocked: esa nave está contra la barrera hacia donde la separación la llevaría.
+	// forwardA / forwardB: hacia dónde apunta cada una, para saber si un roce es de lado o por detrás.
 	public static ContactResult Resolve(Vector2 velocityA, Vector2 velocityB, in ContactHit hit, bool aBlocked, bool bBlocked,
-		bool continuing, bool inCooldown, in ShipContactSettings s, float dt)
+		bool continuing, bool inCooldown, in ShipContactSettings s, float dt, Vector2 forwardA = default, Vector2 forwardB = default)
 	{
 		Vector2 n = hit.Normal;
 		var result = new ContactResult
@@ -131,7 +145,12 @@ public static class ContactResponse
 
 		if (level == ImpactLevel.Graze)
 		{
-			// Las dos igual: al entrar, una fracción; mientras dure, la fricción
+			// Por detrás, solo el empujón (restitución 0): el de detrás queda a la velocidad del de delante y nadie frena
+			result.Graze = Kind(n, forwardA, forwardB, s.SideGrazeAngle);
+			if (result.Graze == GrazeKind.Rear)
+				return result;
+
+			// De lado, las dos igual: al entrar, una fracción; mientras dure, la fricción
 			if (!continuing)
 			{
 				result.A.SpeedScale = result.B.SpeedScale = 1f - s.GrazeEntryLoss;
@@ -151,6 +170,19 @@ public static class ContactResponse
 		result.A.EndDrift = result.B.EndDrift = true;
 		result.A.StartRecovery = result.B.StartRecovery = strong;
 		return result;
+	}
+
+	// Roce de lado si la normal se aparta de la dirección media de las dos naves más de sideAngle; si no (también justo
+	// en él), por detrás. Sin dirección (naves enfrentadas o sin datos), de lado.
+	public static GrazeKind Kind(Vector2 normal, Vector2 forwardA, Vector2 forwardB, float sideAngle)
+	{
+		Vector2 mean = forwardA + forwardB;
+		float length = mean.Length();
+		if (length < 1e-4f)
+			return GrazeKind.Side;
+		float cos = Math.Clamp(MathF.Abs(Vector2.Dot(normal, mean / length)), 0f, 1f);
+		float angle = MathF.Acos(cos);
+		return angle > sideAngle + 1e-4f ? GrazeKind.Side : GrazeKind.Rear;
 	}
 
 	// Papeles con lo que va cada nave hacia la otra (m/s; lo que se aleja cuenta 0): embiste la de más aportación, y es

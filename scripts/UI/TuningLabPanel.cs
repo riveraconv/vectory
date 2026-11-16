@@ -210,6 +210,9 @@ public partial class TuningLabPanel : CanvasLayer
 				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}  PACE {RivalDriver.PaceFor(Rivals.Pace, car.Entry.PaceOffset) * 100f:0.0}");
 		}
 		text.Append($"\nSHIP = RAMS / RECEIVED / MUTUAL · RIVAL VS RIVAL {Rivals.RivalHits}");
+		Contact.GrazeLossMeter graze = Rivals.PlayerGraze;
+		string kind = graze.Kind switch { Contact.GrazeKind.Side => "SIDE", Contact.GrazeKind.Rear => "REAR", _ => "—" };
+		text.Append($"\nYOUR GRAZE {kind,-5} LOST {graze.Total * 3.6f:0.0} KM/H IN {graze.Window:0} S");
 		_rivalsLabel.Text = text.ToString();
 	}
 

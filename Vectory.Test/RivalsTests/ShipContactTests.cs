@@ -60,6 +60,14 @@ public class ShipContactTests
 			Physics.AfterContactMove(ref _position);
 		}
 
+		// Un paso conduciendo a fondo en línea recta (sin circuito)
+		public void Drive(in ShipTuning tuning)
+		{
+			PreviousPosition = _position;
+			Physics.Move(ref _position, new ShipInput { Accelerate = true }, false, true, tuning, Shape.HalfWidth,
+				ShipPhysicsSettings.Default, Step);
+		}
+
 		public void Set(Vector3 position, Vector2 velocity)
 		{
 			_position = position;
@@ -74,9 +82,17 @@ public class ShipContactTests
 	// Hacia delante con yaw = 0 es -Z: en planta, (0, -1)
 	private static readonly Vector2 Ahead = new(0f, -1f);
 
+	// Alcance: las dos naves van hacia delante y la normal también (roce por detrás, si es roce)
 	private static ContactResult RearEnd(float rearKmh, float frontKmh, bool continuing = false, bool cooldown = false) =>
 		ContactResponse.Resolve(Ahead * (rearKmh * Kmh), Ahead * (frontKmh * Kmh), new ContactHit(Ahead, 0.2f), false, false,
-			continuing, cooldown, Settings, Step);
+			continuing, cooldown, Settings, Step, Ahead, Ahead);
+
+	// Puerta con puerta: las dos hacia delante y la normal de lado; closingKmh de una hacia la otra
+	private static readonly Vector2 Side = new(1f, 0f);
+
+	private static ContactResult SideBySide(float closingKmh, bool continuing = false) =>
+		ContactResponse.Resolve(Ahead * (200f * Kmh) + Side * (closingKmh * Kmh), Ahead * (200f * Kmh), new ContactHit(Side, 0.2f),
+			false, false, continuing, false, Settings, Step, Ahead, Ahead);
 
 	// 1
 	[Fact]
@@ -325,13 +341,113 @@ public class ShipContactTests
 		Assert.Equal(1f - Settings.StrongSpeedLoss, strong.A.SpeedScale, 5);
 		Assert.Equal(1f, strong.B.SpeedScale);
 
-		// Roce: las dos igual, al entrar y mientras dure
-		ContactResult graze = RearEnd(215f, 200f);
+		// Roce de lado: las dos igual, al entrar y mientras dure
+		ContactResult graze = SideBySide(15f);
+		Assert.Equal(GrazeKind.Side, graze.Graze);
 		Assert.Equal(1f - Settings.GrazeEntryLoss, graze.A.SpeedScale, 5);
 		Assert.Equal(graze.A.SpeedScale, graze.B.SpeedScale);
-		ContactResult sliding = RearEnd(215f, 200f, continuing: true);
+		ContactResult sliding = SideBySide(15f, continuing: true);
 		Assert.Equal(Settings.GrazeFriction * Step, sliding.A.SpeedLoss, 5);
 		Assert.Equal(sliding.A.SpeedLoss, sliding.B.SpeedLoss);
+
+		// Roce por detrás (v1.1): sin pérdidas, ni al entrar ni mientras dure
+		ContactResult rear = RearEnd(215f, 200f);
+		Assert.Equal(GrazeKind.Rear, rear.Graze);
+		Assert.Equal(1f, rear.A.SpeedScale);
+		Assert.Equal(1f, rear.B.SpeedScale);
+		ContactResult glued = RearEnd(215f, 200f, continuing: true);
+		Assert.Equal(0f, glued.A.SpeedLoss);
+		Assert.Equal(0f, glued.B.SpeedLoss);
+	}
+
+	// 14b
+	[Fact]
+	public void The_angle_between_the_normal_and_the_heading_tells_rear_from_side()
+	{
+		float angle = Settings.SideGrazeAngle;
+		Vector2 At(float degrees) => new(MathF.Sin(degrees * MathF.PI / 180f), -MathF.Cos(degrees * MathF.PI / 180f));
+
+		Assert.Equal(GrazeKind.Rear, ContactResponse.Kind(At(5f), Ahead, Ahead, angle));
+		Assert.Equal(GrazeKind.Rear, ContactResponse.Kind(-At(5f), Ahead, Ahead, angle));   // la normal puede ir hacia atrás
+		Assert.Equal(GrazeKind.Side, ContactResponse.Kind(At(80f), Ahead, Ahead, angle));
+		Assert.Equal(GrazeKind.Rear, ContactResponse.Kind(At(45f), Ahead, Ahead, angle));    // 45° justos: por detrás
+		Assert.Equal(GrazeKind.Side, ContactResponse.Kind(At(46f), Ahead, Ahead, angle));
+		// Con la dirección media de las dos
+		Assert.Equal(GrazeKind.Rear, ContactResponse.Kind(Ahead, At(20f), At(-20f), angle));
+		// Sin dirección (enfrentadas), de lado
+		Assert.Equal(GrazeKind.Side, ContactResponse.Kind(Ahead, Ahead, -Ahead, angle));
+	}
+
+	// 14c
+	[Fact]
+	public void Glued_behind_another_ship_at_300_kmh_for_5_s_nobody_slows_down()
+	{
+		float frontAlone = DriveGlued(false, out _);
+		float front = DriveGlued(true, out float rear);
+
+		// Al de delante no le frena nada (el empujón, si acaso, le da algo) y el de detrás va a su velocidad
+		Assert.True(front >= frontAlone - 0.01f, $"front {front * 3.6f:0.0} km/h, alone {frontAlone * 3.6f:0.0} km/h");
+		Assert.Equal(front * 3.6f, rear * 3.6f, 0);
+	}
+
+	// Dos VECTOR en línea recta sin circuito: la de delante, a 300 km/h; la de detrás, pegada y un poco más rápida
+	private static float DriveGlued(bool contact, out float rearSpeed)
+	{
+		ShipTuning fast = ShipDefinitions.Find(ShipCatalog.Ship01).Technical;
+		ShipTuning steady = fast;
+		steady.MaxSpeed = 300f * Kmh;
+		var front = new FakeShip(1, VectorShape, new Vector3(0f, 2f, -(VectorShape.Front + VectorShape.Back + 0.05f)), 0f, steady.MaxSpeed);
+		var rear = new FakeShip(0, VectorShape, Vector3.UnitY * 2f, 0f, steady.MaxSpeed);
+		var solver = new ShipContactSolver { Enabled = contact };
+		var ships = new IContactShip[] { rear, front };
+		int touching = 0;
+		for (int i = 0; i < 300; i++)
+		{
+			front.Drive(steady);
+			rear.Drive(fast);
+			solver.Solve(ships, Step);
+			touching += solver.Touched(0) ? 1 : 0;
+		}
+		if (contact)
+			Assert.True(touching > 200, $"only {touching} steps touching");
+		rearSpeed = rear.Physics.Dynamics.RealSpeed;
+		return front.Physics.Dynamics.RealSpeed;
+	}
+
+	// 14d
+	[Fact]
+	public void A_side_graze_for_1_s_costs_both_the_entry_loss_and_about_20_kmh()
+	{
+		const float speed = 200f;
+		float before = speed * Kmh;
+		float afterEntry = before * (1f - Settings.GrazeEntryLoss);
+		var d = new ShipDynamics();
+		d.Reset(0f, before);
+		for (int i = 0; i < 60; i++)
+		{
+			ContactResult r = SideBySide(15f, continuing: i > 0);
+			d.ApplyContact(Vector2.Zero, r.A.SpeedScale, r.A.SpeedLoss);
+		}
+		// El primer paso es la entrada; la fricción, los otros 59 (unos 20 km/h en el segundo)
+		Assert.Equal((afterEntry - 59 * Settings.GrazeFriction * Step) * 3.6f, d.Speed * 3.6f, 2);
+		Assert.InRange((afterEntry - d.Speed) * 3.6f, 19f, 20f);
+	}
+
+	[Fact]
+	public void The_graze_meter_keeps_the_last_5_seconds()
+	{
+		var meter = new GrazeLossMeter();
+		for (int i = 0; i < 60; i++)
+			meter.Add(Step, 0.1f, GrazeKind.Side);
+		Assert.Equal(6f, meter.Total, 3);
+		Assert.Equal(GrazeKind.Side, meter.Kind);
+		for (int i = 0; i < 4 * 60; i++)
+			meter.Add(Step, 0f, GrazeKind.Rear);
+		Assert.Equal(6f, meter.Total, 3);
+		Assert.Equal(GrazeKind.Rear, meter.Kind);
+		for (int i = 0; i < 61; i++)
+			meter.Add(Step, 0f, GrazeKind.None);
+		Assert.Equal(0f, meter.Total, 3);
 	}
 
 	// 15
