@@ -215,6 +215,65 @@ public class ClearLineTests
 	}
 
 	[Fact]
+	public void Passing_a_stopped_ship_never_drops_below_the_speed_it_needs_to_steer()
+	{
+		ClearLine line = NewLine();
+		var parked = new[] { Ship(1, At + Front + Back + 8f, 0f, 0f) };
+		line.Update(Self(line, At, 0f), parked, Step);
+
+		Assert.True(line.State is LineState.PassLeft or LineState.PassRight);
+		Assert.True(line.SpeedCap >= ClearLineSettings.DefaultPassMinSpeed - 1e-4f);
+
+		// Con hueco de sobra, más rápido que el mínimo
+		line = NewLine();
+		line.Update(Self(line, At, 0f), new[] { Ship(1, At + Front + Back + 40f, 0f, 0f) }, Step);
+		Assert.True(line.SpeedCap > ClearLineSettings.DefaultPassMinSpeed + 1f);
+	}
+
+	[Fact]
+	public void A_rival_behind_a_ship_stopped_on_the_grid_gets_past_it()
+	{
+		TrackFile file = TrackFile.Load("circuit_01");
+		TrackFrame frame = file.Frame();
+		float barrier = BarrierGeometry.Offset(file.TrackWidth, BarrierGeometry.DefaultGap);
+		var context = new RivalRaceContext
+		{
+			Frame = frame,
+			TrackWidth = file.TrackWidth,
+			BarrierOffset = barrier,
+			LapLength = frame.LapLength,
+			CheckpointIndices = CenterlineBuilder.CheckpointIndices(frame.Plan, file.CheckpointCount),
+			Respawn = new RespawnSettings
+			{
+				BarrierOffset = barrier,
+				StuckSpeed = RespawnSettings.DefaultStuckSpeedKmh / 3.6f,
+				StuckTime = RespawnSettings.DefaultStuckTime,
+				OutsideMargin = RespawnSettings.DefaultOutsideMargin
+			}
+		};
+		var cache = new PilotCache(frame, file.TrackWidth, Physics, AutopilotSettings.Default);
+		var entry = new RivalEntry("rival_1", 1, 8, ShipCatalog.Ship01, 0, HullPaints.ChoiceAt(HullStyle.Racing, 0), PilotCatalog.All[0]);
+		var car = new RivalCar(entry, Vector, cache, context, RivalDriver.DefaultPace);
+
+		// Una VECTOR parada en el puesto 6, justo delante en la misma columna
+		TrackPlacement.GridStart(frame, 6, Vector.Visual.NoseDistance, file.TrackWidth, context.Grid, Track.ShipHover,
+			out System.Numerics.Vector3 position, out _);
+		SurfacePoint under = frame.SurfaceUnder(position.X, position.Z, position.Y);
+		var parked = new TrafficShip(0, under.Frame.Distance, under.Lateral, 0f, HalfWidth, Front, Back, false);
+
+		float lap = frame.LapLength;
+		float ahead = 0f;
+		for (int i = 0; i < 60 * 15 && ahead <= 0f; i++)
+		{
+			car.Move(true, new[] { parked, car.Traffic });
+			car.AfterContacts(false);
+			float ds = (car.TrackDistance - parked.Distance) % lap;
+			ahead = ds > lap / 2f ? ds - lap : ds < -lap / 2f ? ds + lap : ds;
+		}
+		Assert.True(ahead > 0f, "the rival stayed behind the stopped ship");
+	}
+
+	[Fact]
 	public void Each_rival_gets_its_own_pace_after_the_rest_of_the_lineup()
 	{
 		var order = GridLayout.RandomOrder(8, new Random(5));

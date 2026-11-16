@@ -28,6 +28,7 @@ public struct ClearLineSettings
 	public const float DefaultReturnDistance = 5f;
 	public const float DefaultFollowTime = 0.5f;
 	public const float DefaultFollowMin = 8f;
+	public const float DefaultPassMinSpeed = 3f;
 
 	public float MinLookahead;     // distancia de mirada: la mayor entre esta…
 	public float LookaheadTime;    // …y estos segundos a su velocidad
@@ -39,6 +40,7 @@ public struct ClearLineSettings
 	public float FollowTime;       // hueco al seguir…
 	public float FollowMin;        // …y como mínimo
 	public float FollowGain;       // 1/s: cuánto baja la velocidad por cada metro que le falta de hueco
+	public float PassMinSpeed;     // m/s: al apartarse, nunca menos (parada no podría girar para salir)
 	public float SpeedTolerance;   // m/s: hasta esto más rápida, cuenta como "a la misma velocidad"
 
 	public static ClearLineSettings Default => new()
@@ -53,6 +55,7 @@ public struct ClearLineSettings
 		FollowTime = DefaultFollowTime,
 		FollowMin = DefaultFollowMin,
 		FollowGain = 1f,
+		PassMinSpeed = DefaultPassMinSpeed,
 		SpeedTolerance = 0.3f
 	};
 }
@@ -162,7 +165,7 @@ public sealed class ClearLine
 				_targetOffset = beside - aimLine;
 				// Mientras su pasillo aún se cruza con la de delante, no se le echa encima
 				if (Overlaps(self.Lateral, self.HalfWidth, b))
-					SpeedCap = FollowCap(self, b);
+					SpeedCap = PassCap(self, b);
 			}
 			else
 			{
@@ -320,6 +323,12 @@ public sealed class ClearLine
 	// Un pasillo de semiancho halfWidth centrado en center se cruza con la nave o (con el margen a cada lado)
 	private bool Overlaps(float center, float halfWidth, in TrafficShip o) =>
 		MathF.Abs(o.Lateral - center) < halfWidth + o.HalfWidth + Settings.CorridorMargin;
+
+	// Al apartarse, todavía en el carril de la de delante: la de seguirla, pero nunca menos de PassMinSpeed. Detrás de una
+	// nave parada, seguirla deja la velocidad en 0, y parada no puede girar para apartarse: se quedaba ahí para siempre. Con
+	// el mínimo sale; si llega a tocarla, es un roce por detrás (no frena) y, tocándola, el atasco la recoloca. En carrera
+	// normal nunca se va tan despacio, así que no cambia nada.
+	private float PassCap(in TrafficShip self, in TrafficShip b) => MathF.Max(FollowCap(self, b), Settings.PassMinSpeed);
 
 	// Detrás de la de delante: su velocidad, menos cuanto más le falte para el hueco de FollowTime (mínimo FollowMin)
 	private float FollowCap(in TrafficShip self, in TrafficShip b)

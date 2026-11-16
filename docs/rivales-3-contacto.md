@@ -1,6 +1,8 @@
 # VECTORY — Spec: Rivales 3 · Contacto entre naves
 
-Versión 1.0 · 2026-11-16 · Estado: **hecha y validada** (versión 0.18.0; ver la sección 15)
+Versión 1.1 · 2026-11-16 · Estado: **hecha y validada**, también el parche 1.1 (versión 0.18.1; ver la sección 15)
+
+**Cambios en v1.1**: el **roce por detrás** deja de frenar. En la 1.0 todo roce aplicaba a las dos naves el 4 % al entrar y 20 km/h/s mientras durase el contacto. Si una nave va pegada detrás de otra, el contacto no se corta y **las dos se iban parando**. Ahora esas pérdidas solo cuentan en el **roce de lado** (sección 3.3). Va como etapa aparte, **1.1 · Arreglo del roce** (sección 13), con commit `fix:`.
 
 Tercera spec de rivales. Las naves **dejan de atravesarse**: chocan entre ellas y contigo con los niveles de siempre (roce, medio, fuerte), con un **reparto de daño** que castiga más al que embiste. Los rivales aprenden lo mínimo para no comerse por detrás: si no tienen la trazada clara, **se apartan o frenan**.
 
@@ -9,7 +11,7 @@ Plan de las specs de rivales:
 1. Parrilla llena (hecha).
 2. Clasificación y pilotos (hecha).
 3. **Contacto** (esta).
-4. Personalidades y dificultad. Ahí va **todo el comportamiento completo**: defender, cerrar la puerta, agresividad, errores, uso del boost con cabeza y FÁCIL / NORMAL / DIFÍCIL.
+4. Personalidades y dificultad. Ahí va **todo el comportamiento completo**: defender, cerrar la puerta, agresividad, errores, rebufo, uso del boost con cabeza y FÁCIL / NORMAL / DIFÍCIL.
 
 Se apoya en lo que ya existe:
 - La **colisión con la barrera** de la spec `barreras-y-colisiones`: niveles, umbrales, restitución, pérdidas, corrección temporal, espera de 0,3 s, sacudida y recolocación.
@@ -19,7 +21,7 @@ Se apoya en lo que ya existe:
 - La **distancia de carrera** y la clasificación de la spec `rivales-2-clasificacion`.
 - El marco de la pista (`s`, `d`, `h`) y la capa vertical.
 
-Rama: `feature/rivals-3-contact`, que sale de `master` con la spec 2 ya mergeada. Versión: la siguiente **minor** sobre la que haya al empezar. Se sube en el commit de la última etapa.
+Rama: `feature/rivals-3-contact`, que sale de `develop` con la spec 2 ya mergeada. Versión: la siguiente **minor** sobre la que haya al empezar. Se sube en el commit de la última etapa. El parche 1.1 va en su propia rama `fix/rear-contact` desde `develop` y sube la **patch**.
 
 Todo lo demás del documento maestro sigue aplicando: principios, flujo por etapa, SOLID, pruebas y commits tras validación.
 
@@ -39,6 +41,7 @@ Todo lo demás del documento maestro sigue aplicando: principios, flujo por etap
 - **Etapa 0 · Inventario**: mirar y apuntar, sin cambiar nada.
 - **Etapa 1 · Choques**: detección, respuesta, daño y sacudida. Los rivales todavía conducen **sin mirar**.
 - **Etapa 2 · Trazada clara**: los rivales se apartan o frenan si tienen a alguien delante.
+- **Etapa 1.1 · Arreglo del roce** (v1.1): ir pegado detrás de otra nave ya no frena a ninguna.
 
 ## 2. Etapa 0 · Inventario
 
@@ -101,10 +104,15 @@ Con las dos naves y la normal del contacto:
 
 | Nivel | El que embiste | El que recibe | Mutuo (cada uno) |
 |---|---|---|---|
-| Roce | 4 % al entrar y 20 km/h/s mientras dure | Igual | Igual |
+| Roce **de lado** | 4 % al entrar y 20 km/h/s mientras dure | Igual | Igual |
+| Roce **por detrás** | Ninguna | Ninguna | Ninguna |
 | Medio | 20 % | Ninguna | 20 % |
 | Fuerte | 45 % | Ninguna | 45 % |
 
+- **Tipo de roce** (v1.1): se mira el ángulo entre la **normal** del contacto y la **dirección media** de las dos naves.
+  - Más de **45°**: el empuje va más de lado que hacia delante → **roce de lado** (puerta con puerta).
+  - 45° o menos → **roce por detrás** (morro contra cola). Solo se aplica el empujón con restitución 0: el de detrás queda a la velocidad del de delante por la normal, y **al de delante no le frena nada**. Ir pegado a otra nave no para a ninguna de las dos.
+  - El tipo se recalcula en cada paso: si una nave pegada detrás se abre y acaba puerta con puerta, pasa a roce de lado.
 - **Corrección temporal** de la barrera (1 s, giro y aceleración del 50 % al 100 %): en golpes **fuertes**, para **las dos** naves. Al que recibe también lo descoloca.
 - **Dirección**: el choque **no gira** el morro directamente. El empujón deja velocidad de lado y el agarre la corrige, como en un derrape. Si el inventario dice que la dinámica no puede, se avisa (punto 1).
 - **Espera**: un golpe medio o fuerte entre la **misma pareja** no se vuelve a contar hasta pasados **0,3 s**. El roce es continuo.
@@ -176,6 +184,7 @@ Una nave atravesable **no choca con otras naves**, pero **sí con la barrera**.
 
 - Ya no se atraviesa a nadie (salvo los atravesables).
 - Rozar lado con lado: las naves se separan un poco y pierden algo de velocidad.
+- Ir pegado detrás de un rival tocándole: ninguno de los dos se va parando (v1.1).
 - Alcanzar a un rival por detrás: tú pierdes y él gana un poco. Si vas fuerte, tú te llevas el daño y él, como mucho, 1 punto.
 - Que te embistan de lado: te empuja y te descoloca, sin daño en un medio.
 - Nadie atraviesa la barrera al ser empujado.
@@ -230,6 +239,7 @@ Si no hay hueco a ningún lado:
   - nuevas columnas por rival: **golpes con naves** (embestidas / recibidos / mutuos) y **puntos de daño**;
   - un interruptor **CONTACT** (por defecto activado) para volver a atravesarse y comparar. No se guarda en disco.
 - Etapa 2: en depuración, una tecla o un interruptor del panel dibuja, encima de cada rival, el **estado** (`CLEAR`, `PASS L`, `PASS R`, `FOLLOW`) y su pasillo, para ver qué decide.
+- Etapa 1.1: el panel enseña, para tu nave, si estás en **roce de lado** o **por detrás** y la velocidad perdida por roce en los últimos 5 s.
 
 ## 10. Parámetros en el Inspector
 
@@ -240,6 +250,7 @@ Si no hay hueco a ningún lado:
 | Umbrales roce → medio → fuerte | 30 / 90 km/h (los de la barrera) | Colisiones |
 | Restitución roce / medio / fuerte | 0 / 0,4 / 0,5 (los de la barrera) | Colisiones |
 | Pérdidas por nivel | Tabla de 3.3 | Colisiones |
+| Ángulo roce de lado / por detrás | 45° | Colisiones |
 | Margen para golpe mutuo | 70 % | Colisiones |
 | Espera entre golpes de la misma pareja | 0,3 s | Colisiones |
 | Puntos de daño por papel | Tabla de 4 | Daños |
@@ -258,7 +269,7 @@ Respetar la estructura de carpetas y namespaces actual.
 
 - **Forma de la nave** (pura): semiancho y medio largo, desde el perfil y el manifiesto.
 - **Contacto entre naves** (puro): con las dos formas, posiciones, orientaciones, alturas y velocidades, da si hay contacto, la normal, la profundidad y la velocidad de cierre.
-- **Respuesta al contacto** (pura): separación, nivel (con la clasificación de la barrera), empujón, pérdidas, corrección y **papeles** (embiste / recibe / mutuo). Sin nodos.
+- **Respuesta al contacto** (pura): separación, nivel (con la clasificación de la barrera), **tipo de roce** (de lado / por detrás), empujón, pérdidas, corrección y **papeles** (embiste / recibe / mutuo). Sin nodos.
 - **Reparto de daño** (puro): papel + nivel → puntos.
 - **Espera por pareja** (pura): como la de la barrera, por pareja.
 - **Estado atravesable** (puro): terminada, temporizador de recolocación y «sigue solapada».
@@ -291,6 +302,11 @@ Papeles y daño (etapa 1):
 13. Medio: +1 / 0 / +1 cada uno si es mutuo. Fuerte: +3 / +1 / +3 cada uno. Roce: 0.
 14. Pérdidas: el que recibe un medio no pierde nada extra; el que embiste pierde un 20 %.
 
+Roce por detrás (etapa 1.1):
+14b. Normal casi en la dirección de la marcha (alcance): roce por detrás. Normal a 80° de la marcha: roce de lado. A 45° justos: por detrás.
+14c. Nave pegada detrás de otra a 300 km/h, en roce durante 5 s: la de delante **no pierde** velocidad por el contacto y la de detrás va a la velocidad de la de delante.
+14d. Roce de lado durante 1 s: las dos pierden el 4 % al entrar y unos 20 km/h más.
+
 Atravesables (etapa 1):
 15. Una nave terminada no choca con nadie, pero sí con la barrera.
 16. Recolocada: atravesable 2 s. Si sigue solapada a los 2 s, sigue atravesable hasta que deje de estarlo.
@@ -305,7 +321,7 @@ Trazada clara (etapa 2):
 23. Vuelve a la trazada solo después de pasar al otro (5 m) y si ese lado está libre.
 24. Boost: con la trazada tapada no se gasta; al quedar clara en la misma recta, sí.
 
-Las pruebas existentes siguen pasando. Si se toca la dinámica (inventario, punto 1), sus pruebas dan lo mismo antes y después.
+Las pruebas existentes siguen pasando. Si se toca la dinámica (inventario, punto 1), sus pruebas dan lo mismo antes y después. En la 1.1, las pruebas de roce que daban por hecho la pérdida en un alcance se adaptan al roce por detrás.
 
 ## 13. Etapas
 
@@ -315,6 +331,7 @@ Las pruebas existentes siguen pasando. Si se toca la dinámica (inventario, punt
 | *(si hace falta) Refactor* | Lo que diga el inventario (velocidad lateral, puntos sueltos en el daño, paso común de física) | Pruebas existentes · el juego se conduce exactamente igual · Commit `refactor:` |
 | **1 · Choques** | Secciones 3–7 y 9 (sin el dibujo de estados) | Pruebas 1–17 · Prueba manual 1–11 · Commit `feat:` |
 | **2 · Trazada clara** | Sección 8 y el dibujo de estados de la 9 · versión | Pruebas 18–24 · Prueba manual 12–18 · Commit `feat:` |
+| **1.1 · Arreglo del roce** (v1.1) | Tipo de roce de 3.3 y lo de F9 de la 9. **Antes de cambiar nada**, confirmar con F9 que la pérdida al ir pegado viene del roce, y apuntar si hay otra causa | Pruebas 14b–14d · Prueba manual 19–21 · Commit `fix:` · versión: siguiente **patch** |
 
 No se empieza una etapa sin validar la anterior.
 
@@ -341,6 +358,11 @@ No se empieza una etapa sin validar la anterior.
 16. En la recta más larga, con un rival delante, el que va detrás no gasta el boost hasta tener la trazada clara.
 17. Varias carreras: apuntar en F9 los golpes medios y fuertes entre rivales por carrera.
 18. Mirar los fps en la salida, con los 8 juntos.
+
+**Etapa 1.1 · Arreglo del roce**
+19. Pegarse detrás de un rival tocándole en una recta durante 10 s: él no se frena, y tú vas a su velocidad. F9 marca roce por detrás.
+20. Que un rival se te pegue detrás (ir algo más lento delante de él): no te baja la velocidad.
+21. Rozar puerta con puerta: sigue perdiendo velocidad como antes. F9 marca roce de lado.
 
 ## 14. Fuera de alcance
 
@@ -371,3 +393,11 @@ Lo que se aparta de esta spec o la concreta, validado por el usuario.
 - Si no puede volver, o tiene una nave al lado, mantiene su lateral real; al pasar, el objetivo es un lateral real al lado de la otra. Un desplazamiento fijo respecto a la trazada lo llevaba contra la barrera en las curvas.
 - El punto al que apunta el piloto nunca pasa de la barrera menos 1 m.
 - Resultado en 8 carreras de `circuit_01` con el piloto: 0 golpes medios o fuertes entre rivales (antes de la etapa, ~23) y 0–1 impactos de los rivales con la barrera.
+
+**Parche 1.1 (versión 0.18.1)**
+- Antes de cambiar nada se midió la causa: dos VECTOR pegadas en línea recta acababan las dos a 345,8 km/h y bajando (solas, 392 y 396); era solo la fricción del roce. Con el arreglo van a 393,9.
+- El tipo de roce se decide con el ángulo entre la normal y la dirección media de las dos naves; sin dirección (enfrentadas), cuenta como de lado.
+- Arreglo añadido, validado por el usuario: un rival justo detrás de una nave parada se quedaba bloqueado para siempre (al apartarse iba a la velocidad de seguirla, 0, y parado no puede girar; sin tocarla, el atasco no lo recolocaba). Ahora, al apartarse, nunca baja de 3 m/s. En carrera normal no cambia nada.
+- Descartado: limitar la velocidad con la distancia de frenada, alargar la mirada, no cruzar por delante y una red de seguridad para cualquier nave del camino. En carrera normal subían los golpes entre rivales.
+- Límite conocido: la mirada de 8.1 (máx(30 m, 1,5 s)) se queda corta para frenar ante una nave parada a toda velocidad (~154 m frente a ~164 m de frenada a 370 km/h).
+- Resultado en 8 carreras por caso: con el jugador parado, terminan los 7 rivales en todas y 0 golpes contra él; con el jugador en marcha, 0 golpes entre rivales en 7 de 8.
