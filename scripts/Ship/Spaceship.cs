@@ -77,6 +77,12 @@ public partial class Spaceship : Node3D
 		_hull3D?.UpdateEffects(glow, glowStrength, speed, time);
 	}
 
+	// Balizas del techo del casco 3D (HAMMER): intensidad de la ámbar y de la roja; sin balizas no hace nada
+	public void SetHullBeacons(float boost, float damage)
+	{
+		_hull3D?.SetBeacons(boost, damage);
+	}
+
 	// Pone o quita el casco 3D según el perfil actual; el wireframe se oculta mientras haya uno
 	private void RebuildHull3D()
 	{

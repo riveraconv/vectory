@@ -179,7 +179,7 @@ public class Hull3DHammerTests
         Assert.InRange(MathF.Abs(Manifest.HalfWidth - HammerShip.Definition.Visual.CollisionHalfWidth), 0f, 0.01f);
     }
 
-    // ---------- Pintura de por defecto: AMARILLO OBRA (spec 6.2; el resto del catálogo, en la etapa 3) ----------
+    // ---------- 7. Pintura: las máscaras y el color reconstruido ----------
 
     [Fact]
     public void Manifest_PointsToTheMasksOfBodyAndCab()
@@ -222,14 +222,5 @@ public class Hull3DHammerTests
             Assert.InRange(Math.Abs(yellow[c] - wantYellow[c]), 0, 1);
             Assert.InRange(Math.Abs(white[c] - wantWhite[c]), 0, 1);
         }
-    }
-
-    [Fact]
-    public void HullPaints_Industrial_HasOnlyTheDefault_ForNow()
-    {
-        Assert.Equal(1, HullPaints.Count(HullStyle.Industrial));
-        Assert.Equal(0, HullPaints.DefaultIndex(HullStyle.Industrial));
-        Assert.Equal(0, HullPaints.Step(HullStyle.Industrial, 0, 1));
-        Assert.Equal("AMARILLO OBRA · MARCAS", HullPaints.DisplayName(HullStyle.Industrial, 0));
     }
 }

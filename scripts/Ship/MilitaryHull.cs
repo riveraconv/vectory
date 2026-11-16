@@ -291,11 +291,10 @@ public static class StrobeLights
 // Las pinturas de los cascos 3D por estilo, como índices de sus 40 combinaciones (spec 6.2, depuración con F5)
 public static class HullPaints
 {
-	// HAMMER, por ahora, solo con su pintura de por defecto (su catálogo entra en la etapa 3 de su spec)
 	public static int Count(HullStyle style) => style switch
 	{
 		HullStyle.Military => MilitaryPaintCatalog.Combinations.Count,
-		HullStyle.Industrial => 1,
+		HullStyle.Industrial => IndustrialPaintCatalog.Combinations.Count,
 		_ => HullPaintCatalog.Combinations.Count
 	};
 
@@ -303,14 +302,14 @@ public static class HullPaints
 	public static int DefaultIndex(HullStyle style) => style switch
 	{
 		HullStyle.Military => MilitaryPaintCatalog.DefaultIndex,
-		HullStyle.Industrial => 0,
+		HullStyle.Industrial => IndustrialPaintCatalog.DefaultIndex,
 		_ => HullPaintCatalog.IndexOf(HullPaintCatalog.Default)
 	};
 
 	public static string DisplayName(HullStyle style, int index) => style switch
 	{
 		HullStyle.Military => MilitaryPaintCatalog.Combinations[Wrap(style, index)].DisplayName,
-		HullStyle.Industrial => IndustrialHullPaint.SiteYellowName,
+		HullStyle.Industrial => IndustrialPaintCatalog.Combinations[Wrap(style, index)].DisplayName,
 		_ => HullPaintCatalog.Combinations[Wrap(style, index)].DisplayName
 	};
 

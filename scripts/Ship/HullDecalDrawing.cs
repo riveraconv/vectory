@@ -3,16 +3,21 @@ using System.Collections.Generic;
 namespace Vectory.Ship;
 
 // Ring: circunferencia de radio Radius y W px de grueso. Polygon: relleno con Points.
-public enum DecalShape { RoundRect, Circle, Rect, Text, Ring, Polygon }
+// Outline: polilínea cerrada de Points con W de grueso (con Radius > 0, esquinas redondeadas, lineJoin = 'round')
+public enum DecalShape { RoundRect, Circle, Rect, Text, Ring, Polygon, Outline }
 
-// Fuente de un texto: Orbitron Black (VECTOR) o Black Ops One (BLADE)
-public enum DecalFont { Orbitron, BlackOps }
+// Fuente de un texto: Orbitron Black (VECTOR), Black Ops One (BLADE y HAMMER) o Share Tech Mono (avisos de HAMMER)
+public enum DecalFont { Orbitron, BlackOps, ShareTech }
+
+// Alineación de un texto en X, como textAlign del lienzo del prototipo
+public enum DecalAlign { Center, Left }
 
 // Línea base del texto, como textBaseline del lienzo del prototipo
 public enum DecalBaseline { Middle, Alphabetic }
 
 // Una primitiva de una calcomanía, en píxeles de su lienzo (origen arriba a la izquierda). Los textos van centrados
-// en X; MaxWidth > 0 los estrecha si no caben (el maxWidth de fillText).
+// en X (o desde X, con Align = Left); MaxWidth > 0 los estrecha si no caben (el maxWidth de fillText). Erase vacía lo
+// que ya hay pintado debajo (destination-out); Bold, la negrita fingida del lienzo con una fuente sin negrita.
 public readonly record struct DecalPrimitive(
 	DecalShape Shape,
 	float X, float Y, float W, float H, float Radius,
@@ -23,7 +28,10 @@ public readonly record struct DecalPrimitive(
 	DecalBaseline Baseline = DecalBaseline.Alphabetic,
 	float MaxWidth = 0f,
 	DecalFont Font = DecalFont.Orbitron,
-	System.Numerics.Vector2[] Points = null);
+	System.Numerics.Vector2[] Points = null,
+	DecalAlign Align = DecalAlign.Center,
+	bool Erase = false,
+	bool Bold = false);
 
 // Lienzo de una calcomanía: tamaño en píxeles (fondo transparente) y lo que se pinta, en orden
 public sealed record DecalCanvas(int Width, int Height, IReadOnlyList<DecalPrimitive> Primitives);

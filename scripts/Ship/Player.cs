@@ -181,7 +181,9 @@ public partial class Player : CharacterBody3D
 	[Export] public float Cockpit3DBoostRearLight = 0.85f;
 	[Export] public float Cockpit3DDamageLight = 0.7f;
 
-	[ExportGroup("Cabina 3D: HAMMER")]   // setas del boost y balizas del larguero (spec docs/cabinas-3d-3-hammer.md, 6.5)
+	// Setas del boost y balizas del larguero (spec docs/cabinas-3d-3-hammer.md, 6.5); las balizas también valen para las
+	// del techo del casco 3D (spec docs/cascos-3d-3-hammer.md, 6.4)
+	[ExportGroup("Cabina 3D: HAMMER")]
 	[Export] public float HammerSetaFull = IndustrialLampSettings.Default.SetaFull;
 	[Export] public float HammerSetaCooldown = IndustrialLampSettings.Default.SetaCooldown;
 	[Export] public float HammerSetaLocked = IndustrialLampSettings.Default.SetaLocked;
@@ -692,6 +694,10 @@ public partial class Player : CharacterBody3D
 		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * ShipHull3D.GlowLiftAboveTrack + back * _ship.Visual.Hull3D.Glow.CenterZ;
 		float strength = HoverGlow.Strength(_hoverTime, HullHoverGlow) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
 		_ship.UpdateHullEffects(new Transform3D(new Basis(right, up, back), origin), strength, Dynamics.RealSpeed, _hoverTime);
+		// Balizas del techo (HAMMER): las mismas reglas y ajustes que las de su cabina 3D
+		(float boostBeacon, float damageBeacon) = IndustrialHullBeacons.Intensities(Boost.IsImpulseActive, _damageLevel,
+			CockpitDamageEnabled, _hoverTime, BuildIndustrialLampSettings());
+		_ship.SetHullBeacons(boostBeacon, damageBeacon);
 	}
 
 	private float _hoverTime;
@@ -973,9 +979,13 @@ public partial class Player : CharacterBody3D
 			Cockpit3DGlowThreshold, Cockpit3DScreenBrightness, Cockpit3DClearcoat, Cockpit3DGlowWide,
 			Cockpit3DReflections, Cockpit3DCarbonSpecular,
 			new CockpitLightIntensities(Cockpit3DBoostFrontLight, Cockpit3DBoostRearLight, Cockpit3DDamageLight),
-			new IndustrialLampSettings(HammerSetaFull, HammerSetaCooldown, HammerSetaLocked, HammerSetaEmpty,
-				HammerBoostBeaconOn, HammerBoostBeaconPulse, HammerDamageBeaconOn, HammerBeaconOff));
+			BuildIndustrialLampSettings());
 	}
+
+	// Setas y balizas de HAMMER: las de la cabina 3D y las del techo del casco 3D comparten ajustes
+	private IndustrialLampSettings BuildIndustrialLampSettings() =>
+		new(HammerSetaFull, HammerSetaCooldown, HammerSetaLocked, HammerSetaEmpty,
+			HammerBoostBeaconOn, HammerBoostBeaconPulse, HammerDamageBeaconOn, HammerBeaconOff);
 
 	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos
 	// cámaras, así cambiar de vista (C) durante la sacudida sigue con la amplitud de la nueva.

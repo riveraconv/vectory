@@ -99,6 +99,8 @@ void fragment() {
 	// Puntas traseras de BLADE pintadas (sin marcas): copia de la pintura con la repetición de sus UV, que van
 	// horneadas con la de las franjas de aviso
 	private readonly Dictionary<string, (StandardMaterial3D Hazard, StandardMaterial3D Paint)> _tips = new();
+	// Bordes del canard de HAMMER: franjas con marcas; sin ellas, copia de la chapa oscura con la escala de sus UV
+	private readonly Dictionary<string, (StandardMaterial3D Hazard, StandardMaterial3D Plate)> _leadingEdges = new();
 	private int _paintVersion;
 	private CpuParticles3D _smoke;
 	private MeshInstance3D _glow;
@@ -170,9 +172,8 @@ void fragment() {
 		}
 		if (Profile.Style == HullStyle.Industrial)
 		{
-			// Por ahora, AMARILLO OBRA con marcas en casco y cabina (el catálogo, en la etapa 3 de su spec)
 			if (IsLoaded)
-				ApplyIndustrialPaint(IndustrialHullPaint.SiteYellow, IndustrialHullPaint.SiteYellow);
+				ApplyIndustrialPaint(IndustrialPaintCatalog.Combinations[index]);
 			return;
 		}
 		_paint = HullPaintCatalog.Combinations[index];
@@ -359,14 +360,17 @@ void fragment() {
 		return CamoTextures[key] = ImageTexture.CreateFromImage(image);
 	}
 
-	// Pintura de HAMMER (spec 6.2): el color del casco y el de la cabina salen de sus máscaras (casco: M_Paint*;
-	// cabina: M_PaintCab). La rugosidad y la normal son las del modelo, que no dependen del color.
-	private void ApplyIndustrialPaint(uint body, uint cab)
+	// Pintura de HAMMER (spec 6.2 y 6.3): el color del casco y el de la cabina salen de sus máscaras (casco: M_Paint*;
+	// cabina: M_PaintCab); la rugosidad y la normal son las del modelo, que no dependen del color. Con marcas se ven las
+	// calcomanías y las franjas de las aletas y del compartimento, y el borde del canard lleva franjas; sin ellas, nada
+	// de eso y el borde en chapa oscura.
+	private void ApplyIndustrialPaint(IndustrialPaintChoice choice)
 	{
+		IndustrialHullLook look = IndustrialHullLook.For(choice);
 		foreach (HullManifestPaintMask entry in _manifest.PaintMasks)
 		{
 			bool isCab = entry.Group == "cab";
-			Texture2D texture = PlateTexture(entry, isCab ? cab : body);
+			Texture2D texture = PlateTexture(entry, isCab ? look.Cab : look.Body);
 			if (texture == null)
 				continue;
 			foreach (string name in isCab ? IndustrialHullPieces.PaintedCab : IndustrialHullPieces.PaintedBody)
@@ -377,6 +381,50 @@ void fragment() {
 				material.AlbedoTexture = texture;
 				material.AlbedoColor = Colors.White;
 			}
+		}
+		foreach (KeyValuePair<string, (StandardMaterial3D Hazard, StandardMaterial3D Plate)> edge in _leadingEdges)
+			_pieces[edge.Key].SetSurfaceOverrideMaterial(0, look.LeadingEdgeHazard ? edge.Value.Hazard : edge.Value.Plate);
+		foreach (string name in IndustrialHullPieces.LiveryPieces)
+		{
+			if (_pieces.TryGetValue(name, out MeshInstance3D mesh))
+				mesh.Visible = look.MarkingsVisible;
+		}
+		if (look.MarkingsVisible)
+			PaintDecals(IndustrialDecalDrawing.For(look));
+	}
+
+	// Copia de la chapa oscura para cada borde del canard, con las UV pasadas de la repetición de las franjas a la suya
+	private void PrepareLeadingEdges(HullManifest manifest)
+	{
+		if (Profile.Style != HullStyle.Industrial)
+			return;
+		StandardMaterial3D plate = _pieces.Values.Select(m => m.GetSurfaceOverrideMaterial(0) as StandardMaterial3D)
+			.FirstOrDefault(m => m != null && m.ResourceName == manifest.LeadingEdges.WithoutLivery);
+		foreach (string name in manifest.LeadingEdges.Pieces)
+		{
+			StandardMaterial3D hazard = MaterialOf(name);
+			if (plate == null || hazard == null)
+				continue;
+			var copy = (StandardMaterial3D)plate.Duplicate();
+			copy.ResourceName = plate.ResourceName;
+			float k = manifest.LeadingEdges.UvScaleWithoutLivery;
+			copy.Uv1Scale = new Vector3(k, k, 1f);
+			_scorchMaterials.Add(copy);
+			_leadingEdges[name] = (hazard, copy);
+		}
+	}
+
+	// Balizas del techo (HAMMER, spec 6.4): intensidad de cada lente según su papel; sin balizas no hace nada. No
+	// titilan con el daño.
+	public void SetBeacons(float boost, float damage)
+	{
+		if (_manifest == null)
+			return;
+		foreach (HullManifestBeacon beacon in _manifest.Beacons)
+		{
+			StandardMaterial3D material = MaterialOf(beacon.Name);
+			if (material != null)
+				material.EmissionEnergyMultiplier = beacon.Role == "boost" ? boost : damage;
 		}
 	}
 
@@ -601,6 +649,7 @@ void fragment() {
 
 		ApplyManifest(manifest);
 		PrepareTips(manifest);
+		PrepareLeadingEdges(manifest);
 		return missing.Count == 0;
 	}
 

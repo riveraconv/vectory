@@ -5,7 +5,8 @@ using Vectory.UI;
 namespace Vectory.Ship;
 
 // Pinta un lienzo de calcomanía (HullDecalDrawing) una sola vez en una textura: un SubViewport que se dibuja un frame
-// y se borra. Sin reglas: solo traduce primitivas a llamadas de Godot.
+// y se borra. Sin reglas: solo traduce primitivas a llamadas de Godot. Lo que vacía (Erase) va en un nodo aparte con
+// mezcla de resta, que quita también el alfa de lo que hay debajo.
 public static partial class HullDecalPainter
 {
 	private const int OrbitronBlack = 900;
@@ -22,7 +23,8 @@ public static partial class HullDecalPainter
 			Disable3D = true,
 			RenderTargetUpdateMode = SubViewport.UpdateMode.Once
 		};
-		viewport.AddChild(new DecalCanvasControl(canvas));
+		foreach (DecalCanvasControl control in Controls(canvas))
+			viewport.AddChild(control);
 		host.AddChild(viewport);
 		await host.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
 		if (!GodotObject.IsInstanceValid(viewport))
@@ -36,31 +38,66 @@ public static partial class HullDecalPainter
 	public static Color ToColor(uint rgb, float alpha = 1f) =>
 		new(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, alpha);
 
-	private static Font FontFor(float size, bool italic, DecalFont which)
+	// Negrita fingida del lienzo con Share Tech Mono, que no tiene negrita (la de los pilotos y pantallas de BLADE)
+	private const float BoldEmbolden = 0.6f;
+
+	private static Font FontFor(float size, bool italic, DecalFont which, bool bold)
 	{
-		var font = which == DecalFont.BlackOps
-			? (FontVariation)MenuFonts.Make(MenuFonts.BlackOps, 400, size, 0f)
-			: (FontVariation)MenuFonts.Make(MenuFonts.Orbitron, OrbitronBlack, size, 0f);
+		var font = which switch
+		{
+			DecalFont.BlackOps => (FontVariation)MenuFonts.Make(MenuFonts.BlackOps, 400, size, 0f),
+			DecalFont.ShareTech => (FontVariation)MenuFonts.Make(MenuFonts.Mono, 400, size, 0f),
+			_ => (FontVariation)MenuFonts.Make(MenuFonts.Orbitron, OrbitronBlack, size, 0f)
+		};
 		if (italic)
 			font.VariationTransform = new Transform2D(new Vector2(1f, 0f), new Vector2(-ItalicSkew, 1f), Vector2.Zero);
+		if (bold)
+			font.VariationEmbolden = BoldEmbolden;
 		return font;
+	}
+
+	// Las primitivas en orden: un nodo con todas las seguidas que pintan y uno propio para cada una que vacía
+	private static System.Collections.Generic.List<DecalCanvasControl> Controls(DecalCanvas canvas)
+	{
+		var controls = new System.Collections.Generic.List<DecalCanvasControl>();
+		var run = new System.Collections.Generic.List<DecalPrimitive>();
+		foreach (DecalPrimitive p in canvas.Primitives)
+		{
+			if (!p.Erase)
+			{
+				run.Add(p);
+				continue;
+			}
+			if (run.Count > 0)
+				controls.Add(new DecalCanvasControl(canvas, run.ToArray(), false));
+			run.Clear();
+			controls.Add(new DecalCanvasControl(canvas, new[] { p }, true));
+		}
+		if (run.Count > 0 || controls.Count == 0)
+			controls.Add(new DecalCanvasControl(canvas, run.ToArray(), false));
+		return controls;
 	}
 
 	private sealed partial class DecalCanvasControl : Control
 	{
-		private readonly DecalCanvas _canvas;
+		private readonly DecalPrimitive[] _primitives;
+		private readonly bool _erase;
 
-		public DecalCanvasControl(DecalCanvas canvas)
+		public DecalCanvasControl(DecalCanvas canvas, DecalPrimitive[] primitives, bool erase)
 		{
-			_canvas = canvas;
+			_primitives = primitives;
+			_erase = erase;
 			Size = new Vector2(canvas.Width, canvas.Height);
+			// Resta: el color y el alfa de debajo bajan lo que se pinte en blanco opaco, hasta 0
+			if (erase)
+				Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Sub };
 		}
 
 		public override void _Draw()
 		{
-			foreach (DecalPrimitive p in _canvas.Primitives)
+			foreach (DecalPrimitive p in _primitives)
 			{
-				Color color = ToColor(p.Color);
+				Color color = _erase ? Colors.White : ToColor(p.Color);
 				switch (p.Shape)
 				{
 					case DecalShape.Rect:
@@ -86,21 +123,40 @@ public static partial class HullDecalPainter
 							points[i] = new Vector2(p.Points[i].X, p.Points[i].Y);
 						DrawColoredPolygon(points, color);
 						break;
+					case DecalShape.Outline:
+						DrawOutline(p, color);
+						break;
 				}
 			}
 		}
 
-		// Centrado en X como textAlign = 'center'; si no cabe en MaxWidth, se estrecha como fillText
+		// Polilínea cerrada con su grueso; con Radius > 0, un círculo en cada esquina hace la unión redondeada
+		private void DrawOutline(DecalPrimitive p, Color color)
+		{
+			var points = new Vector2[p.Points.Length + 1];
+			for (int i = 0; i < p.Points.Length; i++)
+				points[i] = new Vector2(p.Points[i].X, p.Points[i].Y);
+			points[^1] = points[0];
+			DrawPolyline(points, color, p.W, true);
+			if (p.Radius > 0f)
+			{
+				for (int i = 0; i < p.Points.Length; i++)
+					DrawCircle(points[i], p.W / 2f, color, true, -1f, true);
+			}
+		}
+
+		// Centrado en X como textAlign = 'center' (o desde X con 'left'); si no cabe en MaxWidth, se estrecha como fillText
 		private void DrawCenteredText(DecalPrimitive p, Color color)
 		{
 			int size = Mathf.RoundToInt(p.FontSize);
-			Font font = FontFor(p.FontSize, p.Italic, p.Font);
+			Font font = FontFor(p.FontSize, p.Italic, p.Font, p.Bold);
 			float width = font.GetStringSize(p.Text, HorizontalAlignment.Left, -1f, size).X;
 			float scale = p.MaxWidth > 0f && width > p.MaxWidth ? p.MaxWidth / width : 1f;
 			float baseline = p.Baseline == DecalBaseline.Middle
 				? p.Y + (font.GetAscent(size) - font.GetDescent(size)) / 2f
 				: p.Y;
-			DrawSetTransform(new Vector2(p.X - width * scale / 2f, baseline), 0f, new Vector2(scale, 1f));
+			float left = p.Align == DecalAlign.Left ? p.X : p.X - width * scale / 2f;
+			DrawSetTransform(new Vector2(left, baseline), 0f, new Vector2(scale, 1f));
 			DrawString(font, Vector2.Zero, p.Text, HorizontalAlignment.Left, -1f, size, color);
 			DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
 		}
