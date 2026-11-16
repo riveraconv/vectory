@@ -1,4 +1,6 @@
 using Godot;
+using Vectory.Autopilot;
+using Vectory.Core;
 using Vectory.Circuit;
 using Vectory.Contact;
 using Vectory.Radar;
@@ -35,6 +37,14 @@ public partial class RivalShip : Node3D
 	private RespawnBlink _blink;
 	private float _blinkTime;
 	private float _hullOpacity = 1f;
+
+	// Depuración (spec docs/rivales-3-contacto.md, 9): estado de la trazada clara y pasillo encima de cada rival. Lo
+	// enciende el panel de pruebas; dura hasta cerrar el juego.
+	public static bool ShowLineStates { get; set; }
+	private Label3D _stateLabel;
+	private MeshInstance3D _corridor;
+	private ImmediateMesh _corridorMesh;
+	private StandardMaterial3D _corridorMaterial;
 
 	public RivalCar Car => _car;
 
@@ -123,6 +133,8 @@ public partial class RivalShip : Node3D
 		if (_flicker != null && _flicker.Update(dt))
 			_ship.ShowEdgeFlicker(_flicker, _flickerOpacity);
 
+		UpdateLineStateDebug();
+
 		// Atravesable tras recolocarla: el casco parpadea
 		float opacity = 1f;
 		if (_car.Passable.FromRespawn)
@@ -139,6 +151,87 @@ public partial class RivalShip : Node3D
 			_hullOpacity = opacity;
 			_ship.SetHullOpacity(opacity);
 		}
+	}
+
+	// Texto del estado (CLEAR, PASS L, PASS R, FOLLOW) y pasillo de la trazada, desplazada, hasta la distancia de mirada
+	private void UpdateLineStateDebug()
+	{
+		bool show = ShowLineStates && OS.IsDebugBuild() && _car.Phase == RivalPhase.Running;
+		if (!show)
+		{
+			if (_stateLabel != null)
+			{
+				_stateLabel.Visible = false;
+				_corridor.Visible = false;
+			}
+			return;
+		}
+
+		if (_stateLabel == null)
+		{
+			_stateLabel = new Label3D
+			{
+				Name = "LineState",
+				TopLevel = true,
+				Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+				NoDepthTest = true,
+				FixedSize = true,
+				FontSize = 32,
+				PixelSize = 0.0012f,
+				Shaded = false
+			};
+			AddChild(_stateLabel);
+			_corridorMesh = new ImmediateMesh();
+			_corridorMaterial = new StandardMaterial3D
+			{
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+				VertexColorUseAsAlbedo = true,
+				NoDepthTest = true
+			};
+			_corridor = new MeshInstance3D { Name = "Corridor", TopLevel = true, Mesh = _corridorMesh };
+			AddChild(_corridor);
+		}
+
+		ClearLine line = _car.Driver.ClearLine;
+		(string text, Color color) = line.State switch
+		{
+			LineState.PassLeft => ("PASS L", Palette.RivalStatePass),
+			LineState.PassRight => ("PASS R", Palette.RivalStatePass),
+			LineState.Follow => ("FOLLOW", Palette.RivalStateFollow),
+			_ => ("CLEAR", Palette.RivalStateClear)
+		};
+		_stateLabel.Visible = true;
+		_stateLabel.Text = text;
+		_stateLabel.Modulate = color;
+		_stateLabel.GlobalPosition = GlobalPosition + Vector3.Up * 3f;
+
+		_corridor.Visible = true;
+		_corridorMesh.ClearSurfaces();
+		_corridorMesh.SurfaceBegin(Mesh.PrimitiveType.Lines, _corridorMaterial);
+		RacingLine racing = _car.Driver.Pilot.Line;
+		Circuit.TrackFrame frame = _car.Frame;
+		float start = _car.TrackDistance;
+		float half = _car.Shape.HalfWidth;
+		const float Step = 4f;
+		for (float d = 0f; d < line.Lookahead; d += Step)
+		{
+			foreach (float side in new[] { -half, half })
+			{
+				AddCorridorPoint(frame, racing, start + d, line.Offset + side, color);
+				AddCorridorPoint(frame, racing, start + d + Step, line.Offset + side, color);
+			}
+		}
+		_corridorMesh.SurfaceEnd();
+	}
+
+	private void AddCorridorPoint(Circuit.TrackFrame frame, RacingLine racing, float distance, float lateral, Color color)
+	{
+		float lap = frame.LapLength;
+		float s = ((distance % lap) + lap) % lap;
+		Circuit.FramePoint f = frame.At(s);
+		NVec3 p = f.Position + f.Right * (racing.LateralAt(s) + lateral) + f.Normal * 0.3f;
+		_corridorMesh.SurfaceSetColor(color);
+		_corridorMesh.SurfaceAddVertex(new Vector3(p.X, p.Y, p.Z));
 	}
 
 	private void OnDamageLevelChanged(int level)

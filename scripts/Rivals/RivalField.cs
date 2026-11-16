@@ -19,6 +19,7 @@ public partial class RivalField : Node3D
 {
 	private readonly List<RivalShip> _ships = new();
 	private readonly List<IContactShip> _contactShips = new();
+	private readonly List<TrafficShip> _traffic = new();
 	private RaceShipList _raceShips;
 	private IContactShip _player;
 	private ContactDamageSettings _contactDamage = ContactDamageSettings.Default;
@@ -86,8 +87,12 @@ public partial class RivalField : Node3D
 	// sacudida y la recolocación del jugador los pone Main con Contacts. Con la pausa no se llama.
 	public void StepPhysics(bool raceStarted, float dt)
 	{
+		// Todas las naves al empezar el paso, para la trazada clara: así no importa en qué orden se mueven
+		_traffic.Clear();
+		foreach (IContactShip ship in _contactShips)
+			_traffic.Add(RivalCar.TrafficOf(ship));
 		foreach (RivalShip ship in _ships)
-			ship.Car.Move(raceStarted);
+			ship.Car.Move(raceStarted, _traffic);
 
 		Contacts.Solve(_contactShips, dt);
 		foreach (ShipContactEvent e in Contacts.Events)
@@ -156,7 +161,7 @@ public partial class RivalField : Node3D
 	{
 		Pace = pace;
 		foreach (RivalShip ship in _ships)
-			ship.Car.Driver.SetPace(pace);
+			ship.Car.Driver.SetPace(RivalDriver.PaceFor(pace, ship.Car.Entry.PaceOffset));
 	}
 
 	// Al salir de la escena, fuera de la lista

@@ -48,6 +48,7 @@ public partial class TuningLabPanel : CanvasLayer
 	private static float? _rivalPace;   // el del deslizador, si se ha movido
 	private static bool _contactEnabled = true;   // CONTACT: dura hasta cerrar el juego, no se guarda
 	private CheckBox _contactCheck;
+	private CheckBox _statesCheck;
 	private Row _rivalPaceRow;
 	private Label _rivalsLabel;
 	private float _rivalsRefresh;
@@ -206,7 +207,7 @@ public partial class TuningLabPanel : CanvasLayer
 				text.Append('\n');
 			text.Append($"{car.Entry.Pilot.Nickname,-8}{ShipCatalog.Find(car.Ship.Id)?.Name ?? car.Ship.Id,-7}{HullPaints.DisplayName(style, car.Entry.PaintIndex),-30}"
 				+ $"LAP {lap,-4} DMG {car.Damage.Level} {car.Damage.Points,2}P  HIT {car.Contacts,-3} RSP {car.Respawns,-2} "
-				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}");
+				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}  PACE {RivalDriver.PaceFor(Rivals.Pace, car.Entry.PaceOffset) * 100f:0.0}");
 		}
 		text.Append($"\nSHIP = RAMS / RECEIVED / MUTUAL · RIVAL VS RIVAL {Rivals.RivalHits}");
 		_rivalsLabel.Text = text.ToString();
@@ -388,6 +389,20 @@ public partial class TuningLabPanel : CanvasLayer
 			_contactCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
 			_contactCheck.Toggled += OnContactToggled;
 			column.AddChild(_contactCheck);
+			_statesCheck = new CheckBox
+			{
+				Text = "LINE STATES",
+				ButtonPressed = RivalShip.ShowLineStates,
+				FocusMode = Control.FocusModeEnum.None
+			};
+			_statesCheck.AddThemeFontOverride("font", font);
+			_statesCheck.AddThemeFontSizeOverride("font_size", fontSize);
+			_statesCheck.AddThemeColorOverride("font_color", Palette.SelectLabel);
+			_statesCheck.AddThemeColorOverride("font_hover_color", Palette.SelectValue);
+			_statesCheck.AddThemeColorOverride("font_pressed_color", Palette.SelectValue);
+			_statesCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
+			_statesCheck.Toggled += enabled => RivalShip.ShowLineStates = enabled;
+			column.AddChild(_statesCheck);
 			_rivalsLabel = new Label { LabelSettings = value };
 			column.AddChild(_rivalsLabel);
 		}

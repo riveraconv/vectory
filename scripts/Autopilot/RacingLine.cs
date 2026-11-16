@@ -28,9 +28,11 @@ public sealed class RacingLine
 	public float[] Lateral { get; }         // m sobre la superficie, positivo = derecha
 	public Vector2[] Points { get; }        // en planta (X, Z de Godot)
 	public float[] Curvature { get; }       // 1/m en planta, positiva = a la izquierda
+	public Vector2[] Rights { get; }        // en planta: el lado de la superficie en cada punto (Points = eje + Rights × Lateral)
 
-	private RacingLine(float lapLength, int count, float[] lateral, Vector2[] points, float[] curvature)
+	private RacingLine(float lapLength, int count, float[] lateral, Vector2[] points, float[] curvature, Vector2[] rights)
 	{
+		Rights = rights;
 		_lapLength = lapLength;
 		Count = count;
 		PointSpacing = lapLength / count;
@@ -69,7 +71,7 @@ public sealed class RacingLine
 			lateral[i] = (float)solver.Lateral[i];
 			points[i] = bases[i] + rights[i] * lateral[i];
 		}
-		return new RacingLine(frame.LapLength, count, lateral, points, MeasureCurvature(points));
+		return new RacingLine(frame.LapLength, count, lateral, points, MeasureCurvature(points), rights);
 	}
 
 	// Línea por el centro del eje, sin suavizar (la de la calibración)
@@ -77,8 +79,9 @@ public sealed class RacingLine
 	{
 		int count = PointCount(frame);
 		var bases = new Vector2[count];
-		Sample(frame, count, bases, new Vector2[count]);
-		return new RacingLine(frame.LapLength, count, new float[count], bases, MeasureCurvature(bases));
+		var rights = new Vector2[count];
+		Sample(frame, count, bases, rights);
+		return new RacingLine(frame.LapLength, count, new float[count], bases, MeasureCurvature(bases), rights);
 	}
 
 	public int IndexAt(float distance)
@@ -90,6 +93,9 @@ public sealed class RacingLine
 	}
 
 	public int Wrap(int index) => Wrap(index, Count);
+
+	// Lateral de la trazada en una distancia (m sobre la superficie, positivo = derecha)
+	public float LateralAt(float distance) => Lateral[IndexAt(distance)];
 
 	// Puntos múltiplos del tramo: al recorrer con vecinos lejanos, la vuelta tiene que cerrar en un múltiplo
 	private static int PointCount(TrackFrame frame)

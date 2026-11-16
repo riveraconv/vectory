@@ -42,6 +42,9 @@ public static class Palette
 	public static readonly Color BarrierFill = new Color(Blue, 0.5f);   // línea media del relleno de la barrera
 	public static readonly Color BarrierPost = new Color(Blue, 0.4f);   // verticales del relleno de la barrera
 	public static readonly Color BarrierFlash = Orange;             // destello de impacto en la barrera
+	public static readonly Color RivalStateClear = Cyan;            // depuración: estado y pasillo de un rival con la trazada clara
+	public static readonly Color RivalStatePass = Magenta;          // ídem apartándose para pasar
+	public static readonly Color RivalStateFollow = Orange;         // ídem siguiendo a la de delante
 	public static readonly Color StartLightOn = Magenta;            // luz del semáforo 2D encendida (StartLightsView; el HUD ya no la usa)
 	public static readonly Color StartLightGlow = new Color(Magenta, 0.25f); // halo de la luz encendida
 	public static readonly Color StartLightOff = BoostEmpty;        // borde de la luz apagada (como la carga de boost vacía)

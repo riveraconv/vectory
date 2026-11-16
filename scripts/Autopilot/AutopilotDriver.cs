@@ -81,17 +81,25 @@ public sealed class AutopilotDriver
 		return new AutopilotDriver(line, profile, tuning, physics.BankGrip, settings.StepTime, settings.UseBoost ? boostAt : -1f);
 	}
 
-	public ShipInput Drive(in PilotState state)
+	// Lo que mira por delante, sobre la trazada, para apuntar (m)
+	public static float Lookahead(float speed) => LookaheadBase + LookaheadPerSpeed * speed;
+
+	public ShipInput Drive(in PilotState state) => Drive(state, 0f, float.PositiveInfinity);
+
+	// Con la trazada desplazada lateralOffset m (positivo = derecha), sin que el punto al que apunta pase de lateralLimit
+	// a ningún lado (la barrera), y sin pasar de speedCap m/s (spec docs/rivales-3-contacto.md, 8): lo usa el conductor
+	// de los rivales; sin desplazamiento ni límite, es lo de siempre
+	public ShipInput Drive(in PilotState state, float lateralOffset, float speedCap, float lateralLimit = float.PositiveInfinity)
 	{
-		float steer = RequiredSteer(state);
+		float steer = RequiredSteer(state, lateralOffset, lateralLimit);
 		int steerInput = SteerInput(steer, state.Steer);
-		bool brake = MustBrake(state);
+		bool brake = MustBrake(state) || state.MotorSpeed > speedCap + BrakeTolerance;
 		return new ShipInput
 		{
 			SteerLeft = steerInput > 0,
 			SteerRight = steerInput < 0,
 			Brake = brake,
-			Accelerate = !brake && state.MotorSpeed < TargetAhead(state)
+			Accelerate = !brake && state.MotorSpeed < MathF.Min(TargetAhead(state), speedCap)
 		};
 	}
 
@@ -112,12 +120,19 @@ public sealed class AutopilotDriver
 		_profile.Target[_line.IndexAt(state.Distance + state.MotorSpeed * _lag)] * TargetScale;
 
 	// Giro de -1 a 1 (izquierda positivo) que hace falta para llegar al punto de delante
-	private float RequiredSteer(in PilotState state)
+	private float RequiredSteer(in PilotState state, float lateralOffset, float lateralLimit)
 	{
 		float speed = state.Velocity.Length();
 		float lookahead = LookaheadBase + LookaheadPerSpeed * speed;
 		int index = _line.Wrap(_line.IndexAt(state.Distance) + (int)MathF.Ceiling(lookahead / _line.PointSpacing));
-		Vector2 toTarget = _line.Points[index] - state.Position;
+		Vector2 target = _line.Points[index];
+		if (lateralOffset != 0f)
+		{
+			float lateral = _line.Lateral[index];
+			float displaced = Math.Clamp(lateral + lateralOffset, -lateralLimit, lateralLimit);
+			target += _line.Rights[index] * (displaced - lateral);
+		}
+		Vector2 toTarget = target - state.Position;
 		float distance = toTarget.Length();
 		if (distance < 0.01f)
 			return 0f;

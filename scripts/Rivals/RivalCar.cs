@@ -65,6 +65,7 @@ public sealed class RivalCar : IContactShip
 	public bool CanCollide => _canDrive;
 
 	public Vector3 Position => _position;
+	public TrackFrame Frame => _context.Frame;
 	public ShipPhysics Physics => _physics;
 	public ShipDynamics Dynamics => _physics.Dynamics;
 	public ShipBoost Boost => _physics.Boost;
@@ -89,8 +90,9 @@ public sealed class RivalCar : IContactShip
 		_halfWidth = ship.Visual.CollisionHalfWidth;
 		Shape = ShipShape.From(ship.Visual);
 
+		(float straightStart, float straightLength) = RivalDriver.LongestStraight(context.Frame);
 		Driver = new RivalDriver(pilots.Get(ship), context.Frame, _tuning, context.Physics, context.StepTime,
-			RivalDriver.LongestStraightStart(context.Frame), pace);
+			straightStart, RivalDriver.PaceFor(pace, entry.PaceOffset), straightLength, context.BarrierOffset);
 		Tracker = new RaceTracker(context.CheckpointIndices.Count, context.Laps);
 		Damage = new DamageModel(context.Damage);
 		Flash = new BarrierFlash(context.LapLength, context.Flash);
@@ -114,8 +116,27 @@ public sealed class RivalCar : IContactShip
 		AfterContacts(false);
 	}
 
+	// Él mismo visto desde la pista, para la trazada clara de los demás (y la suya)
+	public TrafficShip Traffic => TrafficOf(this);
+
+	// Una nave vista desde la pista: distancia y lateral sobre ella, velocidad a lo largo del eje y su forma. Las que no
+	// chocan (atravesables o sin conducir) no tapan a nadie.
+	public static TrafficShip TrafficOf(IContactShip ship)
+	{
+		ShipPhysics physics = ship.Physics;
+		if (!physics.HasSurface)
+			return new TrafficShip(ship.Id, 0f, 0f, 0f, ship.Shape.HalfWidth, ship.Shape.Front, ship.Shape.Back, true);
+		FramePoint f = physics.Surface.Frame;
+		Vector2 velocity = physics.Dynamics.Velocity;
+		float speed = Vector2.Dot(velocity, new Vector2(f.PlanTangent.X, f.PlanTangent.Z));
+		float lateralSpeed = Vector2.Dot(velocity, new Vector2(f.PlanRight.X, f.PlanRight.Z));
+		return new TrafficShip(ship.Id, f.Distance, physics.Surface.Lateral, speed, ship.Shape.HalfWidth, ship.Shape.Front,
+			ship.Shape.Back, ship.Passable.IsPassable || !ship.CanCollide, lateralSpeed);
+	}
+
 	// Primera parte del paso: conducir, mover (barrera incluida) y la carrera. Después van los contactos entre naves.
-	public void Move(bool raceStarted)
+	// traffic: todas las naves de la carrera al empezar el paso (null = conduce sin mirar)
+	public void Move(bool raceStarted, IReadOnlyList<TrafficShip> traffic = null)
 	{
 		float dt = _context.StepTime;
 		if (raceStarted && Tracker.State == RaceState.PreStart)
@@ -133,7 +154,9 @@ public sealed class RivalCar : IContactShip
 
 		var state = new PilotState(new Vector2(_position.X, _position.Z), Dynamics.Velocity, Dynamics.Yaw, Dynamics.Steer,
 			Dynamics.Speed, _physics.Surface.Distance, _physics.Surface.Frame.Bank);
-		RivalCommand command = Driver.Decide(phase, state, Boost.CanActivate);
+		RivalCommand command = traffic == null
+			? Driver.Decide(phase, state, Boost.CanActivate)
+			: Driver.Decide(phase, state, Boost.CanActivate, Traffic, traffic);
 		_physics.Move(ref _position, command.Input, command.Boost, canDrive, tuning, _halfWidth, _context.Physics, dt);
 
 		_detector.Update(_context.Frame.NearestIndex(_position.X, _position.Z));
@@ -209,6 +232,7 @@ public sealed class RivalCar : IContactShip
 		{
 			TrackPlacement.Respawn(_context.Frame, _position, _context.Hover, out _position, out float yaw);
 			_physics.Respawn(_position, yaw);
+			Driver.Reset();
 			_previousPosition = _position;
 			Passable.Respawned();
 			Respawns++;

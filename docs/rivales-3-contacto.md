@@ -1,6 +1,6 @@
 # VECTORY — Spec: Rivales 3 · Contacto entre naves
 
-Versión 1.0 · 2026-11-16 · Estado: **propuesta, pendiente de validar**
+Versión 1.0 · 2026-11-16 · Estado: **hecha y validada** (versión 0.18.0; ver la sección 15)
 
 Tercera spec de rivales. Las naves **dejan de atravesarse**: chocan entre ellas y contigo con los niveles de siempre (roce, medio, fuerte), con un **reparto de daño** que castiga más al que embiste. Los rivales aprenden lo mínimo para no comerse por detrás: si no tienen la trazada clara, **se apartan o frenan**.
 
@@ -352,3 +352,22 @@ No se empieza una etapa sin validar la anterior.
 - Que el choque gire el morro directamente.
 - Contacto con el fantasma o con las naves de prueba (F6).
 - Sonido y vibración del mando.
+
+## 15. Notas de la implementación
+
+Lo que se aparta de esta spec o la concreta, validado por el usuario.
+
+**Etapa 1**
+- Semiancho de VECTOR 2,63 m (el de su casco 3D). El rectángulo usa la caja real del casco, sin centrarla en el origen de la nave.
+- La diferencia de altura se mide sobre la superficie: con peralte, dos naves pegadas van a alturas distintas en el mundo.
+- El descarte de las 20 m es en planta: con la distancia de carrera, una nave doblada parecería lejos.
+- La parte del empujón hacia el morro va también a la velocidad del motor; si no, el agarre la deshace en unas décimas.
+
+**Etapa 2**
+- Ritmo por rival: el común ± hasta un 2 %, sorteado después de los pilotos (decisión del usuario). Sin él, dos rivales con la misma nave no se alcanzan nunca.
+- El desplazamiento se mide en el punto al que apunta el piloto y empieza donde está la nave (en la salida, su columna de la parrilla): llega a la trazada a 4 m/s y con el lado libre, como al volver de pasar.
+- El pasillo va del carril del rival a la trazada, no solo la trazada.
+- "Nunca hacia donde hay una nave al lado" vale también al seguir su propia trazada (cada nave tiene la suya y en las curvas se cruzan), y mira también dónde estará la otra en 1 s.
+- Si no puede volver, o tiene una nave al lado, mantiene su lateral real; al pasar, el objetivo es un lateral real al lado de la otra. Un desplazamiento fijo respecto a la trazada lo llevaba contra la barrera en las curvas.
+- El punto al que apunta el piloto nunca pasa de la barrera menos 1 m.
+- Resultado en 8 carreras de `circuit_01` con el piloto: 0 golpes medios o fuertes entre rivales (antes de la etapa, ~23) y 0–1 impactos de los rivales con la barrera.
