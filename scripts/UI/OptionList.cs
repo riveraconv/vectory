@@ -50,6 +50,12 @@ public partial class OptionList : VBoxContainer
 	// Se lanza al hacer clic en una opción activa, con su identificador
 	public event Action<string> Chosen;
 
+	// Se lanza al pasar el ratón por una opción activa, con su índice
+	public event Action<int> Hovered;
+
+	// Con false no se marca ninguna opción como seleccionada (la selección está en otra parte de la pantalla)
+	public bool ShowSelection { get; set; } = true;
+
 	// Una fila y las piezas que cambian con la selección
 	private sealed class Row
 	{
@@ -132,7 +138,7 @@ public partial class OptionList : VBoxContainer
 		{
 			Row row = _rows[i];
 			bool enabled = _model.Options[i].Enabled;
-			bool selected = i == _model.SelectedIndex;
+			bool selected = ShowSelection && i == _model.SelectedIndex;
 
 			row.Bar.Visible = selected;
 			row.Offset.CustomMinimumSize = new Vector2(selected ? _style.SelectedOffset : 0f, 0f);
@@ -202,6 +208,7 @@ public partial class OptionList : VBoxContainer
 	private void OnHover(int index)
 	{
 		_model.Select(index);
+		Hovered?.Invoke(index);
 		Refresh();
 	}
 

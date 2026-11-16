@@ -7,14 +7,65 @@ namespace Vectory.Ship;
 // Pinta un lienzo de calcomanía (HullDecalDrawing) una sola vez en una textura: un SubViewport que se dibuja un frame
 // y se borra. Sin reglas: solo traduce primitivas a llamadas de Godot. Lo que vacía (Erase) va en un nodo aparte con
 // mezcla de resta, que quita también el alfa de lo que hay debajo.
+// Las texturas se guardan por contenido (DecalCanvas.Key): un lienzo ya pintado se entrega al momento, así cambiar de
+// pintura en la pantalla PAINT no repite el trabajo; y como mucho se empiezan dos lienzos nuevos por frame.
 public static partial class HullDecalPainter
 {
 	private const int OrbitronBlack = 900;
 	// Orbitron no tiene cursiva: se inclina como hace el navegador con una fuente sin cursiva (unos 12°)
 	private static readonly float ItalicSkew = Mathf.Tan(Mathf.DegToRad(12f));
 
-	public static async void Paint(Node host, DecalCanvas canvas, Action<Texture2D> done)
+	// Texturas ya pintadas, por clave del lienzo; las más antiguas se olvidan pasado el límite (unos 1,3 MB cada una)
+	private const int CacheLimit = 48;
+	private static readonly System.Collections.Generic.Dictionary<string, Texture2D> Cache = new();
+	private static readonly System.Collections.Generic.Queue<string> CacheOrder = new();
+	// Lienzos que se están pintando, con quién espera cada uno
+	private static readonly System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<(Node Host, Action<Texture2D> Done)>> Pending = new();
+
+	public static void Paint(Node host, DecalCanvas canvas, Action<Texture2D> done)
 	{
+		string key = canvas.Key();
+		if (Cache.TryGetValue(key, out Texture2D cached))
+		{
+			done(cached);
+			return;
+		}
+		if (Pending.TryGetValue(key, out var waiting))
+		{
+			waiting.Add((host, done));
+			return;
+		}
+		Pending[key] = new() { (host, done) };
+		Render(host, canvas, key);
+	}
+
+	// Calcomanías nuevas que se empiezan a pintar en un mismo frame: el resto espera al siguiente, así una pintura con
+	// cinco lienzos (las libreas de VECTOR) no carga todo su trabajo en un solo frame
+	private const int MaxRendersPerFrame = 2;
+	private static ulong _renderFrame;
+	private static int _rendersThisFrame;
+
+	private static async void Render(Node host, DecalCanvas canvas, string key)
+	{
+		while (true)
+		{
+			ulong frame = Engine.GetProcessFrames();
+			if (frame != _renderFrame)
+			{
+				_renderFrame = frame;
+				_rendersThisFrame = 0;
+			}
+			if (_rendersThisFrame < MaxRendersPerFrame)
+				break;
+			await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+			if (!GodotObject.IsInstanceValid(host))
+			{
+				RetryOrDrop(canvas, key);
+				return;
+			}
+		}
+		_rendersThisFrame++;
+
 		var viewport = new SubViewport
 		{
 			Name = "DecalPainter",
@@ -28,11 +79,47 @@ public static partial class HullDecalPainter
 		host.AddChild(viewport);
 		await host.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
 		if (!GodotObject.IsInstanceValid(viewport))
+		{
+			RetryOrDrop(canvas, key);
 			return;
-		Image image = viewport.GetTexture().GetImage();
+		}
+
+		// Lectura síncrona: espera a la GPU, pero da exactamente la imagen de siempre. Con la caché y el reparto por frame
+		// no llega a dar frames lentos. (Se probó TextureGetDataAsync: menos espera, pero el casco de HAMMER salía con
+		// 62 píxeles distintos sin causa clara.)
+		Finish(key, viewport.GetTexture().GetImage());
 		viewport.QueueFree();
+	}
+
+	// El casco que lo pintaba ya no existe: lo pinta otro de los que esperan o, si no queda ninguno, se olvida (el
+	// siguiente que lo pida lo vuelve a pintar)
+	private static void RetryOrDrop(DecalCanvas canvas, string key)
+	{
+		if (!Pending.TryGetValue(key, out var waiting))
+			return;
+		waiting.RemoveAll(w => !GodotObject.IsInstanceValid(w.Host));
+		if (waiting.Count == 0)
+			Pending.Remove(key);
+		else
+			Render(waiting[0].Host, canvas, key);
+	}
+
+	private static void Finish(string key, Image image)
+	{
 		image.GenerateMipmaps();
-		done(ImageTexture.CreateFromImage(image));
+		Texture2D texture = ImageTexture.CreateFromImage(image);
+		Cache[key] = texture;
+		CacheOrder.Enqueue(key);
+		while (CacheOrder.Count > CacheLimit)
+			Cache.Remove(CacheOrder.Dequeue());
+
+		if (!Pending.Remove(key, out var waiting))
+			return;
+		foreach ((Node host, Action<Texture2D> done) in waiting)
+		{
+			if (GodotObject.IsInstanceValid(host))
+				done(texture);
+		}
 	}
 
 	public static Color ToColor(uint rgb, float alpha = 1f) =>

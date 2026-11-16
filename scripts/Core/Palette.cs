@@ -150,6 +150,18 @@ public static class Palette
 	public static readonly Color ShipPlaceholderTitle = new Color(BlueGray, 0.75f);  // SHIP IN DEVELOPMENT
 	public static readonly Color ShipPlaceholderHint = new Color(BlueGray, 0.5f);    // COMING SOON del placeholder
 	public static readonly Color DragCursorFill = Cyan;             // cursor de mano del arrastre
+
+	// --- PAINT (spec docs/selector-pinturas.md) ---
+	public static readonly Color PaintName = new Color(0xE9F6FFFF);         // nombre de la pintura (blanco azulado de la spec)
+	public static readonly Color PaintSwatchBorder = new Color(Blue, 0.7f); // borde de una muestra
+	public static readonly Color PaintSwatchHover = Cyan;                   // borde de la muestra bajo el ratón
+	public static readonly Color PaintSwatchSelected = Cyan;                // contorno de la muestra seleccionada
+	public static readonly Color PaintSwatchSelectedGlow = new Color(Cyan, 0.7f);   // su halo
+	public static readonly Color PaintEquipped = Cyan;                      // rombo de la equipada y su halo
+	public static readonly Color PaintTagEquipped = Cyan;                   // etiqueta EQUIPPED
+	public static readonly Color PaintTagEquippedBorder = new Color(Cyan, 0.6f);
+	public static readonly Color PaintTagPreview = BlueGray;                // etiqueta PREVIEW
+	public static readonly Color PaintTagPreviewBorder = new Color(BlueGray, 0.45f);
 	public static readonly Color DragCursorOutline = Background;
 
 	// --- TIME TRIAL y récords ---

@@ -11,9 +11,9 @@ namespace Vectory.Menu;
 
 // Pantalla SELECT SHIP, dentro de la escena del menú principal (spec docs/selector-naves.md): a la izquierda el
 // nombre de la nave y su holograma 3D (ShipHologram); a la derecha el panel con SHIP DATA, SHARED SYSTEMS y
-// START / BACK. Las reglas viven en ShipSelectLogic, ShipStats, ShipSelectFormat y HologramSpin; este nodo traduce
-// teclado y ratón y lo dibuja. START deja la nave en GameSession, la guarda en los ajustes y carga la carrera; BACK / ESC
-// lanza Closed.
+// START / PAINT / BACK. Las reglas viven en ShipSelectLogic, ShipStats, ShipSelectFormat y HologramSpin; este nodo traduce
+// teclado y ratón y lo dibuja. START deja la nave en GameSession, la guarda en los ajustes y carga la carrera; PAINT abre
+// PaintSelectScreen encima, con el mismo holograma; BACK / ESC lanza Closed.
 // Medidas sobre 1280×720, multiplicadas por UiScale.Factor.
 public partial class ShipSelectScreen : CanvasLayer
 {
@@ -47,7 +47,8 @@ public partial class ShipSelectScreen : CanvasLayer
 	// Se lanza al volver a SELECT CIRCUIT, con el modo de la pantalla
 	public event Action<GameMode> Closed;
 
-	public bool IsOpen => _root != null && _root.Visible;
+	// También con la pantalla PAINT abierta encima
+	public bool IsOpen => (_root != null && _root.Visible) || (_paint != null && _paint.IsOpen);
 
 	private sealed class StatRow
 	{
@@ -63,6 +64,7 @@ public partial class ShipSelectScreen : CanvasLayer
 
 	private Control _root;
 	private ShipHologram _hologram;
+	private PaintSelectScreen _paint;
 	private Control _dragZone;
 	private Control _placeholder;
 	private Label _header;
@@ -112,6 +114,12 @@ public partial class ShipSelectScreen : CanvasLayer
 		DragCursors.Install();
 		Build();
 		_root.Visible = false;
+
+		// PAINT: después en el árbol, así queda encima y procesa después que esta pantalla
+		_paint = new PaintSelectScreen { Name = "PaintSelect" };
+		_paint.Setup(_hologram, _spin);
+		AddChild(_paint);
+		_paint.Closed += OnPaintClosed;
 	}
 
 	// Abre la pantalla: la nave recordada (GameSession) si es elegible, con START seleccionada.
@@ -145,7 +153,8 @@ public partial class ShipSelectScreen : CanvasLayer
 
 	public override void _Process(double delta)
 	{
-		if (!IsOpen)
+		// Con PAINT abierta, ella lleva el holograma y el teclado
+		if (_root == null || !_root.Visible)
 			return;
 
 		// Con una nave COMING SOON el holograma se queda como estaba: al volver sigue en la misma orientación
@@ -205,6 +214,14 @@ public partial class ShipSelectScreen : CanvasLayer
 				SceneChanger.ChangeTo(this, RaceScenePath);
 				break;
 
+			case ShipSelectAction.OpenPaint:
+				if (HullPaints.StyleOf(_logic.ShipId) == null)
+					break;
+				EndDrag();
+				_root.Visible = false;
+				_paint.Open(_logic.Mode, _logic.CircuitName, _logic.Ship, SavedPaint(_logic.ShipId));
+				break;
+
 			case ShipSelectAction.BackToCircuitSelect:
 				EndDrag();
 				_root.Visible = false;
@@ -212,6 +229,26 @@ public partial class ShipSelectScreen : CanvasLayer
 				Closed?.Invoke(_logic.Mode);
 				break;
 		}
+	}
+
+	// De vuelta de PAINT, con APPLY o sin cambios: la nave con su pintura guardada y PAINT seleccionada. El holograma
+	// no se rehace. Lo que se pulsó para salir de PAINT no cuenta aquí.
+	private void OnPaintClosed()
+	{
+		ApplySavedPaints();
+		_logic.ReturnFromPaint();
+		_options.Refresh();
+		_openedFrame = Engine.GetProcessFrames();
+		_root.Visible = true;
+	}
+
+	private static PaintChoice SavedPaint(string shipId)
+	{
+		var store = new SettingsStore(new FileRecordStorage(SettingsStore.DefaultPath));
+		store.Load();
+		if (store.Warning != null)
+			GD.PushWarning($"Settings: {store.Warning}");
+		return store.Settings.PaintFor(shipId) ?? default;
 	}
 
 	// Si no se puede guardar, se avisa y la carrera empieza igual

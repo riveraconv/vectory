@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Vectory.Ship;
@@ -34,7 +35,26 @@ public readonly record struct DecalPrimitive(
 	bool Bold = false);
 
 // Lienzo de una calcomanía: tamaño en píxeles (fondo transparente) y lo que se pinta, en orden
-public sealed record DecalCanvas(int Width, int Height, IReadOnlyList<DecalPrimitive> Primitives);
+public sealed record DecalCanvas(int Width, int Height, IReadOnlyList<DecalPrimitive> Primitives)
+{
+	// Clave del contenido: dos lienzos con la misma clave se pintan igual (la usa el pintor para no repetirlos)
+	public string Key()
+	{
+		var text = new System.Text.StringBuilder();
+		text.Append(Width).Append('x').Append(Height);
+		foreach (DecalPrimitive p in Primitives)
+		{
+			text.Append('|').Append(FormattableString.Invariant(
+				$"{p.Shape},{p.X},{p.Y},{p.W},{p.H},{p.Radius},{p.Color:X6},{p.Text},{p.FontSize},{p.Italic},{p.Baseline},{p.MaxWidth},{p.Font},{p.Align},{p.Erase},{p.Bold}"));
+			if (p.Points != null)
+			{
+				foreach (System.Numerics.Vector2 point in p.Points)
+					text.Append(FormattableString.Invariant($";{point.X},{point.Y}"));
+			}
+		}
+		return text.ToString();
+	}
+}
 
 // Dibujo de las calcomanías del casco 3D (spec docs/cascos-3d-1-vector.md, 6.3): numberPlate, numberRoundel, sponsorTex y
 // checkerTex del prototipo, con sus mismas medidas. Fuente Orbitron Black, en cursiva donde el prototipo la pone.

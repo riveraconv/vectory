@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Godot;
 
 namespace Vectory.Ship;
@@ -329,7 +331,7 @@ void fragment() {
 	}
 
 	// Textura de color horneada una vez desde la máscara sin pérdidas que hay junto al manifiesto (con mipmaps: así
-	// los bordes duros del camuflaje no centellean de lejos)
+	// los bordes duros del camuflaje no centellean de lejos). Si ya la calculó PrewarmPaints en otro hilo, solo se sube.
 	private Texture2D CamoTexture(string material, uint[] tones)
 	{
 		HullManifestCamoMask entry = _manifest.CamoMasks.FirstOrDefault(m => m.Material == material);
@@ -339,25 +341,31 @@ void fragment() {
 			return null;
 		}
 		string path = Profile.ManifestPath.GetBaseDir().PathJoin(entry.Mask);
-		string key = path + ":" + string.Join(",", tones);
+		string key = CamoKey(path, tones);
 		if (CamoTextures.TryGetValue(key, out ImageTexture cached))
+		{
+			BakedImages.TryRemove(key, out _);   // por si el otro hilo la calculó también
 			return cached;
-		var source = GD.Load<Texture2D>(path);
-		if (source == null)
+		}
+		if (BakedImages.TryRemove(key, out Image baked))
+			return CamoTextures[key] = ImageTexture.CreateFromImage(baked);
+		MaskData mask = Mask(path, Image.Format.Rgb8);
+		if (mask == null)
 		{
 			GD.PushError($"[Hull3D] Cannot load camo mask {path}");
 			return null;
 		}
-		Image mask = source.GetImage();
-		if (mask.IsCompressed())
-			mask.Decompress();
-		if (mask.HasMipmaps())
-			mask.ClearMipmaps();
-		mask.Convert(Image.Format.Rgb8);
-		byte[] color = MilitaryHullPaint.BakeCamo(mask.GetData(), tones);
-		Image image = Image.CreateFromData(mask.GetWidth(), mask.GetHeight(), false, Image.Format.Rgb8, color);
+		return CamoTextures[key] = ImageTexture.CreateFromImage(BakeCamoImage(mask, tones));
+	}
+
+	private static string CamoKey(string maskPath, uint[] tones) => maskPath + ":" + string.Join(",", tones);
+
+	private static Image BakeCamoImage(MaskData mask, uint[] tones)
+	{
+		Image image = Image.CreateFromData(mask.Width, mask.Height, false, Image.Format.Rgb8, MilitaryHullPaint.BakeCamo(mask.Data, tones));
 		image.GenerateMipmaps();
-		return CamoTextures[key] = ImageTexture.CreateFromImage(image);
+		image.Convert(Image.Format.Rgba8);   // la GPU no tiene RGB8: así no se convierte al subirla, en el hilo principal
+		return image;
 	}
 
 	// Pintura de HAMMER (spec 6.2 y 6.3): el color del casco y el de la cabina salen de sus máscaras (casco: M_Paint*;
@@ -428,29 +436,50 @@ void fragment() {
 		}
 	}
 
-	// Textura de color horneada una vez desde las dos máscaras sin pérdidas que hay junto al manifiesto
+	// Textura de color horneada una vez desde las dos máscaras sin pérdidas que hay junto al manifiesto. Si ya la calculó
+	// PrewarmPaints en otro hilo, solo se sube.
 	private Texture2D PlateTexture(HullManifestPaintMask entry, uint paint)
 	{
 		string dir = Profile.ManifestPath.GetBaseDir();
 		string mulPath = dir.PathJoin(entry.Mul), addPath = dir.PathJoin(entry.Add);
-		string key = mulPath + ":" + paint.ToString("X6");
+		string key = PlateKey(mulPath, paint);
 		if (PlateTextures.TryGetValue(key, out ImageTexture cached))
+		{
+			BakedImages.TryRemove(key, out _);   // por si el otro hilo la calculó también
 			return cached;
-		Image mul = MaskImage(mulPath, Image.Format.L8);
-		Image add = MaskImage(addPath, Image.Format.Rgb8);
-		if (mul == null || add == null || mul.GetSize() != add.GetSize())
+		}
+		if (BakedImages.TryRemove(key, out Image baked))
+			return PlateTextures[key] = ImageTexture.CreateFromImage(baked);
+		MaskData mul = Mask(mulPath, Image.Format.L8);
+		MaskData add = Mask(addPath, Image.Format.Rgb8);
+		if (mul == null || add == null || mul.Width != add.Width || mul.Height != add.Height)
 		{
 			GD.PushError($"[Hull3D] Cannot use paint masks {mulPath} and {addPath}");
 			return null;
 		}
-		byte[] color = IndustrialHullPaint.Bake(mul.GetData(), add.GetData(), paint);
-		Image image = Image.CreateFromData(mul.GetWidth(), mul.GetHeight(), false, Image.Format.Rgb8, color);
-		image.GenerateMipmaps();
-		return PlateTextures[key] = ImageTexture.CreateFromImage(image);
+		return PlateTextures[key] = ImageTexture.CreateFromImage(BakePlateImage(mul, add, paint));
 	}
 
-	private static Image MaskImage(string path, Image.Format format)
+	private static string PlateKey(string mulPath, uint paint) => mulPath + ":" + paint.ToString("X6");
+
+	private static Image BakePlateImage(MaskData mul, MaskData add, uint paint)
 	{
+		Image image = Image.CreateFromData(mul.Width, mul.Height, false, Image.Format.Rgb8, IndustrialHullPaint.Bake(mul.Data, add.Data, paint));
+		image.GenerateMipmaps();
+		image.Convert(Image.Format.Rgba8);   // la GPU no tiene RGB8: así no se convierte al subirla, en el hilo principal
+		return image;
+	}
+
+	// Una máscara ya leída: se lee y se descomprime una sola vez por ejecución
+	private sealed record MaskData(int Width, int Height, byte[] Data);
+
+	private static readonly Dictionary<string, MaskData> Masks = new();
+
+	private static MaskData Mask(string path, Image.Format format)
+	{
+		string key = path + ":" + format;
+		if (Masks.TryGetValue(key, out MaskData cached))
+			return cached;
 		var source = GD.Load<Texture2D>(path);
 		if (source == null)
 			return null;
@@ -460,7 +489,69 @@ void fragment() {
 		if (image.HasMipmaps())
 			image.ClearMipmaps();
 		image.Convert(format);
-		return image;
+		return Masks[key] = new MaskData(image.GetWidth(), image.GetHeight(), image.GetData());
+	}
+
+	// Colores de camuflaje o de chapa calculados en otro hilo y aún sin subir, por clave
+	private static readonly ConcurrentDictionary<string, Image> BakedImages = new();
+
+	// Calcula en otro hilo los colores de las 20 pinturas de un casco que aún no estén hechos (BLADE y HAMMER; VECTOR no
+	// hornea nada), para que cambiar de pintura en la pantalla PAINT no dé tirones. Las máscaras se leen aquí, en el
+	// hilo principal; si se pide una pintura antes de que esté, se hornea en el momento como siempre.
+	public static void PrewarmPaints(ShipHull3DProfile profile)
+	{
+		if (profile == null || profile.Style == HullStyle.Racing)
+			return;
+		HullManifest manifest = LoadManifest(profile);
+		if (manifest == null)
+			return;
+		string dir = profile.ManifestPath.GetBaseDir();
+		var jobs = new List<(string Key, System.Func<Image> Bake)>();
+		var keys = new HashSet<string>();
+
+		void Add(string key, System.Func<Image> bake)
+		{
+			if (keys.Add(key) && !CamoTextures.ContainsKey(key) && !PlateTextures.ContainsKey(key) && !BakedImages.ContainsKey(key))
+				jobs.Add((key, bake));
+		}
+
+		if (profile.Style == HullStyle.Military)
+		{
+			foreach (MilitaryPaintChoice choice in MilitaryPaintCatalog.Combinations)
+			{
+				MilitaryHullLook look = MilitaryHullLook.For(choice);
+				foreach ((string material, uint[] tones) in new[] { ("M_Paint", look.Tones), ("M_PaintArmor", look.ArmorTones) })
+				{
+					HullManifestCamoMask entry = manifest.CamoMasks.FirstOrDefault(m => m.Material == material);
+					MaskData mask = entry == null ? null : Mask(dir.PathJoin(entry.Mask), Image.Format.Rgb8);
+					if (mask != null)
+						Add(CamoKey(dir.PathJoin(entry.Mask), tones), () => BakeCamoImage(mask, tones));
+				}
+			}
+		}
+		else
+		{
+			foreach (IndustrialPaintChoice choice in IndustrialPaintCatalog.Combinations)
+			{
+				IndustrialHullLook look = IndustrialHullLook.For(choice);
+				foreach (HullManifestPaintMask entry in manifest.PaintMasks)
+				{
+					uint paint = entry.Group == "cab" ? look.Cab : look.Body;
+					MaskData mul = Mask(dir.PathJoin(entry.Mul), Image.Format.L8);
+					MaskData add = Mask(dir.PathJoin(entry.Add), Image.Format.Rgb8);
+					if (mul != null && add != null && mul.Width == add.Width && mul.Height == add.Height)
+						Add(PlateKey(dir.PathJoin(entry.Mul), paint), () => BakePlateImage(mul, add, paint));
+				}
+			}
+		}
+
+		if (jobs.Count == 0)
+			return;
+		Task.Run(() =>
+		{
+			foreach ((string key, System.Func<Image> bake) in jobs)
+				BakedImages.TryAdd(key, bake());
+		});
 	}
 
 	// Perla, camaleón, la cúpula de VECTOR y la bola de sensores de BLADE: cambio de color con el ángulo

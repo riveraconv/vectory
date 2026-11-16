@@ -186,18 +186,19 @@ public sealed class SelectScreenKit
 		return options;
 	}
 
-	// Pie, a la derecha de la versión
-	public void Footer(Control parent, string text)
+	// Pie, a la derecha de la versión (x sobre 1280×720; por defecto, la de los selectores)
+	public Label Footer(Control parent, string text, float x = FooterX)
 	{
 		Label hint = MakeLabel(text, MenuFonts.Mono, 400, 13f, 0.18f, Palette.SelectFooter);
 		hint.AnchorLeft = 0f;
 		hint.AnchorRight = 0f;
 		hint.AnchorTop = 1f;
 		hint.AnchorBottom = 1f;
-		hint.OffsetLeft = S(FooterX);
+		hint.OffsetLeft = S(x);
 		hint.OffsetTop = -S(44f);
 		hint.OffsetBottom = -S(44f);
 		hint.GrowVertical = Control.GrowDirection.Begin;
 		parent.AddChild(hint);
+		return hint;
 	}
 }
