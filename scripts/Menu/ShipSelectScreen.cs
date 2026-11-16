@@ -122,9 +122,25 @@ public partial class ShipSelectScreen : CanvasLayer
 		_options.SetModel(_logic.Menu);
 		_openedFrame = Engine.GetProcessFrames();   // el Enter que abre la pantalla no elige nada aquí
 
+		ApplySavedPaints();
 		_hologram.SetActive(true);
 		_root.Visible = true;
 		UpdateView();
+	}
+
+	// Cada nave con su pintura guardada (spec docs/selector-pinturas.md, 3.3), leída cada vez que se abre
+	private void ApplySavedPaints()
+	{
+		var store = new SettingsStore(new FileRecordStorage(SettingsStore.DefaultPath));
+		store.Load();
+		if (store.Warning != null)
+			GD.PushWarning($"Settings: {store.Warning}");
+
+		foreach (ShipEntry entry in ShipCatalog.Entries)
+		{
+			if (HullPaints.StyleOf(entry.Id) is HullStyle style && store.Settings.PaintFor(entry.Id) is PaintChoice choice)
+				_hologram.SetHullPaint(style, HullPaints.IndexOf(style, choice));
+		}
 	}
 
 	public override void _Process(double delta)

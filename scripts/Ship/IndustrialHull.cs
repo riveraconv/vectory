@@ -77,9 +77,9 @@ public static class IndustrialHullPaint
 	private static byte Channel(double v) => (byte)Math.Round(Math.Clamp(v, 0.0, 255.0), MidpointRounding.ToEven);
 }
 
-// Una pintura del MINERO en 0xRRGGBB: el casco (Body) y, en las bicolor, la cabina de otro color (Cab). Los nombres son
-// internos.
-public sealed record IndustrialPaint(string Id, string Name, uint Body, uint? Cab = null)
+// Una pintura del MINERO en 0xRRGGBB: el casco (Body) y, en las bicolor, la cabina de otro color (Cab). Name es el
+// nombre interno y ScreenName, el que se ve en pantalla.
+public sealed record IndustrialPaint(string Id, string Name, string ScreenName, uint Body, uint? Cab = null)
 {
 	public bool IsTwoTone => Cab.HasValue;
 
@@ -90,7 +90,7 @@ public sealed record IndustrialPaint(string Id, string Name, uint Body, uint? Ca
 // Una de las 40 combinaciones: una pintura, sin marcas o con marcas de flota (calcomanías y franjas)
 public readonly record struct IndustrialPaintChoice(IndustrialPaint Paint, bool WithMarkings)
 {
-	public string DisplayName => WithMarkings ? $"{Paint.Name} · MARCAS" : Paint.Name;
+	public string DisplayName => WithMarkings ? $"{Paint.ScreenName} · MARKINGS" : Paint.ScreenName;
 }
 
 // Catálogo de pinturas del casco 3D de HAMMER (PAINTS del prototipo, spec docs/cascos-3d-3-hammer.md, 6.1): 15 lisas y 5
@@ -102,26 +102,26 @@ public static class IndustrialPaintCatalog
 
 	public static readonly IReadOnlyList<IndustrialPaint> Paints = new IndustrialPaint[]
 	{
-		new("site_yellow", "AMARILLO OBRA", C(170, 132, 40)),
-		new("bright_yellow", "AMARILLO VIVO", C(196, 156, 30)),
-		new("orange", "NARANJA", C(196, 98, 30)),
-		new("terracotta", "TEJA", C(160, 70, 40)),
-		new("tractor_green", "VERDE TRACTOR", C(52, 98, 48)),
-		new("crane_red", "ROJO GRÚA", C(150, 36, 30)),
-		new("fleet_white", "BLANCO FLOTA", C(206, 204, 196)),
-		new("site_blue", "AZUL OBRA", C(40, 74, 128)),
-		new("plant_grey", "GRIS PLANTA", C(112, 114, 110)),
-		new("coal_black", "NEGRO CARBÓN", C(36, 36, 38)),
-		new("khaki", "CAQUI", C(140, 128, 90)),
-		new("safety_green", "VERDE SEGURIDAD", C(150, 170, 40)),
-		new("cream", "CREMA", C(196, 182, 140)),
-		new("maroon", "GRANATE", C(104, 34, 36)),
-		new("petrol_blue", "AZUL PETRÓLEO", C(30, 78, 86)),
-		new("yellow_black", "AMARILLO · CABINA NEGRA", C(170, 132, 40), C(36, 36, 38)),
-		new("orange_white", "NARANJA · CABINA BLANCA", C(196, 98, 30), C(206, 204, 196)),
-		new("white_red", "BLANCO · CABINA ROJA", C(206, 204, 196), C(150, 36, 30)),
-		new("green_white", "VERDE · CABINA BLANCA", C(52, 98, 48), C(206, 204, 196)),
-		new("grey_orange", "GRIS · CABINA NARANJA", C(112, 114, 110), C(196, 98, 30))
+		new("site_yellow", "AMARILLO OBRA", "SITE YELLOW", C(170, 132, 40)),
+		new("bright_yellow", "AMARILLO VIVO", "BRIGHT YELLOW", C(196, 156, 30)),
+		new("orange", "NARANJA", "ORANGE", C(196, 98, 30)),
+		new("terracotta", "TEJA", "TERRACOTTA", C(160, 70, 40)),
+		new("tractor_green", "VERDE TRACTOR", "TRACTOR GREEN", C(52, 98, 48)),
+		new("crane_red", "ROJO GRÚA", "CRANE RED", C(150, 36, 30)),
+		new("fleet_white", "BLANCO FLOTA", "FLEET WHITE", C(206, 204, 196)),
+		new("site_blue", "AZUL OBRA", "SITE BLUE", C(40, 74, 128)),
+		new("plant_grey", "GRIS PLANTA", "PLANT GREY", C(112, 114, 110)),
+		new("coal_black", "NEGRO CARBÓN", "COAL BLACK", C(36, 36, 38)),
+		new("khaki", "CAQUI", "KHAKI", C(140, 128, 90)),
+		new("safety_green", "VERDE SEGURIDAD", "SAFETY GREEN", C(150, 170, 40)),
+		new("cream", "CREMA", "CREAM", C(196, 182, 140)),
+		new("maroon", "GRANATE", "MAROON", C(104, 34, 36)),
+		new("petrol_blue", "AZUL PETRÓLEO", "PETROL BLUE", C(30, 78, 86)),
+		new("yellow_black", "AMARILLO · CABINA NEGRA", "YELLOW · BLACK CAB", C(170, 132, 40), C(36, 36, 38)),
+		new("orange_white", "NARANJA · CABINA BLANCA", "ORANGE · WHITE CAB", C(196, 98, 30), C(206, 204, 196)),
+		new("white_red", "BLANCO · CABINA ROJA", "WHITE · RED CAB", C(206, 204, 196), C(150, 36, 30)),
+		new("green_white", "VERDE · CABINA BLANCA", "GREEN · WHITE CAB", C(52, 98, 48), C(206, 204, 196)),
+		new("grey_orange", "GRIS · CABINA NARANJA", "GREY · ORANGE CAB", C(112, 114, 110), C(196, 98, 30))
 	};
 
 	// Las 20 sin marcas y luego las 20 con marcas

@@ -1,12 +1,15 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Vectory.Records;
+using Vectory.Ship;
 
 namespace Vectory.Game;
 
-// Ajustes del juego que se guardan entre partidas (user://settings.json): el fantasma de TIME TRIAL y la última
-// nave elegida; aquí irán los demás cuando exista SETTINGS.
+// Ajustes del juego que se guardan entre partidas (user://settings.json): el fantasma de TIME TRIAL, la última
+// nave elegida y la pintura de cada nave; aquí irán los demás cuando exista SETTINGS.
 public sealed class GameSettings
 {
 	public bool GhostEnabled { get; set; } = true;
@@ -14,6 +17,29 @@ public sealed class GameSettings
 	// Última nave con la que se pulsó START; null = ninguna. Se guarda tal cual: si ya no se puede elegir, lo decide
 	// ShipCatalog.StartShip al arrancar.
 	public string LastShipDesignId { get; set; }
+
+	// Pintura guardada de cada nave (spec docs/selector-pinturas.md, 3.2), solo las que tienen entrada y son válidas
+	private readonly Dictionary<string, PaintChoice> _shipPaints = new();
+
+	public IReadOnlyDictionary<string, PaintChoice> ShipPaints => _shipPaints;
+
+	// La pintura guardada de una nave o, sin entrada, la de por defecto de su catálogo; null si la nave no existe o no
+	// tiene casco 3D
+	public PaintChoice? PaintFor(string shipId)
+	{
+		if (HullPaints.StyleOf(shipId) is not HullStyle style)
+			return null;
+		return _shipPaints.TryGetValue(shipId, out PaintChoice choice) ? choice : HullPaints.Default(style);
+	}
+
+	// Guarda en memoria la pintura de una nave; false (y no cambia nada) si la nave o la pintura no valen
+	public bool SetPaint(string shipId, PaintChoice choice)
+	{
+		if (HullPaints.StyleOf(shipId) is not HullStyle style || !HullPaints.HasPaint(style, choice.PaintId))
+			return false;
+		_shipPaints[shipId] = choice;
+		return true;
+	}
 }
 
 // Carga y guarda los ajustes con las mismas reglas que los récords: lectura tolerante (lo que falte
@@ -36,6 +62,16 @@ public sealed class SettingsStore
 
 		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 		public string LastShipDesignId { get; set; }
+
+		// Se lee a mano (ReadShipPaints): un valor raro dentro no debe hacer que el archivo entero cuente como corrupto
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public JsonElement? ShipPaints { get; set; }
+	}
+
+	private sealed class PaintEntry
+	{
+		public string Paint { get; set; }
+		public bool Marks { get; set; }
 	}
 
 	private readonly IRecordStorage _storage;
@@ -77,6 +113,7 @@ public sealed class SettingsStore
 			{
 				Settings.GhostEnabled = file.GhostEnabled ?? true;
 				Settings.LastShipDesignId = file.LastShipDesignId;
+				ReadShipPaints(file.ShipPaints, Settings);
 				return;
 			}
 			error = file == null ? "empty file" : $"unknown format version {file.Version}";
@@ -97,6 +134,35 @@ public sealed class SettingsStore
 		}
 	}
 
+	// Lectura tolerante de shipPaints (spec 3.2): nave desconocida o sin casco 3D, ignorada; pintura que no es de su
+	// catálogo, sin entrada (la de por defecto); marks ausente o no booleano, el de la pintura por defecto
+	private static void ReadShipPaints(JsonElement? element, GameSettings settings)
+	{
+		if (element is not JsonElement paints || paints.ValueKind != JsonValueKind.Object)
+			return;
+		foreach (JsonProperty ship in paints.EnumerateObject())
+		{
+			if (HullPaints.StyleOf(ship.Name) is not HullStyle style || ship.Value.ValueKind != JsonValueKind.Object)
+				continue;
+			if (!ship.Value.TryGetProperty("paint", out JsonElement paint) || paint.ValueKind != JsonValueKind.String)
+				continue;
+			bool marks = HullPaints.Default(style).Marks;
+			if (ship.Value.TryGetProperty("marks", out JsonElement value)
+				&& (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False))
+				marks = value.GetBoolean();
+			settings.SetPaint(ship.Name, new PaintChoice(paint.GetString(), marks));
+		}
+	}
+
+	private static JsonElement? WriteShipPaints(GameSettings settings)
+	{
+		if (settings.ShipPaints.Count == 0)
+			return null;
+		var entries = settings.ShipPaints.OrderBy(p => p.Key, StringComparer.Ordinal)
+			.ToDictionary(p => p.Key, p => new PaintEntry { Paint = p.Value.PaintId, Marks = p.Value.Marks });
+		return JsonSerializer.SerializeToElement(entries, JsonOptions);
+	}
+
 	public bool Save()
 	{
 		Warning = null;
@@ -106,7 +172,8 @@ public sealed class SettingsStore
 			{
 				Version = FormatVersion,
 				GhostEnabled = Settings.GhostEnabled,
-				LastShipDesignId = Settings.LastShipDesignId
+				LastShipDesignId = Settings.LastShipDesignId,
+				ShipPaints = WriteShipPaints(Settings)
 			};
 			_storage.Write(JsonSerializer.Serialize(file, JsonOptions));
 			return true;

@@ -107,6 +107,9 @@ void fragment() {
 			_camera.MakeCurrent();
 	}
 
+	// Pintura del casco 3D de un estilo (una de sus 40 combinaciones); se ve ya si la nave mostrada es de ese estilo
+	public void SetHullPaint(HullStyle style, int combination) => _ship.SetHullPaint(style, combination);
+
 	// Muestra u oculta la nave; la rejilla y el anillo siguen (nave COMING SOON)
 	public void SetShipVisible(bool visible) => _ship.Visible = visible;
 

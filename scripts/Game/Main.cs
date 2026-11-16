@@ -159,6 +159,8 @@ public partial class Main : Node3D
 			_player = new Player { Name = "Player" };
 			AddChild(_player);
 		}
+		LoadSettings();
+		ApplySavedPaints();
 
 		// Pausa (ESC): igual que Track y Player, se usa la de la escena si existe
 		_pause = GetNodeOrNull<PauseMenu>("PauseMenu");
@@ -601,17 +603,36 @@ public partial class Main : Node3D
 	}
 
 	// ---------------------------------------------------------------
+	// Ajustes y pintura
+	// ---------------------------------------------------------------
+
+	private void LoadSettings()
+	{
+		_settings = new SettingsStore(new FileRecordStorage(SettingsStore.DefaultPath));
+		_settings.Load();
+		if (_settings.Warning != null)
+			GD.PushWarning($"Settings: {_settings.Warning}");
+	}
+
+	// Pintura guardada de cada nave (spec docs/selector-pinturas.md, 3.3): la de la nave elegida se ve al momento y la
+	// de las demás queda puesta para cuando F10 cambie a ellas
+	private void ApplySavedPaints()
+	{
+		foreach (ShipDefinition definition in ShipDefinitions.All)
+		{
+			if (HullPaints.StyleOf(definition.Id) is not HullStyle style || _settings.Settings.PaintFor(definition.Id) is not PaintChoice choice)
+				continue;
+			_player.SetHullPaint(style, HullPaints.IndexOf(style, choice));
+		}
+	}
+
+	// ---------------------------------------------------------------
 	// Fantasma (TIME TRIAL)
 	// ---------------------------------------------------------------
 
 	// Ajustes, grabador, nave fantasma y fantasma guardado del circuito (si sigue siendo válido)
 	private void SetupGhost()
 	{
-		_settings = new SettingsStore(new FileRecordStorage(SettingsStore.DefaultPath));
-		_settings.Load();
-		if (_settings.Warning != null)
-			GD.PushWarning($"Settings: {_settings.Warning}");
-
 		_ghosts = new GhostStore(new FileGhostStorage());
 		_recorder = new GhostRecorder(Math.Max(1, GhostSampleRate));
 		_trackSignature = _track.Signature;

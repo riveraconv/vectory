@@ -57,6 +57,10 @@ public partial class Spaceship : Node3D
 			_hull3D.SetPaint(combination);
 	}
 
+	// Combinación puesta para un estilo, o la de por defecto si no se ha puesto ninguna
+	public int HullPaint(HullStyle style) =>
+		_hullPaints.TryGetValue(style, out int index) && index >= 0 ? HullPaints.Step(style, index, 0) : HullPaints.DefaultIndex(style);
+
 	// Daño visible del casco 3D: quemaduras y humo (en TIME TRIAL, nada)
 	public void SetHullDamage(int level, bool timeTrial)
 	{

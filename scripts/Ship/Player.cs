@@ -671,11 +671,14 @@ public partial class Player : CharacterBody3D
 		_cockpit.Position = new Vector3(0f, -drop, 0f);
 	}
 
-	// Pintura del casco 3D (depuración: F5 del panel de ajuste). Sin casco 3D no hace nada.
+	// Pintura del casco 3D de un estilo: la guardada al montar la carrera y, en depuración, F5 del panel de ajuste
 	public void SetHullPaint(HullStyle style, int combination)
 	{
 		_ship.SetHullPaint(style, combination);
 	}
+
+	// Combinación de pintura que lleva el casco 3D de un estilo
+	public int HullPaint(HullStyle style) => _ship.HullPaint(style);
 
 	// Brillo de levitación sobre la pista bajo la nave, con la inclinación de la pista (no la de la nave) y apagándose
 	// en el aire; y la velocidad, que agranda el humo. Con la pausa no avanza: queda congelado.

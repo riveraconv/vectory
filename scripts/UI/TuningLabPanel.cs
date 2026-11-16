@@ -77,8 +77,9 @@ public partial class TuningLabPanel : CanvasLayer
 	// Estilo del casco 3D de la nave que se conduce; null si no tiene (HAMMER)
 	private HullStyle? CurrentHullStyle => _lab.Current.Visual.Hull3D?.Style;
 
-	private static int PaintIndex(HullStyle style) =>
-		_paintIndices.TryGetValue(style, out int index) ? index : HullPaints.DefaultIndex(style);
+	// La de F5 si se ha usado con ese estilo; si no, la que lleva la nave (la guardada)
+	private int PaintIndex(HullStyle style) =>
+		_paintIndices.TryGetValue(style, out int index) ? index : Player?.HullPaint(style) ?? HullPaints.DefaultIndex(style);
 
 	// Recorre las 40 combinaciones de pintura del casco 3D de la nave que se conduce (specs docs/cascos-3d-1-vector.md
 	// y docs/cascos-3d-2-blade.md, 6.2). Sin casco 3D no hace nada.

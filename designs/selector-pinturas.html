@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VECTORY · Selector de pinturas · 3 composiciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#05070D;--cyan:#36E7FF;--blue:#245BFF;--grey:#A6B8D8;--orange:#FF9D32;--mag:#FF43D0}
+  html,body{margin:0;height:100%;background:#000;color:var(--grey);font-family:"Share Tech Mono",monospace;overflow:hidden}
+  /* barra de la maqueta (fuera de la pantalla del juego) */
+  #tool{position:fixed;left:0;right:0;top:0;min-height:44px;display:flex;gap:6px;align-items:center;padding:0 12px;background:#0b0d14;border-bottom:1px solid #1b2133;z-index:10;font-size:12px;flex-wrap:wrap}
+  #tool .t{color:var(--cyan);letter-spacing:.12em;margin-right:8px}
+  #tool button{font:inherit;font-size:12px;color:#cfd6e6;background:#121623;border:1px solid #2a3350;padding:5px 10px;cursor:pointer;letter-spacing:.06em}
+  #tool button.on{color:#05070D;background:var(--cyan);border-color:var(--cyan)}
+  #tool .sep{width:1px;height:22px;background:#2a3350;margin:0 6px}
+  #tool .d{color:#7f8aa6;margin-left:6px}
+  #wrap{position:fixed;left:0;right:0;top:64px;bottom:0;display:flex;align-items:center;justify-content:center}
+  #stage{position:absolute;width:1280px;height:720px;background:var(--bg);overflow:hidden;transform-origin:0 0;box-shadow:0 0 0 1px #1b2133}
+  #stage *{box-sizing:border-box}
+  canvas#view{position:absolute;cursor:grab;touch-action:none}
+  canvas#view.drag{cursor:grabbing}
+  #ui{position:absolute;inset:0;pointer-events:none}
+  #ui .hit{pointer-events:auto}
+  .floor{position:absolute;height:240px;top:470px;transform:perspective(260px) rotateX(62deg);transform-origin:50% 0;
+    background:repeating-linear-gradient(90deg,rgba(36,91,255,.38) 0 1px,transparent 1px 64px),repeating-linear-gradient(0deg,rgba(36,91,255,.38) 0 1px,transparent 1px 44px);
+    -webkit-mask-image:linear-gradient(#0000,#000 30%,#000 60%,#0000);mask-image:linear-gradient(#0000,#000 30%,#000 60%,#0000);opacity:.55}
+  .ring{position:absolute;border-radius:50%;border:1px solid rgba(36,91,255,.45)}
+  .ring.in{border:1px dashed rgba(54,231,255,.3)}
+  .crumb{position:absolute;white-space:nowrap;font-size:15px;color:var(--cyan);letter-spacing:.22em}
+  .shipname{position:absolute;font-family:Orbitron;font-weight:900;color:var(--cyan);letter-spacing:.08em;text-shadow:0 0 14px rgba(54,231,255,.55)}
+  .pname{position:absolute;font-family:Orbitron;font-weight:700;color:#e9f6ff;letter-spacing:.06em;white-space:nowrap}
+  .pinfo{position:absolute;font-size:14px;color:var(--grey);letter-spacing:.12em;white-space:nowrap}
+  .pinfo b{color:var(--cyan);font-weight:normal}
+  .tag{display:inline-block;font-size:11px;letter-spacing:.18em;padding:2px 7px;border:1px solid rgba(54,231,255,.6);color:var(--cyan);margin-left:10px;vertical-align:2px}
+  .tag.prev{border-color:rgba(166,184,216,.45);color:var(--grey)}
+  .panel{position:absolute;top:0;bottom:0;background:rgba(5,7,13,.92)}
+  .panel.r{border-left:1px solid var(--cyan);box-shadow:-10px 0 24px -14px rgba(54,231,255,.7)}
+  .panel.l{border-right:1px solid var(--cyan);box-shadow:10px 0 24px -14px rgba(54,231,255,.7)}
+  .head{position:absolute;font-size:13px;color:var(--cyan);letter-spacing:.22em}
+  .grp{position:absolute;font-size:11px;color:var(--grey);letter-spacing:.2em}
+  .grid{position:absolute;display:grid;gap:8px}
+  .sw{position:relative;border:1px solid rgba(36,91,255,.7);cursor:pointer;overflow:hidden}
+  .sw:hover{border-color:var(--cyan)}
+  .sw.sel{outline:2px solid var(--cyan);outline-offset:2px;box-shadow:0 0 14px rgba(54,231,255,.7)}
+  .sw .acc{position:absolute;left:4px;right:4px;bottom:4px;height:3px;border-radius:2px}
+  .sw .str{position:absolute;top:0;bottom:0;left:38%;width:7px;border-left:2px solid;border-right:2px solid}
+  .sw .num{position:absolute;right:3px;top:1px;font:italic 900 10px Orbitron}
+  .sw .rnd{position:absolute;right:4px;top:4px;width:11px;height:11px;border-radius:50%;border:2px solid #1d2a1a;background:#d7d2c0}
+  .sw .haz{position:absolute;left:0;right:0;bottom:0;height:6px;background:repeating-linear-gradient(45deg,#E8B414 0 4px,#141412 4px 8px)}
+  .sw .eq{position:absolute;left:3px;top:3px;width:7px;height:7px;background:var(--cyan);box-shadow:0 0 6px var(--cyan);transform:rotate(45deg)}
+  .opts{position:absolute}
+  .opt{font-family:Orbitron;font-weight:500;font-size:22px;letter-spacing:.14em;color:rgba(166,184,216,.75);padding:7px 0 7px 22px;position:relative;cursor:pointer}
+  .opt.on{color:var(--cyan);text-shadow:0 0 10px rgba(54,231,255,.7)}
+  .opt.on::before{content:"";position:absolute;left:0;top:50%;width:10px;height:10px;margin-top:-5px;border:2px solid var(--cyan);transform:rotate(45deg);box-shadow:0 0 8px var(--cyan)}
+  .hopts{display:flex;gap:36px}
+  .foot{position:absolute;bottom:18px;font-size:13px;color:rgba(166,184,216,.7);letter-spacing:.08em;white-space:nowrap}
+  .ver{position:absolute;left:28px;bottom:18px;font-size:13px;color:rgba(166,184,216,.55)}
+  .tabs{position:absolute;display:flex;gap:0}
+  .tab{font-size:13px;letter-spacing:.2em;padding:7px 18px;border:1px solid rgba(36,91,255,.7);color:var(--grey);cursor:pointer}
+  .tab+.tab{border-left:none}
+  .tab.on{color:#05070D;background:var(--cyan);border-color:var(--cyan)}
+  .switch{position:absolute;display:flex;align-items:center;gap:14px;font-size:13px;letter-spacing:.2em;color:var(--grey);cursor:pointer}
+  .switch .k{display:flex}
+  .switch .k span{padding:4px 12px;border:1px solid rgba(36,91,255,.7);font-size:12px}
+  .switch .k span.on{background:var(--cyan);color:#05070D;border-color:var(--cyan)}
+  .list{position:absolute}
+  .row{height:24px;display:flex;align-items:center;gap:12px;padding-left:12px;cursor:pointer;position:relative;font-size:14px;letter-spacing:.1em;color:rgba(166,184,216,.85)}
+  .row .chip{width:30px;height:14px;position:relative;border:1px solid rgba(36,91,255,.7);overflow:hidden;flex:0 0 auto}
+  .row .nm{flex:1;white-space:nowrap}
+  .row .fn{font-size:11px;color:rgba(166,184,216,.55);padding-right:14px}
+  .row.sel{color:var(--cyan);background:linear-gradient(90deg,rgba(54,231,255,.16),transparent)}
+  .row.sel::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:3px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .row .eqd{width:7px;height:7px;background:var(--cyan);transform:rotate(45deg);box-shadow:0 0 6px var(--cyan);margin-right:2px}
+  #toast{position:absolute;left:50%;top:330px;transform:translateX(-50%);padding:12px 26px;border:1px solid var(--cyan);background:rgba(5,7,13,.94);color:var(--cyan);font-size:15px;letter-spacing:.2em;box-shadow:0 0 24px rgba(54,231,255,.4);opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+  #note{position:fixed;left:12px;right:12px;top:44px;height:20px;font-size:11px;color:#6d7894;z-index:10;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="tool">
+  <span class="t">SELECTOR DE PINTURAS</span>
+  <button data-l="A">A · TALLER</button><button data-l="B">B · ESCAPARATE</button><button data-l="C">C · CATÁLOGO</button>
+  <span class="sep"></span>
+  <button data-s="ship_02">BLADE</button><button data-s="ship_01">VECTOR</button><button data-s="ship_03">HAMMER</button>
+</div>
+<div id="wrap"><div id="stage"><canvas id="view"></canvas><div id="ui"></div><div id="toast"></div></div></div>
+<div id="note"><span id="ldesc" style="color:#9fb0d0"></span> · Maqueta de composición. La nave es una versión simplificada para ver colores y acabados; en el juego va el casco 3D real de cada nave. Teclado: ← → ↑ ↓ pintura · M marcas · ENTER aplicar · ESC volver · arrastrar para girar.</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// =====================================================================================
+// Catálogos (datos de las specs cascos-3d-1/2/3), nombres traducidos al inglés
+// =====================================================================================
+const FIN = {
+  GLOSS:{m:.1,r:.25,cc:1,ccr:.04}, METALLIC:{m:.6,r:.35,cc:.8,ccr:.1}, SATIN:{m:.6,r:.42,cc:.5,ccr:.22},
+  MATTE:{m:.2,r:.8,cc:0,ccr:.5}, CHROME:{m:1,r:.12,cc:1,ccr:.03}, PEARL:{m:.25,r:.25,cc:1,ccr:.04,iris:.35},
+  CHAMELEON:{m:.5,r:.25,cc:1,ccr:.04,iris:1},
+  B_MATTE:{m:.1,r:.85,cc:0,ccr:.5}, B_SATIN:{m:.2,r:.6,cc:.25,ccr:.35}, INDUSTRIAL:{m:.15,r:.62,cc:.1,ccr:.4},
+};
+const FIN_LABEL = { B_MATTE:'MATTE', B_SATIN:'SATIN', INDUSTRIAL:'INDUSTRIAL' };
+const rgb = a => '#' + a.map(v => v.toString(16).padStart(2, '0')).join('');
+
+const VEC = [
+  ['graphite_red','GRAPHITE','#222429','SATIN','#FF2D2D','#FF2D2D','#F2F2F2','#111111','07'],
+  ['piano_cyan','PIANO BLACK','#0A0B0D','GLOSS','#36E7FF','#36E7FF','#36E7FF','#050505','21'],
+  ['black_chrome','BLACK CHROME','#2A2C31','CHROME','#FF9D32','#FF9D32','#111111','#FF9D32','88'],
+  ['stealth_matte','STEALTH','#2B2E33','MATTE','#FF2D2D','#FF2D2D','#FF2D2D','#111111','00'],
+  ['pearl_white','PEARL WHITE','#E4E6EA','PEARL','#FF2D2D','#1A42B0','#FFFFFF','#1A42B0','14'],
+  ['liquid_silver','LIQUID SILVER','#C3C8CF','CHROME','#3D7BFF','#B5121B','#FFFFFF','#B5121B','3'],
+  ['titanium','TITANIUM','#6A6E75','METALLIC','#FFB000','#FFB000','#111111','#FFB000','42'],
+  ['racing_red','RACING RED','#B5121B','GLOSS','#FFF4E6','#F2F2F2','#F2F2F2','#B5121B','1'],
+  ['lava','LAVA','#5A0A0C','METALLIC','#FF9D32','#FF9D32','#FF9D32','#1A0505','66'],
+  ['amber','AMBER','#E0701A','GLOSS','#FFFFFF','#111111','#111111','#FFFFFF','27'],
+  ['taxi','TAXI YELLOW','#E8B414','GLOSS','#FF2D2D','#111111','#111111','#E8B414','99'],
+  ['gold','GOLD','#C8963A','CHROME','#FFF4E6','#111111','#111111','#C8963A','24'],
+  ['acid_green','ACID GREEN','#7CC81A','GLOSS','#FFFFFF','#111111','#FFFFFF','#111111','55'],
+  ['british_green','BRITISH GREEN','#0F3A28','METALLIC','#3DFF8A','#E8D9A8','#E8D9A8','#0F3A28','9'],
+  ['cobalt','COBALT','#1A42B0','METALLIC','#36E7FF','#F2F2F2','#F2F2F2','#1A42B0','12'],
+  ['midnight','MIDNIGHT','#0E1634','METALLIC','#6F9BFF','#C8963A','#C8963A','#0E1634','33'],
+  ['ice','ICE','#9FD8E8','PEARL','#36E7FF','#1A42B0','#FFFFFF','#1A42B0','71'],
+  ['violet','VIOLET','#4B1A82','METALLIC','#FF43D0','#E8B414','#E8B414','#4B1A82','18'],
+  ['neon_pink','NEON PINK','#D42E7C','GLOSS','#36E7FF','#111111','#36E7FF','#111111','23'],
+  ['chameleon','CHAMELEON','#1C1630','CHAMELEON','#FF43D0','#E4E6EA','#E4E6EA','#1C1630','13'],
+].map(([id,name,color,fin,acc,stripe,numBg,numFg,num]) => ({ id, name, color, fin, acc, liv:{ stripe, numBg, numFg, num } }));
+
+const BLD = [
+  ['woodland','WOODLAND',[86,96,64],[118,122,96],[44,51,38]],
+  ['desert','DESERT',[196,170,122],[160,128,88],[112,92,64]],
+  ['arctic','ARCTIC',[222,224,222],[176,182,186],[96,102,108]],
+  ['urban','URBAN',[128,130,132],[92,94,98],[52,54,58]],
+  ['night','NIGHT',[40,44,52],[62,66,76],[24,26,30]],
+  ['jungle','JUNGLE',[58,82,46],[92,104,60],[32,48,30]],
+  ['tundra','TUNDRA',[150,148,128],[184,182,166],[74,78,68]],
+  ['naval_split','NAVAL',[92,110,130],[150,160,170],[56,70,88]],
+  ['autumn','AUTUMN',[120,92,56],[146,132,90],[56,46,34]],
+  ['ash','ASH',[100,96,90],[140,136,128],[62,60,58]],
+].map(([id,name,a,b,c]) => ({ id, name, camo:true, c0:rgb(a), c1:rgb(b), c2:rgb(c), fin:'B_MATTE' }))
+.concat([
+  ['olive','OLIVE',[86,94,62],'B_MATTE'], ['sand','SAND',[194,170,124],'B_MATTE'], ['field_grey','FIELD GREY',[104,110,104],'B_MATTE'],
+  ['ops_black','OPS BLACK',[30,32,34],'B_SATIN'], ['nato_green','NATO GREEN',[64,74,56],'B_MATTE'], ['earth','EARTH BROWN',[110,86,60],'B_MATTE'],
+  ['navy_grey','NAVY GREY',[118,126,134],'B_SATIN'], ['winter_white','WINTER WHITE',[214,216,212],'B_MATTE'], ['slate_blue','SLATE BLUE',[58,70,84],'B_MATTE'],
+  ['khaki','KHAKI',[150,138,100],'B_MATTE'],
+].map(([id,name,c,fin]) => ({ id, name, camo:false, c0:rgb(c), c1:rgb(c), c2:rgb(c), fin })));
+
+const HAM = [
+  ['site_yellow','SITE YELLOW',[170,132,40]], ['bright_yellow','BRIGHT YELLOW',[196,156,30]], ['orange','ORANGE',[196,98,30]],
+  ['terracotta','TERRACOTTA',[160,70,40]], ['tractor_green','TRACTOR GREEN',[52,98,48]], ['crane_red','CRANE RED',[150,36,30]],
+  ['fleet_white','FLEET WHITE',[206,204,196]], ['site_blue','SITE BLUE',[40,74,128]], ['plant_grey','PLANT GREY',[112,114,110]],
+  ['coal_black','COAL BLACK',[36,36,38]], ['khaki','KHAKI',[140,128,90]], ['safety_green','SAFETY GREEN',[150,170,40]],
+  ['cream','CREAM',[196,182,140]], ['maroon','MAROON',[104,34,36]], ['petrol_blue','PETROL BLUE',[30,78,86]],
+].map(([id,name,b]) => ({ id, name, body:b, cab:b, fin:'INDUSTRIAL' }))
+.concat([
+  ['yellow_black','YELLOW · BLACK CAB',[170,132,40],[36,36,38]], ['orange_white','ORANGE · WHITE CAB',[196,98,30],[206,204,196]],
+  ['white_red','WHITE · RED CAB',[206,204,196],[150,36,30]], ['green_white','GREEN · WHITE CAB',[52,98,48],[206,204,196]],
+  ['grey_orange','GREY · ORANGE CAB',[112,114,110],[196,98,30]],
+].map(([id,name,b,c]) => ({ id, name, body:b, cab:c, fin:'INDUSTRIAL', bi:true })));
+HAM.forEach(p => { p.bodyHex = rgb(p.body); p.cabHex = rgb(p.cab); p.markCol = p.body.reduce((a, b) => a + b) > 360 ? '#141412' : '#E8E2D0'; });
+
+const SHIPS = {
+  ship_02: { name:'BLADE', paints:BLD, marks:'MARKINGS', plain:'PLAIN', def:{ i:0, m:true } },
+  ship_01: { name:'VECTOR', paints:VEC, marks:'RACING LIVERY', plain:'PLAIN', def:{ i:0, m:false } },
+  ship_03: { name:'HAMMER', paints:HAM, marks:'FLEET MARKINGS', plain:'PLAIN', def:{ i:0, m:true } },
+};
+
+// =====================================================================================
+// Estado (lo guardado simula settings.json: una pintura por nave)
+// =====================================================================================
+const saved = {}; for (const k in SHIPS) saved[k] = { ...SHIPS[k].def };
+const st = { layout:'A', ship:'ship_01', i:0, m:false, opt:0 };
+function openShip(id) { st.ship = id; st.i = saved[id].i; st.m = saved[id].m; st.opt = 0; }
+openShip('ship_01');
+const P = () => SHIPS[st.ship].paints[st.i];
+const isEquipped = (i, m) => saved[st.ship].i === i && saved[st.ship].m === m;
+
+function finLabel(p) {
+  if (st.ship === 'ship_02') return (p.camo ? 'CAMO · ' : '') + FIN_LABEL[p.fin];
+  if (st.ship === 'ship_03') return p.bi ? 'TWO-TONE' : 'INDUSTRIAL';
+  return p.fin;
+}
+function infoLine(p, m) {
+  const parts = [finLabel(p)];
+  if (m && st.ship === 'ship_01') parts.push('NO. ' + p.liv.num);
+  if (m && st.ship !== 'ship_01') parts.push(SHIPS[st.ship].marks);
+  const n = st.i + 1 + (m ? 20 : 0);
+  parts.push(String(n).padStart(2, '0') + ' / 40');
+  return parts.join(' · ');
+}
+
+// =====================================================================================
+// Muestras (HTML)
+// =====================================================================================
+function swatchInner(p, m) {
+  let bg, extra = '';
+  if (st.ship === 'ship_01') {
+    bg = `linear-gradient(135deg, ${p.color} 55%, #000 160%)`;
+    extra = `<i class="acc" style="background:${p.acc};box-shadow:0 0 6px ${p.acc}"></i>`;
+    if (m) extra += `<i class="str" style="border-color:${p.liv.stripe}"></i><i class="num" style="color:${p.liv.numBg}">${p.liv.num}</i>`;
+  } else if (st.ship === 'ship_02') {
+    bg = p.camo ? `radial-gradient(ellipse 30% 22% at 28% 30%, ${p.c1} 98%, transparent 100%), radial-gradient(ellipse 26% 30% at 72% 66%, ${p.c2} 98%, transparent 100%), radial-gradient(ellipse 18% 14% at 78% 22%, ${p.c2} 98%, transparent 100%), radial-gradient(ellipse 20% 18% at 22% 82%, ${p.c1} 98%, transparent 100%), radial-gradient(ellipse 16% 22% at 50% 48%, ${p.c2} 98%, transparent 100%), ${p.c0}`
+                : `linear-gradient(135deg, ${p.c0} 60%, #000 190%)`;
+    if (m) extra = `<i class="rnd"></i>`;
+  } else {
+    bg = p.bi ? `linear-gradient(135deg, ${p.bodyHex} 58%, ${p.cabHex} 58%)` : `linear-gradient(135deg, ${p.bodyHex} 60%, #000 190%)`;
+    if (m) extra = `<i class="haz"></i>`;
+  }
+  return { bg, extra };
+}
+function swatch(i, m, w, h, cls = 'sw') {
+  const p = SHIPS[st.ship].paints[i], s = swatchInner(p, m), sel = st.i === i && st.m === m;
+  return `<div class="${cls} hit${sel ? ' sel' : ''}" data-i="${i}" data-m="${m ? 1 : 0}" style="width:${w}px;height:${h}px;background:${s.bg}">${s.extra}${isEquipped(i, m) ? '<i class="eq"></i>' : ''}</div>`;
+}
+function tag() { return isEquipped(st.i, st.m) ? '<span class="tag">EQUIPPED</span>' : '<span class="tag prev">PREVIEW</span>'; }
+const crumb = () => `RACE · CIRCUIT 01 · SELECT SHIP · PAINT`;
+function options(cls = '') {
+  return ['APPLY', 'BACK'].map((o, k) => `<div class="opt hit${st.opt === k ? ' on' : ''}" data-opt="${k}">${o}</div>`).join('');
+}
+
+// =====================================================================================
+// Composiciones
+// =====================================================================================
+const LAYOUTS = {
+  A: { desc:'Briefing como SELECT SHIP: nave a la izquierda, las 40 muestras en el panel.', cols:5,
+    view:{ x:0, y:150, w:836, h:520 },
+    html() {
+      const p = P(), S = SHIPS[st.ship];
+      let g1 = '', g2 = ''; for (let i = 0; i < 20; i++) { g1 += swatch(i, false, 66, 30); g2 += swatch(i, true, 66, 30); }
+      return `
+      <div class="floor" style="left:-200px;width:1236px"></div>
+      <div class="ring" style="left:160px;top:582px;width:500px;height:68px"></div>
+      <div class="ring in" style="left:240px;top:594px;width:340px;height:44px"></div>
+      <div class="crumb" style="left:72px;top:56px">${crumb()}</div>
+      <div class="shipname" style="left:72px;top:80px;font-size:54px">${S.name}</div>
+      <div class="pinfo" style="left:74px;top:150px">PAINT · <b>${p.name}</b></div>
+      <div class="panel r" style="left:836px;right:0">
+        <div class="head" style="left:40px;top:52px">PAINT</div>
+        <div class="pname" style="left:40px;top:76px;font-size:24px">${p.name}${tag()}</div>
+        <div class="pinfo" style="left:40px;top:112px;font-size:12px">${infoLine(p, st.m)}</div>
+        <div class="grp" style="left:40px;top:150px">${S.plain}</div>
+        <div class="grid" style="left:40px;top:170px;grid-template-columns:repeat(5,66px)">${g1}</div>
+        <div class="grp" style="left:40px;top:336px">${S.marks}</div>
+        <div class="grid" style="left:40px;top:356px;grid-template-columns:repeat(5,66px)">${g2}</div>
+        <div class="opts" style="left:40px;top:560px">${options()}</div>
+      </div>
+      <div class="ver">v0.14.x</div>
+      <div class="foot" style="left:110px">← → ↑ ↓ PAINT · M ${S.marks} · ENTER APPLY · ESC BACK · DRAG ROTATE</div>`;
+    } },
+  B: { desc:'Nave grande en el centro; abajo una tira de 20 muestras y pestañas lisa / con marcas.', cols:20,
+    view:{ x:0, y:40, w:1280, h:520 },
+    html() {
+      const p = P(), S = SHIPS[st.ship];
+      let strip = ''; for (let i = 0; i < 20; i++) strip += swatch(i, st.m, 50, 50);
+      return `
+      <div class="floor" style="left:-100px;width:1480px;top:440px"></div>
+      <div class="ring" style="left:340px;top:470px;width:600px;height:80px"></div>
+      <div class="ring in" style="left:440px;top:484px;width:400px;height:52px"></div>
+      <div class="crumb" style="left:72px;top:56px">${crumb()}</div>
+      <div class="shipname" style="left:72px;top:80px;font-size:40px">${S.name}</div>
+      <div class="pname" style="right:72px;top:56px;font-size:30px;text-align:right">${p.name}</div>
+      <div class="pinfo" style="right:72px;top:100px;text-align:right">${infoLine(p, st.m)}</div>
+      <div class="pinfo" style="right:62px;top:126px">${tag()}</div>
+      <div class="opts" style="right:72px;top:420px;width:150px">${options()}</div>
+      <div class="tabs" style="left:73px;top:556px">
+        <div class="tab hit${st.m ? '' : ' on'}" data-tab="0">${S.plain}</div><div class="tab hit${st.m ? ' on' : ''}" data-tab="1">${S.marks}</div>
+      </div>
+      <div class="grid" style="left:73px;top:600px;grid-template-columns:repeat(20,50px);gap:7px">${strip}</div>
+      <div class="ver">v0.14.x</div>
+      <div class="foot" style="left:300px">← → PAINT · ↑ ↓ / M ${S.marks} · ENTER APPLY · ESC BACK · DRAG ROTATE</div>`;
+    } },
+  C: { desc:'Lista con los nombres a la izquierda (cómoda con teclado), nave a la derecha.', cols:1,
+    view:{ x:420, y:40, w:860, h:560 },
+    html() {
+      const p = P(), S = SHIPS[st.ship];
+      let rows = '';
+      for (let i = 0; i < 20; i++) {
+        const q = S.paints[i], s = swatchInner(q, st.m);
+        rows += `<div class="row hit${st.i === i ? ' sel' : ''}" data-i="${i}" data-m="${st.m ? 1 : 0}">
+          <span class="chip" style="background:${s.bg}">${st.ship === 'ship_01' ? '' : s.extra}</span>
+          <span class="nm">${q.name}</span>${isEquipped(i, st.m) ? '<span class="eqd"></span>' : ''}<span class="fn">${finLabel(q)}</span></div>`;
+      }
+      return `
+      <div class="floor" style="left:300px;width:1100px;top:450px"></div>
+      <div class="ring" style="left:600px;top:500px;width:520px;height:70px"></div>
+      <div class="ring in" style="left:690px;top:512px;width:340px;height:46px"></div>
+      <div class="panel l" style="left:0;width:420px">
+        <div class="crumb" style="left:40px;top:40px;font-size:12px">SELECT SHIP · PAINT</div>
+        <div class="shipname" style="left:40px;top:62px;font-size:34px">${S.name}</div>
+        <div class="switch hit" style="left:40px;top:122px" data-sw="1">${S.marks}
+          <span class="k"><span class="${st.m ? '' : 'on'}">OFF</span><span class="${st.m ? 'on' : ''}">ON</span></span></div>
+        <div class="list" style="left:28px;top:160px;width:372px">${rows}</div>
+        <div class="foot" style="left:40px;bottom:16px;font-size:12px">↑ ↓ PAINT · M ${S.marks} · ENTER · ESC</div>
+      </div>
+      <div class="pname" style="left:480px;top:612px;font-size:28px">${p.name}${tag()}</div>
+      <div class="pinfo" style="left:482px;top:654px">${infoLine(p, st.m)}</div>
+      <div class="opts" style="right:60px;top:612px"><div class="hopts">${options()}</div></div>`;
+    } },
+};
+
+// =====================================================================================
+// Escena 3D: nave simplificada con la pintura real (color y acabado)
+// =====================================================================================
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
+const scene = new THREE.Scene();
+const pm = new THREE.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 200);
+const key = new THREE.DirectionalLight('#fff1e0', 1.6); key.position.set(-6, 10, 8); scene.add(key);
+const rim = new THREE.DirectionalLight('#5f8cff', 1.2); rim.position.set(8, 3, -8); scene.add(rim);
+scene.add(new THREE.HemisphereLight('#b0b8c8', '#101010', 0.35));
+const pivot = new THREE.Group(); scene.add(pivot);
+const spin = new THREE.Group(); pivot.add(spin);
+let ship = null;
+
+function planGeo(half, thick, bevel = 0.08) {
+  const pts = half.concat(half.slice().reverse().filter(p => p[0] !== 0).map(([x, z]) => [-x, z]));
+  const sh = new THREE.Shape(); pts.forEach(([x, z], k) => k ? sh.lineTo(x, z) : sh.moveTo(x, z)); sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, { depth:thick, bevelEnabled:bevel > 0, bevelThickness:bevel, bevelSize:bevel, bevelSegments:3 });
+  g.rotateX(Math.PI / 2); g.translate(0, thick / 2, 0); return g;
+}
+function sideGeo(pts, thick) {   // ala o pieza plana de un lado (no simétrica)
+  const sh = new THREE.Shape(); pts.forEach(([x, z], k) => k ? sh.lineTo(x, z) : sh.moveTo(x, z)); sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, { depth:thick, bevelEnabled:true, bevelThickness:.02, bevelSize:.02, bevelSegments:2 });
+  g.rotateX(Math.PI / 2); g.translate(0, thick / 2, 0); return g;
+}
+function boxR(w, h, len, r) {    // sección de rectángulo redondeado extruida a lo largo de z
+  const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  const g = new THREE.ExtrudeGeometry(s, { depth:len, bevelEnabled:true, bevelThickness:.04, bevelSize:.04, bevelSegments:2 }); g.translate(0, 0, -len / 2); return g;
+}
+const paintMat = (color, fin, map) => { const f = FIN[fin]; return new THREE.MeshPhysicalMaterial({ color, map:map || null, metalness:f.m, roughness:f.r, clearcoat:f.cc, clearcoatRoughness:f.ccr, iridescence:f.iris || 0, iridescenceIOR:1.8, iridescenceThicknessRange:[250, 700] }); };
+const M = {
+  carbon: () => new THREE.MeshPhysicalMaterial({ color:'#16171b', metalness:.3, roughness:.35, clearcoat:1, clearcoatRoughness:.06 }),
+  dark: () => new THREE.MeshStandardMaterial({ color:'#0b0b0d', roughness:.7, metalness:.2 }),
+  ti: () => new THREE.MeshStandardMaterial({ color:'#8f8c88', roughness:.3, metalness:1 }),
+  steel: () => new THREE.MeshStandardMaterial({ color:'#5a5d62', roughness:.45, metalness:.9 }),
+  glass: () => new THREE.MeshPhysicalMaterial({ color:'#0b0e14', roughness:.04, metalness:.1, transparent:true, opacity:.75, clearcoat:1, iridescence:.8, iridescenceIOR:1.6 }),
+  glow: (c, k = 2.5) => new THREE.MeshStandardMaterial({ color:'#000', emissive:new THREE.Color(c), emissiveIntensity:k }),
+  flat: c => new THREE.MeshPhysicalMaterial({ color:c, roughness:.3, metalness:.1, clearcoat:1, clearcoatRoughness:.05 }),
+};
+function decal(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
+function decalMesh(tex, w, h, parent, pos, rot) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshPhysicalMaterial({ map:tex, transparent:true, roughness:.35, clearcoat:1, polygonOffset:true, polygonOffsetFactor:-4 }));
+  m.position.set(...pos); m.rotation.set(...rot); parent.add(m); return m;
+}
+const add = (g, mat, parent, pos = [0, 0, 0], rot = [0, 0, 0]) => { const m = new THREE.Mesh(g, mat); m.position.set(...pos); m.rotation.set(...rot); parent.add(m); return m; };
+
+function camoTex(p) {
+  let s = 1234567; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const t = decal(256, 256, (x, w, h) => {
+    x.fillStyle = p.c0; x.fillRect(0, 0, w, h);
+    [[p.c1, 26], [p.c2, 22]].forEach(([c, n]) => { x.fillStyle = c; for (let i = 0; i < n; i++) { const cx = r() * w, cy = r() * h, rx = 14 + r() * 34, ry = 10 + r() * 22, a = r() * 3;
+      for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) { x.beginPath(); x.ellipse(cx + ox, cy + oy, rx, ry, a, 0, Math.PI * 2); x.fill(); } } });
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.35, 0.35); return t;
+}
+
+function buildVector(p, m) {
+  const g = new THREE.Group(), paint = paintMat(p.color, p.fin), acc = M.glow(p.acc, 2.2);
+  add(planGeo([[0, -4], [0.5, -2.5], [0.9, -0.5], [0.8, 1.5], [0.7, 2.6]], 0.42, 0.13), paint, g, [0, 0.12, 0]);
+  add(new THREE.SphereGeometry(1, 40, 20), M.glass(), g, [0, 0.47, -0.85]).scale.set(0.34, 0.14, 1.15);
+  [-1, 1].forEach(k => {
+    add(sideGeo([[k * .85, -.5], [k * 2.6, 2.2], [k * 2.6, 2.7], [k * .8, 2.0]], .06), M.carbon(), g, [0, .08, 0]);
+    add(new THREE.BoxGeometry(.04, .4, .4), paint, g, [k * 2.62, .25, 2.5]);
+    add(new THREE.SphereGeometry(.03, 10, 8), acc, g, [k * 2.62, .46, 2.65]);
+    add(boxR(.84, .54, 1.9, .1), paint, g, [k * .75, .12, 1.78]);
+    add(new THREE.BoxGeometry(.62, .3, .45), M.ti(), g, [k * .75, .12, 2.95]);
+    add(new THREE.PlaneGeometry(.5, .2), M.glow('#245BFF', 2.4), g, [k * .75, .12, 3.18]);
+    add(new THREE.BoxGeometry(.03, .03, 5.4), acc, g, [k * .62, .3, -.2], [0, k * -.07, 0]);
+    add(new THREE.BoxGeometry(.03, .03, 1.6), acc, g, [k * 1.65, .12, 1.05], [0, k * -.58, 0]);
+    add(new THREE.BoxGeometry(.3, .03, .02), M.glow('#FF1A1A', 3), g, [k * .3, .35, 2.75]);
+  });
+  if (m) {
+    const L = p.liv, sm = M.flat(L.stripe);
+    [-1, 1].forEach(k => { add(new THREE.BoxGeometry(.08, .012, 1.9), sm, g, [k * .17, .465, -2.65]); add(new THREE.BoxGeometry(.08, .012, 2.2), sm, g, [k * .17, .465, 1.45]); });
+    const round = decal(256, 256, (x, w) => { x.fillStyle = L.stripe; x.beginPath(); x.arc(128, 128, 124, 0, 7); x.fill(); x.fillStyle = L.numBg; x.beginPath(); x.arc(128, 128, 110, 0, 7); x.fill();
+      x.fillStyle = L.numFg; x.font = `italic 900 ${L.num.length > 1 ? 110 : 140}px Orbitron`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(L.num, 128, 136); });
+    decalMesh(round, .5, .5, g, [0, .47, -2.9], [-Math.PI / 2, 0, 0]);
+    const plate = decal(320, 192, (x, w, h) => { x.fillStyle = L.stripe; x.fillRect(0, 0, w, h); x.fillStyle = L.numBg; x.fillRect(14, 14, w - 28, h - 28);
+      x.fillStyle = L.numFg; x.font = 'italic 900 120px Orbitron'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(L.num, w / 2, h / 2 + 6); });
+    [-1, 1].forEach(k => decalMesh(plate, .36, .22, g, [k * 1.22, .12, 1.8], [0, k * Math.PI / 2, 0]));
+  }
+  return g;
+}
+function buildBlade(p, m) {
+  const g = new THREE.Group(), map = p.camo ? camoTex(p) : null, paint = paintMat(p.camo ? '#ffffff' : p.c0, p.fin, map);
+  add(planGeo([[0, -5.0], [0.45, -2.4], [1.61, 2.5], [1.5, 3.0], [0.45, 2.8], [0.4, 3.35]], .26, .09), paint, g, [0, .05, 0]);
+  add(planGeo([[0, -3.2], [0.32, -1.2], [0.4, 1.8], [0.35, 3.0]], .2, .08), paint, g, [0, .3, 0]);
+  add(new THREE.SphereGeometry(1, 40, 20), M.glass(), g, [0, .5, -1.5]).scale.set(.34, .3, .95);
+  [-1, 1].forEach(k => {
+    add(new THREE.BoxGeometry(.04, .7, .7), paint, g, [k * .75, .55, 2.55], [0, 0, k * -.35]);
+    add(new THREE.SphereGeometry(.03, 10, 8), M.glow('#ff2a2a', 3), g, [k * 1.62, .1, 2.55]);
+  });
+  add(new THREE.BoxGeometry(.7, .26, .4), M.ti(), g, [0, .2, 3.45]);
+  add(new THREE.PlaneGeometry(.56, .16), M.glow('#245BFF', 2.4), g, [0, .2, 3.66]);
+  if (m) {
+    const ins = decal(256, 256, x => { x.fillStyle = '#1d2a1a'; x.beginPath(); x.arc(128, 128, 120, 0, 7); x.fill(); x.fillStyle = '#d7d2c0'; x.beginPath(); x.arc(128, 128, 96, 0, 7); x.fill();
+      x.fillStyle = '#1d2a1a'; x.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 4 * Math.PI / 5; x.lineTo(128 + Math.cos(a) * 70, 128 + Math.sin(a) * 70); } x.fill(); });
+    [-1, 1].forEach(k => decalMesh(ins, .55, .55, g, [k * 1.05, .28, 1.7], [-Math.PI / 2, 0, 0]));
+    const code = decal(256, 96, (x, w, h) => { x.fillStyle = '#d7d2c0'; x.font = '700 64px Orbitron'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('B-' + String(st.i + 1).padStart(2, '0'), w / 2, h / 2); });
+    [-1, 1].forEach(k => decalMesh(code, .55, .2, g, [k * 0.5, .22, -2.6], [0, k * Math.PI / 2 - k * 0.2, 0]));
+  }
+  return g;
+}
+function buildHammer(p, m) {
+  const g = new THREE.Group(), body = paintMat(rgb(p.body), p.fin), cab = paintMat(rgb(p.cab), p.fin);
+  add(boxR(1.7, .95, 6.2, .14), body, g, [0, .28, -.2]);
+  add(new THREE.BoxGeometry(1.6, .2, .3), M.steel(), g, [0, .12, -3.45]);
+  add(new THREE.BoxGeometry(4.6, .16, .95), body, g, [0, .05, -2.95]);
+  [-1, 1].forEach(k => {
+    add(new THREE.BoxGeometry(.16, .55, .95), body, g, [k * 2.38, -.12, -2.95], [0, 0, k * .25]);
+    add(new THREE.CylinderGeometry(.42, .46, 1.7, 28), M.ti(), g, [k * .45, .25, 2.75], [Math.PI / 2, 0, 0]);
+    add(new THREE.CircleGeometry(.34, 28), M.glow('#FF5A14', 2.4), g, [k * .45, .25, 3.61]);
+    add(new THREE.BoxGeometry(.05, .6, .7), body, g, [k * .8, .95, 2.4], [0, 0, k * -.2]);
+    add(new THREE.BoxGeometry(.03, .5, .6), M.dark(), g, [k * .555, 1.05, -1.55]);
+  });
+  add(new THREE.BoxGeometry(1.1, .62, 1.15), cab, g, [0, 1.06, -1.55]);
+  add(new THREE.PlaneGeometry(.9, .42), M.glass(), g, [0, 1.08, -2.14], [-.25, 0, 0]);
+  add(new THREE.SphereGeometry(.07, 12, 8), M.glow('#FFB000', 3), g, [-.35, 1.43, -1.5]);
+  add(new THREE.SphereGeometry(.07, 12, 8), M.glow('#FF2020', 3), g, [.35, 1.43, -1.5]);
+  add(new THREE.BoxGeometry(1.2, .32, 1.3), body, g, [0, .9, 1.25]);
+  for (let q = 0; q < 5; q++) add(new THREE.BoxGeometry(1.0, .02, .08), M.dark(), g, [0, 1.07, .8 + q * .22]);
+  add(new THREE.CylinderGeometry(.06, .06, .9, 12), M.steel(), g, [.5, 1.3, -.8]);
+  if (m) {
+    const haz = decal(512, 64, (x, w, h) => { for (let i = -2; i < 20; i++) { x.fillStyle = i % 2 ? '#141412' : '#E8B414'; x.beginPath(); x.moveTo(i * 32, h); x.lineTo(i * 32 + 32, h); x.lineTo(i * 32 + 64, 0); x.lineTo(i * 32 + 32, 0); x.fill(); } });
+    decalMesh(haz, 4.4, .16, g, [0, .05, -3.435], [0, Math.PI, 0]);
+    const no = decal(256, 128, (x, w, h) => { x.fillStyle = p.markCol; x.font = '900 84px Orbitron'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(st.i + 1).padStart(2, '0'), w / 2, h / 2 + 4); });
+    [-1, 1].forEach(k => decalMesh(no, .7, .35, g, [k * .9, .4, -.3], [0, k * Math.PI / 2, 0]));
+    const fl = decal(256, 64, (x, w, h) => { x.fillStyle = p.markCol; x.font = '700 30px "Share Tech Mono"'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('FLEET · MINING CO.', w / 2, h / 2); });
+    [-1, 1].forEach(k => decalMesh(fl, 1.2, .3, g, [k * .9, .4, 1.4], [0, k * Math.PI / 2, 0]));
+  }
+  return g;
+}
+function rebuildShip() {
+  if (ship) { spin.remove(ship); ship.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
+  const p = P(); ship = st.ship === 'ship_01' ? buildVector(p, st.m) : st.ship === 'ship_02' ? buildBlade(p, st.m) : buildHammer(p, st.m);
+  const box = new THREE.Box3().setFromObject(ship), c = box.getCenter(new THREE.Vector3()); ship.position.sub(c);
+  spin.add(ship);
+}
+
+// tamaño común para las tres naves: la esfera de 10 m del holograma
+const R = 5.0;
+let vw = 0, vh = 0;
+function placeView() {
+  const v = LAYOUTS[st.layout].view, k = scale;
+  canvas.style.left = v.x + 'px'; canvas.style.top = v.y + 'px'; canvas.style.width = v.w + 'px'; canvas.style.height = v.h + 'px';
+  vw = v.w; vh = v.h; renderer.setPixelRatio(Math.min(2, devicePixelRatio * k)); renderer.setSize(v.w, v.h, false);
+  camera.aspect = v.w / v.h;
+  const vf = camera.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect), d = R / Math.sin(Math.min(vf, hf) / 2) * 0.95;
+  camera.position.set(0, d * Math.sin(0.33), d * Math.cos(0.33)); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
+}
+
+// giro: automático (una vuelta cada 20 s) y arrastre libre con inercia
+const q0 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, THREE.MathUtils.degToRad(143), 0));
+spin.quaternion.copy(q0);
+let drag = null, vel = { x:0, y:0 }, idle = 99, lastMove = 0;
+canvas.addEventListener('pointerdown', e => { drag = { x:e.clientX, y:e.clientY }; vel = { x:0, y:0 }; canvas.setPointerCapture(e.pointerId); canvas.classList.add('drag'); });
+canvas.addEventListener('pointermove', e => { if (!drag) return; const dx = (e.clientX - drag.x) / scale, dy = (e.clientY - drag.y) / scale; drag = { x:e.clientX, y:e.clientY };
+  rotateBy(dx * 0.01, dy * 0.01); vel = { x:dx * 0.01 * 60, y:dy * 0.01 * 60 }; lastMove = performance.now(); idle = 0; });
+const endDrag = () => { if (!drag) return; drag = null; canvas.classList.remove('drag'); if (performance.now() - lastMove > 80) vel = { x:0, y:0 }; idle = 0; };
+canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+const ax = new THREE.Vector3(), qq = new THREE.Quaternion();
+function rotateBy(a, b) {   // a: sobre el eje vertical · b: sobre el horizontal de la pantalla
+  ax.set(0, 1, 0); qq.setFromAxisAngle(ax, a); spin.quaternion.premultiply(qq);
+  ax.set(1, 0, 0).applyQuaternion(camera.quaternion); qq.setFromAxisAngle(ax, b); spin.quaternion.premultiply(qq);
+}
+
+// =====================================================================================
+// UI
+// =====================================================================================
+const ui = document.getElementById('ui');
+function render() {
+  ui.innerHTML = LAYOUTS[st.layout].html();
+  document.getElementById('ldesc').textContent = LAYOUTS[st.layout].desc;
+  document.querySelectorAll('#tool [data-l]').forEach(b => b.classList.toggle('on', b.dataset.l === st.layout));
+  document.querySelectorAll('#tool [data-s]').forEach(b => b.classList.toggle('on', b.dataset.s === st.ship));
+}
+function choose(i, m) { st.i = i; st.m = m; render(); rebuildShip(); }
+ui.addEventListener('click', e => {
+  const t = e.target.closest('.hit'); if (!t) return;
+  if (t.dataset.i !== undefined) choose(+t.dataset.i, t.dataset.m === '1');
+  else if (t.dataset.tab !== undefined) choose(st.i, t.dataset.tab === '1');
+  else if (t.dataset.sw) choose(st.i, !st.m);
+  else if (t.dataset.opt !== undefined) { st.opt = +t.dataset.opt; st.opt === 0 ? apply() : back(); }
+});
+ui.addEventListener('mouseover', e => { const t = e.target.closest('.opt'); if (t && st.opt !== +t.dataset.opt) { st.opt = +t.dataset.opt; ui.querySelectorAll('.opt').forEach(o => o.classList.toggle('on', +o.dataset.opt === st.opt)); } });
+const toastEl = document.getElementById('toast'); let toastT = 0;
+function toast(s) { toastEl.textContent = s; toastEl.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => toastEl.style.opacity = 0, 1600); }
+function apply() { saved[st.ship] = { i:st.i, m:st.m }; render(); toast(`SAVED · ${SHIPS[st.ship].name} · ${P().name}${st.m ? ' · ' + SHIPS[st.ship].marks : ''}`); }
+function back() { const s = saved[st.ship]; st.opt = 0; choose(s.i, s.m); toast('BACK TO SELECT SHIP · NO CHANGES'); }
+addEventListener('keydown', e => {
+  const L = LAYOUTS[st.layout];
+  const mv = d => { e.preventDefault(); choose((st.i + d + 20) % 20, st.m); };
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') L.cols === 1 ? choose(st.i, !st.m) : mv(-1);
+  else if (e.code === 'ArrowRight' || e.code === 'KeyD') L.cols === 1 ? choose(st.i, !st.m) : mv(1);
+  else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+    e.preventDefault();
+    if (L.cols === 1) mv(-1); else if (L.cols === 20) choose(st.i, !st.m);
+    else { if (st.i >= 5) choose(st.i - 5, st.m); else if (st.m) choose(st.i + 15, false); }
+  } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+    e.preventDefault();
+    if (L.cols === 1) mv(1); else if (L.cols === 20) choose(st.i, !st.m);
+    else { if (st.i < 15) choose(st.i + 5, st.m); else if (!st.m) choose(st.i - 15, true); }
+  } else if (e.code === 'KeyM') choose(st.i, !st.m);
+  else if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); apply(); }
+  else if (e.code === 'Escape') back();
+});
+document.querySelectorAll('#tool [data-l]').forEach(b => b.onclick = () => { st.layout = b.dataset.l; render(); placeView(); });
+document.querySelectorAll('#tool [data-s]').forEach(b => b.onclick = () => { openShip(b.dataset.s); render(); rebuildShip(); });
+
+// escala de la pantalla de 1280×720 a la ventana
+const stage = document.getElementById('stage'), wrap = document.getElementById('wrap'); let scale = 1;
+function fit() { const W = wrap.clientWidth, H = wrap.clientHeight; scale = Math.min(W / 1280, H / 720);
+  stage.style.transform = `scale(${scale})`; stage.style.left = (W - 1280 * scale) / 2 + 'px'; stage.style.top = (H - 720 * scale) / 2 + 'px'; placeView(); }
+addEventListener('resize', fit);
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!drag) {
+    idle += dt;
+    if (Math.abs(vel.x) + Math.abs(vel.y) > 1e-4) { rotateBy(vel.x * dt, vel.y * dt); const k = Math.exp(-dt / 0.4); vel.x *= k; vel.y *= k; }
+    const auto = idle < 3 ? 0 : Math.min(1, idle - 3);
+    if (auto > 0) rotateBy(auto * Math.PI * 2 / 20 * dt, 0);
+  }
+  renderer.render(scene, camera);
+}
+document.fonts.load('900 40px Orbitron').catch(() => {}).finally(() => { render(); fit(); rebuildShip(); requestAnimationFrame(frame); });
+</script>
+</body>
+</html>

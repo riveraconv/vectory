@@ -50,8 +50,8 @@ public class HullPaintHammerTests
         Assert.Equal(40, HullPaints.Count(HullStyle.Industrial));
         Assert.Equal(0, HullPaints.Step(HullStyle.Industrial, 39, 1));
         Assert.Equal(39, HullPaints.Step(HullStyle.Industrial, 0, -1));
-        Assert.Equal("NARANJA · CABINA BLANCA", HullPaints.DisplayName(HullStyle.Industrial, 16));
-        Assert.Equal("AMARILLO OBRA · MARCAS", HullPaints.DisplayName(HullStyle.Industrial, 20));
+        Assert.Equal("ORANGE · WHITE CAB", HullPaints.DisplayName(HullStyle.Industrial, 16));
+        Assert.Equal("SITE YELLOW · MARKINGS", HullPaints.DisplayName(HullStyle.Industrial, 20));
     }
 
     [Fact]

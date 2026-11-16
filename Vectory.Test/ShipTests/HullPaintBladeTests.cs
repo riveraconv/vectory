@@ -49,8 +49,8 @@ public class HullPaintBladeTests
         MilitaryPaintChoice choice = MilitaryPaintCatalog.Default;
         Assert.Equal("woodland", choice.Paint.Id);
         Assert.True(choice.WithMarkings);
-        Assert.Equal("BOSQUE · MARCAS", HullPaints.DisplayName(HullStyle.Military, 20));
-        Assert.Equal("BOSQUE", HullPaints.DisplayName(HullStyle.Military, 0));
+        Assert.Equal("WOODLAND · MARKINGS", HullPaints.DisplayName(HullStyle.Military, 20));
+        Assert.Equal("WOODLAND", HullPaints.DisplayName(HullStyle.Military, 0));
         Assert.Equal(0, HullPaints.DefaultIndex(HullStyle.Racing));
         Assert.Equal(HullPaintCatalog.Default.DisplayName, HullPaints.DisplayName(HullStyle.Racing, 0));
     }

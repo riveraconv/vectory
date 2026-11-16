@@ -68,8 +68,8 @@ public class HullPaintTests
     {
         Assert.Equal("graphite_red", HullPaintCatalog.Default.Paint.Id);
         Assert.False(HullPaintCatalog.Default.WithLivery);
-        Assert.Equal("GRAFITO", HullPaintCatalog.Default.DisplayName);
-        Assert.Equal("GRAFITO #07", Choice("graphite_red", true).DisplayName);
+        Assert.Equal("GRAPHITE", HullPaintCatalog.Default.DisplayName);
+        Assert.Equal("GRAPHITE #07", Choice("graphite_red", true).DisplayName);
     }
 
     // ---------- 6. Aplicación de pintura ----------

@@ -37,8 +37,8 @@ public static class MilitaryHullPieces
 }
 
 // Una pintura de camuflaje de tres tonos (base, claro y oscuro) en 0xRRGGBB. Las lisas llevan los tres iguales.
-// Satin: acabado SATINADO; si no, MATE. Los nombres son internos.
-public sealed record MilitaryPaint(string Id, string Name, uint Base, uint Light, uint Dark, bool Satin = false)
+// Satin: acabado SATINADO; si no, MATE. Name es el nombre interno y ScreenName, el que se ve en pantalla.
+public sealed record MilitaryPaint(string Id, string Name, string ScreenName, uint Base, uint Light, uint Dark, bool Satin = false)
 {
 	public bool IsCamo => Base != Light || Base != Dark;
 }
@@ -46,7 +46,7 @@ public sealed record MilitaryPaint(string Id, string Name, uint Base, uint Light
 // Una de las 40 combinaciones: una pintura, sin marcas o con marcas (número, distintivo y franjas en las puntas)
 public readonly record struct MilitaryPaintChoice(MilitaryPaint Paint, bool WithMarkings)
 {
-	public string DisplayName => WithMarkings ? $"{Paint.Name} · MARCAS" : Paint.Name;
+	public string DisplayName => WithMarkings ? $"{Paint.ScreenName} · MARKINGS" : Paint.ScreenName;
 }
 
 // Catálogo de pinturas del casco 3D de BLADE (PAINTS del prototipo, spec docs/cascos-3d-2-blade.md, 6.1): 10
@@ -56,37 +56,37 @@ public static class MilitaryPaintCatalog
 {
 	private static uint C(int r, int g, int b) => (uint)((r << 16) | (g << 8) | b);
 
-	private static MilitaryPaint Camo(string id, string name, (int, int, int) c0, (int, int, int) c1, (int, int, int) c2) =>
-		new(id, name, C(c0.Item1, c0.Item2, c0.Item3), C(c1.Item1, c1.Item2, c1.Item3), C(c2.Item1, c2.Item2, c2.Item3));
+	private static MilitaryPaint Camo(string id, string name, string screenName, (int, int, int) c0, (int, int, int) c1, (int, int, int) c2) =>
+		new(id, name, screenName, C(c0.Item1, c0.Item2, c0.Item3), C(c1.Item1, c1.Item2, c1.Item3), C(c2.Item1, c2.Item2, c2.Item3));
 
-	private static MilitaryPaint Plain(string id, string name, (int, int, int) c, bool satin = false)
+	private static MilitaryPaint Plain(string id, string name, string screenName, (int, int, int) c, bool satin = false)
 	{
 		uint color = C(c.Item1, c.Item2, c.Item3);
-		return new MilitaryPaint(id, name, color, color, color, satin);
+		return new MilitaryPaint(id, name, screenName, color, color, color, satin);
 	}
 
 	public static readonly IReadOnlyList<MilitaryPaint> Paints = new[]
 	{
-		Camo("woodland", "BOSQUE", (86, 96, 64), (118, 122, 96), (44, 51, 38)),
-		Camo("desert", "DESIERTO", (196, 170, 122), (160, 128, 88), (112, 92, 64)),
-		Camo("arctic", "ÁRTICO", (222, 224, 222), (176, 182, 186), (96, 102, 108)),
-		Camo("urban", "URBANO", (128, 130, 132), (92, 94, 98), (52, 54, 58)),
-		Camo("night", "NOCHE", (40, 44, 52), (62, 66, 76), (24, 26, 30)),
-		Camo("jungle", "SELVA", (58, 82, 46), (92, 104, 60), (32, 48, 30)),
-		Camo("tundra", "TUNDRA", (150, 148, 128), (184, 182, 166), (74, 78, 68)),
-		Camo("naval_split", "MARINO", (92, 110, 130), (150, 160, 170), (56, 70, 88)),
-		Camo("autumn", "OTOÑO", (120, 92, 56), (146, 132, 90), (56, 46, 34)),
-		Camo("ash", "CENIZA", (100, 96, 90), (140, 136, 128), (62, 60, 58)),
-		Plain("olive", "OLIVA", (86, 94, 62)),
-		Plain("sand", "ARENA", (194, 170, 124)),
-		Plain("field_grey", "GRIS CAMPAÑA", (104, 110, 104)),
-		Plain("ops_black", "NEGRO OPERACIONES", (30, 32, 34), true),
-		Plain("nato_green", "VERDE OTAN", (64, 74, 56)),
-		Plain("earth", "MARRÓN TIERRA", (110, 86, 60)),
-		Plain("navy_grey", "GRIS NAVAL", (118, 126, 134), true),
-		Plain("winter_white", "BLANCO INVIERNO", (214, 216, 212)),
-		Plain("slate_blue", "AZUL PIZARRA", (58, 70, 84)),
-		Plain("khaki", "CAQUI", (150, 138, 100))
+		Camo("woodland", "BOSQUE", "WOODLAND", (86, 96, 64), (118, 122, 96), (44, 51, 38)),
+		Camo("desert", "DESIERTO", "DESERT", (196, 170, 122), (160, 128, 88), (112, 92, 64)),
+		Camo("arctic", "ÁRTICO", "ARCTIC", (222, 224, 222), (176, 182, 186), (96, 102, 108)),
+		Camo("urban", "URBANO", "URBAN", (128, 130, 132), (92, 94, 98), (52, 54, 58)),
+		Camo("night", "NOCHE", "NIGHT", (40, 44, 52), (62, 66, 76), (24, 26, 30)),
+		Camo("jungle", "SELVA", "JUNGLE", (58, 82, 46), (92, 104, 60), (32, 48, 30)),
+		Camo("tundra", "TUNDRA", "TUNDRA", (150, 148, 128), (184, 182, 166), (74, 78, 68)),
+		Camo("naval_split", "MARINO", "NAVAL", (92, 110, 130), (150, 160, 170), (56, 70, 88)),
+		Camo("autumn", "OTOÑO", "AUTUMN", (120, 92, 56), (146, 132, 90), (56, 46, 34)),
+		Camo("ash", "CENIZA", "ASH", (100, 96, 90), (140, 136, 128), (62, 60, 58)),
+		Plain("olive", "OLIVA", "OLIVE", (86, 94, 62)),
+		Plain("sand", "ARENA", "SAND", (194, 170, 124)),
+		Plain("field_grey", "GRIS CAMPAÑA", "FIELD GREY", (104, 110, 104)),
+		Plain("ops_black", "NEGRO OPERACIONES", "OPS BLACK", (30, 32, 34), true),
+		Plain("nato_green", "VERDE OTAN", "NATO GREEN", (64, 74, 56)),
+		Plain("earth", "MARRÓN TIERRA", "EARTH BROWN", (110, 86, 60)),
+		Plain("navy_grey", "GRIS NAVAL", "NAVY GREY", (118, 126, 134), true),
+		Plain("winter_white", "BLANCO INVIERNO", "WINTER WHITE", (214, 216, 212)),
+		Plain("slate_blue", "AZUL PIZARRA", "SLATE BLUE", (58, 70, 84)),
+		Plain("khaki", "CAQUI", "KHAKI", (150, 138, 100))
 	};
 
 	// Las 20 sin marcas y luego las 20 con marcas
@@ -101,10 +101,10 @@ public static class MilitaryPaintCatalog
 }
 
 // Acabado de una pintura militar (spec 6.2): metal, factor sobre la textura de rugosidad y barniz
-public readonly record struct MilitaryFinish(string Name, float Metal, float RoughnessFactor, float Coat, float CoatRoughness)
+public readonly record struct MilitaryFinish(string Name, string ScreenName, float Metal, float RoughnessFactor, float Coat, float CoatRoughness)
 {
-	public static readonly MilitaryFinish Matte = new("MATE", 0.10f, 1.00f, 0f, 0f);
-	public static readonly MilitaryFinish Satin = new("SATINADO", 0.20f, 0.75f, 0.25f, 0.35f);
+	public static readonly MilitaryFinish Matte = new("MATE", "MATTE", 0.10f, 1.00f, 0f, 0f);
+	public static readonly MilitaryFinish Satin = new("SATINADO", "SATIN", 0.20f, 0.75f, 0.25f, 0.35f);
 	// El blindaje lleva 0,05 más de metal
 	public const float ArmorExtraMetal = 0.05f;
 }
@@ -315,6 +315,36 @@ public static class HullPaints
 
 	// Siguiente o anterior combinación, con vuelta
 	public static int Step(HullStyle style, int index, int delta) => Wrap(style, index + delta);
+
+	// Ids de las 20 pinturas del catálogo de un estilo, en su orden
+	public static IReadOnlyList<string> PaintIds(HullStyle style) => style switch
+	{
+		HullStyle.Military => MilitaryPaintCatalog.Paints.Select(p => p.Id).ToList(),
+		HullStyle.Industrial => IndustrialPaintCatalog.Paints.Select(p => p.Id).ToList(),
+		_ => HullPaintCatalog.Paints.Select(p => p.Id).ToList()
+	};
+
+	public static bool HasPaint(HullStyle style, string paintId) => paintId != null && PaintIds(style).Contains(paintId);
+
+	// Elección de una de las 40 combinaciones (con vuelta)
+	public static PaintChoice ChoiceAt(HullStyle style, int index)
+	{
+		IReadOnlyList<string> ids = PaintIds(style);
+		int i = Wrap(style, index);
+		return new PaintChoice(ids[i % ids.Count], i >= ids.Count);
+	}
+
+	// Posición (0–39) de una elección; -1 si la pintura no es de ese catálogo
+	public static int IndexOf(HullStyle style, PaintChoice choice)
+	{
+		int paint = choice.PaintId == null ? -1 : PaintIds(style).ToList().IndexOf(choice.PaintId);
+		return paint < 0 ? -1 : paint + (choice.Marks ? PaintIds(style).Count : 0);
+	}
+
+	public static PaintChoice Default(HullStyle style) => ChoiceAt(style, DefaultIndex(style));
+
+	// Estilo del casco 3D de una nave; null si la nave no existe o no tiene casco 3D
+	public static HullStyle? StyleOf(string shipId) => ShipDefinitions.Find(shipId)?.Visual.Hull3D?.Style;
 
 	private static int Wrap(HullStyle style, int index)
 	{
