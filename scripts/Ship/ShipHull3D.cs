@@ -641,6 +641,15 @@ void fragment() {
 	}
 
 	// La recolocación borra el humo que había
+	// Opacidad de todo el casco (1 = normal), para el parpadeo de la nave atravesable tras recolocarla (spec
+	// docs/rivales-3-contacto.md, 5.2): la transparencia de cada malla, sin tocar sus materiales
+	public void SetOpacity(float opacity)
+	{
+		float transparency = Mathf.Clamp(1f - opacity, 0f, 1f);
+		foreach (MeshInstance3D mesh in _pieces.Values)
+			mesh.Transparency = transparency;
+	}
+
 	public void ClearSmoke()
 	{
 		if (_smoke == null)

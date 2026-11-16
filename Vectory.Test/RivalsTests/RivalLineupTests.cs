@@ -51,7 +51,7 @@ public class RivalLineupTests
 			foreach (RivalEntry rival in Lineup(seed).Rivals)
 			{
 				Assert.Contains(rival.ShipDesignId, new[] { ShipCatalog.Ship01, ShipCatalog.Ship02, ShipCatalog.Ship03 });
-				HullStyle style = HullPaints.StyleOf(rival.ShipDesignId).Value;
+				HullStyle style = Assert.NotNull(HullPaints.StyleOf(rival.ShipDesignId));
 				Assert.InRange(rival.PaintIndex, 0, HullPaints.Count(style) - 1);
 				Assert.Equal(rival.PaintIndex, HullPaints.IndexOf(style, rival.Paint));
 			}

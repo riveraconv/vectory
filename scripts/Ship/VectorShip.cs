@@ -33,6 +33,9 @@ public static class VectorShip
 			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): el filo luminoso de la deriva.
 			// El wireframe, que siguen usando el fantasma y el menú, llega a 3,4.
 			CollisionHalfWidth = 2.63f,
+			// Caja total del manifiesto del casco 3D, al centímetro
+			CollisionFront = 4f,
+			CollisionBack = 3.31f,
 			NoseDistance = 4f,
 			PhysicsBoxSize = new Vector3(6.8f, 1.2f, 7.2f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.4f)

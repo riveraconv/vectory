@@ -142,6 +142,10 @@ public sealed class ShipPhysics
 	private TrackFrame _frame;
 	private float _barrierOffset;
 
+	// Los del último paso, para volver a pasar la barrera tras un choque con otra nave
+	private float _halfWidth;
+	private ShipPhysicsSettings _settings = ShipPhysicsSettings.Default;
+
 	// Superficie de la pista bajo la nave en el último paso (sin circuito: ninguna, la nave no sube ni baja)
 	public bool HasSurface { get; private set; }
 	public SurfacePoint Surface { get; private set; }
@@ -236,6 +240,8 @@ public sealed class ShipPhysics
 	public void AfterMove(ref Vector3 position, Vector2 velocity, bool collided, float halfWidth, in ShipPhysicsSettings s, float dt)
 	{
 		Dynamics.SetVelocity(velocity);
+		_halfWidth = halfWidth;
+		_settings = s;
 
 		UpdateSurface(position);
 		ApplyBarriers(ref position, halfWidth, s, dt);
@@ -245,6 +251,37 @@ public sealed class ShipPhysics
 			Dynamics.AbsorbCollision();
 
 		UpdateVertical(ref position, s, dt);
+	}
+
+	// Golpe con otra nave (spec docs/rivales-3-contacto.md, 3.3), después de AfterMove: empujón y pérdidas en la velocidad
+	// y en el motor; un medio o fuerte corta el derrape y un fuerte empieza la corrección. El boost no se toca.
+	public void ApplyShipContact(Vector2 velocityChange, float speedScale, float speedLoss, bool endDrift, bool startRecovery,
+		float recoveryDuration, float recoveryControl)
+	{
+		Dynamics.ApplyContact(velocityChange, speedScale, speedLoss);
+		if (endDrift)
+			Dynamics.EndDrift();
+		if (startRecovery)
+		{
+			Recovery.Duration = recoveryDuration;
+			Recovery.MinFactor = recoveryControl;
+			Recovery.Start();
+		}
+	}
+
+	// Con la nave ya separada de otra: la barrera otra vez, sin que pase tiempo (así ninguna nave queda dentro de ella
+	// ni un paso). Si el primer paso por la barrera tuvo un impacto que cuenta, no se pierde: un contacto nuevo aquí
+	// cae dentro de su espera. La altura la ajusta el paso siguiente.
+	public void AfterContactMove(ref Vector3 position)
+	{
+		BarrierTouch first = LastBarrierTouch;
+		UpdateSurface(position);
+		ApplyBarriers(ref position, _halfWidth, _settings, 0f);
+		BarrierTouch second = LastBarrierTouch;
+		if (first.IsNewImpact && !second.IsNewImpact)
+			LastBarrierTouch = first;
+		else if (first.Contact && !second.Contact)
+			LastBarrierTouch = first with { Lateral = second.Lateral };
 	}
 
 	// Superficie bajo la nave en su posición actual (en planta)

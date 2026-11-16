@@ -58,7 +58,7 @@ public class StandingsTests
 		foreach (RivalEntry rival in rivals)
 		{
 			string ship = RivalLineup.Ships[check.Next(RivalLineup.Ships.Count)];
-			int paint = check.Next(Vectory.Ship.HullPaints.Count(Vectory.Ship.HullPaints.StyleOf(ship).Value));
+			int paint = check.Next(Vectory.Ship.HullPaints.Count(Assert.NotNull(Vectory.Ship.HullPaints.StyleOf(ship))));
 			Assert.Equal(ship, rival.ShipDesignId);
 			Assert.Equal(paint, rival.PaintIndex);
 		}
@@ -230,17 +230,17 @@ public class StandingsTests
 		marks.Record(-15, 0);
 		marks.Record(25, 4);     // marcas en −10, 0, 10 y 20
 		Assert.Equal(4, marks.Count);
-		Assert.Equal(0.5, marks.TimeAt(-10).Value, 6);
-		Assert.Equal(2.5, marks.TimeAt(10).Value, 6);
-		Assert.Equal(2.75, marks.TimeAt(12.5).Value, 6);
+		Assert.Equal(0.5, Assert.NotNull(marks.TimeAt(-10)), 6);
+		Assert.Equal(2.5, Assert.NotNull(marks.TimeAt(10)), 6);
+		Assert.Equal(2.75, Assert.NotNull(marks.TimeAt(12.5)), 6);
 
 		marks.Record(5, 6);      // hacia atrás: nada nuevo
 		Assert.Equal(4, marks.Count);
-		Assert.Equal(2.5, marks.TimeAt(10).Value, 6);
+		Assert.Equal(2.5, Assert.NotNull(marks.TimeAt(10)), 6);
 
 		marks.Record(35, 7);     // vuelve a avanzar desde 25 m a los 6 s
 		Assert.Equal(5, marks.Count);
-		Assert.Equal(6.5, marks.TimeAt(30).Value, 6);
+		Assert.Equal(6.5, Assert.NotNull(marks.TimeAt(30)), 6);
 		Assert.Null(marks.TimeAt(36));
 		Assert.Null(marks.TimeAt(-16));
 	}
@@ -293,12 +293,12 @@ public class StandingsTests
 	public void The_panel_shows_two_ahead_and_two_behind_with_you_in_the_middle()
 	{
 		StandingsRow?[] fourth = Slots(4);
-		Assert.Equal(new[] { 2, 3, 4, 5, 6 }, fourth.Select(r => r.Value.Position));
-		Assert.Equal(new[] { -2, -1, 0, 1, 2 }, fourth.Select(r => r.Value.Offset));
-		Assert.True(fourth[2].Value.IsPlayer);
-		Assert.Equal("PLAYER", fourth[2].Value.Name);
-		Assert.Equal("", fourth[2].Value.Interval);
-		Assert.Equal("▲ 0.84", fourth[1].Value.Interval);
+		Assert.Equal(new[] { 2, 3, 4, 5, 6 }, fourth.Select(r => Assert.NotNull(r).Position));
+		Assert.Equal(new[] { -2, -1, 0, 1, 2 }, fourth.Select(r => Assert.NotNull(r).Offset));
+		Assert.True(Assert.NotNull(fourth[2]).IsPlayer);
+		Assert.Equal("PLAYER", Assert.NotNull(fourth[2]).Name);
+		Assert.Equal("", Assert.NotNull(fourth[2]).Interval);
+		Assert.Equal("▲ 0.84", Assert.NotNull(fourth[1]).Interval);
 	}
 
 	[Fact]
@@ -307,18 +307,18 @@ public class StandingsTests
 		StandingsRow?[] first = Slots(1);
 		Assert.Null(first[0]);
 		Assert.Null(first[1]);
-		Assert.True(first[2].Value.IsPlayer);
-		Assert.Equal(1, first[2].Value.Position);
-		Assert.Equal(new[] { 2, 3 }, new[] { first[3].Value.Position, first[4].Value.Position });
+		Assert.True(Assert.NotNull(first[2]).IsPlayer);
+		Assert.Equal(1, Assert.NotNull(first[2]).Position);
+		Assert.Equal(new[] { 2, 3 }, new[] { Assert.NotNull(first[3]).Position, Assert.NotNull(first[4]).Position });
 
 		StandingsRow?[] last = Slots(8);
 		Assert.Null(last[3]);
 		Assert.Null(last[4]);
-		Assert.True(last[2].Value.IsPlayer);
-		Assert.Equal(new[] { 6, 7, 8 }, new[] { last[0].Value.Position, last[1].Value.Position, last[2].Value.Position });
+		Assert.True(Assert.NotNull(last[2]).IsPlayer);
+		Assert.Equal(new[] { 6, 7, 8 }, new[] { Assert.NotNull(last[0]).Position, Assert.NotNull(last[1]).Position, Assert.NotNull(last[2]).Position });
 
 		StandingsRow?[] second = Slots(2);
 		Assert.Null(second[0]);
-		Assert.Equal(1, second[1].Value.Position);
+		Assert.Equal(1, Assert.NotNull(second[1]).Position);
 	}
 }

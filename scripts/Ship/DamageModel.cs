@@ -86,7 +86,13 @@ public class DamageModel
 			ImpactLevel.Strong => _settings.StrongPoints,
 			_ => 0
 		};
-		if (points <= 0)
+		AddPoints(points);
+	}
+
+	// Suma puntos sueltos (el reparto de un golpe entre naves); 0 o menos no hace nada
+	public void AddPoints(int points)
+	{
+		if (Stopped || points <= 0)
 			return;
 
 		Points += points;

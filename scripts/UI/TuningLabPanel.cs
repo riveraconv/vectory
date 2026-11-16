@@ -46,6 +46,8 @@ public partial class TuningLabPanel : CanvasLayer
 	private const int MaxRivalPace = 100;
 	private const float RivalsRefreshTime = 0.25f;   // s entre repasos de las filas
 	private static float? _rivalPace;   // el del deslizador, si se ha movido
+	private static bool _contactEnabled = true;   // CONTACT: dura hasta cerrar el juego, no se guarda
+	private CheckBox _contactCheck;
 	private Row _rivalPaceRow;
 	private Label _rivalsLabel;
 	private float _rivalsRefresh;
@@ -79,6 +81,8 @@ public partial class TuningLabPanel : CanvasLayer
 
 		if (_rivalPace is float pace)
 			Rivals?.SetPace(pace);
+		if (Rivals != null)
+			Rivals.Contacts.Enabled = _contactEnabled;
 
 		Build();
 		_root.Visible = false;
@@ -174,6 +178,15 @@ public partial class TuningLabPanel : CanvasLayer
 		GD.Print($"[TuningLab] Rival pace: {Mathf.RoundToInt(value)} %");
 	}
 
+	// Choques entre naves: sin ellos se vuelven a atravesar, para comparar
+	private void OnContactToggled(bool enabled)
+	{
+		_contactEnabled = enabled;
+		if (Rivals != null)
+			Rivals.Contacts.Enabled = enabled;
+		GD.Print($"[TuningLab] Ship contact: {(enabled ? "ON" : "OFF")}");
+	}
+
 	private void RefreshRivals()
 	{
 		if (Rivals == null)
@@ -192,8 +205,10 @@ public partial class TuningLabPanel : CanvasLayer
 			if (text.Length > 0)
 				text.Append('\n');
 			text.Append($"{car.Entry.Pilot.Nickname,-8}{ShipCatalog.Find(car.Ship.Id)?.Name ?? car.Ship.Id,-7}{HullPaints.DisplayName(style, car.Entry.PaintIndex),-30}"
-				+ $"LAP {lap,-4} DMG {car.Damage.Level}  HIT {car.Contacts,-3} RSP {car.Respawns}");
+				+ $"LAP {lap,-4} DMG {car.Damage.Level} {car.Damage.Points,2}P  HIT {car.Contacts,-3} RSP {car.Respawns,-2} "
+				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}");
 		}
+		text.Append($"\nSHIP = RAMS / RECEIVED / MUTUAL · RIVAL VS RIVAL {Rivals.RivalHits}");
 		_rivalsLabel.Text = text.ToString();
 	}
 
@@ -359,6 +374,20 @@ public partial class TuningLabPanel : CanvasLayer
 			column.AddChild(rivalGrid);
 			_rivalPaceRow = BuildRow(rivalGrid, MinRivalPace, MaxRivalPace, 1, OnRivalPaceChanged, label, value, scale);
 			_rivalPaceRow.Name.Text = "PACE";
+			_contactCheck = new CheckBox
+			{
+				Text = "CONTACT",
+				ButtonPressed = _contactEnabled,
+				FocusMode = Control.FocusModeEnum.None
+			};
+			_contactCheck.AddThemeFontOverride("font", font);
+			_contactCheck.AddThemeFontSizeOverride("font_size", fontSize);
+			_contactCheck.AddThemeColorOverride("font_color", Palette.SelectLabel);
+			_contactCheck.AddThemeColorOverride("font_hover_color", Palette.SelectValue);
+			_contactCheck.AddThemeColorOverride("font_pressed_color", Palette.SelectValue);
+			_contactCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
+			_contactCheck.Toggled += OnContactToggled;
+			column.AddChild(_contactCheck);
 			_rivalsLabel = new Label { LabelSettings = value };
 			column.AddChild(_rivalsLabel);
 		}

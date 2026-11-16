@@ -3,6 +3,7 @@ using System.Linq;
 using Godot;
 using Vectory.Autopilot;
 using Vectory.Circuit;
+using Vectory.Contact;
 using Vectory.Radar;
 using Vectory.Ship;
 
@@ -17,7 +18,16 @@ namespace Vectory.Rivals;
 public partial class RivalField : Node3D
 {
 	private readonly List<RivalShip> _ships = new();
+	private readonly List<IContactShip> _contactShips = new();
 	private RaceShipList _raceShips;
+	private IContactShip _player;
+	private ContactDamageSettings _contactDamage = ContactDamageSettings.Default;
+
+	// Choques entre naves (spec docs/rivales-3-contacto.md): el jugador y los rivales
+	public ShipContactSolver Contacts { get; } = new();
+
+	// Golpes medios y fuertes entre dos rivales en esta carrera (para ver si se comen por detrás)
+	public int RivalHits { get; private set; }
 
 	public IReadOnlyList<RivalShip> Ships => _ships;
 
@@ -29,9 +39,13 @@ public partial class RivalField : Node3D
 
 	// Después de añadirlo al árbol: con el circuito ya generado, el jugador ya creado y la carrera ya montada
 	public void Setup(IReadOnlyList<RivalEntry> lineup, Track track, Player player, RaceSession race, RaceShipList raceShips,
-		RivalRaceContext context, float pace, float cooldownPace)
+		RivalRaceContext context, float pace, float cooldownPace, ContactDamageSettings contactDamage, float passableTime)
 	{
 		_raceShips = raceShips;
+		_player = player;
+		_contactDamage = contactDamage;
+		Contacts.Settings = player.BuildShipContactSettings();
+		player.Passable.RespawnTime = passableTime;
 		Pace = pace;
 		Hull3DSettings hullSettings = player.BuildHull3DSettings();
 		var look = new RivalLook(hullSettings, player.BuildBankSettings(), player.BuildAttitudeSettings(),
@@ -51,15 +65,91 @@ public partial class RivalField : Node3D
 			ShipDefinition definition = definitions[i];
 			var car = new RivalCar(entry, definition, pilots, context, pace);
 			car.Driver.CooldownPace = cooldownPace;
+			car.Passable.RespawnTime = passableTime;
 			var ship = new RivalShip();
-			ship.Setup(car, race, raceShips, look, player.FlickerOpacity);
+			ship.Setup(car, race, raceShips, look, player.FlickerOpacity, player.BuildRespawnBlink());
 			AddChild(ship);
 			_ships.Add(ship);
 			GD.Print($"[Race] {entry.Id} {entry.Pilot.Nickname}: grid {entry.GridPosition}, {ShipCatalog.Find(entry.ShipDesignId)?.Name ?? entry.ShipDesignId}, "
 				+ $"{HullPaints.DisplayName(HullPaints.StyleOf(entry.ShipDesignId) ?? HullStyle.Racing, entry.PaintIndex)}");
 		}
 		GD.Print($"[Race] Rival pilots ready: {pilots.ComputedShips.Count} ships in {(Time.GetTicksUsec() - start) / 1000.0:0} ms");
+
+		_contactShips.Add(player);
+		foreach (RivalShip ship in _ships)
+			_contactShips.Add(ship.Car);
+		WarnGridOverlaps();
 	}
+
+	// Un paso de física de la carrera, después del del jugador: mueve los rivales, resuelve los contactos entre todas las
+	// naves (con la barrera otra vez) y termina el paso de cada rival (destello, daño y recolocación). El daño, la
+	// sacudida y la recolocación del jugador los pone Main con Contacts. Con la pausa no se llama.
+	public void StepPhysics(bool raceStarted, float dt)
+	{
+		foreach (RivalShip ship in _ships)
+			ship.Car.Move(raceStarted);
+
+		Contacts.Solve(_contactShips, dt);
+		foreach (ShipContactEvent e in Contacts.Events)
+		{
+			if (!e.IsNewImpact)
+				continue;
+			OnImpact(e.A, e.RoleA, e.Level);
+			OnImpact(e.B, e.RoleB, e.Level);
+			if (e.A != _player.Id && e.B != _player.Id)
+				RivalHits++;
+			GD.Print($"[Race] Contact {e.Level.ToString().ToLowerInvariant()}: {Describe(e)} ({e.ClosingSpeed * 3.6f:0} km/h)");
+		}
+
+		foreach (RivalShip ship in _ships)
+			ship.Car.AfterContacts(Contacts.Touched(ship.Car.Id));
+	}
+
+	// Puntos de un golpe para una nave, según su papel (los del jugador los suma Main)
+	public int ContactPoints(ContactRole role, ImpactLevel level) => ContactDamage.Points(level, role, _contactDamage);
+
+	private void OnImpact(int id, ContactRole role, ImpactLevel level)
+	{
+		RivalCar car = CarOf(id);
+		car?.OnShipImpact(role, ContactPoints(role, level));
+	}
+
+	private RivalCar CarOf(int id)
+	{
+		foreach (RivalShip ship in _ships)
+		{
+			if (ship.Car.Id == id)
+				return ship.Car;
+		}
+		return null;
+	}
+
+	private string NameOf(int id) => CarOf(id)?.Entry.Pilot.Nickname ?? PilotCatalog.PlayerName;
+
+	private string Describe(ShipContactEvent e)
+	{
+		if (e.RoleA == ContactRole.Mutual)
+			return $"{NameOf(e.A)} and {NameOf(e.B)}, mutual";
+		return e.RoleA == ContactRole.Rammer ? $"{NameOf(e.A)} rams {NameOf(e.B)}" : $"{NameOf(e.B)} rams {NameOf(e.A)}";
+	}
+
+	// En la previa no se comprueba nada; si con los anchos dos marcas de la parrilla se solapan, se avisa
+	private void WarnGridOverlaps()
+	{
+		for (int i = 0; i < _contactShips.Count; i++)
+		{
+			for (int j = i + 1; j < _contactShips.Count; j++)
+			{
+				IContactShip a = _contactShips[i];
+				IContactShip b = _contactShips[j];
+				if (ShipContactDetector.Overlap(Plan(a.Position), a.Physics.Dynamics.Yaw, a.Shape, Plan(b.Position), b.Physics.Dynamics.Yaw,
+					b.Shape, out _))
+					GD.PushWarning($"[Race] Grid slots of {NameOf(a.Id)} and {NameOf(b.Id)} overlap");
+			}
+		}
+	}
+
+	private static System.Numerics.Vector2 Plan(System.Numerics.Vector3 p) => new(p.X, p.Z);
 
 	// Cambia el ritmo de todos los rivales al momento (panel de pruebas)
 	public void SetPace(float pace)

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Vectory.Autopilot;
 using Vectory.Circuit;
+using Vectory.Contact;
 using Vectory.Ship;
 
 namespace Vectory.Rivals;
@@ -28,7 +29,7 @@ public sealed class RivalRaceContext
 // de siempre (ShipPhysics), su propio RaceTracker y las mismas reglas que el jugador para barreras, destello,
 // recolocación y daño. Arranca con el GO de la carrera; al completar la última vuelta cancela el impulso del boost y
 // sigue en su vuelta de enfriamiento. Lógica pura: el nodo RivalShip solo la pinta.
-public sealed class RivalCar
+public sealed class RivalCar : IContactShip
 {
 	private readonly RivalRaceContext _context;
 	private readonly ShipTuning _tuning;
@@ -37,7 +38,9 @@ public sealed class RivalCar
 	private readonly RespawnDetector _respawn;
 	private readonly ShipPhysics _physics = new();
 	private Vector3 _position;
+	private Vector3 _previousPosition;
 	private bool _wasInContact;
+	private bool _canDrive;
 
 	public RivalEntry Entry { get; }
 	public ShipDefinition Ship { get; }
@@ -48,6 +51,18 @@ public sealed class RivalCar
 
 	public int Contacts { get; private set; }   // veces que ha empezado a tocar la barrera
 	public int Respawns { get; private set; }
+
+	// Golpes medios y fuertes con otras naves (spec docs/rivales-3-contacto.md, 9): embestidas, recibidos y mutuos
+	public int Rams { get; private set; }
+	public int Received { get; private set; }
+	public int Mutual { get; private set; }
+
+	// Choque entre naves (IContactShip)
+	public int Id => Entry.Number;
+	public ShipShape Shape { get; }
+	public Vector3 PreviousPosition => _previousPosition;
+	public PassableState Passable { get; } = new();
+	public bool CanCollide => _canDrive;
 
 	public Vector3 Position => _position;
 	public ShipPhysics Physics => _physics;
@@ -72,6 +87,7 @@ public sealed class RivalCar
 		_context = context;
 		_tuning = ship.Technical;
 		_halfWidth = ship.Visual.CollisionHalfWidth;
+		Shape = ShipShape.From(ship.Visual);
 
 		Driver = new RivalDriver(pilots.Get(ship), context.Frame, _tuning, context.Physics, context.StepTime,
 			RivalDriver.LongestStraightStart(context.Frame), pace);
@@ -84,13 +100,22 @@ public sealed class RivalCar
 		TrackPlacement.GridStart(context.Frame, entry.GridPosition, ship.Visual.NoseDistance, context.TrackWidth, context.Grid,
 			context.Hover, out _position, out float yaw);
 		_physics.Place(_position, yaw, 0f, context.Physics.Boost);
+		_previousPosition = _position;
 
 		_detector = new LineCrossingDetector(context.Frame.Count);
 		_detector.Update(context.Frame.NearestIndex(_position.X, _position.Z));
 	}
 
-	// Un paso de física. raceStarted: la carrera ya ha dado el GO (el rival arranca su cronómetro en ese paso).
+	// Un paso de física entero, sin otras naves. raceStarted: la carrera ya ha dado el GO (el rival arranca su
+	// cronómetro en ese paso).
 	public void Step(bool raceStarted)
+	{
+		Move(raceStarted);
+		AfterContacts(false);
+	}
+
+	// Primera parte del paso: conducir, mover (barrera incluida) y la carrera. Después van los contactos entre naves.
+	public void Move(bool raceStarted)
 	{
 		float dt = _context.StepTime;
 		if (raceStarted && Tracker.State == RaceState.PreStart)
@@ -98,6 +123,8 @@ public sealed class RivalCar
 
 		RivalPhase phase = Phase;
 		bool canDrive = phase != RivalPhase.PreStart;
+		_canDrive = canDrive;
+		_previousPosition = _position;
 
 		ShipTuning tuning = _tuning;
 		tuning.MaxSpeed *= Damage.TopSpeedFactor;
@@ -115,14 +142,43 @@ public sealed class RivalCar
 			Tracker.Advance(_detector, _context.CheckpointIndices, Track.FinishIndex, dt);
 			// Al terminar, el impulso en curso se corta como en la llegada del jugador
 			if (Tracker.State == RaceState.Finished)
+			{
 				Boost.CancelImpulse();
+				Passable.Finished = true;
+			}
 		}
+	}
 
-		UpdateBarrier(dt, canDrive);
+	// Segunda parte, con los contactos ya resueltos: barrera (destello, daño) y recolocación. touchedShip: ha tocado
+	// a otra nave en este paso (cuenta para el atasco).
+	public void AfterContacts(bool touchedShip)
+	{
+		UpdateBarrier(_context.StepTime, _canDrive, touchedShip);
+	}
+
+	// Separación de otra nave: la barrera otra vez, sin que pase tiempo
+	public void MoveBy(Vector2 delta)
+	{
+		_position.X += delta.X;
+		_position.Z += delta.Y;
+		_physics.AfterContactMove(ref _position);
+	}
+
+	// Golpe con otra nave que cuenta: estadística y daño (solo en carrera)
+	public void OnShipImpact(ContactRole role, int points)
+	{
+		switch (role)
+		{
+			case ContactRole.Rammer: Rams++; break;
+			case ContactRole.Receiver: Received++; break;
+			default: Mutual++; break;
+		}
+		if (Tracker.State == RaceState.Running)
+			Damage.AddPoints(points);
 	}
 
 	// Destello, daño (solo en carrera) y recolocación (siempre que conduce, también en la vuelta de enfriamiento)
-	private void UpdateBarrier(float dt, bool canDrive)
+	private void UpdateBarrier(float dt, bool canDrive, bool touchedShip)
 	{
 		BarrierTouch touch = _physics.LastBarrierTouch;
 		Flash.Update(dt);
@@ -148,10 +204,13 @@ public sealed class RivalCar
 			_respawn.Reset();
 			return;
 		}
-		if (_respawn.Update(dt, touch.Contact, Dynamics.RealSpeed, touch.Lateral, _physics.Vertical.Airborne))
+		// El atasco cuenta contra la barrera o contra otra nave
+		if (_respawn.Update(dt, touch.Contact || touchedShip, Dynamics.RealSpeed, touch.Lateral, _physics.Vertical.Airborne))
 		{
 			TrackPlacement.Respawn(_context.Frame, _position, _context.Hover, out _position, out float yaw);
 			_physics.Respawn(_position, yaw);
+			_previousPosition = _position;
+			Passable.Respawned();
 			Respawns++;
 		}
 	}

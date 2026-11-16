@@ -227,6 +227,18 @@ public class ShipDynamics
 		Speed = MathF.Min(Speed, forwardSpeed);
 	}
 
+	// Golpe con otra nave (spec docs/rivales-3-contacto.md, 3.3): el empujón se suma a la velocidad real y, su parte
+	// hacia el morro, también al motor (si no, el agarre lo deshace en unas décimas); luego la pérdida, a las dos
+	// (factor y m/s, sin bajar de 0). El morro no gira: lo que queda de lado lo corrige el agarre.
+	public void ApplyContact(Vector2 velocityChange, float speedScale, float speedLoss)
+	{
+		float forwardGain = Vector2.Dot(velocityChange, Forward);
+		Vector2 velocity = (Velocity + velocityChange) * speedScale;
+		float length = velocity.Length();
+		Velocity = length > speedLoss ? velocity * ((length - speedLoss) / length) : Vector2.Zero;
+		Speed = MathF.Max(0f, (Speed + forwardGain) * speedScale - speedLoss);
+	}
+
 	// Resta velocidad al motor (sin bajar de 0)
 	public void ReduceSpeed(float amount)
 	{

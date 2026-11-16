@@ -55,6 +55,9 @@ public static class BladeShip
 			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): las puntas traseras en flecha con su
 			// bisel. El wireframe, que siguen usando el fantasma y el menú, llega a 1,6.
 			CollisionHalfWidth = 1.61f,
+			// Caja total del manifiesto del casco 3D sin la sonda, al centímetro
+			CollisionFront = 5.2f,
+			CollisionBack = 3.61f,
 			NoseDistance = 5.2f,
 			PhysicsBoxSize = new Vector3(3.2f, 0.62f, 8.8f),
 			PhysicsBoxCenter = new Vector3(0f, 0.17f, -0.8f)

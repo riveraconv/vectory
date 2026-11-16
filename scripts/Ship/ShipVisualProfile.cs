@@ -84,6 +84,12 @@ public sealed record ShipVisualProfile
 	// Semiancho que usa la colisión con la barrera. Sale del diseño: el de una nave con alas llega a la punta del ala.
 	public required float CollisionHalfWidth { get; init; }
 
+	// Largo que usa el choque entre naves (spec docs/rivales-3-contacto.md, 3.1): del origen de la nave a lo más adelantado
+	// y a lo más atrasado de la caja total del manifiesto de su casco 3D (sin la sonda de BLADE). La caja no está centrada
+	// en el origen, así que van por separado. Como el semiancho, es un dato del perfil y una prueba lo compara con el manifiesto.
+	public required float CollisionFront { get; init; }
+	public required float CollisionBack { get; init; }
+
 	// Distancia del origen de la nave a la punta del morro (colocación en la parrilla)
 	public required float NoseDistance { get; init; }
 

@@ -79,6 +79,12 @@ public partial class Spaceship : Node3D
 		_hull3D?.ClearSmoke();
 	}
 
+	// Opacidad del casco 3D (parpadeo tras recolocar); el wireframe no la usa
+	public void SetHullOpacity(float opacity)
+	{
+		_hull3D?.SetOpacity(opacity);
+	}
+
 	// Brillo de levitación (transformación sobre la pista y fuerza), velocidad para el tamaño del humo y tiempo de la
 	// nave para la anticolisión
 	public void UpdateHullEffects(Transform3D glow, float glowStrength, float speed, float time)

@@ -1,6 +1,7 @@
 using Godot;
 using Vectory.Autopilot;
 using Vectory.Circuit;
+using Vectory.Contact;
 using Vectory.Game;
 using NVec2 = System.Numerics.Vector2;
 
@@ -30,7 +31,7 @@ namespace Vectory.Ship;
 // A,D / Flechas izq.-der.: girar
 // Espacio (acción "drift") + girar: derrapar    Shift (acción "boost"): gastar una carga de boost
 // C: alternar cabina / tercera persona
-public partial class Player : CharacterBody3D
+public partial class Player : CharacterBody3D, IContactShip
 {
 	// Misma conversión que usa el HUD para mostrar la velocidad
 	private const float KmhPerMs = 3.6f;
@@ -127,6 +128,15 @@ public partial class Player : CharacterBody3D
 	[Export] public float RecoveryDuration = ShipPhysicsDefaults.RecoveryDuration;     // segundos de control reducido tras un impacto fuerte
 	[Export(PropertyHint.Range, "0,1,0.01")] public float RecoveryControl = ShipPhysicsDefaults.RecoveryControl;   // giro y aceleración al empezar la corrección
 	[Export] public float ImpactCooldown = ShipPhysicsDefaults.ImpactCooldown;         // segundos sin contar otro impacto medio o fuerte en el mismo lado
+	// Choques entre naves (spec docs/rivales-3-contacto.md): umbrales, restituciones, roce y pérdidas son los de arriba
+	[Export] public float ShipContactMaxHeight = ShipContactSettings.DefaultMaxHeightDifference;   // m de diferencia de altura sobre la pista desde los que no chocan
+	[Export] public float ShipContactCullDistance = ShipContactSettings.DefaultCullDistance;       // m entre naves desde los que no se miran
+	[Export(PropertyHint.Range, "0,1,0.01")] public float ShipContactMutualMargin = ShipContactSettings.DefaultMutualMargin;   // golpe mutuo si la aportación menor llega a esta fracción de la mayor
+	[Export] public float ShipContactCooldown = ShipPhysicsDefaults.ImpactCooldown;   // segundos sin contar otro golpe medio o fuerte de la misma pareja
+
+	[ExportGroup("Recolocación")]
+	[Export(PropertyHint.Range, "0,1,0.01")] public float RespawnBlinkOpacity = RespawnBlink.DefaultOpacity;   // la nave atravesable tras recolocarla baja a esta opacidad
+	[Export] public float RespawnBlinkFrequency = RespawnBlink.DefaultFrequency;                              // Hz del parpadeo
 
 	[ExportGroup("Sacudida de cámara")]
 	[Export] public float MediumShakeAmplitude = 0.06f;   // m (cámara exterior)
@@ -259,6 +269,28 @@ public partial class Player : CharacterBody3D
 
 	public bool AutopilotActive => _autopilot != null;
 	public bool AutopilotUsed { get; private set; }
+
+	// Choque con las otras naves (IContactShip): el jugador es el 0
+	public int Id => 0;
+	public ShipShape Shape => ShipShape.From(ExteriorVisual);
+	public ShipPhysics Physics => _physics;
+	// Node3D ya tiene Position (la local): esta es la del contacto, en el mundo
+	System.Numerics.Vector3 IContactShip.Position => ToNumerics(GlobalPosition);
+	public System.Numerics.Vector3 PreviousPosition { get; private set; }
+	public PassableState Passable { get; } = new();
+	public bool CanCollide => _race != null && _race.CanDrive;
+	private float _blinkTime;
+	private float _hullOpacity = 1f;
+
+	// Separación de otra nave: la barrera otra vez, sin que pase tiempo
+	public void MoveBy(NVec2 delta)
+	{
+		System.Numerics.Vector3 position = ToNumerics(GlobalPosition);
+		position.X += delta.X;
+		position.Z += delta.Y;
+		_physics.AfterContactMove(ref position);
+		GlobalPosition = new Vector3(position.X, position.Y, position.Z);
+	}
 
 	private ShipDynamics Dynamics => _physics.Dynamics;
 	private ShipBoost Boost => _physics.Boost;
@@ -458,6 +490,7 @@ public partial class Player : CharacterBody3D
 	{
 		GlobalPosition = position;
 		_physics.Place(ToNumerics(GlobalPosition), yaw, initialSpeed, BuildBoostTuning());
+		PreviousPosition = ToNumerics(GlobalPosition);
 		_bank.Reset();
 		ResetCameraEffects();
 		SettleOnSurface();
@@ -471,6 +504,8 @@ public partial class Player : CharacterBody3D
 	{
 		GlobalPosition = position;
 		_physics.Respawn(ToNumerics(GlobalPosition), yaw);
+		PreviousPosition = ToNumerics(GlobalPosition);
+		Passable.Respawned();
 		_ship.ClearHullSmoke();
 		_bank.Reset();
 		ResetCameraEffects();
@@ -559,6 +594,7 @@ public partial class Player : CharacterBody3D
 			ScreenGlow = CockpitScreenGlowIntensity
 		}, dt);
 		UpdateHullEffects(dt);
+		UpdateRespawnBlink(dt);
 
 		if (_shipFlicker == null)
 			return;
@@ -572,9 +608,31 @@ public partial class Player : CharacterBody3D
 			_cockpit.ShowEdgeFlicker(_cockpitFlicker);
 	}
 
+	// Atravesable tras recolocarla: el casco parpadea (en cabina no se ve). Con la pausa no avanza.
+	private void UpdateRespawnBlink(float dt)
+	{
+		float opacity = 1f;
+		if (Passable.FromRespawn)
+		{
+			_blinkTime += dt;
+			opacity = new RespawnBlink(RespawnBlinkOpacity, RespawnBlinkFrequency).At(_blinkTime);
+		}
+		else
+		{
+			_blinkTime = 0f;
+		}
+		if (opacity == _hullOpacity)
+			return;
+		_hullOpacity = opacity;
+		_ship.SetHullOpacity(opacity);
+	}
+
+	public RespawnBlink BuildRespawnBlink() => new(RespawnBlinkOpacity, RespawnBlinkFrequency);
+
 	public override void _PhysicsProcess(double delta)
 	{
 		float dt = (float)delta;
+		PreviousPosition = ToNumerics(GlobalPosition);
 
 		// 1. Boost por cargas y reglas de conducción (lógica pura).
 		// Sin carrera en marcha no hay input ni boost (ni recarga): en la previa la nave está
@@ -898,6 +956,28 @@ public partial class Player : CharacterBody3D
 			MediumSpeedLoss = MediumSpeedLoss,
 			StrongSpeedLoss = StrongSpeedLoss,
 			ImpactCooldown = ImpactCooldown
+		};
+	}
+
+	// Choques entre naves: los umbrales, restituciones, roce, pérdidas y corrección de la barrera, más lo propio
+	public ShipContactSettings BuildShipContactSettings()
+	{
+		return new ShipContactSettings
+		{
+			MaxHeightDifference = ShipContactMaxHeight,
+			CullDistance = ShipContactCullDistance,
+			MediumSpeed = ImpactMediumSpeed / KmhPerMs,
+			StrongSpeed = ImpactStrongSpeed / KmhPerMs,
+			MediumRestitution = MediumRestitution,
+			StrongRestitution = StrongRestitution,
+			GrazeEntryLoss = GrazeEntryLoss,
+			GrazeFriction = GrazeFriction / KmhPerMs,
+			MediumSpeedLoss = MediumSpeedLoss,
+			StrongSpeedLoss = StrongSpeedLoss,
+			MutualMargin = ShipContactMutualMargin,
+			PairCooldown = ShipContactCooldown,
+			RecoveryDuration = RecoveryDuration,
+			RecoveryControl = RecoveryControl
 		};
 	}
 

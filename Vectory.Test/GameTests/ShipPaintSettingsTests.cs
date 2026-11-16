@@ -11,7 +11,7 @@ namespace Vectory.Test.GameTests;
 // Pintura guardada por nave (spec docs/selector-pinturas.md, 3 y pruebas 1–6)
 public class ShipPaintSettingsTests
 {
-    private static SettingsStore Loaded(string text)
+    private static SettingsStore Loaded(string? text)
     {
         var store = new SettingsStore(new MemoryRecordStorage { Text = text });
         store.Load();
@@ -22,7 +22,7 @@ public class ShipPaintSettingsTests
     [Theory]
     [InlineData(null)]
     [InlineData("{\"version\":1,\"ghostEnabled\":true,\"lastShipDesignId\":\"ship_02\"}")]
-    public void WithoutShipPaints_EachShipHasItsDefault(string text)
+    public void WithoutShipPaints_EachShipHasItsDefault(string? text)
     {
         SettingsStore store = Loaded(text);
 

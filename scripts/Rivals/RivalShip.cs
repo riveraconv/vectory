@@ -1,5 +1,6 @@
 using Godot;
 using Vectory.Circuit;
+using Vectory.Contact;
 using Vectory.Radar;
 using Vectory.Ship;
 using NVec3 = System.Numerics.Vector3;
@@ -31,12 +32,16 @@ public partial class RivalShip : Node3D
 	private float _time;
 	private int _damageLevel;
 	private int _respawns;
+	private RespawnBlink _blink;
+	private float _blinkTime;
+	private float _hullOpacity = 1f;
 
 	public RivalCar Car => _car;
 
 	// Antes de añadirlo al árbol
-	public void Setup(RivalCar car, RaceSession race, RaceShipList raceShips, RivalLook look, float flickerOpacity)
+	public void Setup(RivalCar car, RaceSession race, RaceShipList raceShips, RivalLook look, float flickerOpacity, RespawnBlink blink)
 	{
+		_blink = blink;
 		_car = car;
 		_race = race;
 		_raceShips = raceShips;
@@ -47,7 +52,7 @@ public partial class RivalShip : Node3D
 
 	public override void _Ready()
 	{
-		// Después de la nave del jugador (prioridad 0), que es la que da el GO en su paso
+		// Después de Main (prioridad 1, su padre), que mueve los rivales con RivalField.StepPhysics
 		ProcessPhysicsPriority = 1;
 
 		ShipDefinition definition = _car.Ship;
@@ -72,10 +77,9 @@ public partial class RivalShip : Node3D
 		Publish();
 	}
 
+	// Pinta el paso que acaba de dar su RivalCar (lo mueve RivalField, con los contactos entre naves)
 	public override void _PhysicsProcess(double delta)
 	{
-		_car.Step(_race.State != RaceState.PreStart);
-
 		if (_car.Respawns != _respawns)
 		{
 			_respawns = _car.Respawns;
@@ -118,6 +122,23 @@ public partial class RivalShip : Node3D
 
 		if (_flicker != null && _flicker.Update(dt))
 			_ship.ShowEdgeFlicker(_flicker, _flickerOpacity);
+
+		// Atravesable tras recolocarla: el casco parpadea
+		float opacity = 1f;
+		if (_car.Passable.FromRespawn)
+		{
+			_blinkTime += dt;
+			opacity = _blink.At(_blinkTime);
+		}
+		else
+		{
+			_blinkTime = 0f;
+		}
+		if (opacity != _hullOpacity)
+		{
+			_hullOpacity = opacity;
+			_ship.SetHullOpacity(opacity);
+		}
 	}
 
 	private void OnDamageLevelChanged(int level)

@@ -3,6 +3,7 @@ using Godot;
 using System.Collections.Generic;
 using System.Linq;
 using Vectory.Circuit;
+using Vectory.Contact;
 using Vectory.Core;
 using Vectory.Ghost;
 using Vectory.Menu;
@@ -84,6 +85,13 @@ public partial class Main : Node3D
 	[Export] public float DamageSegmentGap = 4f;
 	[Export] public float DamageIndicatorGap = 24f;    // separación entre el indicador y las esferas de boost
 	[Export] public float DamageBlinkFrequency = 2f;   // Hz del parpadeo del indicador con nivel 3
+	// Golpes entre naves (spec docs/rivales-3-contacto.md, 4): puntos según el papel; el roce no suma
+	[Export] public int ContactMediumRammer = ContactDamageSettings.DefaultMediumRammer;       // medio: el que embiste
+	[Export] public int ContactMediumReceiver = ContactDamageSettings.DefaultMediumReceiver;   // medio: el que recibe
+	[Export] public int ContactMediumMutual = ContactDamageSettings.DefaultMediumMutual;       // medio mutuo: cada uno
+	[Export] public int ContactStrongRammer = ContactDamageSettings.DefaultStrongRammer;
+	[Export] public int ContactStrongReceiver = ContactDamageSettings.DefaultStrongReceiver;
+	[Export] public int ContactStrongMutual = ContactDamageSettings.DefaultStrongMutual;
 
 	[ExportGroup("Radar")]
 	[Export] public float RadarRange = RadarSettings.DefaultRange;                                 // alcance (m)
@@ -114,6 +122,7 @@ public partial class Main : Node3D
 	[Export] public float StuckSpeed = RespawnSettings.DefaultStuckSpeedKmh;          // km/h: por debajo, y tocando la barrera, la nave está atascada
 	[Export] public float StuckTime = RespawnSettings.DefaultStuckTime;               // segundos seguidos atascada antes de recolocarla
 	[Export] public float OutsideTrackMargin = RespawnSettings.DefaultOutsideMargin;  // metros más allá de la barrera para considerarla fuera de la pista
+	[Export] public float PassableAfterRespawn = PassableState.DefaultRespawnTime;   // segundos sin chocar con otras naves tras recolocarla
 
 	private Player _player;
 	private Track _track;
@@ -321,7 +330,8 @@ public partial class Main : Node3D
 		{
 			_rivals = new RivalField { Name = "Rivals" };
 			AddChild(_rivals);
-			_rivals.Setup(_lineup, _track, _player, _race, _raceShips, BuildRivalContext(), RivalPace, RivalCooldownPace);
+			_rivals.Setup(_lineup, _track, _player, _race, _raceShips, BuildRivalContext(), RivalPace, RivalCooldownPace,
+				BuildContactDamageSettings(), PassableAfterRespawn);
 		}
 		if (_mode == GameMode.Race)
 			SetupStandings();
@@ -389,6 +399,13 @@ public partial class Main : Node3D
 		if (_race == null)
 			return;
 
+		// Rivales y choques entre naves (solo RACE), antes de la barrera del jugador: un empujón contra ella también cuenta
+		if (_rivals != null)
+		{
+			_rivals.StepPhysics(_race.State != RaceState.PreStart, (float)delta);
+			UpdatePlayerShipContacts();
+		}
+
 		UpdateBarrierContact((float)delta);
 
 		if (_recorder != null && _recorder.IsRecording && _race.State == RaceState.Running)
@@ -418,7 +435,7 @@ public partial class Main : Node3D
 				_barrierFlash.Graze(touch.Side, touch.AxisDistance);
 			}
 		}
-		// El del jugador y los de los rivales (que van un paso por detrás: se mueven después de Main)
+		// El del jugador y los de los rivales
 		_track.SetBarrierFlashes(_rivals == null ? new[] { _barrierFlash } : _rivals.Flashes.Prepend(_barrierFlash));
 
 		bool canRespawn = _race.CanDrive && _race.State != RaceState.Finished;
@@ -428,11 +445,28 @@ public partial class Main : Node3D
 			return;
 		}
 
-		if (_respawn.Update(delta, touch.Contact, _player.Speed, touch.Lateral, _player.IsAirborne))
+		// El atasco cuenta contra la barrera o contra otra nave
+		bool touchedShip = _rivals != null && _rivals.Contacts.Touched(_player.Id);
+		if (_respawn.Update(delta, touch.Contact || touchedShip, _player.Speed, touch.Lateral, _player.IsAirborne))
 		{
 			_track.GetRespawn(_player.GlobalPosition, out Vector3 position, out float yaw);
 			_player.Respawn(position, yaw);
 			GD.Print("[Race] Ship repositioned on the track");
+		}
+	}
+
+	// Golpes del jugador con otras naves en este paso: sacudida como con la barrera (medio y fuerte) y daño según su papel
+	// (solo en carrera)
+	private void UpdatePlayerShipContacts()
+	{
+		foreach (ShipContactEvent e in _rivals.Contacts.Events)
+		{
+			if (!e.IsNewImpact || (e.A != _player.Id && e.B != _player.Id))
+				continue;
+			ContactRole role = e.A == _player.Id ? e.RoleA : e.RoleB;
+			_player.ShakeCamera(e.Level);
+			if (_race.State == RaceState.Running)
+				_damage?.AddPoints(_rivals.ContactPoints(role, e.Level));
 		}
 	}
 
@@ -691,6 +725,7 @@ public partial class Main : Node3D
 			return;
 
 		_damage?.Stop();
+		_player.Passable.Finished = true;
 
 		// Con el piloto automático, esta carrera no guarda récords
 		if (_player.AutopilotUsed)
@@ -742,6 +777,19 @@ public partial class Main : Node3D
 	}
 
 	// Lo que comparten los rivales: el circuito y las mismas reglas que el jugador (física, daño, recolocación y destello)
+	private ContactDamageSettings BuildContactDamageSettings()
+	{
+		return new ContactDamageSettings
+		{
+			MediumRammer = ContactMediumRammer,
+			MediumReceiver = ContactMediumReceiver,
+			MediumMutual = ContactMediumMutual,
+			StrongRammer = ContactStrongRammer,
+			StrongReceiver = ContactStrongReceiver,
+			StrongMutual = ContactStrongMutual
+		};
+	}
+
 	private RivalRaceContext BuildRivalContext()
 	{
 		return new RivalRaceContext
