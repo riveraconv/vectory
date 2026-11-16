@@ -15,10 +15,12 @@ namespace Vectory.Circuit
 		double? BestLapTime);
 
 	/// <summary>
-	/// Clasificación final de RACE (spec docs/rivales-2-clasificacion.md, 4): el orden queda fijo al llegar el jugador; las
-	/// naves que no han terminado reciben un tiempo estimado, que pasa a real al cruzar la meta sin cambiar su puesto.
-	/// Ningún tiempo estimado contradice el orden: si saliera igual o más bajo que el de delante, queda en ese + 0,001 s.
-	/// Lógica pura: sin nodos.
+	/// Clasificación final de RACE (spec docs/rivales-2-clasificacion.md, 4): al llegar el jugador quedan fijos su puesto y
+	/// los de quienes llegaron antes (las filas reales del principio); las naves que no han terminado reciben un tiempo
+	/// estimado, en el orden de pista de ese momento. Al cruzar la meta, el tiempo de una pasa a real y las de detrás del
+	/// jugador se reordenan: primero las llegadas, por su tiempo real; después las que siguen en pista, en su orden. Así la
+	/// tabla final nunca se contradice (decisión del usuario, cambia la 4.3). Ningún tiempo estimado contradice el orden:
+	/// si saliera igual o más bajo que el de delante, queda en ese + 0,001 s. Lógica pura: sin nodos.
 	/// </summary>
 	public sealed class RaceClassification
 	{
@@ -26,6 +28,7 @@ namespace Vectory.Circuit
 		public const double MinimumGap = 0.001;
 
 		private readonly ClassificationRow[] _rows;
+		private readonly int _fixedCount;   // filas que ya no se mueven: las reales al fijar la clasificación
 
 		/// <param name="entries">Las naves en el orden de pista en la llegada del jugador.</param>
 		/// <param name="estimates">Tiempo estimado de cada nave sin terminar (por id).</param>
@@ -40,6 +43,8 @@ namespace Vectory.Circuit
 				double time = e.Finished ? e.TotalTime : estimates.TryGetValue(e.Id, out double t) ? t : e.TotalTime;
 				_rows[i] = new ClassificationRow(i + 1, e.Id, e.Name, e.ShipName, time, !e.Finished, e.BestLapTime);
 			}
+			while (_fixedCount < _rows.Length && !_rows[_fixedCount].IsEstimated)
+				_fixedCount++;
 			KeepEstimatesInOrder();
 		}
 
@@ -70,21 +75,38 @@ namespace Vectory.Circuit
 			position < 1 || position > _rows.Length ? 0 : _rows[position - 1].TotalTime - _rows[0].TotalTime;
 
 		/// <summary>
-		/// Una nave estimada cruza la meta: su tiempo pasa a real y su puesto no cambia. Devuelve false si contradice el
-		/// orden (llega antes que la de delante o después que una de detrás ya llegada): manda el orden de pista y quien
-		/// llama lo avisa.
+		/// Una nave estimada cruza la meta: su tiempo pasa a real y las filas de detrás del jugador se reordenan (las
+		/// llegadas por tiempo, delante de las que siguen en pista). Devuelve el puesto que tenía antes de llegar (0 si no
+		/// estaba estimada), para avisar si ha cambiado.
 		/// </summary>
-		public bool Arrive(int id, double totalTime, double? bestLapTime)
+		public int Arrive(int id, double totalTime, double? bestLapTime)
 		{
 			int index = IndexOf(id);
 			if (index < 0 || !_rows[index].IsEstimated)
-				return true;
+				return 0;
 
 			_rows[index] = _rows[index] with { TotalTime = totalTime, IsEstimated = false, BestLapTime = bestLapTime };
-			bool consistent = (index == 0 || _rows[index - 1].TotalTime <= totalTime)
-				&& (index == _rows.Length - 1 || _rows[index + 1].IsEstimated || totalTime <= _rows[index + 1].TotalTime);
+			Reorder();
 			KeepEstimatesInOrder();
-			return consistent;
+			return index + 1;
+		}
+
+		// Detrás de las filas fijas: llegadas por tiempo (con empate, su orden de antes) y luego las estimadas, en su orden
+		private void Reorder()
+		{
+			var tail = new List<(ClassificationRow Row, int Index)>();
+			for (int i = _fixedCount; i < _rows.Length; i++)
+				tail.Add((_rows[i], i));
+			tail.Sort((a, b) =>
+			{
+				if (a.Row.IsEstimated != b.Row.IsEstimated)
+					return a.Row.IsEstimated ? 1 : -1;
+				if (!a.Row.IsEstimated && a.Row.TotalTime != b.Row.TotalTime)
+					return a.Row.TotalTime.CompareTo(b.Row.TotalTime);
+				return a.Index.CompareTo(b.Index);
+			});
+			for (int i = 0; i < tail.Count; i++)
+				_rows[_fixedCount + i] = tail[i].Row with { Position = _fixedCount + i + 1 };
 		}
 
 		/// <summary>Mejor vuelta de una nave que sigue en pista (cambia mientras termina).</summary>

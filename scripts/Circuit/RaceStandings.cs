@@ -275,8 +275,8 @@ namespace Vectory.Circuit
 		public RaceClassification Final { get; private set; }
 
 		/// <summary>
-		/// Se lanza cuando cambia la clasificación final: al fijarla y con cada llegada real (también si la llegada
-		/// contradice el orden: el segundo argumento es la nave que llegó fuera de orden, o -1).
+		/// Se lanza cuando cambia la clasificación final: al fijarla y con cada llegada real. El segundo argumento es la
+		/// nave que ha cambiado de puesto al llegar (adelantando a otras antes de la meta), o -1.
 		/// </summary>
 		public event Action<RaceClassification, int> FinalChanged;
 
@@ -391,8 +391,8 @@ namespace Vectory.Circuit
 		{
 			foreach (Entry arrival in arrivals)
 			{
-				bool consistent = Final.Arrive(arrival.Id, arrival.Time, arrival.BestLapTime);
-				FinalChanged?.Invoke(Final, consistent ? -1 : arrival.Id);
+				int before = Final.Arrive(arrival.Id, arrival.Time, arrival.BestLapTime);
+				FinalChanged?.Invoke(Final, before != 0 && before != Final.PositionOf(arrival.Id) ? arrival.Id : -1);
 			}
 			foreach (Entry e in _ordered)
 			{

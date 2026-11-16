@@ -43,6 +43,9 @@ namespace Vectory.Circuit
         /// </summary>
         public RaceClassification Classification { get; }
 
+        /// <summary>Id del jugador en Classification (su fila va resaltada).</summary>
+        public int ClassificationPlayerId { get; private init; }
+
         public RaceResult(int position, int participantCount, double totalTime, double bestLapTime, int bestLapNumber,
             IReadOnlyList<SectorBest> bestSectors, string shipName = "", RaceClassification classification = null)
         {
@@ -65,7 +68,7 @@ namespace Vectory.Circuit
             if (classification == null || classification.PositionOf(playerId) == 0)
                 return this;
             return new RaceResult(classification.PositionOf(playerId), classification.Count, TotalTime, BestLapTime,
-                BestLapNumber, BestSectors, ShipName, classification);
+                BestLapNumber, BestSectors, ShipName, classification) { ClassificationPlayerId = playerId };
         }
     }
 }

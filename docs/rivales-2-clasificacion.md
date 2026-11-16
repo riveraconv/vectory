@@ -164,7 +164,7 @@ En el momento en que **llegas tú**, cada rival que no ha terminado recibe un **
 ### 4.3 Cuando terminan los demás
 
 - Tras tu llegada, los rivales **siguen corriendo** como en la spec 1 (también con la franja de resultados en pantalla).
-- Cuando uno cruza la meta, su tiempo **estimado** pasa a **real**. Su **puesto no cambia**: el orden quedó fijado al llegar tú. Si su tiempo real contradice el orden (raro, por ejemplo si se queda atascado y otro le pasa), **manda el orden de pista en tu llegada** y se apunta en la consola.
+- Cuando uno cruza la meta, su tiempo **estimado** pasa a **real**. **Tu puesto y el de los que llegaron antes que tú no cambian nunca.** Los de detrás de ti se **reordenan** con cada llegada: primero los que ya han llegado, por su tiempo real; después los que siguen en pista, en su orden. Si una llegada cambia de puesto a alguien, se apunta en la consola. *(Decisión del usuario en la etapa 3: con los rivales en grupo, pasaba a menudo que se adelantaban entre tu llegada y la suya, y la tabla final enseñaba tiempos que contradecían los puestos.)*
 - Cada fila sabe si su tiempo es **estimado** o **real**. Los resultados lo enseñan (etapa 3).
 - **Saltar**: no hay que esperar. RESTART RACE y BACK TO MAIN MENU funcionan desde el primer momento, como ahora. Al salir, lo que quede se queda estimado y no se guarda nada de los rivales.
 - La pausa congela también a los rivales y la clasificación.
@@ -219,6 +219,16 @@ La franja de resultados tiene hoy tres columnas: resultado (posición), tiempos 
 
 Esta sección se completa con la maqueta elegida. Hasta entonces, las etapas 1 y 2 se pueden implementar y validar.
 
+### 7.1 Composición elegida
+
+Maqueta: **`designs/clasificacion-resultados.html`**, versión **B · TABLA A LA DERECHA**, con **tiempos totales** (no diferencia) y la **etiqueta `EST`** en los estimados (la opción por defecto de la maqueta). Su función `variantB` y las que usa (`resultBlock`, `timesBlock`, `table`, `optionsBlock` en horizontal) son la referencia de medidas y colores. Si algo no cuadra, **manda la maqueta**.
+
+- La franja crece de 340 a **440 px**. Tres columnas como hoy con separadores en x = 470 y 860: **resultado** (RACE FINISHED, posición, nave) y **tiempos** (TOTAL TIME, BEST LAP y sectores, con NEW RECORD en la línea de la etiqueta, como ahora) no cambian; la **tabla** ocupa la tercera columna (x = 890, 340 px de ancho).
+- **Opciones** RESTART RACE / BACK TO MAIN MENU en **una fila**, centradas, abajo de la franja, debajo de una línea azul tenue. ↑ ↓ (y ← →) cambian la opción; ratón igual que ahora.
+- **Tabla**: cabecera `CLASSIFICATION` (Share Tech Mono 14, azul grisáceo) y, a la derecha, `N PROVISIONAL` en naranja con un punto que late mientras quedan estimados, o `FINAL` en cian. Ocho filas de 32 px: puesto (magenta; cian el tuyo), apodo (blanco azulado; `PLAYER` en cian), nave (11 px, azul grisáceo tenue) y tiempo total alineado a la derecha (el primero en Orbitron cian; el tuyo en cian; el resto en blanco azulado). Tu fila con franja cian al 12 % y una línea de 2 px a la izquierda.
+- **Estimados**: tiempo al 60 % con la etiqueta `EST` en un recuadro a su derecha. Al llegar el rival, la fila **destella** en cian (0,6 s) y el tiempo pasa a real.
+- La tabla se actualiza en directo con la franja en pantalla; la pausa la congela.
+
 ## 8. Pruebas
 
 ### Pruebas unitarias mínimas
@@ -241,7 +251,7 @@ Intervalo y formato (etapa 1):
 Clasificación final (etapa 2):
 10. Al llegar tú, los no terminados reciben tiempo estimado con la fórmula de 4.2, en orden de pista, y ninguno por delante de ti.
 11. Si una estimación es menor que la del de delante, queda en la del de delante + 0,001 s.
-12. Una llegada real pasa la fila de estimada a real sin cambiar su puesto.
+12. Una llegada real pasa la fila de estimada a real; los de detrás de ti se reordenan por su tiempo real, delante de los estimados, y tu puesto y el de los llegados antes que tú no cambian.
 13. `RaceResult` lleva los 8 con todos los campos de 4.4.
 
 Las pruebas existentes siguen pasando. Las que comprobaban el texto `N / 8` del HUD se adaptan al panel.

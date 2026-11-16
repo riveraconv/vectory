@@ -52,8 +52,8 @@ public partial class Main : Node3D
 
 	[ExportGroup("Resultados")]
 	[Export] public float ResultsDelay = 1.5f;    // segundos desde la meta hasta la pantalla de resultados
-	[Export] public float ResultsBandHeight = 340f;   // alto de la franja de resultados (px sobre 1280×720)
-	[Export] public int ResultsOptionFontSize = 24;   // opciones RESTART RACE / BACK TO MAIN MENU (máximo: se reduce si no caben)
+	[Export] public float ResultsBandHeight = 440f;   // alto de la franja de resultados (px sobre 1280×720)
+	[Export] public int ResultsOptionFontSize = 22;   // opciones RESTART RACE / BACK TO MAIN MENU, en fila (máximo: se reduce si no caben)
 	[Export] public int ResultsShipNameFontSize = 16; // nombre de la nave, bajo la posición (px sobre 1280×720)
 	[Export(PropertyHint.File, "*.tscn")] public string MainMenuScenePath = SceneChanger.MainMenuScene;
 
@@ -459,12 +459,13 @@ public partial class Main : Node3D
 			return;   // el Enter de este frame no elige todavía
 		}
 
-		if (Input.IsActionJustPressed("menu_down"))
+		// Opciones en fila: también ← →
+		if (Input.IsActionJustPressed("menu_down") || Input.IsActionJustPressed("menu_right"))
 		{
 			_resultsMenu.MoveNext();
 			_hud.RefreshResultsOptions();
 		}
-		else if (Input.IsActionJustPressed("menu_up"))
+		else if (Input.IsActionJustPressed("menu_up") || Input.IsActionJustPressed("menu_left"))
 		{
 			_resultsMenu.MovePrevious();
 			_hud.RefreshResultsOptions();
@@ -583,12 +584,12 @@ public partial class Main : Node3D
 
 	// Clasificación final (spec docs/rivales-2-clasificacion.md, 4): en la consola al fijarla con tu llegada y con cada
 	// llegada de un rival, que pasa de estimado a real. Hasta la etapa 3 los resultados solo enseñan la posición.
-	private void OnFinalClassificationChanged(RaceClassification final, int outOfOrderId)
+	private void OnFinalClassificationChanged(RaceClassification final, int movedId)
 	{
-		if (outOfOrderId >= 0)
+		if (movedId >= 0)
 		{
-			GD.Print($"[Race] {_standingsNames.GetValueOrDefault(outOfOrderId, outOfOrderId.ToString())} arrived out of order; "
-				+ "the track order at your arrival is kept");
+			GD.Print($"[Race] {_standingsNames.GetValueOrDefault(movedId, movedId.ToString())} finished in position "
+				+ $"{final.PositionOf(movedId)}, not where it was at your arrival");
 		}
 		var text = new System.Text.StringBuilder();
 		text.Append($"[Race] Classification ({final.EstimatedCount} estimated):");

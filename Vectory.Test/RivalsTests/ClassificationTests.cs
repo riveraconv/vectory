@@ -73,36 +73,46 @@ public class ClassificationTests
 	// --- 12 ---
 
 	[Fact]
-	public void A_real_arrival_turns_the_row_real_without_changing_its_place()
+	public void A_real_arrival_turns_the_row_real_and_rivals_behind_you_are_reordered_by_their_real_times()
 	{
 		RaceStandings standings = Standings();
-		var changes = new List<int>();
-		standings.FinalChanged += (_, outOfOrder) => changes.Add(outOfOrder);
-		standings.Update(new[] { Done(0, 1, 120), Racing(1, 2, 3, 3, 900f, 120, 40), Racing(2, 3, 3, 3, 800f, 120, 40) });
-		Assert.Equal(2, standings.Final.EstimatedCount);
+		var moved = new List<int>();
+		standings.FinalChanged += (_, id) => moved.Add(id);
+		standings.Update(new[] { Done(0, 1, 120), Racing(1, 2, 3, 3, 900f, 120, 40), Racing(2, 3, 3, 3, 800f, 120, 40),
+			Racing(3, 4, 3, 3, 700f, 120, 40) });
+		Assert.Equal(new[] { 0, 1, 2, 3 }, standings.Final.Rows.Select(r => r.Id));
+		Assert.Equal(3, standings.Final.EstimatedCount);
 
-		// Llega el 2 antes que el 1 (que se ha quedado atascado): manda el orden de tu llegada y se avisa
-		standings.Update(new[] { Done(0, 1, 120), Racing(1, 2, 3, 3, 905f, 124, 40), Done(2, 3, 124) });
-		Assert.Equal(new[] { 0, 1, 2 }, standings.Final.Rows.Select(r => r.Id));
-		Assert.False(standings.Final.Rows[2].IsEstimated);
-		Assert.Equal(124, standings.Final.Rows[2].TotalTime, 9);
-		Assert.True(standings.Final.Rows[1].IsEstimated);
+		// Llega el 2 antes que el 1 (que se ha quedado atascado): pasa delante de él, detrás de ti, y se avisa
+		standings.Update(new[] { Done(0, 1, 120), Racing(1, 2, 3, 3, 905f, 124, 40), Done(2, 3, 124), Racing(3, 4, 3, 3, 960f, 124, 40) });
+		Assert.Equal(new[] { 0, 2, 1, 3 }, standings.Final.Rows.Select(r => r.Id));
+		Assert.Equal(new[] { 1, 2, 3, 4 }, standings.Final.Rows.Select(r => r.Position));
+		Assert.False(standings.Final.Rows[1].IsEstimated);
+		Assert.Equal(124, standings.Final.Rows[1].TotalTime, 9);
+		Assert.True(standings.Final.Rows[2].IsEstimated);
+		Assert.True(standings.Final.Rows[2].TotalTime > 124);   // las estimadas, detrás de las llegadas
+		Assert.Equal(new[] { 0, 2, 1, 3 }, standings.Order);   // el panel del HUD, igual
 
-		standings.Update(new[] { Done(0, 1, 120), Done(1, 2, 126), Done(2, 3, 124) });
-		Assert.Equal(new[] { 0, 1, 2 }, standings.Order);
+		// Llegan el 3 y luego el 1: cada uno en su sitio por tiempo
+		standings.Update(new[] { Done(0, 1, 120), Racing(1, 2, 3, 3, 910f, 125, 40), Done(2, 3, 124), Done(3, 4, 125) });
+		standings.Update(new[] { Done(0, 1, 120), Done(1, 2, 126), Done(2, 3, 124), Done(3, 4, 125) });
+		Assert.Equal(new[] { 0, 2, 3, 1 }, standings.Order);
 		Assert.Equal(0, standings.Final.EstimatedCount);
-		Assert.Equal(126, standings.Final.Rows[1].TotalTime, 9);
-		Assert.Equal(new[] { -1, -1, 1 }, changes);   // al fijarla, la llegada del 2 (en orden respecto a ti) y la del 1, fuera de orden
+		Assert.Equal(new double[] { 120, 124, 125, 126 }, standings.Final.Rows.Select(r => r.TotalTime));
+		// Al fijarla nadie; el 2 sube del 3º al 2º; el 3 sube del 4º al 3º; el 1 llega 4º, donde ya estaba tras ellos
+		Assert.Equal(new[] { -1, 2, 3, -1 }, moved);
 
-		// Las llegadas en orden no avisan
-		var inOrder = new RaceClassification(new[]
+		// Tu puesto y el de quien llegó antes que tú no se mueven nunca
+		var before = new RaceClassification(new[]
 		{
+			new ClassificationEntry(1, "R1", "BLADE", true, 119, 39),
 			new ClassificationEntry(0, "PLAYER", "VECTOR", true, 120, 39),
-			new ClassificationEntry(1, "R1", "BLADE", false, 0, 40)
-		}, new Dictionary<int, double> { [1] = 125 });
-		Assert.True(inOrder.Arrive(1, 123, 40));
-		Assert.Equal(2, inOrder.PositionOf(1));
-		Assert.Equal(3, inOrder.GapToLeader(2), 9);
+			new ClassificationEntry(2, "R2", "BLADE", false, 0, 40)
+		}, new Dictionary<int, double> { [2] = 125 });
+		Assert.Equal(3, before.Arrive(2, 118, 40));   // imposible en pista, pero ni así pasa delante
+		Assert.Equal(new[] { 1, 0, 2 }, before.Rows.Select(r => r.Id));
+		Assert.Equal(1, before.GapToLeader(2), 9);
+		Assert.Equal(0, before.Arrive(2, 130, 40));   // ya llegada: nada
 	}
 
 	[Fact]

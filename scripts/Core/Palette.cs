@@ -187,4 +187,11 @@ public static class Palette
 	// de los rivales en Magenta, /8 e intervalo en BlueGray, fondo Background ---
 	public static readonly Color StandingsName = new Color(0xE9F6FFFF);             // apodo de un rival (blanco azulado)
 	public static readonly Color StandingsPlayerStrip = new Color(Cyan, 0.12f);     // franja detrás de la fila del jugador
+
+	// --- Clasificación en resultados (spec docs/rivales-2-clasificacion.md, 7.1): mismos colores que el panel, más ---
+	public static readonly Color ClassificationProvisional = Orange;               // N PROVISIONAL y su punto
+	public static readonly Color ClassificationFinal = Cyan;                       // FINAL
+	public static readonly Color ClassificationEstimated = BlueGray;               // etiqueta EST (y su recuadro, atenuado)
+	public static readonly Color ClassificationArrival = Cyan;                     // destello de la fila al llegar el rival
+	public static readonly Color ResultsDivider = new Color(Blue, 0.35f);          // línea sobre las opciones en fila
 }

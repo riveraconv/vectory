@@ -18,7 +18,7 @@ public partial class MenuBand : Control
 	private float _scale = 1f;
 	private float _height;
 	private float _centerY = ScreenCenterY;
-	private readonly System.Collections.Generic.List<(ColorRect Rect, float Height)> _separators = new();
+	private readonly System.Collections.Generic.List<(ColorRect Rect, float Height, float Offset)> _separators = new();
 
 	// Contenedor de la franja: lo que se añada aquí va en coordenadas de la franja (0 = borde de arriba)
 	public Control Band { get; private set; }
@@ -73,34 +73,36 @@ public partial class MenuBand : Control
 		Band.OffsetTop = center - heightPx * 0.5f;
 		Band.OffsetBottom = center + heightPx * 0.5f;
 
-		foreach (var (rect, h) in _separators)
-			rect.Position = new Vector2(rect.Position.X, (heightPx - h) * 0.5f);
+		foreach (var (rect, h, offset) in _separators)
+			rect.Position = new Vector2(rect.Position.X, (heightPx - h) * 0.5f + offset);
 	}
 
-	// Separador vertical de 1 px centrado en la franja (x y alto en px sobre 1280×720)
-	public void AddSeparator(float x, float height)
+	// Separador vertical de 1 px centrado en la franja (x y alto en px sobre 1280×720). centerOffset: desplazamiento
+	// de su centro respecto al de la franja (px sobre 1280×720; negativo = más arriba)
+	public void AddSeparator(float x, float height, float centerOffset = 0f)
 	{
 		float h = height * _scale;
+		float offset = centerOffset * _scale;
 		var rect = new ColorRect
 		{
 			Name = "Separator",
 			Color = Palette.MenuSeparator,
 			MouseFilter = MouseFilterEnum.Ignore,
-			Position = new Vector2(x * _scale, (_height - h) * 0.5f),
+			Position = new Vector2(x * _scale, (_height - h) * 0.5f + offset),
 			Size = new Vector2(Mathf.Max(1f, _scale), h)
 		};
 		Band.AddChild(rect);
-		_separators.Add((rect, h));
+		_separators.Add((rect, h, offset));
 	}
 
 	// Cambia el alto de un separador (por orden de creación; px sobre 1280×720), que sigue centrado
 	public void SetSeparatorHeight(int index, float height)
 	{
 		float h = height * _scale;
-		ColorRect rect = _separators[index].Rect;
+		(ColorRect rect, _, float offset) = _separators[index];
 		rect.Size = new Vector2(rect.Size.X, h);
-		rect.Position = new Vector2(rect.Position.X, (_height - h) * 0.5f);
-		_separators[index] = (rect, h);
+		rect.Position = new Vector2(rect.Position.X, (_height - h) * 0.5f + offset);
+		_separators[index] = (rect, h, offset);
 	}
 
 	// Columna de contenido centrada en vertical en la franja, empezando en x (px sobre 1280×720)

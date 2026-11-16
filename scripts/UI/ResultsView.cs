@@ -6,11 +6,13 @@ using Vectory.Menu;
 
 namespace Vectory.UI;
 
-// Pantalla de resultados: franja horizontal como la de la pausa (MenuBand), con tres columnas:
+// Pantalla de resultados: franja horizontal como la de la pausa (MenuBand), con tres columnas y las opciones en una fila
+// abajo (spec docs/rivales-2-clasificacion.md, 7.1; maqueta designs/clasificacion-resultados.html, versión B):
 //   izquierda: RACE FINISHED, la posición final (1st / 8) y la nave con la que se ha corrido
 //   centro:    tiempo total, mejor vuelta (NEW RECORD si baten el récord de RACE) y mejor tiempo
 //              de cada sector, con la vuelta en que se hizo
-//   derecha:   opciones RESTART RACE / BACK TO MAIN MENU (OptionList)
+//   derecha:   la clasificación de los participantes (ClassificationTableView), en directo; sin ella, vacía
+//   abajo:     opciones RESTART RACE / BACK TO MAIN MENU en fila (OptionList), bajo una línea
 // Solo MUESTRA el RaceResult y el MenuModel que le pasan: la acción elegida la ejecuta Main.
 //
 // Medidas sobre 1280×720, multiplicadas por UiScale.Factor. Ocupa toda la pantalla.
@@ -22,9 +24,13 @@ public partial class ResultsView : Control
 	private const float BandOpacity = 0.9f;
 	private const float ResultLeft = 96f;
 	private const float TimesLeft = 520f;
-	private const float OptionsLeft = 900f;
-	private const float RightMargin = 40f;         // hueco mínimo entre las opciones y el borde derecho
-	private const float SeparatorHeight = 244f;
+	private const float TableLeft = 890f;
+	private const float OptionsRowHeight = 60f;    // fila de las opciones, abajo de la franja
+	private const float DividerAbove = 70f;        // la línea sobre las opciones, desde el borde de abajo
+	private const float DividerLeft = 96f;
+	private const float DividerWidth = 1088f;
+	private const float OptionsGap = 60f;          // entre RESTART RACE y BACK TO MAIN MENU
+	private const float SeparatorHeight = 300f;
 	private const float VerticalPadding = 20f;     // hueco mínimo arriba y abajo del contenido antes de que la franja crezca
 	private const float SectorNameWidth = 44f;
 	private const float SectorTimeWidth = 130f;
@@ -58,12 +64,14 @@ public partial class ResultsView : Control
 		_band = new MenuBand { Name = "MenuBand" };
 		AddChild(_band);
 		_band.Setup(bandHeight, DimOpacity, BandOpacity);
-		_band.AddSeparator(470f, SeparatorHeight);
-		_band.AddSeparator(860f, SeparatorHeight);
+		// Separadores centrados en la parte de arriba, la de las columnas
+		_band.AddSeparator(470f, SeparatorHeight, -OptionsRowHeight * 0.5f);
+		_band.AddSeparator(860f, SeparatorHeight, -OptionsRowHeight * 0.5f);
 
 		BuildResultColumn(result, shipNameFontSize);
 		BuildTimesColumn(result, newTotalRecord, newLapRecord);
-		BuildOptionsColumn(options, optionFontSize);
+		BuildClassificationColumn(result);
+		BuildOptionsRow(options, optionFontSize);
 
 		// El tamaño mínimo de las columnas se conoce cuando ya están montadas
 		CallDeferred(MethodName.FitBandHeight);
@@ -83,9 +91,17 @@ public partial class ResultsView : Control
 	// Columnas
 	// ---------------------------------------------------------------
 
+	// Columna centrada en la parte de arriba de la franja (sin la fila de las opciones)
+	private VBoxContainer AddColumn(string name, float x, float separation)
+	{
+		VBoxContainer column = _band.AddColumn(name, x, separation);
+		column.OffsetBottom = -S(OptionsRowHeight);
+		return column;
+	}
+
 	private void BuildResultColumn(RaceResult result, int shipNameFontSize)
 	{
-		VBoxContainer column = _band.AddColumn("Result", ResultLeft, 18f);
+		VBoxContainer column = AddColumn("Result", ResultLeft, 18f);
 
 		column.AddChild(MakeLabel("RACE FINISHED", MenuFonts.Orbitron, 900, 34f, 0.08f, Palette.Cyan, Palette.MenuTitleGlow, 14f));
 
@@ -112,7 +128,7 @@ public partial class ResultsView : Control
 
 	private void BuildTimesColumn(RaceResult result, bool newTotalRecord, bool newLapRecord)
 	{
-		VBoxContainer column = _band.AddColumn("Times", TimesLeft, 8f);
+		VBoxContainer column = AddColumn("Times", TimesLeft, 8f);
 
 		// NEW RECORD va en la línea de la etiqueta: junto al tiempo de la mejor vuelta (con "lap N")
 		// no cabe en la columna y pisaría las opciones
@@ -152,14 +168,52 @@ public partial class ResultsView : Control
 		column.AddChild(sectors);
 	}
 
-	private void BuildOptionsColumn(MenuModel options, int optionFontSize)
+	// Clasificación de los participantes, en directo (sin ella, la columna queda vacía)
+	private void BuildClassificationColumn(RaceResult result)
 	{
-		VBoxContainer column = _band.AddColumn("Options", OptionsLeft, 0f);
+		if (result.Classification == null)
+			return;
+		VBoxContainer column = AddColumn("Classification", TableLeft - 8f, 0f);
+		var table = new ClassificationTableView { Name = "ClassificationTable" };
+		column.AddChild(table);
+		table.Setup(result.Classification, result.ClassificationPlayerId);
+	}
 
-		_options = new OptionList { Name = "OptionList" };
+	// Opciones en una fila, centradas en la parte de abajo de la franja, bajo una línea tenue
+	private void BuildOptionsRow(MenuModel options, int optionFontSize)
+	{
+		_band.Band.AddChild(new ColorRect
+		{
+			Name = "OptionsDivider",
+			Color = Palette.ResultsDivider,
+			MouseFilter = MouseFilterEnum.Ignore,
+			AnchorLeft = 0f,
+			AnchorRight = 0f,
+			AnchorTop = 1f,
+			AnchorBottom = 1f,
+			OffsetLeft = S(DividerLeft),
+			OffsetRight = S(DividerLeft + DividerWidth),
+			OffsetTop = -S(DividerAbove),
+			OffsetBottom = -S(DividerAbove) + Mathf.Max(1f, _scale)
+		});
+
+		var row = new CenterContainer
+		{
+			Name = "Options",
+			MouseFilter = MouseFilterEnum.Ignore,
+			AnchorLeft = 0f,
+			AnchorRight = 1f,
+			AnchorTop = 1f,
+			AnchorBottom = 1f,
+			OffsetTop = -S(OptionsRowHeight),
+			OffsetBottom = 0f
+		};
+		_band.Band.AddChild(row);
+
+		_options = new OptionList { Name = "OptionList", Horizontal = true };
 		_options.Setup(OptionListStyle.Scaled(_scale, FitOptionFontSize(options, optionFontSize),
-			46f, 4f, new Vector2(4f, 32f), 16f));
-		column.AddChild(_options);
+			40f, OptionsGap, new Vector2(3f, 24f), 10f));
+		row.AddChild(_options);
 		_options.SetModel(options);
 		_options.Chosen += id => OptionChosen?.Invoke(id);
 	}
@@ -167,7 +221,7 @@ public partial class ResultsView : Control
 	// Mayor tamaño (como mucho maxSize) con el que las opciones caben antes del borde derecho de la pantalla
 	private int FitOptionFontSize(MenuModel options, int maxSize)
 	{
-		int size = OptionList.FitFontSize(options, maxSize, _scale, S(1280f - OptionsLeft - RightMargin));
+		int size = OptionList.FitFontSize(options, maxSize, _scale, S((DividerWidth - OptionsGap) * 0.5f));
 		if (size < maxSize)
 			GD.Print($"ResultsView: opciones reducidas a {size} px para que quepan en pantalla.");
 		return size;
@@ -183,7 +237,7 @@ public partial class ResultsView : Control
 				needed = Mathf.Max(needed, column.GetCombinedMinimumSize().Y);
 		}
 
-		needed += 2f * S(VerticalPadding);
+		needed += 2f * S(VerticalPadding) + S(OptionsRowHeight);
 		if (needed > _band.BandHeight)
 			_band.SetHeight(needed);
 	}

@@ -37,14 +37,23 @@ public struct OptionListStyle
 	}
 }
 
-// Lista vertical de opciones con el aspecto de los menús: barra lateral cian y texto desplazado
+// Lista de opciones (vertical; en fila con Horizontal) con el aspecto de los menús: barra lateral cian y texto desplazado
 // en la seleccionada, azul grisáceo en las activas y azul atenuado + COMING SOON en las desactivadas.
 // Solo DIBUJA un MenuModel: el ratón selecciona (hover) y elige (clic) a través del modelo;
 // el teclado lo gestiona quien la usa, que después llama a Refresh(). Elegir lanza Chosen.
 //
 // La usan el menú principal, la pausa y la pantalla de resultados.
-public partial class OptionList : VBoxContainer
+public partial class OptionList : BoxContainer
 {
+	public OptionList()
+	{
+		Vertical = true;
+	}
+
+	// En fila (resultados de RACE): cada opción reserva el ancho de su texto seleccionado, así marcar una no mueve la otra.
+	// Fijarlo antes de Setup.
+	public bool Horizontal { get; set; }
+
 	public const string ComingSoon = "COMING SOON";
 
 	// Se lanza al hacer clic en una opción activa, con su identificador
@@ -98,6 +107,7 @@ public partial class OptionList : VBoxContainer
 	public void Setup(OptionListStyle style)
 	{
 		_style = style;
+		Vertical = !Horizontal;
 		MouseFilter = MouseFilterEnum.Ignore;
 		AddThemeConstantOverride("separation", style.Spacing);
 
@@ -148,10 +158,14 @@ public partial class OptionList : VBoxContainer
 
 	private Row BuildRow(MenuOption option, int index)
 	{
+		float rowWidth = Horizontal
+			? _style.BarSize.X + _style.SelectedOffset
+				+ _selectedSettings.Font.GetStringSize(option.Label, HorizontalAlignment.Left, -1, _style.FontSize).X
+			: 0f;
 		var row = new HBoxContainer
 		{
 			Name = option.Id,
-			CustomMinimumSize = new Vector2(0f, _style.RowHeight),
+			CustomMinimumSize = new Vector2(rowWidth, _style.RowHeight),
 			// Las desactivadas no reaccionan al ratón
 			MouseFilter = option.Enabled ? MouseFilterEnum.Stop : MouseFilterEnum.Ignore,
 			MouseDefaultCursorShape = option.Enabled ? CursorShape.PointingHand : CursorShape.Arrow

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>VECTORY · Clasificación en resultados · Versiones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { --cyan:#36E7FF; --blue:#245BFF; --mag:#FF43D0; --orange:#FF9D32; --bg:#05070D; --grey:#A6B8D8; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--grey); font-family:'Share Tech Mono', monospace; overflow:hidden; user-select:none; -webkit-user-select:none; }
+  body { display:flex; flex-direction:column; }
+  #stage { flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:0; }
+  #view { position:relative; }
+  #view canvas { position:absolute; inset:0; display:block; width:100%; height:100%; }
+  #bar { flex:none; display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; align-items:center; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid rgba(36,91,255,.35); background:#070B16; }
+  .grp { display:flex; gap:4px; align-items:center; }
+  .grp b { font-weight:normal; font-size:11px; letter-spacing:.12em; opacity:.6; margin-right:2px; }
+  #bar button { font-family:inherit; font-size:12px; letter-spacing:.08em; color:var(--cyan); background:#0C1324; border:1px solid rgba(54,231,255,.35); padding:8px 10px; cursor:pointer; }
+  #bar button.on { background:rgba(54,231,255,.18); border-color:rgba(54,231,255,.9); }
+  #help { flex-basis:100%; text-align:center; font-size:11px; letter-spacing:.05em; opacity:.55; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="view"><canvas id="c"></canvas></div></div>
+<div id="bar">
+  <div class="grp"><b>VERSIÓN</b>
+    <button data-g="variant" data-v="A" class="on">A · CUATRO COLUMNAS</button>
+    <button data-g="variant" data-v="B">B · TABLA A LA DERECHA</button>
+    <button data-g="variant" data-v="C">C · PESTAÑAS</button>
+  </div>
+  <div class="grp"><b>PLAYER</b>
+    <button data-g="pos" data-v="1">1º</button>
+    <button data-g="pos" data-v="4" class="on">4º</button>
+    <button data-g="pos" data-v="8">8º</button>
+  </div>
+  <div class="grp"><b>TIEMPOS</b>
+    <button data-g="times" data-v="gap" class="on">DIFERENCIA</button>
+    <button data-g="times" data-v="total">TOTAL</button>
+  </div>
+  <div class="grp"><b>ESTIMADOS</b>
+    <button data-g="est" data-v="tag" class="on">ETIQUETA EST</button>
+    <button data-g="est" data-v="tilde">≈ Y TENUE</button>
+  </div>
+  <div class="grp"><b>RÉCORD</b>
+    <button data-g="rec" data-v="off" class="on">NO</button>
+    <button data-g="rec" data-v="on">NEW RECORD</button>
+  </div>
+  <div class="grp"><button id="bRun">REPETIR LLEGADAS</button><button id="bDraw">SORTEAR PILOTOS</button></div>
+  <div id="help">Franja de resultados de RACE con la clasificación de los 8 · los que no han llegado salen estimados y pasan a reales en directo al cruzar la meta (destello) · los tiempos son inventados · en C, ← → o clic en las pestañas cambian de página · ↑ ↓ mueven la opción</div>
+</div>
+
+<script>
+const C = { cyan:'#36E7FF', blue:'#245BFF', mag:'#FF43D0', orange:'#FF9D32', bg:'#05070D', grey:'#A6B8D8', white:'#E9F6FF' };
+const opt = { variant:'A', pos:4, times:'gap', est:'tag', rec:'off', page:0, sel:0 };
+
+// ================= DATOS =================
+const NICKS = ['RAZOR','EDGE','BUTCHER','VIPER','NOMAD','HEX','BLITZ','CINDER','JACKAL','ONYX',
+  'RIPTIDE','WRAITH','KESTREL','SPARK','TITAN','VANDAL','ORBIT','FURY','SHADE','ROOK'];
+const SHIPS = ['VECTOR','BLADE','HAMMER'];
+let field = [];
+function draw() {
+  const pool = NICKS.slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  field = pool.slice(0, 7).map(n => ({ nick:n, ship:SHIPS[Math.floor(Math.random() * 3)] }));
+}
+draw();
+
+// Clasificación: 8 filas con PLAYER en su puesto. Los de delante, reales; los de detrás, estimados y con su llegada real
+let t0 = performance.now();
+function rows(now) {
+  const elapsed = (now - t0) / 1000;
+  const playerTime = 125.450;
+  const out = [];
+  let k = 0;
+  for (let p = 1; p <= 8; p++) {
+    if (p === opt.pos) { out.push({ pos:p, name:'PLAYER', ship:'VECTOR', player:true, time:playerTime, est:false, flash:0 }); continue; }
+    const r = field[k++];
+    if (p < opt.pos) {
+      out.push({ pos:p, name:r.nick, ship:r.ship, time:playerTime - (opt.pos - p) * 0.21 - 0.05 * p, est:false, flash:0 });
+    } else {
+      const behind = p - opt.pos;
+      const real = playerTime + behind * 0.37 + 0.11 * Math.sin(p * 1.7);
+      const estimate = real + 0.02 * Math.sin(p * 3.1) + 0.012;
+      const arrival = 1.2 + behind * 1.4;         // segundos tras salir los resultados
+      const arrived = elapsed >= arrival;
+      out.push({ pos:p, name:r.nick, ship:r.ship, time:arrived ? real : estimate, est:!arrived, flash:arrived ? Math.max(0, 1 - (elapsed - arrival) / 0.6) : 0 });
+    }
+  }
+  // Las estimaciones no contradicen el orden
+  for (let i = 1; i < out.length; i++) if (out[i].est && out[i].time <= out[i - 1].time) out[i].time = out[i - 1].time + 0.001;
+  return out;
+}
+
+// ================= DIBUJO =================
+const cv = document.getElementById('c'), hx = cv.getContext('2d');
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+const fmt = s => { const m = Math.floor(s / 60), r = s - m * 60; return m + ':' + (r < 10 ? '0' : '') + r.toFixed(3); };
+const gapFmt = g => '+' + (g < 60 ? g.toFixed(3) : fmt(g));
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th','st','nd','rd'][n % 10] || 'th');
+
+function font(family, size, weight) {
+  return family === 'orb' ? `${weight || 500} ${size}px 'Orbitron', sans-serif` : `${size}px 'Share Tech Mono', monospace`;
+}
+// Texto con espaciado entre letras (em) y halo opcional; devuelve el ancho
+function txt(s, x, y, family, size, color, o = {}) {
+  const sp = (o.spacing || 0) * size, weight = o.weight || 500;
+  hx.font = font(family, size, weight);
+  let w = 0; for (const ch of s) w += hx.measureText(ch).width + sp; w -= sp;
+  let sx = o.align === 'right' ? x - w : o.align === 'center' ? x - w / 2 : x;
+  hx.globalAlpha = o.op ?? 1; hx.fillStyle = color; hx.textBaseline = 'alphabetic'; hx.textAlign = 'left';
+  hx.shadowColor = o.glowColor || color; hx.shadowBlur = o.glow || 0;
+  for (const ch of s) { hx.fillText(ch, sx, y); sx += hx.measureText(ch).width + sp; }
+  hx.shadowBlur = 0; hx.globalAlpha = 1;
+  return w;
+}
+function width(s, family, size, o = {}) { hx.font = font(family, size, o.weight || 500); let w = 0; const sp = (o.spacing || 0) * size; for (const ch of s) w += hx.measureText(ch).width + sp; return w - sp; }
+
+// Fondo: la carrera atenuada (rejilla en perspectiva y la pista)
+function scene() {
+  hx.fillStyle = C.bg; hx.fillRect(0, 0, 1280, 720);
+  const hy = 330;
+  hx.strokeStyle = C.blue; hx.lineWidth = 1; hx.globalAlpha = 0.5;
+  for (let i = -20; i <= 20; i++) { hx.beginPath(); hx.moveTo(640 + i * 12, hy); hx.lineTo(640 + i * 160, 720); hx.stroke(); }
+  for (let j = 1; j < 14; j++) { const y = hy + Math.pow(j / 14, 2.2) * 390; hx.beginPath(); hx.moveTo(0, y); hx.lineTo(1280, y); hx.stroke(); }
+  hx.strokeStyle = C.cyan; hx.globalAlpha = 0.8; hx.lineWidth = 2;
+  hx.beginPath(); hx.moveTo(600, hy); hx.lineTo(160, 720); hx.moveTo(680, hy); hx.lineTo(1120, 720); hx.stroke();
+  hx.globalAlpha = 1;
+  // HUD de fondo (clasificación, vuelta, velocidad) para ver cómo queda detrás
+  txt('LAP 3/3', 1240, 58, 'mono', 26, C.cyan, { align:'right' });
+  txt('0:40.450', 1240, 86, 'mono', 20, C.cyan, { align:'right' });
+  txt('BEST 0:40.433', 1240, 108, 'mono', 16, C.grey, { align:'right' });
+  txt('359', 1172, 668, 'mono', 54, C.cyan, { align:'right' });
+  hx.fillStyle = 'rgba(5,7,13,0.45)'; hx.fillRect(0, 0, 1280, 720);   // atenuado de la franja
+}
+
+// Franja (MenuBand): fondo al 90 %, líneas cian arriba y abajo con halo
+function band(h) {
+  const top = 360 - h / 2;
+  hx.fillStyle = 'rgba(5,7,13,0.9)'; hx.fillRect(0, top, 1280, h);
+  for (const y of [top, top + h]) {
+    const g = hx.createLinearGradient(0, y - 24, 0, y + 24);
+    g.addColorStop(0, 'rgba(54,231,255,0)'); g.addColorStop(0.5, 'rgba(54,231,255,0.10)'); g.addColorStop(1, 'rgba(54,231,255,0)');
+    hx.fillStyle = g; hx.fillRect(0, y - 24, 1280, 48);
+    hx.fillStyle = C.cyan; hx.shadowColor = C.cyan; hx.shadowBlur = 8; hx.fillRect(0, y - 0.5, 1280, 1); hx.shadowBlur = 0;
+  }
+  return top;
+}
+function separator(x, yc, h) { hx.fillStyle = C.blue; hx.globalAlpha = 0.6; hx.fillRect(x, yc - h / 2, 1, h); hx.globalAlpha = 1; }
+
+// Bloques de la franja de hoy
+function resultBlock(x, yBase, titleSize, posSize) {
+  const player = rows(performance.now()).find(r => r.player);
+  txt('RACE FINISHED', x, yBase, 'orb', titleSize, C.cyan, { weight:900, spacing:0.08, glow:14 });
+  const py = yBase + posSize * 1.15;
+  const w = txt(ordinal(player.pos), x, py, 'orb', posSize, C.cyan, { weight:700, spacing:0.04, glow:16 });
+  txt(' / 8', x + w, py, 'orb', posSize * 0.45, C.grey, { spacing:0.04 });
+  txt('VECTOR', x, py + 30, 'mono', 16, C.grey, { spacing:0.18 });
+}
+function caption(s, x, y, rec) {
+  const w = txt(s, x, y, 'mono', 14, C.grey, { spacing:0.22 });
+  if (rec) txt('NEW RECORD', x + w + 14, y, 'orb', 16 * 0.8, C.orange, { weight:900, spacing:0.14, glow:10 });
+}
+function timesBlock(x, y, o = {}) {
+  const big = o.big || 30, sector = o.sector || 20;
+  caption('TOTAL TIME', x, y, opt.rec === 'on');
+  txt(fmt(125.450), x, y + big + 6, 'orb', big, C.cyan, { spacing:0.06 });
+  let yy = y + big + 6 + 14 + 20;
+  caption('BEST LAP', x, yy, opt.rec === 'on');
+  const w = txt(fmt(40.433), x, yy + big + 6, 'orb', big, C.cyan, { spacing:0.06 });
+  txt('lap 2', x + w + 14, yy + big + 6, 'mono', 16, C.grey, { spacing:0.08 });
+  yy += big + 6 + 14 + 24;
+  if (o.noSectors) return;
+  caption('BEST SECTORS', x, yy);
+  const S = [[9.550, 2], [9.450, 1], [11.133, 1], [10.300, 1]];
+  if (o.grid) {
+    S.forEach(([t, l], i) => {
+      const cx = x + (i % 2) * 136, cy = yy + 26 + Math.floor(i / 2) * 26;
+      txt('S' + (i + 1), cx, cy, 'mono', 13, C.grey, { spacing:0.22 });
+      txt(fmt(t), cx + 30, cy, 'orb', 15, C.cyan, { spacing:0.06 });
+      txt('l' + l, cx + 106, cy, 'mono', 12, C.grey, { op:0.8 });
+    });
+  } else {
+    S.forEach(([t, l], i) => {
+      const cy = yy + 28 + i * 30;
+      txt('S' + (i + 1), x, cy, 'mono', 15, C.grey, { spacing:0.22 });
+      txt(fmt(t), x + 44, cy, 'orb', sector, C.cyan, { spacing:0.06 });
+      txt('lap ' + l, x + 44 + 130, cy, 'mono', 15, C.grey, { spacing:0.08 });
+    });
+  }
+}
+// Opciones (OptionList): barra lateral en la seleccionada
+function optionsBlock(x, yc, size, horizontal) {
+  const items = ['RESTART RACE', 'BACK TO MAIN MENU'];
+  if (horizontal) {
+    let cx = x;
+    items.forEach((s, i) => {
+      const on = opt.sel === i;
+      if (on) { hx.fillStyle = C.cyan; hx.shadowColor = C.cyan; hx.shadowBlur = 8; hx.fillRect(cx - 14, yc - size, 3, size + 2); hx.shadowBlur = 0; }
+      const w = txt(s, cx + (on ? 4 : 0), yc, 'orb', size, on ? C.cyan : C.grey, { weight:700, spacing:0.12, glow:on ? 10 : 0 });
+      cx += w + 60;
+    });
+    return;
+  }
+  items.forEach((s, i) => {
+    const on = opt.sel === i, y = yc - 12 + i * size * 2.1;
+    if (on) { hx.fillStyle = C.cyan; hx.shadowColor = C.cyan; hx.shadowBlur = 8; hx.fillRect(x - 6, y - size, 3, size + 4); hx.shadowBlur = 0; }
+    txt(s, x + (on ? 12 : 4), y, 'orb', size, on ? C.cyan : C.grey, { weight:700, spacing:0.12, glow:on ? 10 : 0 });
+  });
+}
+
+// Tabla de la clasificación: cabecera, 8 filas y estado (PROVISIONAL / FINAL)
+function table(x, y, w, rowH, o = {}) {
+  const list = rows(performance.now()), from = o.from || 0, count = o.count || 8;
+  const pending = list.filter(r => r.est).length;
+  if (!o.noHeader) {
+    txt('CLASSIFICATION', x, y, 'mono', 14, C.grey, { spacing:0.22 });
+    const state = pending ? `${pending} PROVISIONAL` : 'FINAL';
+    txt(state, x + w, y, 'mono', 12, pending ? C.orange : C.cyan, { align:'right', spacing:0.16, op:pending ? 0.9 : 0.8 });
+    if (pending) {   // punto que late: se está actualizando
+      const a = 0.45 + 0.45 * Math.sin(performance.now() / 180);
+      hx.globalAlpha = a; hx.fillStyle = C.orange; hx.beginPath(); hx.arc(x + w - width(state, 'mono', 12, { spacing:0.16 }) - 10, y - 4, 3, 0, 7); hx.fill(); hx.globalAlpha = 1;
+    }
+  }
+  const leader = list[0].time;
+  for (let i = from; i < from + count; i++) {
+    const r = list[i], ry = y + 14 + (i - from + 1) * rowH;
+    if (r.player) { hx.fillStyle = 'rgba(54,231,255,0.12)'; hx.fillRect(x - 8, ry - rowH + 6, w + 16, rowH - 2); hx.fillStyle = C.cyan; hx.fillRect(x - 8, ry - rowH + 6, 2, rowH - 2); }
+    if (r.flash > 0) { hx.fillStyle = `rgba(54,231,255,${0.28 * r.flash})`; hx.fillRect(x - 8, ry - rowH + 6, w + 16, rowH - 2); }
+    txt(String(r.pos), x + 16, ry, 'mono', 15, r.player ? C.cyan : C.mag, { align:'right', glow:r.player ? 6 : 4 });
+    txt(r.name, x + 30, ry, 'mono', 15, r.player ? C.cyan : C.white, { glow:r.player ? 6 : 0 });
+    if (!o.noShip) txt(r.ship, x + 30 + (o.nameW || 92), ry, 'mono', 11, C.grey, { spacing:0.12, op:0.7 });
+    // Tiempo: el primero siempre total; el resto, diferencia o total
+    const value = i === 0 || opt.times === 'total' ? fmt(r.time) : gapFmt(r.time - leader);
+    const leaderStyle = i === 0;
+    if (r.est && opt.est === 'tilde') {
+      txt('≈ ' + value, x + w, ry, leaderStyle ? 'orb' : 'mono', leaderStyle ? 15 : 15, C.grey, { align:'right', op:0.55 });
+    } else {
+      txt(value, x + w - (r.est ? 34 : 0), ry, leaderStyle ? 'orb' : 'mono', 15, leaderStyle || r.player ? C.cyan : C.white, { align:'right', op:r.est ? 0.6 : 1 });
+      if (r.est) {
+        const tx = x + w - 28, ty = ry - 11;
+        hx.strokeStyle = C.grey; hx.globalAlpha = 0.6; hx.lineWidth = 1; hx.strokeRect(tx + 0.5, ty + 0.5, 28, 13); hx.globalAlpha = 1;
+        txt('EST', tx + 14, ry - 1, 'mono', 10, C.grey, { align:'center', spacing:0.1, op:0.8 });
+      }
+    }
+  }
+}
+
+// ================= VERSIONES =================
+function variantA() {
+  // Cuatro columnas en la franja de 340: resultado y tiempos se aprietan; la tabla entra entre ellos y las opciones
+  const top = band(340);
+  separator(300, 360, 260); separator(610, 360, 260); separator(985, 360, 260);
+  resultBlock(56, 330, 22, 58);
+  timesBlock(330, top + 46, { big:22, grid:true });
+  table(640, top + 46, 310, 30);
+  optionsBlock(1012, 360, 17);
+}
+function variantB() {
+  // Tres columnas como hoy (resultado | tiempos | tabla) y las opciones en una fila abajo: la franja crece a 440
+  const top = band(440);
+  separator(470, 330, 300); separator(860, 330, 300);
+  resultBlock(96, 300, 34, 80);
+  timesBlock(520, top + 44, {});
+  table(890, top + 44, 340, 32);
+  hx.fillStyle = C.blue; hx.globalAlpha = 0.35; hx.fillRect(96, top + 370, 1088, 1); hx.globalAlpha = 1;
+  const items = ['RESTART RACE', 'BACK TO MAIN MENU'];
+  optionsBlock(640 - (width(items.join(''), 'orb', 22, { weight:700, spacing:0.12 }) + 60) / 2, top + 412, 22, true);
+}
+function variantC() {
+  // La franja de hoy con dos páginas: RESULT (como ahora) y CLASSIFICATION (la tabla en dos columnas de 4)
+  const top = band(340);
+  separator(860, 360, 244);
+  const tabs = ['RESULT', 'CLASSIFICATION'];
+  let tx = 96;
+  tabs.forEach((s, i) => {
+    const on = opt.page === i;
+    const w = txt(s, tx, top + 34, 'mono', 14, on ? C.cyan : C.grey, { spacing:0.22, op:on ? 1 : 0.6, glow:on ? 6 : 0 });
+    if (on) { hx.fillStyle = C.cyan; hx.fillRect(tx, top + 42, w, 2); }
+    tab[i] = { x:tx, w };
+    tx += w + 40;
+  });
+  txt('← →', tx - 8, top + 34, 'mono', 12, C.grey, { op:0.5, spacing:0.1 });
+  const pending = rows(performance.now()).filter(r => r.est).length;
+  if (opt.page === 0 && pending) txt(`${pending} PROVISIONAL`, tab[1].x + tab[1].w + 64, top + 34, 'mono', 12, C.orange, { spacing:0.16 });
+  if (opt.page === 0) {
+    separator(470, 375, 220);
+    resultBlock(96, 350, 30, 72);
+    timesBlock(520, top + 82, { big:24, grid:true });
+  } else {
+    table(96, top + 82, 330, 30, { count:4, noHeader:true });
+    table(480, top + 82, 330, 30, { from:4, count:4, noHeader:true });
+    const state = pending ? `${pending} PROVISIONAL` : 'FINAL';
+    txt(state, 810, top + 300, 'mono', 12, pending ? C.orange : C.cyan, { align:'right', spacing:0.16 });
+  }
+  optionsBlock(900, 360, 22);
+}
+const tab = [];
+
+function frame() {
+  const W = cv.clientWidth, H = cv.clientHeight;
+  hx.setTransform(1, 0, 0, 1, 0, 0); hx.clearRect(0, 0, cv.width, cv.height);
+  const u = cv.width / 1280; hx.setTransform(u, 0, 0, u, 0, 0);
+  scene();
+  ({ A:variantA, B:variantB, C:variantC })[opt.variant]();
+  requestAnimationFrame(frame);
+}
+
+// ================= CONTROLES =================
+document.querySelectorAll('button[data-g]').forEach(b => b.addEventListener('click', () => {
+  const g = b.dataset.g; opt[g] = g === 'pos' ? +b.dataset.v : b.dataset.v;
+  document.querySelectorAll(`button[data-g="${g}"]`).forEach(x => x.classList.toggle('on', x === b));
+  if (g === 'pos' || g === 'variant') t0 = performance.now();
+}));
+document.getElementById('bRun').addEventListener('click', () => t0 = performance.now());
+document.getElementById('bDraw').addEventListener('click', () => { draw(); t0 = performance.now(); });
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') opt.page = 1 - opt.page;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') opt.sel = 1 - opt.sel;
+});
+cv.addEventListener('click', e => {
+  if (opt.variant !== 'C') return;
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * 1280 / r.width, y = (e.clientY - r.top) * 720 / r.height;
+  tab.forEach((t, i) => { if (x >= t.x - 8 && x <= t.x + t.w + 8 && y > 170 && y < 230) opt.page = i; });
+});
+function resize() {
+  const st = document.getElementById('stage'), W = st.clientWidth, H = st.clientHeight;
+  let w = W, h = W * 9 / 16; if (h > H) { h = H; w = H * 16 / 9; }
+  const view = document.getElementById('view');
+  view.style.width = w + 'px'; view.style.height = h + 'px';
+  cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+}
+addEventListener('resize', resize); resize();
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { t0 = performance.now(); requestAnimationFrame(frame); });
+</script>
+</body>
+</html>
