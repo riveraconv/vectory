@@ -39,7 +39,7 @@ public class DifficultyTests
 	private static RivalCar Car(Difficulty difficulty, RivalPilot pilot, string shipId = ShipCatalog.Ship01)
 	{
 		ShipDefinition ship = ShipDefinitions.Find(shipId);
-		var entry = new RivalEntry("rival_1", 1, 2, shipId, 0, HullPaints.ChoiceAt(HullPaints.StyleOf(shipId).Value, 0), pilot, 0.02f, 7);
+		var entry = new RivalEntry("rival_1", 1, 2, shipId, 0, HullPaints.ChoiceAt(HullPaints.StyleOf(shipId) ?? throw new InvalidOperationException(shipId), 0), pilot, 0.02f, 7);
 		return new RivalCar(entry, ship, Oval.Value.Cache, Context(difficulty));
 	}
 
