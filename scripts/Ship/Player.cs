@@ -3,6 +3,7 @@ using Vectory.Autopilot;
 using Vectory.Circuit;
 using Vectory.Contact;
 using Vectory.Game;
+using Vectory.Settings;
 using NVec2 = System.Numerics.Vector2;
 
 namespace Vectory.Ship;
@@ -652,7 +653,7 @@ public partial class Player : CharacterBody3D, IContactShip
 	public AirLineSettings BuildAirLineSettings()
 	{
 		AirLineSettings settings = AirLineSettings.Default;
-		settings.Count = AirLineCount;
+		settings.Count = ActiveSettings.SpeedLines ? AirLineCount : 0;   // SPEED LINES de SETTINGS
 		settings.Intensity = AirLineIntensity;
 		return settings;
 	}
@@ -973,7 +974,7 @@ public partial class Player : CharacterBody3D, IContactShip
 			ExtraDistance = chase.ExtraDistance,
 			LookTarget = ShipLineMesh.ToGodot(chase.LookTarget),
 			BaseFov = BaseFov,
-			MaxFov = MaxFov,
+			MaxFov = ActiveSettings.ScaledMaxFov(BaseFov, MaxFov),   // SPEED FOV de SETTINGS
 			UpSmoothTime = CameraUpSmoothing
 		};
 	}
@@ -1044,7 +1045,8 @@ public partial class Player : CharacterBody3D, IContactShip
 		};
 	}
 
-	// Copia los parámetros del Inspector al objeto de ajustes (ángulos a radianes)
+	// Copia los parámetros del Inspector al objeto de ajustes (ángulos a radianes), con los multiplicadores de SETTINGS:
+	// COCKPIT SHAKE en la vibración de las dos cámaras y SPEED FOV en el FOV extra del boost
 	private CameraEffectSettings BuildCameraEffects()
 	{
 		CameraEffectSettings s = _cameraEffects;
@@ -1052,12 +1054,12 @@ public partial class Player : CharacterBody3D, IContactShip
 		s.CockpitBankMax = Mathf.DegToRad(CockpitBankMax);
 		s.CockpitBankSmoothTime = CockpitBankSmoothing;
 		s.VibrationThreshold = VibrationThreshold;
-		s.VibrationAmplitudeCockpit = VibrationAmplitudeCockpit;
-		s.VibrationAmplitudeChase = VibrationAmplitudeChase;
+		s.VibrationAmplitudeCockpit = VibrationAmplitudeCockpit * ActiveSettings.CockpitShake;
+		s.VibrationAmplitudeChase = VibrationAmplitudeChase * ActiveSettings.CockpitShake;
 		s.VibrationBoostMultiplier = VibrationBoostMultiplier;
 		s.VibrationFrequency = VibrationFrequency;
 		s.VibrationSmoothTime = VibrationSmoothing;
-		s.BoostFovExtra = BoostFovExtra;
+		s.BoostFovExtra = BoostFovExtra * ActiveSettings.SpeedFov;
 		s.BoostPushCockpit = BoostPushCockpit;
 		s.BoostPushChase = BoostPushChase;
 		s.BoostEnterTime = BoostEffectEnterTime;
@@ -1100,14 +1102,16 @@ public partial class Player : CharacterBody3D, IContactShip
 		// La cabina 3D se mueve por su cuenta a partir de los mismos datos, sin sus metros
 		var input = new CockpitCameraInput(Dynamics.Steer, Mathf.Clamp(Speed / BoostedTopSpeed, 0f, 1f), _cockpitBank.Angle,
 			_vibration.Intensity, _boostCamera.Eased, _vibration.Time);
-		var settings = new CockpitCameraSettings(Cockpit3DSway, Cockpit3DVibrationPosition, Cockpit3DVibrationRotation, Cockpit3DCounterRoll, Cockpit3DBoostPush);
+		float shake = ActiveSettings.CockpitShake;
+		var settings = new CockpitCameraSettings(Cockpit3DSway, Cockpit3DVibrationPosition * shake, Cockpit3DVibrationRotation * shake,
+			Cockpit3DCounterRoll, Cockpit3DBoostPush);
 		_cockpit.Update3D(CockpitCameraMotion.Compute(input, settings), BuildCockpit3DSettings());
 	}
 
 	private Cockpit3DSettings BuildCockpit3DSettings()
 	{
 		return new Cockpit3DSettings(Cockpit3DFov, Cockpit3DKeyEnergy, Cockpit3DAmbientEnergy, Cockpit3DLampEnergy,
-			Cockpit3DLargeScreenLight, Cockpit3DSmallScreenLight, Cockpit3DGlowIntensity, Cockpit3DGlowStrength,
+			Cockpit3DLargeScreenLight, Cockpit3DSmallScreenLight, Cockpit3DGlowIntensity * ActiveSettings.Bloom, Cockpit3DGlowStrength,
 			Cockpit3DGlowThreshold, Cockpit3DScreenBrightness, Cockpit3DClearcoat, Cockpit3DGlowWide,
 			Cockpit3DReflections, Cockpit3DCarbonSpecular,
 			new CockpitLightIntensities(Cockpit3DBoostFrontLight, Cockpit3DBoostRearLight, Cockpit3DDamageLight),

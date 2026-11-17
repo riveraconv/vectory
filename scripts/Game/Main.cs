@@ -176,6 +176,9 @@ public partial class Main : Node3D
 
 	public override void _Ready()
 	{
+		// Los ajustes de SETTINGS (ejecutada sola desde el editor, sin pasar por el menú)
+		SettingsService.EnsureLoaded();
+
 		// El fantasma graba la nave después de que se mueva en cada paso de física (Player tiene prioridad 0)
 		ProcessPhysicsPriority = 1;
 

@@ -120,6 +120,25 @@ public sealed class SelectScreenKit
 	// Devuelve la columna donde va su contenido.
 	public VBoxContainer Panel(Control parent, string name)
 	{
+		Control panel = PanelFrame(parent, name);
+
+		var margin = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+		margin.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		margin.AddThemeConstantOverride("margin_top", Px(PanelTop));
+		margin.AddThemeConstantOverride("margin_left", Px(PanelLeft));
+		margin.AddThemeConstantOverride("margin_right", Px(PanelRight));
+		margin.AddThemeConstantOverride("margin_bottom", Px(PanelBottom));
+		panel.AddChild(margin);
+
+		var content = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+		content.AddThemeConstantOverride("separation", Px(8f));
+		margin.AddChild(content);
+		return content;
+	}
+
+	// Solo el marco del panel (fondo, línea y halo), sin márgenes: el contenido se coloca a mano (SETTINGS)
+	public Control PanelFrame(Control parent, string name)
+	{
 		var panel = new Control
 		{
 			Name = name,
@@ -160,19 +179,7 @@ public sealed class SelectScreenKit
 			OffsetLeft = 0f,
 			OffsetRight = Mathf.Max(1f, S(1f))
 		});
-
-		var margin = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-		margin.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		margin.AddThemeConstantOverride("margin_top", Px(PanelTop));
-		margin.AddThemeConstantOverride("margin_left", Px(PanelLeft));
-		margin.AddThemeConstantOverride("margin_right", Px(PanelRight));
-		margin.AddThemeConstantOverride("margin_bottom", Px(PanelBottom));
-		panel.AddChild(margin);
-
-		var content = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-		content.AddThemeConstantOverride("separation", Px(8f));
-		margin.AddChild(content);
-		return content;
+		return panel;
 	}
 
 	// Lista de opciones con el estilo de las pantallas de selección, sin COMING SOON en las desactivadas

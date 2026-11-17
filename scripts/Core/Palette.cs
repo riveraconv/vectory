@@ -162,6 +162,39 @@ public static class Palette
 
 	// --- PAINT (spec docs/selector-pinturas.md) ---
 	public static readonly Color PaintName = new Color(0xE9F6FFFF);         // nombre de la pintura (blanco azulado de la spec)
+
+	// SETTINGS (spec docs/settings.md, 3; designs/settings.html, composición C)
+	public static readonly Color SettingsName = Cyan;                              // nombre del ajuste elegido, en grande
+	public static readonly Color SettingsNameGlow = new Color(Cyan, 0.55f);         // su halo
+	public static readonly Color SettingsGroupText = BlueGray;                      // grupo a la izquierda y explicación
+	public static readonly Color SettingsValueText = Cyan;                          // valor junto al grupo
+	public static readonly Color SettingsHighlight = PaintName;                     // partes resaltadas de la explicación
+	public static readonly Color SettingsRow = new Color(BlueGray, 0.85f);          // nombre de una fila
+	public static readonly Color SettingsRowValue = PaintName;                      // valor de una fila
+	public static readonly Color SettingsRowSelected = Cyan;                        // fila elegida, su barra y su halo
+	public static readonly Color SettingsRowGradient = new Color(Cyan, 0.14f);      // degradado detrás de la fila elegida
+	public static readonly Color SettingsRowDisabled = new Color(BlueGray, 0.45f);  // fila en COMING SOON
+	public static readonly Color SettingsGroupHeader = new Color(BlueGray, 0.85f);  // cabecera de grupo de la lista
+	public static readonly Color SettingsComingSoon = new Color(BlueGray, 0.6f);    // COMING SOON
+	public static readonly Color SettingsArrow = new Color(Blue, 0.9f);             // ‹ › sin elegir
+	public static readonly Color SettingsSegmentOff = new Color(Blue, 0.75f);       // borde de un segmento apagado, de OFF / ON
+	public static readonly Color SettingsSegmentGlow = new Color(Cyan, 0.7f);       // halo de un segmento encendido
+	public static readonly Color SettingsToggleOnText = Background;                 // texto de la opción elegida de OFF / ON
+	public static readonly Color SettingsKeyBorder = new Color(Cyan, 0.55f);        // recuadro de una tecla
+	public static readonly Color SettingsKeyFixed = new Color(BlueGray, 0.3f);      // recuadro de una tecla fija (ESC)
+	public static readonly Color SettingsKeyFixedText = new Color(BlueGray, 0.7f);  // su texto
+	public static readonly Color SettingsKeyWaiting = Orange;                       // PRESS A KEY
+	public static readonly Color SettingsPreviewBorder = new Color(Blue, 0.6f);     // borde de la vista previa
+	public static readonly Color SettingsPreviewBackground = new Color(0x04060BFF);  // fondo de la vista previa
+	public static readonly Color SettingsPreviewLabel = new Color(BlueGray, 0.6f);  // PREVIEW
+	public static readonly Color SettingsPreviewDim = new Color(BlueGray, 0.7f);    // textos tenues de la vista previa
+	public static readonly Color SettingsPreviewGlow = new Color(Cyan, 0.35f);      // halo de la vista previa (bloom)
+	public static readonly Color SettingsPreviewSpeedLine = new Color(0xBFF6FF8C);   // líneas de velocidad de la vista previa
+	public static readonly Color SettingsPreviewHorizon = new Color(Cyan, 0.35f);   // horizonte de la pista de la vista previa
+	public static readonly Color SettingsPreviewLane = new Color(Blue, 0.7f);       // carriles de la pista de la vista previa
+	public static readonly Color SettingsPreviewRival = Magenta;                    // nave rival de la vista previa
+	public static readonly Color SettingsToastBackground = new Color(Background, 0.94f);   // aviso corto (DEFAULTS RESTORED)
+	public static readonly Color SettingsToastGlow = new Color(Cyan, 0.4f);         // su halo
 	public static readonly Color PaintSwatchBorder = new Color(Blue, 0.7f); // borde de una muestra
 	public static readonly Color PaintSwatchHover = Cyan;                   // borde de la muestra bajo el ratón
 	public static readonly Color PaintSwatchSelected = Cyan;                // contorno de la muestra seleccionada

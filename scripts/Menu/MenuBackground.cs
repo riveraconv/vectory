@@ -96,6 +96,13 @@ public partial class MenuBackground : Node3D
 			_camera.MakeCurrent();
 	}
 
+	// SETTINGS (spec docs/settings.md, 3.1): la rejilla y el horizonte del menú, sin la nave ni la sombra
+	public void SetShipVisible(bool visible)
+	{
+		_ship.Visible = visible;
+		_shade.Visible = visible;
+	}
+
 	public override void _ExitTree()
 	{
 		GetViewport().SizeChanged -= ApplyLensShift;

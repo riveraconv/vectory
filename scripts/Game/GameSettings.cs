@@ -4,15 +4,19 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Vectory.Records;
+using Vectory.Settings;
 using Vectory.Ship;
 
 namespace Vectory.Game;
 
 // Ajustes del juego que se guardan entre partidas (user://settings.json): el fantasma de TIME TRIAL, la última
-// nave elegida y la pintura de cada nave; aquí irán los demás cuando exista SETTINGS.
+// nave elegida, la pintura de cada nave y los de la pantalla SETTINGS (Options, spec docs/settings.md, 5).
 public sealed class GameSettings
 {
 	public bool GhostEnabled { get; set; } = true;
+
+	// Los de SETTINGS, en sus secciones (gameplay, video, effects)
+	public SettingsModel Options { get; set; } = new();
 
 	// Última nave con la que se pulsó START; null = ninguna. Se guarda tal cual: si ya no se puede elegir, lo decide
 	// ShipCatalog.StartShip al arrancar.
@@ -66,6 +70,16 @@ public sealed class SettingsStore
 		// Se lee a mano (ReadShipPaints): un valor raro dentro no debe hacer que el archivo entero cuente como corrupto
 		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 		public JsonElement? ShipPaints { get; set; }
+
+		// SETTINGS (spec docs/settings.md, 5): se leen valor a valor (SettingsSerializer)
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public JsonElement? Gameplay { get; set; }
+
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public JsonElement? Video { get; set; }
+
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public JsonElement? Effects { get; set; }
 	}
 
 	private sealed class PaintEntry
@@ -81,6 +95,9 @@ public sealed class SettingsStore
 	// Último problema con el archivo (null si todo fue bien)
 	public string Warning { get; private set; }
 
+	// Valores de SETTINGS que no valían y han tomado su valor por defecto (spec docs/settings.md, 5)
+	public List<string> OptionWarnings { get; } = new();
+
 	public SettingsStore(IRecordStorage storage)
 	{
 		_storage = storage ?? throw new ArgumentNullException(nameof(storage));
@@ -89,6 +106,7 @@ public sealed class SettingsStore
 	public void Load()
 	{
 		Warning = null;
+		OptionWarnings.Clear();
 		Settings = new GameSettings();
 
 		string text;
@@ -114,6 +132,7 @@ public sealed class SettingsStore
 				Settings.GhostEnabled = file.GhostEnabled ?? true;
 				Settings.LastShipDesignId = file.LastShipDesignId;
 				ReadShipPaints(file.ShipPaints, Settings);
+				Settings.Options = SettingsSerializer.Read(Sections(file), OptionWarnings);
 				return;
 			}
 			error = file == null ? "empty file" : $"unknown format version {file.Version}";
@@ -154,6 +173,20 @@ public sealed class SettingsStore
 		}
 	}
 
+	private static Dictionary<string, JsonElement> Sections(SettingsFile file)
+	{
+		var sections = new Dictionary<string, JsonElement>();
+		void Add(string group, JsonElement? element)
+		{
+			if (element is JsonElement value)
+				sections[SettingsSerializer.SectionOf(group)] = value;
+		}
+		Add(SettingsCatalog.Gameplay, file.Gameplay);
+		Add(SettingsCatalog.Video, file.Video);
+		Add(SettingsCatalog.Effects, file.Effects);
+		return sections;
+	}
+
 	private static JsonElement? WriteShipPaints(GameSettings settings)
 	{
 		if (settings.ShipPaints.Count == 0)
@@ -162,6 +195,9 @@ public sealed class SettingsStore
 			.ToDictionary(p => p.Key, p => new PaintEntry { Paint = p.Value.PaintId, Marks = p.Value.Marks });
 		return JsonSerializer.SerializeToElement(entries, JsonOptions);
 	}
+
+	private static JsonElement? SectionOrNull(Dictionary<string, JsonElement> sections, string group) =>
+		sections.TryGetValue(SettingsSerializer.SectionOf(group), out JsonElement value) ? value : null;
 
 	public bool Save()
 	{
@@ -175,6 +211,10 @@ public sealed class SettingsStore
 				LastShipDesignId = Settings.LastShipDesignId,
 				ShipPaints = WriteShipPaints(Settings)
 			};
+			Dictionary<string, JsonElement> sections = SettingsSerializer.Write(Settings.Options);
+			file.Gameplay = SectionOrNull(sections, SettingsCatalog.Gameplay);
+			file.Video = SectionOrNull(sections, SettingsCatalog.Video);
+			file.Effects = SectionOrNull(sections, SettingsCatalog.Effects);
 			_storage.Write(JsonSerializer.Serialize(file, JsonOptions));
 			return true;
 		}

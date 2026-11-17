@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VECTORY · Settings · 3 composiciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#05070D;--cyan:#36E7FF;--blue:#245BFF;--grey:#A6B8D8;--orange:#FF9D32;--white:#E9F6FF}
+  html,body{margin:0;height:100%;background:#000;color:var(--grey);font-family:"Share Tech Mono",monospace;overflow:hidden}
+  /* barra de la maqueta (fuera de la pantalla del juego) */
+  #tool{position:fixed;left:0;right:0;top:0;min-height:44px;display:flex;gap:6px;align-items:center;padding:0 12px;background:#0b0d14;border-bottom:1px solid #1b2133;z-index:10;font-size:12px;flex-wrap:wrap}
+  #tool .t{color:var(--cyan);letter-spacing:.12em;margin-right:8px}
+  #tool button{font:inherit;font-size:12px;color:#cfd6e6;background:#121623;border:1px solid #2a3350;padding:5px 10px;cursor:pointer;letter-spacing:.06em}
+  #tool button.on{color:#05070D;background:var(--cyan);border-color:var(--cyan)}
+  #note{position:fixed;left:12px;right:12px;top:44px;height:20px;font-size:11px;color:#6d7894;z-index:10;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:20px}
+  #wrap{position:fixed;left:0;right:0;top:64px;bottom:0}
+  #stage{position:absolute;width:1280px;height:720px;background:var(--bg);overflow:hidden;transform-origin:0 0;box-shadow:0 0 0 1px #1b2133}
+  #stage *{box-sizing:border-box}
+  #bg,#ui{position:absolute;inset:0}
+  #ui{user-select:none}
+
+  /* fondo: rejilla de horizonte del menú principal */
+  .floor{position:absolute;height:300px;top:420px;transform:perspective(260px) rotateX(62deg);transform-origin:50% 0;
+    background:repeating-linear-gradient(90deg,rgba(36,91,255,.42) 0 1px,transparent 1px 64px),repeating-linear-gradient(0deg,rgba(36,91,255,.42) 0 1px,transparent 1px 44px);
+    -webkit-mask-image:linear-gradient(#0000,#000 25%,#000 70%,#0000);mask-image:linear-gradient(#0000,#000 25%,#000 70%,#0000)}
+  .horizon{position:absolute;left:0;right:0;top:420px;height:1px;background:linear-gradient(90deg,rgba(54,231,255,.05),rgba(54,231,255,.35) 60%,rgba(54,231,255,.7) 85%,rgba(54,231,255,.2))}
+  .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,7,13,.97) 0,rgba(5,7,13,.85) 30%,rgba(5,7,13,0) 60%)}
+  .dim{position:absolute;inset:0;background:rgba(5,7,13,.45)}
+
+  /* título como el del menú principal */
+  .crumb{position:absolute;white-space:nowrap;font-size:14px;color:var(--cyan);letter-spacing:.22em}
+  .title{position:absolute;font-family:Orbitron;font-weight:900;color:var(--cyan);letter-spacing:.06em;text-shadow:0 0 16px rgba(54,231,255,.6);white-space:nowrap}
+  .speed{position:absolute;display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+  .speed i{display:block;height:2px}
+  .ver{position:absolute;left:100px;bottom:44px;font-size:14px;color:rgba(166,184,216,.7)}
+  .foot{position:absolute;bottom:18px;font-size:13px;color:rgba(166,184,216,.7);letter-spacing:.08em;white-space:nowrap}
+
+  /* opciones con barra lateral (menú principal, pausa, resultados) */
+  .mlist{position:absolute}
+  .mi{height:48px;display:flex;align-items:center;font-family:Orbitron;font-weight:500;font-size:28px;letter-spacing:.12em;color:var(--grey);position:relative;padding-left:24px;cursor:pointer;white-space:nowrap}
+  .mi .lbl{display:inline-block}
+  .mi.sel{color:var(--cyan);font-weight:700;text-shadow:0 0 12px rgba(54,231,255,.7)}
+  .mi.sel .lbl{transform:translateX(20px)}
+  .mi.sel::before{content:"";position:absolute;left:0;top:6px;width:4px;height:36px;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+  .mi.open{color:rgba(54,231,255,.75);text-shadow:none}
+  .mi.open::before{opacity:.45;box-shadow:none}
+  .mi.dis{color:rgba(36,91,255,.55);cursor:default}
+  .mi .soon{font-family:"Share Tech Mono";font-weight:normal;font-size:13px;color:rgba(166,184,216,.6);letter-spacing:.2em;margin-left:18px}
+  .mi.small{height:36px;font-size:20px}
+  .mi.small.sel::before{top:5px;height:26px}
+  .mi.small.sel .lbl{transform:translateX(14px)}
+  .gap{height:22px}
+
+  /* filas de ajustes */
+  .rows{position:absolute}
+  .srow{height:44px;display:flex;align-items:center;gap:16px;padding:0 14px 0 18px;position:relative;font-family:Orbitron;font-weight:500;font-size:17px;letter-spacing:.12em;color:rgba(166,184,216,.85);cursor:pointer;white-space:nowrap}
+  .srow .lab{flex:1}
+  .srow.sel{color:var(--cyan);background:linear-gradient(90deg,rgba(54,231,255,.14),transparent 85%)}
+  .srow.sel::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .srow.dis{opacity:.45;cursor:default}
+  .srow.compact{height:32px;font-size:13px;gap:10px;padding:0 10px 0 14px}
+  .srow.compact.sel::before{top:5px;bottom:5px}
+  .rows.idle{opacity:.55}
+  .val{font-family:"Share Tech Mono";font-size:16px;letter-spacing:.14em;color:var(--white);display:flex;align-items:center;gap:10px}
+  .compact .val{font-size:13px;gap:7px}
+  .arr{color:rgba(36,91,255,.9);padding:0 4px;cursor:pointer}
+  .sel .arr{color:var(--cyan);text-shadow:0 0 8px var(--cyan)}
+  .arr.off{visibility:hidden}
+  .choice{min-width:150px;text-align:center}
+  .compact .choice{min-width:108px}
+  .segs{display:flex;gap:3px}
+  .segs i{display:block;width:13px;height:11px;border:1px solid rgba(36,91,255,.75);cursor:pointer}
+  .compact .segs i{width:9px;height:9px}
+  .segs i.on{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 6px rgba(54,231,255,.7)}
+  .pct{width:44px;text-align:right}
+  .tg{display:flex}
+  .tg span{padding:3px 12px;border:1px solid rgba(36,91,255,.75);font-size:13px;cursor:pointer}
+  .compact .tg span{padding:2px 9px;font-size:11px}
+  .tg span+span{border-left:none}
+  .tg span.on{background:var(--cyan);color:#05070D;border-color:var(--cyan)}
+  .kc{min-width:76px;text-align:center;padding:3px 10px;border:1px solid rgba(54,231,255,.55);color:var(--white);cursor:pointer}
+  .compact .kc{min-width:62px;padding:2px 8px}
+  .kc.fix{border-color:rgba(166,184,216,.3);color:rgba(166,184,216,.7);cursor:default}
+  .kc.wait{border-color:var(--orange);color:var(--orange);animation:blink .6s steps(2) infinite}
+  @keyframes blink{50%{opacity:.35}}
+  @keyframes shk{0%{transform:translate(0,0)}25%{transform:translate(var(--a),calc(var(--a)*-.6))}50%{transform:translate(calc(var(--a)*-.8),calc(var(--a)*.4))}75%{transform:translate(calc(var(--a)*.5),var(--a))}100%{transform:translate(0,0)}}
+  .soonv{font-size:12px;letter-spacing:.2em;color:rgba(166,184,216,.7)}
+  .grp{font-size:11px;color:var(--grey);letter-spacing:.22em;height:30px;display:flex;align-items:flex-end;padding:0 0 6px 14px;opacity:.85}
+  .grp .s{margin-left:12px;opacity:.6}
+
+  .phead{position:absolute;font-size:13px;color:var(--cyan);letter-spacing:.22em;white-space:nowrap}
+  .desc{position:absolute;font-size:14px;line-height:1.55;color:var(--grey);letter-spacing:.06em}
+  .desc b{color:var(--white);font-weight:normal}
+
+  /* paneles */
+  .panel{position:absolute;background:rgba(5,7,13,.86)}
+  .panel.l{border-left:1px solid rgba(54,231,255,.6);box-shadow:-10px 0 24px -14px rgba(54,231,255,.7)}
+  .band{position:absolute;left:0;right:0;background:rgba(5,7,13,.9);border-top:1px solid var(--cyan);border-bottom:1px solid var(--cyan);box-shadow:0 0 18px -6px rgba(54,231,255,.7)}
+  .vsep{position:absolute;width:1px;background:linear-gradient(transparent,rgba(36,91,255,.7) 20%,rgba(36,91,255,.7) 80%,transparent)}
+
+  /* opciones con rombo (selectores) */
+  .opt{font-family:Orbitron;font-weight:500;font-size:20px;letter-spacing:.14em;color:rgba(166,184,216,.75);padding:7px 0 7px 22px;position:relative;cursor:pointer;white-space:nowrap}
+  .opt.sel{color:var(--cyan);text-shadow:0 0 10px rgba(54,231,255,.7)}
+  .opt.sel::before{content:"";position:absolute;left:0;top:50%;width:10px;height:10px;margin-top:-5px;border:2px solid var(--cyan);transform:rotate(45deg);box-shadow:0 0 8px var(--cyan)}
+  .hopts{position:absolute;display:flex;gap:40px}
+
+  /* briefing (C) */
+  .bname{position:absolute;font-family:Orbitron;font-weight:900;color:var(--cyan);letter-spacing:.06em;text-shadow:0 0 14px rgba(54,231,255,.55);white-space:nowrap}
+  .bcat{position:absolute;font-size:14px;color:var(--grey);letter-spacing:.2em}
+  .bcat b{color:var(--cyan);font-weight:normal}
+  .prev{position:absolute;border:1px solid rgba(36,91,255,.6);overflow:hidden;background:#04060b}
+  .prev .vig{position:absolute;inset:0;pointer-events:none}
+  .prev .lab{position:absolute;left:12px;top:9px;font-size:11px;letter-spacing:.2em;color:rgba(166,184,216,.6)}
+  .clip{position:absolute;overflow:hidden}
+  .scroll{position:absolute;left:0;right:0;top:0;transition:transform .12s}
+
+  #toast{position:absolute;left:50%;top:330px;transform:translateX(-50%);padding:12px 26px;border:1px solid var(--cyan);background:rgba(5,7,13,.94);color:var(--cyan);font-size:15px;letter-spacing:.2em;box-shadow:0 0 24px rgba(54,231,255,.4);opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="tool">
+  <span class="t">SETTINGS</span>
+  <button data-l="A">A · MENÚ</button><button data-l="B">B · FRANJA</button><button data-l="C">C · BRIEFING</button>
+</div>
+<div id="note"><span id="ldesc" style="color:#9fb0d0"></span> · Maqueta de composición. Teclado: W/S o ↑ ↓ moverse · A/D o ← → cambiar valor · Q/E categoría · ENTER elegir · ESC volver. También con ratón.</div>
+<div id="wrap"><div id="stage"><div id="bg"></div><div id="ui"></div><div id="toast"></div></div></div>
+
+<script>
+// =====================================================================================
+// Ajustes (textos del juego en inglés)
+// =====================================================================================
+const CATS = [
+  { id:'gameplay', name:'GAMEPLAY', items:[
+    { id:'difficulty', label:'DIFFICULTY', type:'choice', values:['EASY','NORMAL','HARD'], def:1,
+      desc:'How good the rivals are. It only changes the <b>AI</b>, never the physics of any ship. Takes effect in the <b>next race</b>.' },
+  ]},
+  { id:'video', name:'VIDEO', items:[
+    { id:'mode', label:'DISPLAY MODE', type:'choice', values:['WINDOWED','FULLSCREEN','BORDERLESS'], def:1,
+      desc:'Windowed, exclusive fullscreen or a borderless window the size of the screen.' },
+    { id:'res', label:'RESOLUTION', type:'choice', values:['1280 × 720','1600 × 900','1920 × 1080','2560 × 1440','3840 × 2160'], def:2,
+      desc:'Render resolution. The HUD and the menus scale with it.' },
+    { id:'bloom', label:'BLOOM', type:'slider', def:10,
+      desc:'Glow of the lines of the track, the ships and the HUD. Lower it if the image looks blurry.' },
+  ]},
+  { id:'effects', name:'EFFECTS', items:[
+    { id:'tunnel', label:'TUNNEL VISION', type:'slider', def:10,
+      desc:'Blur and darkening of the edges of the screen at high speed. <b>Lower it if it makes you dizzy.</b>' },
+    { id:'lines', label:'SPEED LINES', type:'toggle', def:true,
+      desc:'Streaks that fly past the camera at high speed. Also turns off the <b>slipstream air lines</b> in the cockpit.' },
+    { id:'fov', label:'SPEED FOV', type:'slider', def:10,
+      desc:'How much the field of view opens up at top speed and with the boost.' },
+    { id:'particles', label:'PARTICLES', type:'choice', values:['LOW','MEDIUM','HIGH'], def:2,
+      desc:'Amount of exhaust and boost particles. Lower it if the game runs slow.' },
+    { id:'shake', label:'COCKPIT SHAKE', type:'slider', def:10,
+      desc:'Vibration of the cockpit view at high speed and with the boost. <b>Lower it if it makes you dizzy.</b> At 0 the cockpit stays still.' },
+  ]},
+  { id:'controls', name:'CONTROLS', items:[
+    { id:'k_acc', label:'ACCELERATE', type:'key', def:'W', desc:'Press ENTER and then the new key. If the key is in use, the two actions swap keys.' },
+    { id:'k_brk', label:'BRAKE', type:'key', def:'S', desc:'Press ENTER and then the new key. If the key is in use, the two actions swap keys.' },
+    { id:'k_lft', label:'STEER LEFT', type:'key', def:'A', desc:'Press ENTER and then the new key. If the key is in use, the two actions swap keys.' },
+    { id:'k_rgt', label:'STEER RIGHT', type:'key', def:'D', desc:'Press ENTER and then the new key. If the key is in use, the two actions swap keys.' },
+    { id:'k_bst', label:'BOOST', type:'key', def:'SHIFT', desc:'Press ENTER and then the new key. If the key is in use, the two actions swap keys.' },
+    { id:'k_dft', label:'DRIFT', type:'key', def:'SPACE', desc:'Press ENTER and then the new key. If the key is in use, the two actions swap keys.' },
+    { id:'k_cam', label:'CAMERA', type:'key', def:'C', desc:'Press ENTER and then the new key. If the key is in use, the two actions swap keys.' },
+    { id:'k_pau', label:'PAUSE', type:'key', def:'ESC', fixed:true, desc:'Pause is always ESC.' },
+  ]},
+  { id:'audio', name:'AUDIO', soon:true, items:[
+    { id:'v_master', label:'MASTER', type:'slider', def:8, desc:'' },
+    { id:'v_music', label:'MUSIC', type:'slider', def:7, desc:'' },
+    { id:'v_engines', label:'ENGINES', type:'slider', def:8, desc:'' },
+    { id:'v_fx', label:'EFFECTS', type:'slider', def:8, desc:'' },
+  ]},
+];
+const ACTS = [ { id:'reset', label:'RESET DEFAULTS' }, { id:'back', label:'BACK' } ];
+const ITEM = {}; CATS.forEach((c, ci) => c.items.forEach(it => { it.cat = ci; ITEM[it.id] = it; }));
+const vals = {}; function resetVals() { for (const id in ITEM) vals[id] = ITEM[id].def; } resetVals();
+
+// =====================================================================================
+// Estado
+// =====================================================================================
+const st = { layout:'A', cat:0, focus:'cats', sel:0, rebind:null, scroll:0 };
+
+// lista navegable según la composición
+function list() {
+  if (st.layout === 'A' && st.focus === 'cats')
+    return CATS.map((c, i) => ({ k:'cat', i, dis:!!c.soon })).concat(ACTS.map(a => ({ k:'act', a })));
+  if (st.layout === 'A') return CATS[st.cat].items.map(it => ({ k:'item', it }));
+  if (st.layout === 'B') return CATS[st.cat].items.map(it => ({ k:'item', it })).concat(ACTS.map(a => ({ k:'act', a })));
+  const L = [];
+  CATS.forEach(c => c.items.forEach(it => L.push({ k:'item', it, dis:!!c.soon })));
+  return L.concat(ACTS.map(a => ({ k:'act', a })));
+}
+const cur = () => list()[st.sel];
+function firstEnabled(L) { return L.findIndex(e => !e.dis); }
+function move(d) {
+  const L = list(); let i = st.sel;
+  for (let n = 0; n < L.length; n++) { i = (i + d + L.length) % L.length; if (!L[i].dis) break; }
+  st.sel = i;
+  if (st.layout === 'A' && st.focus === 'cats' && L[i].k === 'cat') st.cat = L[i].i;
+  if (st.layout === 'C' && L[i].k === 'item') st.cat = L[i].it.cat;
+}
+function switchCat(d) {
+  let c = st.cat;
+  for (let n = 0; n < CATS.length; n++) { c = (c + d + CATS.length) % CATS.length; if (!CATS[c].soon) break; }
+  st.cat = c;
+  if (st.layout === 'B') st.sel = 0;
+  else if (st.layout === 'C') st.sel = list().findIndex(e => e.k === 'item' && e.it.cat === c);
+  else if (st.focus === 'cats') st.sel = c; else st.sel = 0;
+}
+function change(it, d) {
+  if (!it || CATS[it.cat].soon) return;
+  if (it.type === 'choice') vals[it.id] = Math.max(0, Math.min(it.values.length - 1, vals[it.id] + d));
+  else if (it.type === 'slider') vals[it.id] = Math.max(0, Math.min(10, vals[it.id] + d));
+  else if (it.type === 'toggle') vals[it.id] = !vals[it.id];
+}
+function activate(e) {
+  if (!e || e.dis) return;
+  if (e.k === 'cat') { st.cat = e.i; st.focus = 'rows'; st.sel = 0; return; }
+  if (e.k === 'act') return doAct(e.a.id);
+  const it = e.it;
+  if (it.type === 'key') { if (!it.fixed) st.rebind = it.id; }
+  else if (it.type === 'toggle') change(it, 1);
+  else if (it.type === 'choice') vals[it.id] = (vals[it.id] + 1) % it.values.length;
+}
+function doAct(id) {
+  if (id === 'reset') { resetVals(); toast('DEFAULTS RESTORED'); }
+  else toast('SAVED · BACK TO MAIN MENU');
+}
+function back() {
+  if (st.rebind) { st.rebind = null; return; }
+  if (st.layout === 'A' && st.focus === 'rows') { st.focus = 'cats'; st.sel = st.cat; return; }
+  doAct('back');
+}
+
+// =====================================================================================
+// Controles de cada fila
+// =====================================================================================
+function control(it, r) {
+  if (CATS[it.cat].soon) return `<span class="val soonv">COMING SOON</span>`;
+  const v = vals[it.id];
+  if (it.type === 'choice')
+    return `<span class="val"><span class="arr${v === 0 ? ' off' : ''}" data-r="${r}" data-d="-1">‹</span><span class="choice">${it.values[v]}</span><span class="arr${v === it.values.length - 1 ? ' off' : ''}" data-r="${r}" data-d="1">›</span></span>`;
+  if (it.type === 'slider') {
+    let s = ''; for (let k = 1; k <= 10; k++) s += `<i class="${k <= v ? 'on' : ''}" data-r="${r}" data-seg="${k}"></i>`;
+    return `<span class="val"><span class="segs">${s}</span><span class="pct">${v * 10} %</span></span>`;
+  }
+  if (it.type === 'toggle')
+    return `<span class="val"><span class="tg"><span class="${v ? '' : 'on'}" data-r="${r}" data-tg="0">OFF</span><span class="${v ? 'on' : ''}" data-r="${r}" data-tg="1">ON</span></span></span>`;
+  const wait = st.rebind === it.id;
+  return `<span class="val"><span class="kc${it.fixed ? ' fix' : ''}${wait ? ' wait' : ''}" data-r="${r}" data-kb="1">${wait ? 'PRESS A KEY' : v}</span></span>`;
+}
+function rowHtml(e, r, extra = '') {
+  const it = e.it, sel = r === st.sel && !rowsIdle();
+  return `<div class="srow${extra}${sel ? ' sel' : ''}${e.dis ? ' dis' : ''}" data-r="${r}"><span class="lab">${it.label}</span>${control(it, r)}</div>`;
+}
+const rowsIdle = () => st.layout === 'A' && st.focus === 'cats';
+function speedLines(left, top) {
+  return `<div class="speed" style="left:${left}px;top:${top}px"><i style="width:46px;background:var(--cyan)"></i><i style="width:70px;background:var(--blue)"></i><i style="width:30px;background:rgba(54,231,255,.4)"></i></div>`;
+}
+const descOf = e => !e ? '' : e.k === 'item' ? e.it.desc : e.k === 'cat' ? catDesc(CATS[e.i]) : e.a.id === 'reset' ? 'Puts every setting back to its default value.' : 'Saves the settings and goes back to the main menu.';
+function catDesc(c) {
+  return { gameplay:'Rivals and race options.', video:'Screen, resolution and glow.', effects:'Speed effects. Turn them down if they make you dizzy.', controls:'Keyboard keys for driving.', audio:'Volumes. Coming soon, when the game has sound.' }[c.id];
+}
+
+// =====================================================================================
+// Composiciones
+// =====================================================================================
+const LAYOUTS = {
+  A: { desc:'A · Como el menú principal: categorías a la izquierda con la barra lateral, ajustes en un panel a la derecha sobre la rejilla.',
+    bg:() => `<div class="floor" style="left:-200px;width:1680px"></div><div class="horizon"></div><div class="shade"></div>`,
+    html() {
+      const L = list(), e = cur();
+      let cats = '';
+      CATS.forEach((c, i) => {
+        const isSel = st.focus === 'cats' && L[st.sel].k === 'cat' && L[st.sel].i === i;
+        const open = st.focus === 'rows' && st.cat === i;
+        cats += `<div class="mi${isSel ? ' sel' : ''}${open ? ' sel open' : ''}${c.soon ? ' dis' : ''}" data-cat="${i}"><span class="lbl">${c.name}</span>${c.soon ? '<span class="soon">COMING SOON</span>' : ''}</div>`;
+      });
+      let acts = '';
+      ACTS.forEach((a, k) => { const isSel = st.focus === 'cats' && L[st.sel].k === 'act' && L[st.sel].a.id === a.id;
+        acts += `<div class="mi small${isSel ? ' sel' : ''}" data-act="${a.id}"><span class="lbl">${a.label}</span></div>`; });
+      const c = CATS[st.cat];
+      let rows = '';
+      c.items.forEach((it, r) => rows += rowHtml({ k:'item', it }, r));
+      const d = st.focus === 'rows' ? descOf(e) : catDesc(c);
+      return `
+      ${speedLines(18, 100)}
+      <div class="crumb" style="left:96px;top:58px">MAIN MENU</div>
+      <div class="title" style="left:96px;top:76px;font-size:64px">SETTINGS</div>
+      <div class="mlist" style="left:96px;top:230px">${cats}<div class="gap"></div>${acts}</div>
+      <div class="panel l" style="left:620px;top:190px;width:600px;height:${c.items.length * 44 + 150}px">
+        <div class="phead" style="left:32px;top:24px">${c.name}</div>
+        <div class="rows${rowsIdle() ? ' idle' : ''}" style="left:14px;top:56px;width:572px">${rows}</div>
+        <div class="desc" style="left:32px;top:${c.items.length * 44 + 76}px;width:540px">${d}</div>
+      </div>
+      <div class="ver">v0.x.x</div>
+      <div class="foot" style="left:420px">W/S SELECT · A/D CHANGE · Q/E CATEGORY · ENTER · ESC BACK</div>`;
+    } },
+  B: { desc:'B · Como la pausa y los resultados: franja de lado a lado en tres columnas (categorías · ajustes · ayuda).',
+    bg:() => `<div class="floor" style="left:-200px;width:1680px"></div><div class="horizon"></div><div class="dim"></div>`,
+    html() {
+      const L = list(), e = cur(), c = CATS[st.cat];
+      let cats = '';
+      CATS.forEach((k, i) => cats += `<div class="mi small${st.cat === i ? ' sel' : ''}${k.soon ? ' dis' : ''}" data-cat="${i}"><span class="lbl">${k.name}</span>${k.soon ? '<span class="soon">SOON</span>' : ''}</div>`);
+      let rows = '';
+      L.forEach((x, r) => { if (x.k === 'item') rows += rowHtml(x, r); });
+      let acts = '';
+      L.forEach((x, r) => { if (x.k === 'act') acts += `<div class="opt${r === st.sel ? ' sel' : ''}" data-r="${r}">${x.a.label}</div>`; });
+      return `
+      <div class="title" style="left:72px;top:72px;font-size:40px">SETTINGS</div>
+      <div class="crumb" style="left:76px;top:126px">MAIN MENU · ${c.name}</div>
+      <div class="band" style="top:170px;height:420px"></div>
+      <div class="vsep" style="left:340px;top:190px;height:380px"></div>
+      <div class="vsep" style="left:930px;top:190px;height:380px"></div>
+      <div class="phead" style="left:72px;top:196px">CATEGORY</div>
+      <div class="mlist" style="left:62px;top:226px">${cats}</div>
+      <div class="phead" style="left:384px;top:196px">${c.name}</div>
+      <div class="rows" style="left:366px;top:222px;width:540px">${rows}</div>
+      <div class="phead" style="left:966px;top:196px">INFO</div>
+      <div class="desc" style="left:966px;top:228px;width:250px">${e && e.k === 'item' ? `<div style="font-family:Orbitron;font-size:15px;color:var(--white);letter-spacing:.12em;margin-bottom:10px">${e.it.label}</div>` : ''}${descOf(e)}</div>
+      <div class="hopts" style="left:966px;top:500px;flex-direction:column;gap:0">${acts}</div>
+      <div class="ver" style="left:72px">v0.x.x</div>
+      <div class="foot" style="left:400px">W/S SELECT · A/D CHANGE · Q/E CATEGORY · ENTER · ESC BACK</div>`;
+    } },
+  C: { desc:'C · Como SELECT SHIP y el selector de pinturas: todos los ajustes en el panel derecho; a la izquierda, el ajuste en grande con una vista previa.',
+    bg:() => `<div class="floor" style="left:-300px;width:1240px;top:470px"></div>`,
+    html() {
+      const L = list(), e = cur();
+      let rows = '', lastCat = -1;
+      L.forEach((x, r) => {
+        if (x.k !== 'item') return;
+        if (x.it.cat !== lastCat) { lastCat = x.it.cat; const c = CATS[lastCat]; rows += `<div class="grp">${c.name}${c.soon ? '<span class="s">COMING SOON</span>' : ''}</div>`; }
+        rows += rowHtml(x, r, ' compact');
+      });
+      let acts = '';
+      L.forEach((x, r) => { if (x.k === 'act') acts += `<div class="opt${r === st.sel ? ' sel' : ''}" data-r="${r}" style="font-size:16px">${x.a.label}</div>`; });
+      const big = e.k === 'item' ? e.it.label : e.a.label;
+      const catName = e.k === 'item' ? CATS[e.it.cat].name : 'SETTINGS';
+      return `
+      <div class="crumb" style="left:72px;top:56px">MAIN MENU · SETTINGS</div>
+      <div class="bname" style="left:72px;top:80px;font-size:50px">${big}</div>
+      <div class="bcat" style="left:74px;top:146px">${catName}${e.k === 'item' ? ' · <b>' + valueText(e.it) + '</b>' : ''}</div>
+      <div class="desc" style="left:74px;top:176px;width:640px">${descOf(e)}</div>
+      ${preview(e, 72, 262, 680, 340)}
+      <div class="panel l" style="left:836px;top:0;bottom:0;width:444px">
+        <div class="phead" style="left:32px;top:40px">SETTINGS</div>
+        <div class="clip" style="left:14px;top:62px;width:416px;height:540px"><div class="scroll" id="scr">${rows}</div></div>
+        <div class="hopts" style="left:32px;top:628px">${acts}</div>
+      </div>
+      <div class="ver" style="left:72px">v0.x.x</div>
+      <div class="foot" style="left:220px">W/S SELECT · A/D CHANGE · ENTER · ESC BACK</div>`;
+    } },
+};
+function valueText(it) {
+  if (CATS[it.cat].soon) return 'COMING SOON';
+  const v = vals[it.id];
+  if (it.type === 'choice') return it.values[v];
+  if (it.type === 'slider') return v * 10 + ' %';
+  if (it.type === 'toggle') return v ? 'ON' : 'OFF';
+  return v;
+}
+
+// =====================================================================================
+// Vista previa (C)
+// =====================================================================================
+function preview(e, x, y, w, h) {
+  const box = inner => `<div class="prev" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${inner}<div class="lab">PREVIEW</div></div>`;
+  if (!e || e.k !== 'item') return '';
+  const it = e.it;
+  if (it.id === 'difficulty') {
+    const names = ['EASY', 'NORMAL', 'HARD'], v = vals.difficulty;
+    let s = '';
+    names.forEach((n, k) => {
+      const on = k <= v, cx = w / 2 + (k - 1) * 170;
+      s += `<div style="position:absolute;left:${cx - 60}px;top:${h / 2 - 70}px;width:120px;text-align:center">
+        <div style="height:${50 + k * 30}px;margin:${60 - k * 30}px auto 0;width:44px;border:1px solid ${on ? 'var(--cyan)' : 'rgba(36,91,255,.6)'};background:${on ? 'rgba(54,231,255,.85)' : 'transparent'};box-shadow:${on ? '0 0 12px rgba(54,231,255,.7)' : 'none'}"></div>
+        <div style="margin-top:14px;font-family:Orbitron;font-size:14px;letter-spacing:.14em;color:${k === v ? 'var(--cyan)' : 'var(--grey)'}">${n}</div></div>`;
+    });
+    return box(s + `<div style="position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:12px;letter-spacing:.16em;color:rgba(166,184,216,.7)">RIVALS: PACE · MISTAKES · ATTACK · DEFENCE</div>`);
+  }
+  if (it.id === 'mode' || it.id === 'res') {
+    const m = vals.mode, r = ITEM.res.values[vals.res];
+    const sw = m === 0 ? 300 : 440, sh = m === 0 ? 170 : 248;
+    let s = `<div style="position:absolute;left:${(w - 460) / 2}px;top:${(h - 270) / 2}px;width:460px;height:270px;border:1px solid rgba(36,91,255,.5)"></div>`;
+    s += `<div style="position:absolute;left:${(w - sw) / 2}px;top:${(h - sh) / 2}px;width:${sw}px;height:${sh}px;border:1px solid var(--cyan);box-shadow:0 0 12px rgba(54,231,255,.5)">
+      ${m === 0 ? '<div style="height:16px;border-bottom:1px solid rgba(54,231,255,.5)"></div>' : ''}
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+        <div style="font-family:Orbitron;font-size:22px;color:var(--white);letter-spacing:.1em">${r}</div>
+        <div style="font-size:12px;letter-spacing:.2em;color:var(--grey)">${ITEM.mode.values[m]}</div></div></div>`;
+    return box(s);
+  }
+  if (it.type === 'key') {
+    const keys = CATS[3].items.map(k => `<div style="display:flex;justify-content:space-between;width:250px;font-size:13px;letter-spacing:.14em;color:${k.id === it.id ? 'var(--cyan)' : 'rgba(166,184,216,.7)'};padding:4px 0"><span>${k.label}</span><span>${vals[k.id]}</span></div>`).join('');
+    return box(`<div style="position:absolute;left:60px;top:${h / 2 - 50}px;width:150px;height:100px;border:2px solid var(--cyan);box-shadow:0 0 16px rgba(54,231,255,.6);display:flex;align-items:center;justify-content:center;font-family:Orbitron;font-weight:700;font-size:${String(vals[it.id]).length > 2 ? 24 : 40}px;color:var(--white)">${st.rebind === it.id ? '?' : vals[it.id]}</div>
+      <div style="position:absolute;left:300px;top:${h / 2 - 118}px">${keys}</div>`);
+  }
+  if (CATS[it.cat].soon) return box(`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;letter-spacing:.3em;color:rgba(166,184,216,.6)">COMING SOON</div>`);
+  return box(trackPreview(w, h));
+}
+// pista en perspectiva que reacciona a bloom, visión túnel, líneas, FOV y partículas
+function trackPreview(w, h) {
+  const bloom = vals.bloom / 10, tunnel = vals.tunnel / 10, fov = vals.fov / 10, parts = vals.particles;
+  const vx = w / 2, vy = 120 - fov * 18, spread = 1 + fov * 0.22;
+  let g = '';
+  const L = (x1, y1, x2, y2, c, o, sw = 1.4) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-opacity="${o}" stroke-width="${sw}"/>`;
+  const bx = k => vx + (k * 310) * spread;
+  g += L(vx - 6, vy, bx(-1), h, '#36E7FF', 1, 2) + L(vx + 6, vy, bx(1), h, '#36E7FF', 1, 2);
+  g += L(vx - 2, vy, vx + (-110) * spread, h, '#245BFF', .7) + L(vx + 2, vy, vx + 110 * spread, h, '#245BFF', .7);
+  for (let t = 0.08; t < 1; t += 0.13) {
+    const yy = vy + (h - vy) * t * t, half = 6 + (310 * spread - 6) * t * t;
+    g += L(vx - half, yy, vx + half, yy, '#36E7FF', .25 + .5 * t);
+  }
+  g += L(0, vy, w, vy, '#36E7FF', .35);
+  // nave rival por delante
+  g += `<polygon points="${vx - 26},${vy + 70} ${vx + 26},${vy + 70} ${vx},${vy + 50}" fill="none" stroke="#FF43D0" stroke-width="1.6"/>`;
+  let lines = '';
+  if (vals.lines) {
+    let s = 7;
+    const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 26; k++) {
+      const a = rnd() * Math.PI * 2, r0 = 150 + rnd() * 90, len = 30 + rnd() * 50;
+      const x1 = vx + Math.cos(a) * r0, y1 = h / 2 + Math.sin(a) * r0 * .6, x2 = vx + Math.cos(a) * (r0 + len), y2 = h / 2 + Math.sin(a) * (r0 + len) * .6;
+      lines += L(x1, y1, x2, y2, '#BFF6FF', .55, 1);
+    }
+  }
+  let dots = '';
+  const n = [8, 18, 36][parts];
+  let s2 = 3; const r2 = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < n; k++) dots += `<circle cx="${vx - 40 + r2() * 80}" cy="${vy + 76 + r2() * 26}" r="${1 + r2() * 1.6}" fill="#7FC8FF" fill-opacity="${.3 + r2() * .5}"/>`;
+  const blur = (1 + bloom * 5).toFixed(1);
+  const amp = (vals.shake / 10 * 2.2).toFixed(2);
+  return `<svg width="${w}" height="${h}" style="position:absolute;left:0;top:0;--a:${amp}px;animation:${vals.shake ? 'shk .09s linear infinite' : 'none'}">
+      <defs><filter id="gl" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${blur}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+      <g filter="${bloom > 0 ? 'url(#gl)' : ''}" opacity="${0.75 + bloom * 0.25}">${g}${dots}</g>${lines}</svg>
+      <div class="vig" style="background:radial-gradient(ellipse 60% 62% at 50% 50%, transparent 35%, rgba(5,7,13,${(tunnel * 0.9).toFixed(2)}) 100%);backdrop-filter:none"></div>`;
+}
+
+// =====================================================================================
+// Render y entrada
+// =====================================================================================
+const ui = document.getElementById('ui'), bg = document.getElementById('bg');
+function render() {
+  const Lt = LAYOUTS[st.layout];
+  bg.innerHTML = Lt.bg();
+  ui.innerHTML = Lt.html();
+  document.getElementById('ldesc').textContent = Lt.desc;
+  document.querySelectorAll('#tool [data-l]').forEach(b => b.classList.toggle('on', b.dataset.l === st.layout));
+  if (st.layout === 'C') {
+    const scr = document.getElementById('scr'), el = scr.querySelector('.srow.sel');
+    if (el) {
+      const top = el.offsetTop, hh = el.offsetHeight, H = 540;
+      if (top - st.scroll < 40) st.scroll = Math.max(0, top - 40);
+      if (top + hh - st.scroll > H - 10) st.scroll = top + hh - H + 10;
+    }
+    scr.style.transform = `translateY(${-st.scroll}px)`;
+  }
+}
+function setLayout(l) {
+  st.layout = l; st.rebind = null; st.scroll = 0;
+  if (l === 'A') { st.focus = 'cats'; st.sel = st.cat; }
+  else if (l === 'B') st.sel = 0;
+  else st.sel = list().findIndex(e => e.k === 'item' && e.it.cat === st.cat);
+  render();
+}
+
+const KEYNAME = c => ({ ShiftLeft:'SHIFT', ShiftRight:'R SHIFT', ControlLeft:'CTRL', ControlRight:'R CTRL', AltLeft:'ALT', AltRight:'ALT GR', Space:'SPACE', Enter:'ENTER', Tab:'TAB',
+  ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→', Backspace:'BACKSPACE' }[c] || c.replace(/^Key|^Digit|^Numpad/, (m) => m === 'Numpad' ? 'NUM ' : '').toUpperCase());
+
+addEventListener('keydown', e => {
+  if (st.rebind) {
+    e.preventDefault();
+    if (e.code === 'Escape') { st.rebind = null; render(); return; }
+    const name = KEYNAME(e.code), id = st.rebind;
+    if (name === 'ESC') return;
+    const other = Object.keys(ITEM).find(k => ITEM[k].type === 'key' && k !== id && vals[k] === name);
+    if (other) { if (ITEM[other].fixed) { toast('ESC IS RESERVED FOR PAUSE'); return; } vals[other] = vals[id]; toast(`SWAPPED WITH ${ITEM[other].label}`); }
+    vals[id] = name; st.rebind = null; render(); return;
+  }
+  const c = e.code, it = cur() && cur().k === 'item' ? cur().it : null;
+  if (c === 'ArrowUp' || c === 'KeyW') { e.preventDefault(); move(-1); }
+  else if (c === 'ArrowDown' || c === 'KeyS') { e.preventDefault(); move(1); }
+  else if (c === 'ArrowLeft' || c === 'KeyA') { e.preventDefault(); if (st.layout === 'A' && st.focus === 'rows' && it && (it.type === 'key')) back(); else if (it) change(it, -1); }
+  else if (c === 'ArrowRight' || c === 'KeyD') { e.preventDefault(); if (st.layout === 'A' && st.focus === 'cats') activate(cur()); else if (it) change(it, 1); }
+  else if (c === 'KeyQ') switchCat(-1);
+  else if (c === 'KeyE') switchCat(1);
+  else if (c === 'Enter' || c === 'Space') { e.preventDefault(); activate(cur()); }
+  else if (c === 'Escape') back();
+  else return;
+  render();
+});
+
+ui.addEventListener('click', e => {
+  const t = e.target;
+  const cat = t.closest('[data-cat]');
+  if (cat) {
+    const i = +cat.dataset.cat; if (CATS[i].soon) return;
+    if (st.layout === 'A') { st.cat = i; st.focus = 'rows'; st.sel = 0; } else { st.cat = i; st.sel = 0; }
+    render(); return;
+  }
+  const act = t.closest('[data-act]');
+  if (act) { doAct(act.dataset.act); render(); return; }
+  const el = t.closest('[data-r]'); if (!el) return;
+  const r = +el.dataset.r, L = list(), x = L[r];
+  if (!x || x.dis) return;
+  if (st.layout === 'A' && st.focus === 'cats') { st.focus = 'rows'; }
+  st.sel = r;
+  if (x.k === 'act') { doAct(x.a.id); render(); return; }
+  const it = x.it;
+  if (t.dataset.d) change(it, +t.dataset.d);
+  else if (t.dataset.seg) vals[it.id] = (vals[it.id] === +t.dataset.seg && +t.dataset.seg === 1) ? 0 : +t.dataset.seg;
+  else if (t.dataset.tg) vals[it.id] = t.dataset.tg === '1';
+  else if (t.dataset.kb) { if (!it.fixed) st.rebind = it.id; }
+  if (st.layout === 'C') st.cat = it.cat;
+  render();
+});
+ui.addEventListener('mouseover', e => {
+  if (st.rebind) return;
+  const t = e.target;
+  const cat = t.closest('.mi[data-cat]');
+  if (cat && st.layout === 'A' && st.focus === 'cats') {
+    const i = +cat.dataset.cat; if (CATS[i].soon || st.sel === i) return; st.sel = i; st.cat = i; render(); return;
+  }
+  const act = t.closest('.mi[data-act]');
+  if (act && st.layout === 'A' && st.focus === 'cats') {
+    const i = list().findIndex(x => x.k === 'act' && x.a.id === act.dataset.act); if (st.sel !== i) { st.sel = i; render(); } return;
+  }
+  const el = t.closest('.srow[data-r], .opt[data-r]');
+  if (!el) return;
+  if (st.layout === 'A' && st.focus === 'cats') return;
+  const r = +el.dataset.r, x = list()[r];
+  if (!x || x.dis || st.sel === r) return;
+  st.sel = r; if (st.layout === 'C' && x.k === 'item') st.cat = x.it.cat; render();
+});
+ui.addEventListener('wheel', e => { if (st.layout !== 'C') return; e.preventDefault(); move(e.deltaY > 0 ? 1 : -1); render(); }, { passive:false });
+document.querySelectorAll('#tool [data-l]').forEach(b => b.onclick = () => setLayout(b.dataset.l));
+
+const toastEl = document.getElementById('toast'); let toastT = 0;
+function toast(s) { toastEl.textContent = s; toastEl.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => toastEl.style.opacity = 0, 1500); }
+
+// escala de la pantalla de 1280×720 a la ventana
+const stage = document.getElementById('stage'), wrap = document.getElementById('wrap');
+function fit() { const W = wrap.clientWidth, H = wrap.clientHeight, k = Math.min(W / 1280, H / 720);
+  stage.style.transform = `scale(${k})`; stage.style.left = (W - 1280 * k) / 2 + 'px'; stage.style.top = (H - 720 * k) / 2 + 'px'; }
+addEventListener('resize', fit);
+fit(); setLayout('A');
+document.fonts && document.fonts.load('900 40px Orbitron').then(render).catch(() => {});
+</script>
+</body>
+</html>

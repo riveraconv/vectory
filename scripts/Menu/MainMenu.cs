@@ -11,7 +11,8 @@ namespace Vectory.Menu;
 // Dibuja la lista de opciones con OptionList y traduce el teclado a llamadas al MenuModel;
 // la navegación vive en el modelo. Ejecuta la acción que devuelve Confirm(): RACE y TIME TRIAL
 // abren SELECT CIRCUIT (CircuitSelectScreen) en su modo, que lleva a SELECT SHIP (ShipSelectScreen), que carga la
-// carrera; RECORDS abre la pantalla de récords (RecordsScreen); todas en esta misma escena. QUIT cierra el juego.
+// carrera; RECORDS abre la pantalla de récords (RecordsScreen) y SETTINGS la de ajustes (SettingsScreen); todas en esta
+// misma escena. QUIT cierra el juego. La primera vez carga y aplica los ajustes (SettingsService).
 //
 // Las medidas (Inspector incluido) son las de la spec, sobre una pantalla de referencia de 1280×720,
 // multiplicadas por UiScale.Factor.
@@ -20,6 +21,7 @@ public partial class MainMenu : CanvasLayer
 	public const string RaceId = "RACE";
 	public const string TimeTrialId = "TIME_TRIAL";
 	public const string RecordsId = "RECORDS";
+	public const string SettingsId = "SETTINGS";
 	public const string QuitId = "QUIT";
 
 	// Opciones del menú, en orden. Activar una es cambiar Enabled y conectar su acción en Execute.
@@ -30,7 +32,7 @@ public partial class MainMenu : CanvasLayer
 		new(TimeTrialId, "TIME TRIAL", true),
 		new("HANGAR", "HANGAR", false),
 		new(RecordsId, "RECORDS", true),
-		new("SETTINGS", "SETTINGS", false),
+		new(SettingsId, "SETTINGS", true),
 		new(QuitId, "QUIT", true)
 	};
 
@@ -53,6 +55,7 @@ public partial class MainMenu : CanvasLayer
 	private RecordsScreen _records;
 	private CircuitSelectScreen _circuitSelect;
 	private ShipSelectScreen _shipSelect;
+	private SettingsScreen _settings;
 	private float _scale = 1f;
 	private static bool _lastShipRestored;   // sobrevive al cambio de escena: al volver de una carrera no se vuelve a leer
 
@@ -61,6 +64,7 @@ public partial class MainMenu : CanvasLayer
 		Layer = 2;   // por encima de la sombra izquierda del fondo (capa 1)
 		_scale = UiScale.Factor;
 
+		SettingsService.EnsureLoaded();
 		RestoreLastShip();
 
 		_model = new MenuModel(Options);
@@ -100,6 +104,11 @@ public partial class MainMenu : CanvasLayer
 		_shipSelect = new ShipSelectScreen { Name = "ShipSelect", RaceScenePath = RaceScenePath };
 		AddChild(_shipSelect);
 		_shipSelect.Closed += mode => _circuitSelect.Open(mode);
+
+		// SETTINGS: en esta escena, con la rejilla del fondo y sin la nave
+		_settings = new SettingsScreen { Name = "Settings", Background = GetNodeOrNull<MenuBackground>("../Background") };
+		AddChild(_settings);
+		_settings.Closed += () => ReturnTo(SettingsId);
 	}
 
 	// La primera vez que se abre el menú, la sesión empieza con la última nave elegida
@@ -120,7 +129,7 @@ public partial class MainMenu : CanvasLayer
 	public override void _Process(double delta)
 	{
 		// Con RECORDS, SELECT CIRCUIT o SELECT SHIP abierta, el input es suyo
-		if (_records.IsOpen || _circuitSelect.IsOpen || _shipSelect.IsOpen)
+		if (_records.IsOpen || _circuitSelect.IsOpen || _shipSelect.IsOpen || _settings.IsOpen)
 			return;
 
 		if (Input.IsActionJustPressed("menu_down"))
@@ -153,6 +162,10 @@ public partial class MainMenu : CanvasLayer
 			case RecordsId:
 				_content.Visible = false;
 				_records.Open();
+				break;
+			case SettingsId:
+				_content.Visible = false;
+				_settings.Open();
 				break;
 			case QuitId:
 				SceneChanger.Quit(this);
