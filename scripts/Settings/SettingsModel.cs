@@ -5,13 +5,16 @@ using Vectory.Rivals;
 namespace Vectory.Settings;
 
 // Los valores de SETTINGS (spec docs/settings.md, 9): uno por ajuste del catálogo que no está en COMING SOON y no es
-// una tecla (las teclas, en la etapa 3). Lista: índice; porcentaje: pasos de 10 %; sí / no: 0 o 1. Avisa con Changed.
-// Lógica pura.
+// una tecla. Lista: índice; porcentaje: pasos de 10 %; sí / no: 0 o 1. Las teclas, en Keys (spec 6). Avisa con Changed
+// (también al cambiar una tecla, con el id de su fila). Lógica pura.
 public sealed class SettingsModel
 {
 	private readonly Dictionary<string, int> _values = new();
 
 	public event Action<string> Changed;
+
+	// Teclas de conducción (spec 6)
+	public KeyBindings Keys { get; } = new();
 
 	// Resoluciones que caben en la pantalla (spec 4.2: las primeras de la lista); -1 = todas, sin pantalla (pruebas)
 	public int ResolutionCount { get; }
@@ -20,6 +23,7 @@ public sealed class SettingsModel
 	public SettingsModel(int resolutionCount = -1)
 	{
 		ResolutionCount = resolutionCount;
+		Keys.Changed += id => Changed?.Invoke(id);
 		foreach (SettingDef def in SettingsCatalog.All)
 		{
 			if (Holds(def))
@@ -91,6 +95,7 @@ public sealed class SettingsModel
 			if (Holds(def))
 				Set(def.Id, DefaultOf(def));
 		}
+		Keys.Reset();
 	}
 
 	public SettingsModel Clone()
@@ -98,6 +103,7 @@ public sealed class SettingsModel
 		var copy = new SettingsModel(ResolutionCount);
 		foreach (KeyValuePair<string, int> pair in _values)
 			copy._values[pair.Key] = pair.Value;
+		copy.Keys.CopyFrom(Keys);
 		return copy;
 	}
 
@@ -115,7 +121,7 @@ public sealed class SettingsModel
 			SettingKind.Choice => def.Values[value],
 			SettingKind.Percent => $"{value * 10} %",
 			SettingKind.Toggle => value != 0 ? "ON" : "OFF",
-			_ => def.Values?.Count > 0 ? def.Values[0] : ""
+			_ => KeyNames.Name(Keys.Get(id))
 		};
 	}
 

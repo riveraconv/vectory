@@ -586,7 +586,7 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	public override void _UnhandledKeyInput(InputEvent @event)
 	{
-		if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.C })
+		if (@event.IsActionPressed("camera"))
 		{
 			_chaseView = !_chaseView;
 			ApplyView();
@@ -833,15 +833,15 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	private static System.Numerics.Vector3 ToNumerics(Vector3 v) => new(v.X, v.Y, v.Z);
 
-	// Traduce el teclado a intenciones de conducción
+	// Traduce el teclado a intenciones de conducción (acciones del mapa de entrada; SETTINGS cambia sus teclas)
 	private static ShipInput ReadInput()
 	{
 		return new ShipInput
 		{
-			Accelerate = Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up),
-			Brake = Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down),
-			SteerLeft = Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left),
-			SteerRight = Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right),
+			Accelerate = Input.IsActionPressed("accelerate"),
+			Brake = Input.IsActionPressed("brake"),
+			SteerLeft = Input.IsActionPressed("steer_left"),
+			SteerRight = Input.IsActionPressed("steer_right"),
 			Drift = Input.IsActionPressed("drift")
 		};
 	}

@@ -51,6 +51,7 @@ public partial class SettingsScreen : CanvasLayer
 	private float _scale = 1f;
 	private ulong _openedFrame;
 	private float _toastLeft;
+	private ulong _keyFrame = ulong.MaxValue;   // frame en que se pulsó la tecla esperada: sus acciones de menú no cuentan
 
 	private Control _root;
 	private Label _name;
@@ -125,7 +126,7 @@ public partial class SettingsScreen : CanvasLayer
 		}
 		if (UpdateDisplayConfirm((float)delta))
 			return;
-		if (Engine.GetProcessFrames() == _openedFrame)
+		if (Engine.GetProcessFrames() == _openedFrame || _logic.Listening || Engine.GetProcessFrames() == _keyFrame)
 			return;
 
 		// Con un cambio de pantalla esperando su pregunta, salir la saca ya (no se guarda sin confirmar)
@@ -145,10 +146,29 @@ public partial class SettingsScreen : CanvasLayer
 			Apply(_logic.Accept());
 	}
 
+	// Esperando la tecla nueva (spec 6.2): la siguiente tecla pulsada va a la lógica y no llega a los menús
+	public override void _Input(InputEvent @event)
+	{
+		if (!IsOpen || _logic == null || !_logic.Listening)
+			return;
+		if (@event is not InputEventKey { Pressed: true, Echo: false } key)
+			return;
+		GetViewport().SetInputAsHandled();
+		_keyFrame = Engine.GetProcessFrames();
+		long code = (long)key.PhysicalKeycode;
+		if (code == 0)
+			code = (long)key.Keycode;
+		Apply(_logic.KeyPressed(code));
+	}
+
 	private void Apply(SettingsAction action)
 	{
 		switch (action)
 		{
+			case SettingsAction.KeyDone:
+				if (_logic.LastRebind.Result == RebindResult.Swapped)
+					ShowToast($"SWAPPED WITH {SettingsCatalog.Find(_logic.LastRebind.Other)?.Label}");
+				break;
 			case SettingsAction.OpenConfirm:
 				_confirmOptions.SetModel(_logic.ConfirmMenu);
 				_confirm.Visible = true;
@@ -177,12 +197,12 @@ public partial class SettingsScreen : CanvasLayer
 
 		_name.Text = action ? (id == SettingsScreenLogic.ResetId ? "RESET DEFAULTS" : "BACK") : def.Label;
 		_group.Text = action ? "SETTINGS" : def.Group;
-		_value.Text = action ? "" : "  ·  " + model.ValueText(id);
+		_value.Text = action ? "" : "  ·  " + (_logic.Listening ? "PRESS A KEY" : model.ValueText(id));
 		_description.Text = Markup(action
 			? id == SettingsScreenLogic.ResetId ? "Puts every setting back to its default value." : "Saves the settings and goes back to the main menu."
 			: def.Description);
 		_preview.Show(model, def);
-		_list.Show(model, action ? null : id);
+		_list.Show(model, action ? null : id, _logic.Listening);
 
 		_actions.ShowSelection = action && !_logic.Confirming;
 		_actionModel.Select(id == SettingsScreenLogic.BackId ? 1 : 0);
@@ -235,6 +255,9 @@ public partial class SettingsScreen : CanvasLayer
 			case SettingsClick.Toggle:
 				model.Set(id, value);
 				break;
+			case SettingsClick.Key:
+				Apply(_logic.Choose(id));
+				return;
 		}
 		UpdateView();
 	}
@@ -347,7 +370,7 @@ public partial class SettingsScreen : CanvasLayer
 	private Label _crumbLabel;
 
 	// Con una pregunta en pantalla, el ratón no toca la lista
-	private bool Busy => _logic == null || _logic.Confirming || _display.Showing;
+	private bool Busy => _logic == null || _logic.Confirming || _logic.Listening || _display.Showing;
 
 	private void OnRowOptionChosen(string id)
 	{

@@ -1,4 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Linq;
 using Vectory.Circuit;
 using Vectory.Game;
@@ -381,5 +385,188 @@ public class SettingsTests
 		Assert.Equal(SettingsAction.Back, logic.Back());
 		logic.Accept();
 		Assert.Equal(SettingsAction.CloseConfirm, logic.Back());
+	}
+
+	// 16
+	[Fact]
+	public void Changing_accelerate_to_a_free_key_gives_it_to_accelerate()
+	{
+		var model = new SettingsModel();
+		var changed = new List<string>();
+		model.Changed += changed.Add;
+
+		RebindOutcome outcome = model.Keys.Rebind("keyAccelerate", 'E');
+
+		Assert.Equal(RebindResult.Assigned, outcome.Result);
+		Assert.Equal('E', model.Keys.Get("keyAccelerate"));
+		Assert.Equal('S', model.Keys.Get("keyBrake"));
+		Assert.Equal(new[] { "keyAccelerate" }, changed);
+		Assert.Equal("E", model.ValueText("keyAccelerate"));
+	}
+
+	// 17
+	[Fact]
+	public void Changing_accelerate_to_s_swaps_it_with_brake()
+	{
+		var logic = new SettingsScreenLogic(new SettingsModel());
+		logic.Select("keyAccelerate");
+
+		Assert.Equal(SettingsAction.ListenKey, logic.Accept());
+		Assert.Equal(SettingsAction.KeyDone, logic.KeyPressed('S'));
+
+		Assert.Equal(RebindResult.Swapped, logic.LastRebind.Result);
+		Assert.Equal("keyBrake", logic.LastRebind.Other);
+		Assert.Equal('S', logic.Model.Keys.Get("keyAccelerate"));
+		Assert.Equal('W', logic.Model.Keys.Get("keyBrake"));
+		Assert.False(logic.Listening);
+	}
+
+	// 18
+	[Fact]
+	public void Escape_and_f1_to_f12_are_not_accepted_and_escape_cancels()
+	{
+		var logic = new SettingsScreenLogic(new SettingsModel());
+		logic.Select("keyBoost");
+		logic.Accept();
+
+		for (long key = KeyBindings.F1; key <= KeyBindings.F12; key++)
+		{
+			Assert.Equal(SettingsAction.None, logic.KeyPressed(key));
+			Assert.True(logic.Listening);
+		}
+		// La segunda tecla de otra acción (las flechas) tampoco: una tecla no hace dos cosas
+		Assert.Equal(SettingsAction.None, logic.KeyPressed(KeyNames.Up));
+		Assert.Equal(RebindResult.InUse, logic.LastRebind.Result);
+		Assert.True(logic.Listening);
+
+		Assert.Equal(SettingsAction.KeyDone, logic.KeyPressed(KeyBindings.Escape));
+		Assert.Equal(RebindResult.Cancelled, logic.LastRebind.Result);
+		Assert.False(logic.Listening);
+		Assert.Equal(KeyNames.Shift, logic.Model.Keys.Get("keyBoost"));
+	}
+
+	// 19
+	[Fact]
+	public void Pause_cannot_be_changed()
+	{
+		var logic = new SettingsScreenLogic(new SettingsModel());
+		logic.Select("keyPause");
+
+		Assert.Equal(SettingsAction.None, logic.Accept());
+		Assert.False(logic.Listening);
+		Assert.Equal(RebindResult.Fixed, logic.Model.Keys.Rebind("keyPause", 'P').Result);
+		Assert.Equal(KeyBindings.Escape, logic.Model.Keys.Get("keyPause"));
+		Assert.Equal("ESC", logic.Model.ValueText("keyPause"));
+		Assert.False(logic.Model.Keys.Set("keyPause", 'P'));
+	}
+
+	// 20
+	[Fact]
+	public void The_menu_keys_do_not_change_with_the_driving_keys()
+	{
+		Dictionary<string, List<long>> map = ProjectInputMap();
+
+		// Las acciones de la tabla existen, con su tecla por defecto primero y la segunda detrás
+		foreach (KeyAction action in KeyBindings.Actions)
+		{
+			Assert.True(map.ContainsKey(action.Action), action.Action);
+			Assert.Equal(action.Default, map[action.Action][0]);
+			if (action.Secondary != 0)
+				Assert.Equal(action.Secondary, map[action.Action][1]);
+			Assert.False(action.Action.StartsWith("menu_"), action.Action);
+		}
+		// Los menús tienen sus propias acciones, que SETTINGS no toca
+		Assert.Equal(new long[] { 'W', KeyNames.Up }, map["menu_up"]);
+		Assert.Equal(new long[] { 'S', KeyNames.Down }, map["menu_down"]);
+	}
+
+	[Fact]
+	public void Key_names_are_godot_physical_keys()
+	{
+		Assert.Equal((long)Godot.Key.Escape, KeyBindings.Escape);
+		Assert.Equal((long)Godot.Key.F1, KeyBindings.F1);
+		Assert.Equal((long)Godot.Key.F12, KeyBindings.F12);
+		Assert.Equal((long)Godot.Key.Shift, KeyNames.Shift);
+		Assert.Equal((long)Godot.Key.Up, KeyNames.Up);
+		Assert.Equal((long)Godot.Key.Down, KeyNames.Down);
+		Assert.Equal((long)Godot.Key.Left, KeyNames.Left);
+		Assert.Equal((long)Godot.Key.Right, KeyNames.Right);
+		Assert.Equal((long)Godot.Key.W, 'W');
+		Assert.Equal((long)Godot.Key.Space, ' ');
+
+		foreach (Godot.Key key in new[] { Godot.Key.Enter, Godot.Key.Tab, Godot.Key.Ctrl, Godot.Key.Alt, Godot.Key.Kp0,
+			Godot.Key.Kp9, Godot.Key.KpMultiply, Godot.Key.KpAdd, Godot.Key.Pageup, Godot.Key.Capslock, Godot.Key.Q, Godot.Key.Key7 })
+		{
+			string name = KeyNames.Name((long)key);
+			Assert.DoesNotContain("#", name);
+			Assert.True(KeyNames.TryParse(name, out long back), name);
+			Assert.Equal((long)key, back);
+		}
+		Assert.Equal("KP 0", KeyNames.Name((long)Godot.Key.Kp0));
+		Assert.Equal("CTRL", KeyNames.Name((long)Godot.Key.Ctrl));
+		Assert.True(KeyNames.TryParse("#123456", out long raw));
+		Assert.Equal(123456, raw);
+		Assert.True(KeyNames.TryParse("shift", out long shift));
+		Assert.Equal(KeyNames.Shift, shift);
+	}
+
+	[Fact]
+	public void Keys_are_saved_loaded_and_reset_with_the_rest()
+	{
+		var model = new SettingsModel();
+		model.Keys.Rebind("keyAccelerate", 'S');
+		model.Keys.Rebind("keyBoost", 'E');
+
+		Dictionary<string, JsonElement> sections = SettingsSerializer.Write(model);
+		SettingsModel loaded = SettingsSerializer.Read(sections, new List<string>());
+		foreach (KeyAction action in KeyBindings.Actions)
+			Assert.Equal(model.Keys.Get(action.Id), loaded.Keys.Get(action.Id));
+		Assert.Equal("E", sections["controls"].GetProperty("keyBoost").GetString());
+		Assert.False(sections["controls"].TryGetProperty("keyPause", out _));
+		Assert.Equal('S', model.Clone().Keys.Get("keyAccelerate"));
+
+		loaded.Reset();
+		foreach (KeyAction action in KeyBindings.Actions)
+			Assert.Equal(action.Default, loaded.Keys.Get(action.Id));
+	}
+
+	[Fact]
+	public void A_bad_key_in_the_file_takes_its_default_and_shared_keys_reset_them_all()
+	{
+		var warnings = new List<string>();
+		var sections = new Dictionary<string, JsonElement>
+		{
+			["controls"] = JsonDocument.Parse("{ \"keyAccelerate\": \"Q\", \"keyBrake\": \"F5\", \"keySteerLeft\": 7, \"keySteerRight\": \"UP\", \"keyBoost\": \"NOPE\" }").RootElement
+		};
+		SettingsModel model = SettingsSerializer.Read(sections, warnings);
+		Assert.Equal('Q', model.Keys.Get("keyAccelerate"));
+		Assert.Equal('S', model.Keys.Get("keyBrake"));
+		Assert.Equal('A', model.Keys.Get("keySteerLeft"));
+		Assert.Equal('D', model.Keys.Get("keySteerRight"));
+		Assert.Equal(KeyNames.Shift, model.Keys.Get("keyBoost"));
+		Assert.Equal(6, warnings.Count);   // 4 que no valen + DRIFT y CAMERA, que faltan
+
+		warnings.Clear();
+		sections["controls"] = JsonDocument.Parse("{ \"keyAccelerate\": \"S\", \"keyBrake\": \"S\", \"keySteerLeft\": \"A\", \"keySteerRight\": \"D\", \"keyBoost\": \"SHIFT\", \"keyDrift\": \"SPACE\", \"keyCamera\": \"C\" }").RootElement;
+		model = SettingsSerializer.Read(sections, warnings);
+		Assert.Equal('W', model.Keys.Get("keyAccelerate"));
+		Assert.Equal('S', model.Keys.Get("keyBrake"));
+		Assert.Single(warnings);
+	}
+
+	// Las acciones de project.godot con sus teclas físicas, en orden
+	private static Dictionary<string, List<long>> ProjectInputMap()
+	{
+		var dir = new DirectoryInfo(AppContext.BaseDirectory);
+		while (dir != null && !File.Exists(Path.Combine(dir.FullName, "project.godot")))
+			dir = dir.Parent;
+		string text = File.ReadAllText(Path.Combine(dir!.FullName, "project.godot")).Replace("\r\n", "\n");
+		var map = new Dictionary<string, List<long>>();
+		foreach (Match action in Regex.Matches(text, @"^([a-z_]+)=\{\n(.*?)\n\}", RegexOptions.Multiline | RegexOptions.Singleline))
+		{
+			map[action.Groups[1].Value] = Regex.Matches(action.Groups[2].Value, "\"physical_keycode\":(\\d+)")
+				.Select(m => long.Parse(m.Groups[1].Value)).ToList();
+		}
+		return map;
 	}
 }

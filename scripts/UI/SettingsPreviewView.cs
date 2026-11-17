@@ -120,7 +120,7 @@ public partial class SettingsPreviewView : Control
 	private void DrawKeys()
 	{
 		float h = Size.Y;
-		string key = _def.Values[0];
+		string key = _model.ValueText(_def.Id);
 		var box = new Rect2(S(60f), h / 2f - S(50f), S(150f), S(100f));
 		DrawRect(box.Grow(S(4f)), new Color(Palette.SettingsPreviewGlow, 0.3f), false, S(6f));
 		DrawRect(box, Palette.Cyan, false, S(2f));
@@ -137,7 +137,7 @@ public partial class SettingsPreviewView : Control
 			Color color = def.Id == _def.Id ? Palette.Cyan : Palette.SettingsPreviewDim;
 			y += S(26f);
 			DrawString(font, new Vector2(S(300f), y), def.Label, HorizontalAlignment.Left, -1, listSize, color);
-			DrawString(font, new Vector2(S(300f), y), def.Values[0], HorizontalAlignment.Right, S(250f), listSize, color);
+			DrawString(font, new Vector2(S(300f), y), _model.ValueText(def.Id), HorizontalAlignment.Right, S(250f), listSize, color);
 		}
 	}
 

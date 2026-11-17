@@ -1,6 +1,6 @@
 # VECTORY — Spec: Settings
 
-Versión 1.1 · 2026-11-17 · Estado: **etapa 2 en curso**
+Versión 1.1 · 2026-11-17 · Estado: **etapa 3 en curso**
 
 Añade la pantalla **SETTINGS**. Se entra desde el **menú principal** (deja de estar en COMING SOON) y desde la **pausa**. Tiene cinco grupos:
 
@@ -237,6 +237,14 @@ Los textos en inglés son los de la página.
 
 - Las teclas de los **menús** (W/S, flechas, ENTER, ESPACIO, ESC) **no cambian**. Así nunca te quedas sin poder moverte por los menús.
 - RESET DEFAULTS devuelve también las teclas.
+
+### 6.3 Concreciones de la etapa 3
+
+- **Inventario**: BOOST (`boost`), DRIFT (`drift`) y PAUSE (`pause`) ya eran acciones. Acelerar, frenar, girar y la cámara iban con teclas fijas en `Player` (W/S/A/D con las flechas y C): ahora son las acciones `accelerate`, `brake`, `steer_left`, `steer_right` (W/S/A/D primero y la flecha detrás) y `camera` (C), con las mismas teclas. Los menús siguen con sus `menu_*`.
+- Las teclas son **físicas** (su sitio en el teclado, como las del proyecto) y se guardan por su nombre en `controls`: `"keyAccelerate": "W"`, `"SHIFT"`, `"SPACE"`, `"UP"`…; una que no tiene nombre, `"#código"`. PAUSE no se guarda.
+- **La segunda tecla de otra acción no vale** (por ejemplo, la flecha arriba para BRAKE): no pasa nada y se sigue esperando, como con F1–F12. Así ninguna tecla hace dos cosas, y las flechas no cambian nunca.
+- Al cargar: una tecla que falta, que no se conoce o que no vale toma la de por defecto con aviso; si dos acciones acaban con la misma, todas por defecto.
+- `PRESS A KEY` en naranja y parpadeando (0,6 s), como la página; la tecla que se pulsa no llega a los menús (ni ESC, que cancela sin salir de SETTINGS). Clic en el recuadro de la tecla también espera la nueva.
 
 ## 7. Entrar y salir
 

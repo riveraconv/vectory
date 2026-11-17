@@ -56,7 +56,7 @@ public static class SettingsCatalog
 	private const string KeyHelp = "Press ENTER and then the new key. If the key is in use, the two actions swap keys.";
 
 	private static SettingDef KeyRow(string id, string label, string key, bool fixedKey = false) =>
-		new(id, Controls, label, SettingKind.Key, new[] { key }, 0, fixedKey ? "Pause is always ESC." : KeyHelp, Applied: false);
+		new(id, Controls, label, SettingKind.Key, new[] { key }, 0, fixedKey ? "Pause is always ESC." : KeyHelp);
 
 	public static IReadOnlyList<SettingDef> All { get; } = Array.AsReadOnly(new[]
 	{
@@ -83,7 +83,7 @@ public static class SettingsCatalog
 		new SettingDef(CockpitShake, Effects, "COCKPIT SHAKE", SettingKind.Percent, null, PercentSteps,
 			"Vibration of the cockpit view at high speed and with the boost. [b]Lower it if it makes you dizzy.[/b] At 0 the cockpit stays still."),
 
-		// Las teclas se ven en la etapa 1 y se cambian en la 3
+		// Las teclas (KeyBindings): Values[0] es solo la de por defecto; la actual, en SettingsModel.Keys
 		KeyRow("keyAccelerate", "ACCELERATE", "W"),
 		KeyRow("keyBrake", "BRAKE", "S"),
 		KeyRow("keySteerLeft", "STEER LEFT", "A"),

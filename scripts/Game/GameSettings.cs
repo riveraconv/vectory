@@ -80,6 +80,9 @@ public sealed class SettingsStore
 
 		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 		public JsonElement? Effects { get; set; }
+
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public JsonElement? Controls { get; set; }
 	}
 
 	private sealed class PaintEntry
@@ -187,6 +190,7 @@ public sealed class SettingsStore
 		Add(SettingsCatalog.Gameplay, file.Gameplay);
 		Add(SettingsCatalog.Video, file.Video);
 		Add(SettingsCatalog.Effects, file.Effects);
+		Add(SettingsCatalog.Controls, file.Controls);
 		return sections;
 	}
 
@@ -218,6 +222,7 @@ public sealed class SettingsStore
 			file.Gameplay = SectionOrNull(sections, SettingsCatalog.Gameplay);
 			file.Video = SectionOrNull(sections, SettingsCatalog.Video);
 			file.Effects = SectionOrNull(sections, SettingsCatalog.Effects);
+			file.Controls = SectionOrNull(sections, SettingsCatalog.Controls);
 			_storage.Write(JsonSerializer.Serialize(file, JsonOptions));
 			return true;
 		}

@@ -12,13 +12,16 @@ public enum SettingsAction
 	OpenConfirm,     // RESET DEFAULTS: pregunta
 	CloseConfirm,    // NO o ESC en la pregunta
 	ResetDone,       // YES: todo por defecto (ya en el modelo); hay que guardar y avisar
-	Back             // BACK o ESC: hay que guardar y salir
+	Back,            // BACK o ESC: hay que guardar y salir
+	ListenKey,       // ENTER en una tecla: PRESS A KEY
+	KeyDone          // se ha pulsado la tecla nueva (o ESC): ver LastRebind
 }
 
 // SETTINGS sin nodos (spec docs/settings.md, 3.3 y 7.3): una fila por ajuste del catálogo y, al final, RESET DEFAULTS y
 // BACK. La selección es un MenuModel: salta las de COMING SOON y da la vuelta. A/D cambian el valor de la fila sin dar
-// la vuelta; ENTER en una lista da la vuelta, en sí / no cambia y en RESET DEFAULTS y BACK los elige. Las teclas se ven
-// pero aún no se cambian (etapa 3). RESET DEFAULTS pide NO / YES con NO elegida. Lógica pura.
+// la vuelta; ENTER en una lista da la vuelta, en sí / no cambia y en RESET DEFAULTS y BACK los elige. ENTER en una tecla
+// espera la nueva (spec 6.2): la siguiente tecla pulsada va a KeyPressed; ESC cancela y F1–F12 se ignoran. RESET
+// DEFAULTS pide NO / YES con NO elegida. Lógica pura.
 public sealed class SettingsScreenLogic
 {
 	public const string ResetId = "RESET";
@@ -30,6 +33,12 @@ public sealed class SettingsScreenLogic
 	public MenuModel Menu { get; }
 	public MenuModel ConfirmMenu { get; private set; }
 	public bool Confirming { get; private set; }
+
+	// Esperando la tecla nueva de la fila elegida (PRESS A KEY)
+	public bool Listening { get; private set; }
+
+	// Lo que pasó con la última tecla pulsada esperando
+	public RebindOutcome LastRebind { get; private set; }
 
 	public SettingsScreenLogic(SettingsModel model)
 	{
@@ -121,8 +130,28 @@ public sealed class SettingsScreenLogic
 				return SettingsAction.Back;
 			default:
 				Select(id);
+				if (Selected?.Kind == SettingKind.Key)
+				{
+					KeyAction action = KeyBindings.Find(id);
+					if (action == null || action.Fixed)
+						return SettingsAction.None;
+					Listening = true;
+					return SettingsAction.ListenKey;
+				}
 				return Model.Cycle(id) ? SettingsAction.Changed : SettingsAction.None;
 		}
+	}
+
+	// La tecla pulsada esperando la nueva (código físico de Godot). Con F1–F12 o una tecla que no vale, sigue esperando.
+	public SettingsAction KeyPressed(long key)
+	{
+		if (!Listening)
+			return SettingsAction.None;
+		LastRebind = Model.Keys.Rebind(SelectedId, key);
+		if (LastRebind.KeepWaiting)
+			return SettingsAction.None;
+		Listening = false;
+		return SettingsAction.KeyDone;
 	}
 
 	// ESC: en la pregunta, NO; si no, BACK

@@ -46,6 +46,7 @@ public partial class SettingsListView : Control
 	private int _labelSize, _valueSize, _smallSize, _toggleSize;
 	private SettingsModel _model;
 	private string _selected;
+	private bool _listening;
 	private float _scroll;
 	private GradientTexture2D _selectedFade;
 
@@ -93,11 +94,13 @@ public partial class SettingsListView : Control
 
 	public float ContentHeight { get; private set; }
 
-	// Valores y fila elegida (null: ninguna, en RESET DEFAULTS o BACK); desplaza para que la elegida se vea
-	public void Show(SettingsModel model, string selectedId)
+	// Valores y fila elegida (null: ninguna, en RESET DEFAULTS o BACK); desplaza para que la elegida se vea.
+	// listening: la elegida espera su tecla nueva (PRESS A KEY)
+	public void Show(SettingsModel model, string selectedId, bool listening = false)
 	{
 		_model = model;
 		_selected = selectedId;
+		_listening = listening;
 		foreach (Entry e in _entries)
 		{
 			if (e.Def == null || e.Def.Id != selectedId)
@@ -109,6 +112,27 @@ public partial class SettingsListView : Control
 				_scroll = e.Top + e.Height - Size.Y + margin;
 			_scroll = Mathf.Clamp(_scroll, 0f, Mathf.Max(0f, ContentHeight - Size.Y));
 		}
+		QueueRedraw();
+	}
+
+	// PRESS A KEY parpadea (0,6 s, dos pasos, como la página)
+	private const float WaitBlinkPeriod = 0.6f;
+	private float _waitTime;
+	private bool _waitOn = true;
+
+	public override void _Process(double delta)
+	{
+		if (!_listening)
+		{
+			_waitTime = 0f;
+			_waitOn = true;
+			return;
+		}
+		_waitTime += (float)delta;
+		bool on = _waitTime % WaitBlinkPeriod < WaitBlinkPeriod * 0.5f;
+		if (on == _waitOn)
+			return;
+		_waitOn = on;
 		QueueRedraw();
 	}
 
@@ -253,14 +277,19 @@ public partial class SettingsListView : Control
 
 	private void DrawKey(SettingDef def, float right, float center)
 	{
-		bool fixedKey = def.Id == "keyPause";
-		string key = def.Values[0];
+		bool fixedKey = KeyBindings.Find(def.Id)?.Fixed ?? true;
+		bool waiting = _listening && def.Id == _selected;
+		string key = waiting ? "PRESS A KEY" : _model.ValueText(def.Id);
 		float w = Mathf.Max(S(KeyMinWidth), _value.GetStringSize(key, HorizontalAlignment.Left, -1, _valueSize).X + S(16f));
 		float h = _valueSize + S(4f);
 		var rect = new Rect2(right - w, center - h * 0.5f, w, h);
-		DrawRect(rect, fixedKey ? Palette.SettingsKeyFixed : Palette.SettingsKeyBorder, false, Mathf.Max(1f, S(1f)));
-		DrawCentered(_value, key, rect.Position.X, w, center, _valueSize, fixedKey ? Palette.SettingsKeyFixedText : Palette.SettingsRowValue);
 		_hits.Add(new Hit(def.Id, SettingsClick.Key, 0, rect));
+		if (waiting && !_waitOn)
+			return;   // el paso apagado del parpadeo
+		Color border = waiting ? Palette.SettingsKeyWaiting : fixedKey ? Palette.SettingsKeyFixed : Palette.SettingsKeyBorder;
+		Color text = waiting ? Palette.SettingsKeyWaiting : fixedKey ? Palette.SettingsKeyFixedText : Palette.SettingsRowValue;
+		DrawRect(rect, border, false, Mathf.Max(1f, S(1f)));
+		DrawCentered(_value, key, rect.Position.X, w, center, _valueSize, text);
 	}
 
 	private void AddHit(string id, SettingsClick click, int value, float x, float center, float width) =>

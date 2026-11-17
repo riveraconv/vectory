@@ -6,8 +6,9 @@ using System.Text.Json.Nodes;
 
 namespace Vectory.Settings;
 
-// SETTINGS ↔ secciones del archivo de ajustes (spec docs/settings.md, 5): una por grupo (gameplay, video, effects),
-// valor a valor. Lista: su texto ("NORMAL", "1920x1080"); porcentaje: 0–100 en pasos de 10; sí / no: true / false.
+// SETTINGS ↔ secciones del archivo de ajustes (spec docs/settings.md, 5): una por grupo (gameplay, video, effects,
+// controls), valor a valor. Lista: su texto ("NORMAL", "1920x1080"); porcentaje: 0–100 en pasos de 10; sí / no:
+// true / false; tecla: su nombre ("W", "SHIFT"), sin PAUSE, que es fija.
 // Un valor que falta, de otro tipo o fuera de rango toma su valor por defecto, solo él, y se apunta en Warnings.
 // Lógica pura.
 public static class SettingsSerializer
@@ -36,6 +37,10 @@ public static class SettingsSerializer
 				_ => null
 			};
 		}
+		var controls = new JsonObject();
+		foreach (KeyAction action in KeyBindings.Actions.Where(a => !a.Fixed))
+			controls[action.Id] = JsonValue.Create(KeyNames.Name(model.Keys.Get(action.Id)));
+		sections[SectionOf(SettingsCatalog.Controls)] = controls;
 		return sections.ToDictionary(p => p.Key, p => JsonSerializer.SerializeToElement(p.Value));
 	}
 
@@ -68,7 +73,38 @@ public static class SettingsSerializer
 			else
 				warnings?.Add($"{section}.{def.Id} {problem}; using the default");
 		}
+		ReadKeys(model.Keys, sections, warnings);
 		return model;
+	}
+
+	// Teclas (spec 6): una que falta, no es un texto, no se conoce o no vale (ESC, F1–F12, la segunda de otra acción),
+	// por defecto con aviso. Si al final dos acciones comparten tecla, todas por defecto.
+	private static void ReadKeys(KeyBindings keys, IReadOnlyDictionary<string, JsonElement> sections, List<string> warnings)
+	{
+		string section = SectionOf(SettingsCatalog.Controls);
+		if (sections == null || !sections.TryGetValue(section, out JsonElement obj))
+			return;
+		foreach (KeyAction action in KeyBindings.Actions.Where(a => !a.Fixed))
+		{
+			if (obj.ValueKind != JsonValueKind.Object || !obj.TryGetProperty(action.Id, out JsonElement element))
+			{
+				warnings?.Add($"{section}.{action.Id} missing; using the default");
+				continue;
+			}
+			if (element.ValueKind != JsonValueKind.String)
+			{
+				warnings?.Add($"{section}.{action.Id} is not a text; using the default");
+				continue;
+			}
+			string text = element.GetString();
+			if (!KeyNames.TryParse(text, out long key) || !keys.Set(action.Id, key))
+				warnings?.Add($"{section}.{action.Id} '{text}' is not a valid key; using the default");
+		}
+		if (keys.HasDuplicates)
+		{
+			warnings?.Add($"{section}: two actions share a key; using the default keys");
+			keys.Reset();
+		}
 	}
 
 	private static bool TryValue(SettingDef def, JsonElement element, out int value, out string problem)
