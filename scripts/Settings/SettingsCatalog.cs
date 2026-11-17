@@ -71,7 +71,8 @@ public static class SettingsCatalog
 		new SettingDef(Bloom, Video, "BLOOM", SettingKind.Percent, null, PercentSteps,
 			"Glow of the lines of the track, the ships and the HUD. Lower it if the image looks blurry."),
 
-		// Visión túnel y partículas son de efectos-velocidad, que aún no existe: COMING SOON (decisión del usuario)
+		// Visión túnel es de efectos-velocidad, que aún no existe: COMING SOON (decisión del usuario). PARTICLES, desde la
+		// spec docs/efectos-1-choques.md: chispas y humo de los choques
 		new SettingDef(TunnelVision, Effects, "TUNNEL VISION", SettingKind.Percent, null, PercentSteps,
 			"Blur and darkening of the edges of the screen at high speed. [b]Lower it if it makes you dizzy.[/b]", ComingSoon: true),
 		new SettingDef(SpeedLines, Effects, "SPEED LINES", SettingKind.Toggle, null, 1,
@@ -79,7 +80,7 @@ public static class SettingsCatalog
 		new SettingDef(SpeedFov, Effects, "SPEED FOV", SettingKind.Percent, null, PercentSteps,
 			"How much the field of view opens up at top speed and with the boost."),
 		new SettingDef(Particles, Effects, "PARTICLES", SettingKind.Choice, new[] { "LOW", "MEDIUM", "HIGH" }, 2,
-			"Amount of exhaust and boost particles. Lower it if the game runs slow.", ComingSoon: true),
+			"Amount of sparks and smoke from crashes. Lower it if the game runs slow."),
 		new SettingDef(CockpitShake, Effects, "COCKPIT SHAKE", SettingKind.Percent, null, PercentSteps,
 			"Vibration of the cockpit view at high speed and with the boost. [b]Lower it if it makes you dizzy.[/b] At 0 the cockpit stays still."),
 

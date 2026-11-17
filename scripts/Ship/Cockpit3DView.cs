@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Vectory.Core;
 using Vectory.Radar;
 using Vectory.UI;
 using NVec2 = System.Numerics.Vector2;
@@ -68,6 +69,10 @@ public partial class Cockpit3DView : CanvasLayer
 	private static readonly Vector3 BoostFrontPosition = new(0f, 0.25f, 0.45f);
 	private static readonly Vector3 BoostRearPosition = new(0f, -0.2f, -1.8f);
 	private static readonly Vector3 DamageLightPosition = new(0f, 0.1f, -0.35f);
+	// Luz de las chispas de un roce: por fuera de cada lado, algo por delante del ojo, a la altura del salpicadero
+	private static readonly Vector3 SparkLightPosition = new(1.05f, 0.15f, -0.6f);
+	private const float SparkLightRange = 2.2f;
+	private const float SparkLightDecay = 1.4f;
 
 	private readonly Dictionary<string, MeshInstance3D> _pieces = new();
 	private readonly List<(OmniLight3D Light, Cockpit3DScreenLight Group, float Factor)> _screenLights = new();
@@ -98,6 +103,10 @@ public partial class Cockpit3DView : CanvasLayer
 	private OmniLight3D _damageLight;
 	private TextureRect _boostTint;
 	private TextureRect _damageTint;
+	private TextureRect _sparkTintLeft;
+	private TextureRect _sparkTintRight;
+	private OmniLight3D _sparkLeft;
+	private OmniLight3D _sparkRight;
 	private Godot.Environment _environment;
 	private Cockpit3DSettings _settings;
 
@@ -573,6 +582,8 @@ public partial class Cockpit3DView : CanvasLayer
 
 		_boostTint = NewTint("BoostTint", CockpitTints.Boost);
 		_damageTint = NewTint("DamageTint", CockpitTints.Damage);
+		_sparkTintLeft = NewTint("SparkTintLeft", CockpitTints.SparkLeft);
+		_sparkTintRight = NewTint("SparkTintRight", CockpitTints.SparkRight);
 	}
 
 	private TextureRect NewTint(string name, Texture2D texture)
@@ -625,6 +636,24 @@ public partial class Cockpit3DView : CanvasLayer
 		_boostFront = NewOmni("BoostFront", BoostFrontPosition, scene.BoostLight, BoostFrontRange, BoostLightDecay);
 		_boostRear = NewOmni("BoostRear", BoostRearPosition, scene.BoostLight, BoostRearRange, BoostLightDecay);
 		_damageLight = NewOmni("Damage", DamageLightPosition, scene.DamageLight, DamageLightRange, DamageLightDecay);
+		uint spark = ToHex(Palette.Orange);
+		_sparkLeft = NewOmni("SparkLeft", SparkLightPosition * new Vector3(-1f, 1f, 1f), spark, SparkLightRange, SparkLightDecay);
+		_sparkRight = NewOmni("SparkRight", SparkLightPosition, spark, SparkLightRange, SparkLightDecay);
+	}
+
+	private static uint ToHex(Color c) =>
+		((uint)Mathf.RoundToInt(c.R * 255f) << 16) | ((uint)Mathf.RoundToInt(c.G * 255f) << 8) | (uint)Mathf.RoundToInt(c.B * 255f);
+
+	// Luz de las chispas de un choque en cada lado (CockpitCrashFeel.Light): luz que ilumina pilar y salpicadero de ese
+	// lado y tinte naranja en ese borde de la pantalla. energy y tint: lo que vale 1 de luz.
+	public void SetCrashLight(float left, float right, float energy, float tint)
+	{
+		if (!_built || _sparkLeft == null)
+			return;
+		_sparkLeft.LightEnergy = left * energy;
+		_sparkRight.LightEnergy = right * energy;
+		SetTint(_sparkTintLeft, Mathf.Min(1f, left * tint));
+		SetTint(_sparkTintRight, Mathf.Min(1f, right * tint));
 	}
 
 	private OmniLight3D NewOmni(string name, Vector3 position, uint color, float range, float decay)

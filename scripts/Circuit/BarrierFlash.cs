@@ -15,6 +15,7 @@ public struct BarrierFlashSettings
 	public FlashLevelSettings Graze;
 	public FlashLevelSettings Medium;
 	public FlashLevelSettings Strong;
+	public float Ahead;   // m sobre el eje que se adelanta el centro respecto al de la nave (0 = la spec)
 
 	// Valores de la spec (tabla de la sección 5)
 	public static BarrierFlashSettings Default => new()
@@ -100,7 +101,7 @@ public sealed class BarrierFlash
 		{
 			Kind = Kind.Impact,
 			Level = level == ImpactLevel.Strong ? _settings.Strong : _settings.Medium,
-			Center = Wrap(distance),
+			Center = Wrap(distance + _settings.Ahead),
 			Age = 0f
 		};
 	}
@@ -114,7 +115,7 @@ public sealed class BarrierFlash
 
 		s.Kind = Kind.Graze;
 		s.Level = _settings.Graze;
-		s.Center = Wrap(distance);
+		s.Center = Wrap(distance + _settings.Ahead);
 		s.Age = 0f;
 		s.Touched = true;
 	}

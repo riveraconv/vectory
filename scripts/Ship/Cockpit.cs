@@ -161,6 +161,12 @@ public partial class Cockpit : Node3D
 		_view3D.UpdateHud(input, light, dt);
 	}
 
+	// Luz de las chispas de un choque, por lado (spec docs/efectos-1-choques.md, 14)
+	public void SetCrashLight(float left, float right, float energy, float tint)
+	{
+		_view3D?.SetCrashLight(left, right, energy, tint);
+	}
+
 	// Daños: las luces apagadas del parpadeo bajan (Cockpit3DView)
 	public void ShowEdgeFlicker(EdgeFlicker flicker)
 	{

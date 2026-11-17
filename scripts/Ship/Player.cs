@@ -2,6 +2,7 @@ using Godot;
 using Vectory.Autopilot;
 using Vectory.Circuit;
 using Vectory.Contact;
+using Vectory.Effects;
 using Vectory.Game;
 using Vectory.Settings;
 using NVec2 = System.Numerics.Vector2;
@@ -160,6 +161,14 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export] public float ShakeFrequency = 25f;           // Hz de la vibración
 	[Export(PropertyHint.Range, "0,1,0.01")] public float CockpitShakeFactor = 0.5f;   // en cabina, todo a este factor
 
+	// Cómo se nota un choque desde la cabina (spec docs/efectos-1-choques.md, 14): luz de las chispas por el lado tocado
+	// y temblor fino mientras se roza (este, con COCKPIT SHAKE)
+	[ExportGroup("Cabina: choques")]
+	[Export] public float CrashLightEnergy = 1.2f;       // energía de la luz de cada lado con el roce más fuerte
+	[Export] public float CrashLightTint = 0.8f;         // opacidad del tinte del borde con el roce más fuerte
+	[Export] public float CrashRumbleAmplitude = 0.012f; // m
+	[Export] public float CrashRumbleFrequency = 31f;    // Hz
+
 	[ExportGroup("Daños (parpadeo)")]
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel1 = 0.10f;   // proporción de aristas que parpadean
 	[Export(PropertyHint.Range, "0,1,0.01")] public float FlickerFractionLevel2 = 0.20f;
@@ -269,6 +278,7 @@ public partial class Player : CharacterBody3D, IContactShip
 	private readonly ShipAttitude _attitude = new();
 	private readonly LandingCompression _compression = new();
 	private CameraShake _shake;
+	private CockpitCrashFeel _crashFeel;
 	private Spaceship _ship;
 	private Cockpit _cockpit;
 	private ChaseCamera _chaseCam;
@@ -366,6 +376,9 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	// Hacia dónde apunta el morro, en planta (X, Z del mundo): el frente del radar y el minimapa
 	public System.Numerics.Vector2 PlanForward => Dynamics.Forward;
+
+	// Velocidad real en planta (X, Z del mundo): la que heredan las chispas de los choques
+	public System.Numerics.Vector2 PlanVelocity => Dynamics.Velocity;
 
 	// Distancia sobre el eje de la pista desde la meta (m), la de la superficie bajo la nave
 	public float TrackDistance => _physics.HasSurface ? _physics.Surface.Frame.Distance : 0f;
@@ -1105,7 +1118,11 @@ public partial class Player : CharacterBody3D, IContactShip
 		float shake = ActiveSettings.CockpitShake;
 		var settings = new CockpitCameraSettings(Cockpit3DSway, Cockpit3DVibrationPosition * shake, Cockpit3DVibrationRotation * shake,
 			Cockpit3DCounterRoll, Cockpit3DBoostPush);
-		_cockpit.Update3D(CockpitCameraMotion.Compute(input, settings), BuildCockpit3DSettings());
+		CockpitCameraPose pose = CockpitCameraMotion.Compute(input, settings);
+		// El temblor del roce también mueve la cabina por dentro, a la mitad (el mundo ya se mueve con SetShake)
+		System.Numerics.Vector2 rumble = CrashFeel.RumbleOffset(ActiveSettings.CockpitShake * 0.5f);
+		pose = pose with { Position = pose.Position + new System.Numerics.Vector3(rumble.X, rumble.Y, 0f) };
+		_cockpit.Update3D(pose, BuildCockpit3DSettings());
 	}
 
 	private Cockpit3DSettings BuildCockpit3DSettings()
@@ -1125,11 +1142,28 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	// La sacudida da los valores de la cámara exterior; en cabina se escalan. Se pasa a las dos
 	// cámaras, así cambiar de vista (C) durante la sacudida sigue con la amplitud de la nueva.
+	// El temblor del roce solo va en cabina, encima de la sacudida.
 	private void UpdateShake(float dt)
 	{
 		_shake.Update(dt);
 		var offset = new Vector2(_shake.Offset.X, _shake.Offset.Y);
 		_chaseCam.SetShake(offset, _shake.Roll);
-		_cockpit.SetShake(offset * CockpitShakeFactor, _shake.Roll * CockpitShakeFactor);
+		System.Numerics.Vector2 rumble = CrashFeel.RumbleOffset(ActiveSettings.CockpitShake);
+		_cockpit.SetShake(offset * CockpitShakeFactor + new Vector2(rumble.X, rumble.Y), _shake.Roll * CockpitShakeFactor);
+		_cockpit.SetCrashLight(CrashFeel.Light(BarrierSide.Left), CrashFeel.Light(BarrierSide.Right), CrashLightEnergy, CrashLightTint);
+	}
+
+	private CockpitCrashFeel CrashFeel => _crashFeel ??= new CockpitCrashFeel(new CockpitCrashFeelSettings
+	{
+		RumbleAmplitude = CrashRumbleAmplitude,
+		RumbleFrequency = CrashRumbleFrequency
+	}, new System.Random());
+
+	// Contacto de este paso con la barrera, para la luz y el temblor de la cabina (lo llama Main con el toque final del paso)
+	public void FeelBarrier(in BarrierTouch touch, float dt)
+	{
+		if (touch.Contact)
+			CrashFeel.Contact(touch.Side, touch.Level, touch.IsNewImpact);
+		CrashFeel.Step(dt);
 	}
 }

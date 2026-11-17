@@ -102,6 +102,7 @@ public partial class Track : Node3D
 	[Export(PropertyHint.Range, "0,1,0.01")] public float StrongFlashIntensity = 1f;
 	[Export] public float StrongFlashDuration = 0.6f;
 	[Export] public float FlashGlow = 1.5f;           // brillo extra del naranja en el punto de impacto (halo más fuerte)
+	[Export] public float FlashAhead = 2f;            // m que se adelanta el destello respecto al centro de la nave
 
 	// ---- Datos del circuito actual (salen del TrackDefinition) ----
 	public string CircuitId => Definition?.Id ?? "";
@@ -121,7 +122,8 @@ public partial class Track : Node3D
 	{
 		Graze = new FlashLevelSettings { Radius = GrazeFlashRadius, Intensity = GrazeFlashIntensity, Duration = GrazeFlashFade },
 		Medium = new FlashLevelSettings { Radius = MediumFlashRadius, Intensity = MediumFlashIntensity, Duration = MediumFlashDuration },
-		Strong = new FlashLevelSettings { Radius = StrongFlashRadius, Intensity = StrongFlashIntensity, Duration = StrongFlashDuration }
+		Strong = new FlashLevelSettings { Radius = StrongFlashRadius, Intensity = StrongFlashIntensity, Duration = StrongFlashDuration },
+		Ahead = FlashAhead
 	};
 
 	// Valores por defecto de TrackY y GridSlots: los usa también SELECT CIRCUIT, que calcula el eje y los datos

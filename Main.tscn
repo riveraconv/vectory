@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://d0sbwun4waqmi" path="res://scripts/Ship/Player.cs" id="3_cm0pq"]
 [ext_resource type="Script" uid="uid://fcs6rwnsb3wm" path="res://scripts/Menu/PauseMenu.cs" id="4_pause"]
 [ext_resource type="Script" uid="uid://cmtsv456hvquy" path="res://scripts/Ghost/GhostShip.cs" id="5_ghost"]
+[ext_resource type="Script" uid="uid://umbomwavdjre" path="res://scripts/Effects/CollisionEffects.cs" id="6_crashfx"]
 
 [node name="Main" type="Node3D" unique_id=1889765682]
 script = ExtResource("1_glv2v")
@@ -12,6 +13,7 @@ script = ExtResource("1_glv2v")
 [node name="Track" type="Node3D" parent="." unique_id=1902884476]
 script = ExtResource("2_r0du0")
 GrazeFlashIntensity = 1.0
+FlashAhead = 2.0
 
 [node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
 script = ExtResource("3_cm0pq")
@@ -21,3 +23,7 @@ script = ExtResource("4_pause")
 
 [node name="GhostShip" type="Node3D" parent="." unique_id=369708414]
 script = ExtResource("5_ghost")
+
+[node name="CollisionEffects" type="Node3D" parent="." unique_id=1736402915]
+script = ExtResource("6_crashfx")
+BarrierContactAhead = 2.0

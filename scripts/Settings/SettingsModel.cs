@@ -131,6 +131,7 @@ public sealed class SettingsModel
 	public bool SpeedLines => Get(SettingsCatalog.SpeedLines) != 0;
 	public float SpeedFov => Fraction(SettingsCatalog.SpeedFov);
 	public float CockpitShake => Fraction(SettingsCatalog.CockpitShake);
+	public int Particles => Get(SettingsCatalog.Particles);   // 0 LOW, 1 MEDIUM, 2 HIGH
 	public DisplayMode DisplayMode => (DisplayMode)Get(SettingsCatalog.DisplayMode);
 	public int Resolution => Get(SettingsCatalog.Resolution);
 

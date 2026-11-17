@@ -102,4 +102,19 @@ public class BarrierFlashTests
         flash.Graze(BarrierSide.Right, 110f);
         Assert.Equal(0.4f, flash.IntensityAt(BarrierSide.Right, 110f), 4);
     }
+
+    // Ahead adelanta el centro del destello respecto al de la nave, en el roce y en el golpe
+    [Fact]
+    public void Ahead_moves_the_flash_centre_forward()
+    {
+        BarrierFlashSettings settings = BarrierFlashSettings.Default;
+        settings.Ahead = 6f;
+        var flash = new BarrierFlash(Lap, settings);
+        flash.Impact(BarrierSide.Left, 100f, ImpactLevel.Medium);
+        Assert.Equal(1f, flash.IntensityAt(BarrierSide.Left, 106f), 4);
+
+        var graze = new BarrierFlash(Lap, settings);
+        graze.Graze(BarrierSide.Right, 100f);
+        Assert.Equal(settings.Graze.Intensity, graze.IntensityAt(BarrierSide.Right, 106f), 4);
+    }
 }

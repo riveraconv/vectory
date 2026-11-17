@@ -5,6 +5,7 @@ using System.Linq;
 using Vectory.Circuit;
 using Vectory.Contact;
 using Vectory.Core;
+using Vectory.Effects;
 using Vectory.Ghost;
 using Vectory.Menu;
 using Vectory.Radar;
@@ -152,6 +153,7 @@ public partial class Main : Node3D
 	// Alineación de los rivales y sus naves (solo RACE; null en TIME TRIAL)
 	private IReadOnlyList<RivalEntry> _lineup;
 	private RivalField _rivals;
+	private CollisionEffects _collisionFx;
 	private RadarSweep _radar;
 
 	// Clasificación (solo RACE; null en TIME TRIAL): el jugador es el 0 y cada rival, su número
@@ -341,6 +343,15 @@ public partial class Main : Node3D
 		if (_mode == GameMode.Race)
 			SetupStandings();
 
+		// Chispas, destellos y humo de los choques (spec docs/efectos-1-choques.md); en la escena, para afinarlos
+		_collisionFx = GetNodeOrNull<CollisionEffects>("CollisionEffects");
+		if (_collisionFx == null)
+		{
+			_collisionFx = new CollisionEffects { Name = "CollisionEffects" };
+			AddChild(_collisionFx);
+		}
+		_collisionFx.Setup(_track);
+
 		// Panel de ajuste para pruebas: no existe en una exportación de release
 		if (OS.IsDebugBuild())
 		{
@@ -413,9 +424,27 @@ public partial class Main : Node3D
 		}
 
 		UpdateBarrierContact((float)delta);
+		UpdateCollisionEffects((float)delta);
 
 		if (_recorder != null && _recorder.IsRecording && _race.State == RaceState.Running)
 			SampleGhost();
+	}
+
+	// Efectos de los choques de este paso contra la barrera: el jugador y los rivales (solo visual)
+	private void UpdateCollisionEffects(float delta)
+	{
+		if (_collisionFx == null)
+			return;
+		_player.FeelBarrier(_player.LastBarrierTouch, delta);
+		_collisionFx.SetReference(_player.PlanVelocity);
+		_collisionFx.BarrierContact(_player.Id, _player.LastBarrierTouch, _player.PlanForward, _player.PlanVelocity, delta);
+		if (_rivals == null)
+			return;
+		foreach (RivalShip ship in _rivals.Ships)
+		{
+			RivalCar car = ship.Car;
+			_collisionFx.BarrierContact(car.Id, car.LastTouch, car.Dynamics.Forward, car.Dynamics.Velocity, delta);
+		}
 	}
 
 	// Contacto de la nave con la barrera en este paso: destello en el lado tocado, sacudida en los

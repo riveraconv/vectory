@@ -135,7 +135,7 @@ public class SettingsTests
 			  "version": 1,
 			  "gameplay": { "difficulty": "HARD" },
 			  "video": { "displayMode": 3, "resolution": "1280x720", "bloom": 250 },
-			  "effects": { "speedLines": false, "cockpitShake": 40 }
+			  "effects": { "speedLines": false, "particles": "HIGH", "cockpitShake": 40 }
 			}
 			"""
 		};
@@ -360,7 +360,7 @@ public class SettingsTests
 			visited.Add(logic.SelectedId);
 		}
 		Assert.DoesNotContain(SettingsCatalog.TunnelVision, visited);
-		Assert.DoesNotContain(SettingsCatalog.Particles, visited);
+		Assert.Contains(SettingsCatalog.Particles, visited);
 		Assert.DoesNotContain("audioMaster", visited);
 		Assert.Contains(SettingsScreenLogic.BackId, visited);
 

@@ -21,6 +21,33 @@ public static class CockpitTints
 
 	public static GradientTexture2D Damage => _damage ??= Build(Palette.DamageHeavy, 0.5f, 0.4f);
 
+	private static GradientTexture2D _sparkLeft;
+	private static GradientTexture2D _sparkRight;
+
+	// Luz de las chispas de un roce (spec docs/efectos-1-choques.md, 14): naranja que entra por el borde del lado tocado
+	// y se apaga hacia el centro de la pantalla
+	public static GradientTexture2D SparkLeft => _sparkLeft ??= BuildSide(Palette.Orange, new Vector2(0f, 0.5f), new Vector2(0.38f, 0.5f));
+
+	public static GradientTexture2D SparkRight => _sparkRight ??= BuildSide(Palette.Orange, new Vector2(1f, 0.5f), new Vector2(0.62f, 0.5f));
+
+	private static GradientTexture2D BuildSide(Color color, Vector2 from, Vector2 to)
+	{
+		var gradient = new Gradient
+		{
+			Offsets = new[] { 0f, 0.35f, 1f },
+			Colors = new[] { new Color(color, 0.55f), new Color(color, 0.22f), new Color(color, 0f) }
+		};
+		return new GradientTexture2D
+		{
+			Gradient = gradient,
+			Width = TextureSize,
+			Height = 4,
+			Fill = GradientTexture2D.FillEnum.Linear,
+			FillFrom = from,
+			FillTo = to
+		};
+	}
+
 	// Transparente hasta clearUntil (fracción del radio) y el color con edgeOpacity en el borde
 	private static GradientTexture2D Build(Color color, float clearUntil, float edgeOpacity)
 	{
