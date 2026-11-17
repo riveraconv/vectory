@@ -2,13 +2,13 @@ using System.Collections.Generic;
 
 namespace Vectory.Menu;
 
-public enum PauseState { Closed, Open, Confirm }
+public enum PauseState { Closed, Open, Confirm, Settings }
 
 // Qué se está confirmando en el estado Confirm
 public enum PauseTarget { None, Restart, BackToMenu }
 
 // Qué tiene que hacer quien usa la pausa tras una llamada
-public enum PauseAction { None, Close, Restart, GoToMenu, ToggleGhost }
+public enum PauseAction { None, Close, Restart, GoToMenu, ToggleGhost, OpenSettings }
 
 // Lógica de la pausa de carrera (sin Godot): estados, opciones y confirmación.
 // No cambia de escena ni congela nada: devuelve qué hay que hacer y el nodo lo ejecuta.
@@ -17,15 +17,19 @@ public enum PauseAction { None, Close, Restart, GoToMenu, ToggleGhost }
 //   Open: CONTINUE o ESC -> Closed; RESTART / BACK TO MAIN MENU -> Confirm (NO seleccionado),
 //         o directamente Restart / GoToMenu si la carrera ya ha terminado.
 //         GHOST (solo TIME TRIAL): cambia GhostEnabled y sigue en Open con GHOST seleccionada.
+//         SETTINGS -> Settings (la pantalla de ajustes encima; ESC es suyo: TogglePause no hace nada).
 //   Confirm: NO o ESC -> Open con la opción de origen seleccionada; YES -> Restart / GoToMenu.
+//   Settings: SettingsClosed -> Open con SETTINGS seleccionada.
 //
-// Con la opción del fantasma (hasGhostOption), la lista es CONTINUE, GHOST: ON / OFF, RESTART,
-// BACK TO MAIN MENU. GHOST está activa solo si GhostAvailable (se lee al abrir la pausa).
+// La lista es CONTINUE, SETTINGS, RESTART, BACK TO MAIN MENU (spec docs/settings.md, 7.2). Con la opción del
+// fantasma (hasGhostOption), CONTINUE, GHOST: ON / OFF, SETTINGS, RESTART, BACK TO MAIN MENU. GHOST está activa solo
+// si GhostAvailable (se lee al abrir la pausa).
 // La navegación de cada lista es un MenuModel (Menu): la pausa o la confirmación, según el estado.
 public sealed class PauseLogic
 {
 	public const string ContinueId = "CONTINUE";
 	public const string GhostId = "GHOST";
+	public const string SettingsId = "SETTINGS";
 	public const string RestartId = "RESTART";
 	public const string BackToMenuId = "BACK_TO_MENU";
 	public const string NoId = "NO";
@@ -80,6 +84,9 @@ public sealed class PauseLogic
 			case PauseState.Open:
 				return Close();
 
+			case PauseState.Settings:
+				return PauseAction.None;
+
 			default:
 				return Choose(NoId);
 		}
@@ -96,6 +103,9 @@ public sealed class PauseLogic
 					return Close();
 				case GhostId:
 					return ToggleGhost();
+				case SettingsId:
+					State = PauseState.Settings;
+					return PauseAction.OpenSettings;
 				case RestartId:
 					return RaceFinished ? PauseAction.Restart : StartConfirm(PauseTarget.Restart);
 				case BackToMenuId:
@@ -114,6 +124,16 @@ public sealed class PauseLogic
 		}
 
 		return PauseAction.None;
+	}
+
+	// Se ha salido de SETTINGS (ya guardado): la pausa con SETTINGS seleccionada
+	public void SettingsClosed()
+	{
+		if (State != PauseState.Settings)
+			return;
+		State = PauseState.Open;
+		_pauseMenu.Select(IndexOf(SettingsId));
+		Menu = _pauseMenu;
 	}
 
 	private PauseAction Close()
@@ -160,6 +180,7 @@ public sealed class PauseLogic
 		var options = new List<MenuOption> { new(ContinueId, "CONTINUE", true) };
 		if (HasGhostOption)
 			options.Add(new(GhostId, GhostEnabled ? "GHOST: ON" : "GHOST: OFF", GhostAvailable));
+		options.Add(new(SettingsId, "SETTINGS", true));
 		options.Add(new(RestartId, "RESTART", true));
 		options.Add(new(BackToMenuId, "BACK TO MAIN MENU", true));
 

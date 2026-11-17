@@ -6,10 +6,12 @@ using Vectory.UI;
 
 namespace Vectory.Menu;
 
-// Pausa de la carrera (ESC): franja horizontal con PAUSED y CONTINUE / RESTART / BACK TO MAIN MENU,
+// Pausa de la carrera (ESC): franja horizontal con PAUSED y CONTINUE / SETTINGS / RESTART / BACK TO MAIN MENU,
 // y la confirmación (NO / YES) en la misma franja. Las reglas viven en PauseLogic; este nodo
 // traduce el input, dibuja el estado, congela el árbol (GetTree().Paused) y cambia de escena.
 // En TIME TRIAL (EnableGhostOption) añade GHOST: ON / OFF; el cambio se avisa con GhostToggled.
+// SETTINGS abre la pantalla de ajustes encima, con la carrera congelada y atenuada (spec docs/settings.md, 7.2);
+// al salir de ella vuelve la pausa con SETTINGS elegida.
 //
 // ProcessMode = Always: sigue funcionando con el árbol en pausa. Todo lo demás de la carrera
 // (nave, carrera, HUD, cámara, resultados) se para.
@@ -25,8 +27,8 @@ public partial class PauseMenu : CanvasLayer
 	// Posiciones del lienzo de diseño (px sobre 1280×720; la franja va centrada en vertical)
 	private const float TextLeft = 96f;
 	private const float SeparatorX = 500f;
-	private const float SeparatorHeight = 156f;
-	private const float GhostSeparatorHeight = 204f;   // con cuatro opciones (TIME TRIAL)
+	private const float SeparatorHeight = 204f;        // cuatro opciones
+	private const float GhostSeparatorHeight = 252f;   // con cinco opciones (TIME TRIAL)
 	private const float OptionsLeft = 560f;
 	private const float TitleGap = 12f;           // entre el título y el texto secundario
 	private const float TitleMargin = 24f;        // hueco mínimo entre el título y el separador
@@ -37,10 +39,12 @@ public partial class PauseMenu : CanvasLayer
 	[Export(PropertyHint.Range, "0,1,0.01")] public float DimOpacity = 0.45f;
 	[Export(PropertyHint.Range, "0,1,0.01")] public float BandOpacity = 0.9f;
 	[Export] public float BandHeight = 260f;
+	[Export] public float GhostBandHeight = 320f;   // TIME TRIAL: cinco opciones
 	[Export] public int PausedFontSize = 56;
 	[Export] public int ConfirmTitleFontSize = 40;   // tamaño máximo: si el título no cabe antes del separador, se reduce
 	[Export] public int SecondaryFontSize = 16;
 	[Export] public int OptionFontSize = 28;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SettingsDimOpacity = 0.8f;   // la carrera detrás de SETTINGS
 
 	// Se lanza al cerrar la pausa para seguir con la carrera
 	public event Action Resumed;
@@ -66,6 +70,7 @@ public partial class PauseMenu : CanvasLayer
 	private Label _title;
 	private Label _hint;
 	private OptionList _options;
+	private SettingsScreen _settings;
 	private LabelSettings _pausedSettings;
 	private LabelSettings _confirmSettings;
 
@@ -85,11 +90,16 @@ public partial class PauseMenu : CanvasLayer
 	{
 		_logic = new PauseLogic(hasGhostOption: true) { GhostEnabled = ghostEnabled, RaceFinished = _logic.RaceFinished };
 		_ghostAvailable = ghostAvailable;
+		_band.SetHeight(S(GhostBandHeight));
 		_band.SetSeparatorHeight(0, GhostSeparatorHeight);
 	}
 
 	public override void _Process(double delta)
 	{
+		// Con SETTINGS abierta, el teclado es suyo (también ESC, que vuelve aquí)
+		if (_logic.State == PauseState.Settings)
+			return;
+
 		if (Input.IsActionJustPressed("pause"))
 		{
 			if (_logic.State == PauseState.Closed)
@@ -128,6 +138,9 @@ public partial class PauseMenu : CanvasLayer
 			case PauseAction.GoToMenu:
 				SceneChanger.ChangeTo(this, MainMenuScenePath);
 				return;
+			case PauseAction.OpenSettings:
+				_settings.Open();
+				break;
 		}
 
 		bool open = _logic.State != PauseState.Closed;
@@ -140,13 +153,20 @@ public partial class PauseMenu : CanvasLayer
 			GhostToggled?.Invoke(_logic.GhostEnabled);
 	}
 
+	// Se ha salido de SETTINGS (ya guardado)
+	private void OnSettingsClosed()
+	{
+		_logic.SettingsClosed();
+		UpdateView();
+	}
+
 	// ---------------------------------------------------------------
 	// Vista
 	// ---------------------------------------------------------------
 
 	private void UpdateView()
 	{
-		_root.Visible = _logic.State != PauseState.Closed;
+		_root.Visible = _logic.State is PauseState.Open or PauseState.Confirm;
 		if (!_root.Visible)
 			return;
 
@@ -233,5 +253,16 @@ public partial class PauseMenu : CanvasLayer
 		_options.Setup(style);
 		_options.Chosen += id => Apply(_logic.Choose(id));
 		column.AddChild(_options);
+
+		// SETTINGS encima de la carrera, en la capa de la pausa
+		_settings = new SettingsScreen
+		{
+			Name = "Settings",
+			Crumb = "PAUSE · SETTINGS",
+			CanvasLayerIndex = Layer,
+			DimOpacity = SettingsDimOpacity
+		};
+		_settings.Closed += OnSettingsClosed;
+		AddChild(_settings);
 	}
 }

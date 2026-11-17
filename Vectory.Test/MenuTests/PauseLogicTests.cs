@@ -142,6 +142,8 @@ public class PauseLogicTests
         var pause = OpenPause();
 
         pause.Menu.MoveNext();
+        Assert.Equal(PauseLogic.SettingsId, Selected(pause));
+        pause.Menu.MoveNext();
         Assert.Equal(PauseLogic.RestartId, Selected(pause));
         pause.Menu.MoveNext();
         Assert.Equal(PauseLogic.BackToMenuId, Selected(pause));
@@ -179,11 +181,11 @@ public class PauseLogicTests
     private static string[] Ids(PauseLogic pause) => pause.Menu.Options.Select(o => o.Id).ToArray();
 
     [Fact]
-    public void TimeTrial_WithGhost_FourOptions()
+    public void TimeTrial_WithGhost_FiveOptions()
     {
         var pause = OpenTimeTrialPause(ghostAvailable: true);
 
-        Assert.Equal(new[] { PauseLogic.ContinueId, PauseLogic.GhostId, PauseLogic.RestartId, PauseLogic.BackToMenuId }, Ids(pause));
+        Assert.Equal(new[] { PauseLogic.ContinueId, PauseLogic.GhostId, PauseLogic.SettingsId, PauseLogic.RestartId, PauseLogic.BackToMenuId }, Ids(pause));
         Assert.Equal("GHOST: ON", pause.Menu.Options[1].Label);
         Assert.True(pause.Menu.Options[1].Enabled);
         Assert.Equal(PauseLogic.ContinueId, Selected(pause));
@@ -212,12 +214,12 @@ public class PauseLogicTests
     {
         var pause = OpenTimeTrialPause(ghostAvailable: false, ghostEnabled: false);
 
-        Assert.Equal(4, pause.Menu.Options.Count);
+        Assert.Equal(5, pause.Menu.Options.Count);
         Assert.False(pause.Menu.Options[1].Enabled);
         Assert.Equal("GHOST: OFF", pause.Menu.Options[1].Label);
 
         pause.Menu.MoveNext();
-        Assert.Equal(PauseLogic.RestartId, Selected(pause));
+        Assert.Equal(PauseLogic.SettingsId, Selected(pause));
 
         Assert.Equal(PauseAction.None, pause.Choose(PauseLogic.GhostId));
         Assert.False(pause.GhostEnabled);
@@ -247,11 +249,42 @@ public class PauseLogicTests
     }
 
     [Fact]
-    public void Race_ThreeOptionsAsBefore()
+    public void Race_FourOptionsWithSettings()
     {
         var pause = OpenPause();
 
-        Assert.Equal(new[] { PauseLogic.ContinueId, PauseLogic.RestartId, PauseLogic.BackToMenuId }, Ids(pause));
+        Assert.Equal(new[] { PauseLogic.ContinueId, PauseLogic.SettingsId, PauseLogic.RestartId, PauseLogic.BackToMenuId }, Ids(pause));
         Assert.Equal(PauseAction.None, pause.Choose(PauseLogic.GhostId));
+    }
+
+    // 21 (spec docs/settings.md): SETTINGS se abre encima; ESC es de SETTINGS; al salir, la pausa con SETTINGS elegida
+    [Fact]
+    public void Settings_OpensOverThePauseAndComesBackWithSettingsSelected()
+    {
+        var pause = OpenPause();
+
+        Assert.Equal(PauseAction.OpenSettings, pause.Choose(PauseLogic.SettingsId));
+        Assert.Equal(PauseState.Settings, pause.State);
+        Assert.Equal(PauseAction.None, pause.TogglePause());   // ESC es de la pantalla de ajustes
+        Assert.Equal(PauseState.Settings, pause.State);
+
+        pause.SettingsClosed();
+
+        Assert.Equal(PauseState.Open, pause.State);
+        Assert.Equal(PauseLogic.SettingsId, Selected(pause));
+        Assert.Equal(PauseAction.Close, pause.TogglePause());
+    }
+
+    [Fact]
+    public void Settings_InTimeTrialKeepsGhostAndComesBackToSettings()
+    {
+        var pause = OpenTimeTrialPause(ghostAvailable: true);
+
+        pause.Choose(PauseLogic.SettingsId);
+        pause.SettingsClosed();
+
+        Assert.Equal(PauseLogic.SettingsId, Selected(pause));
+        Assert.Equal(PauseLogic.GhostId, pause.Menu.Options[1].Id);
+        Assert.True(pause.GhostEnabled);
     }
 }

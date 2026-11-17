@@ -38,8 +38,14 @@ public partial class SettingsScreen : CanvasLayer
 	// Fondo del menú principal: se ve la rejilla, sin la nave
 	public MenuBackground Background { get; set; }
 
-	// Miga de arriba: MAIN MENU · SETTINGS (PAUSE · SETTINGS desde la pausa, etapa 4)
+	// Miga de arriba: MAIN MENU · SETTINGS (PAUSE · SETTINGS desde la pausa)
 	public string Crumb { get; set; } = "MAIN MENU · SETTINGS";
+
+	// Capa del lienzo: 3 en el menú (encima del menú principal); en la pausa, la de la pausa
+	public int CanvasLayerIndex { get; set; } = 3;
+
+	// Atenuado de lo que hay detrás (0 en el menú, que tiene su fondo; desde la pausa, la carrera congelada)
+	public float DimOpacity { get; set; }
 
 	// Se lanza al salir (ya guardado)
 	public event Action Closed;
@@ -79,7 +85,7 @@ public partial class SettingsScreen : CanvasLayer
 
 	public override void _Ready()
 	{
-		Layer = 3;   // por encima del menú principal (capa 2) y de la sombra del fondo (capa 1)
+		Layer = CanvasLayerIndex;   // en el menú, 3: por encima del menú principal (capa 2) y de la sombra del fondo (capa 1)
 		_scale = UiScale.Factor;
 		_kit = new SelectScreenKit(_scale);
 		Build();
@@ -280,6 +286,13 @@ public partial class SettingsScreen : CanvasLayer
 		_root = new Control { Name = "SettingsRoot", MouseFilter = Control.MouseFilterEnum.Ignore };
 		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		AddChild(_root);
+
+		if (DimOpacity > 0f)
+		{
+			var dim = new ColorRect { Name = "Dim", Color = new Color(Palette.Background, DimOpacity), MouseFilter = Control.MouseFilterEnum.Stop };
+			dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+			_root.AddChild(dim);
+		}
 
 		// Izquierda: miga, nombre, grupo · valor, explicación y vista previa
 		Label crumb = _kit.MakeLabel(Crumb, MenuFonts.Mono, 400, 14f, 0.22f, Palette.Cyan);

@@ -1,6 +1,6 @@
 # VECTORY — Spec: Settings
 
-Versión 1.1 · 2026-11-17 · Estado: **etapa 3 en curso**
+Versión 1.1 · 2026-11-17 · Estado: **hecha** (versión 0.20.0)
 
 Añade la pantalla **SETTINGS**. Se entra desde el **menú principal** (deja de estar en COMING SOON) y desde la **pausa**. Tiene cinco grupos:
 
@@ -262,6 +262,12 @@ Los textos en inglés son los de la página.
 - Mientras está abierta, las teclas no llegan a la nave, igual que en la pausa. Al continuar, la nave no recibe nada de lo pulsado en SETTINGS.
 - **DIFFICULTY** se puede cambiar, pero la explicación lo deja claro: vale para la **siguiente carrera**. RESTART ya la usa.
 - Cambiar el modo o la resolución desde la pausa funciona igual, con su confirmación.
+
+**Concreciones de la etapa 4**
+
+- En TIME TRIAL la pausa sigue llevando GHOST (decisión del usuario): CONTINUE · GHOST · SETTINGS · RESTART · BACK TO MAIN MENU, y la franja pasa de 260 a 320 px (`GhostBandHeight` en `PauseMenu`) para que quepan las cinco.
+- SETTINGS desde la pausa es la misma pantalla del menú, hija de la pausa y en su capa, con la carrera detrás atenuada al 80 % (`SettingsDimOpacity` en `PauseMenu`). Mientras está abierta, la pausa no lee el teclado: ESC es de SETTINGS.
+- Al continuar, la nave ignora lo pulsado hasta soltarlo, como al salir de la pausa de siempre.
 
 ### 7.3 RESET DEFAULTS
 
