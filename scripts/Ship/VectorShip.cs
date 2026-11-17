@@ -33,8 +33,9 @@ public static class VectorShip
 			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): el filo luminoso de la deriva.
 			// El wireframe, que siguen usando el fantasma y el menú, llega a 3,4.
 			CollisionHalfWidth = 2.63f,
-			// Popa de la punta del ala
-			DriftContact = new DriftContactShape(2.7f),
+			// Popa de la punta del ala; borde de ataque del ala, del 55 % en z 0,2 a la punta, por debajo del ala junto a la
+			// punta (y −0,08); foco en la punta, entre sus bordes de ataque (z 2,2) y de salida (z 2,7)
+			DriftContact = new DriftContactShape(2.7f, 0.2f, 0.55f, 2.7f, 1f, -0.08f, 2.45f, 1f),
 			// Caja total del manifiesto del casco 3D, al centímetro
 			CollisionFront = 4f,
 			CollisionBack = 3.31f,

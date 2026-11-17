@@ -13,7 +13,6 @@ script = ExtResource("1_glv2v")
 [node name="Track" type="Node3D" parent="." unique_id=1902884476]
 script = ExtResource("2_r0du0")
 GrazeFlashIntensity = 1.0
-FlashAhead = 2.0
 
 [node name="Player" type="CharacterBody3D" parent="." unique_id=414314590]
 script = ExtResource("3_cm0pq")
@@ -26,4 +25,3 @@ script = ExtResource("5_ghost")
 
 [node name="CollisionEffects" type="Node3D" parent="." unique_id=1736402915]
 script = ExtResource("6_crashfx")
-BarrierContactAhead = 2.0

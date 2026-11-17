@@ -38,6 +38,9 @@ public partial class RivalShip : Node3D
 	private float _blinkTime;
 	private float _hullOpacity = 1f;
 
+	// La nave que se ve, con su inclinación (de ahí nacen las chispas del derrape)
+	public Transform3D HullTransform => _ship.GlobalTransform;
+
 	// Depuración (spec docs/rivales-3-contacto.md, 9): estado de la trazada clara y pasillo encima de cada rival. Lo
 	// enciende el panel de pruebas; dura hasta cerrar el juego.
 	public static bool ShowLineStates { get; set; }

@@ -14,7 +14,8 @@ namespace Vectory.Effects;
 // llama a CollisionFx y solo dibuja. Chispas en una malla de líneas con color por vértice en suma; brillos de los
 // destellos en cuadrados de cara a la cámara en suma, y sus rayos y ondas en otra malla de líneas; humo en cuadrados de
 // cara a la cámara con mezcla normal. También los efectos del derrape (spec docs/efectos-2-derrape.md): sus marcas en
-// otra malla de líneas en suma. Las mallas se rehacen cada frame en _Process, así la pausa lo congela todo.
+// otra malla de líneas en suma, sus chispas con las de los choques y su foco (núcleo y halo de cara a la cámara) en
+// cuadrados en suma. Las mallas se rehacen cada frame en _Process, así la pausa lo congela todo.
 // Sin reglas propias.
 public partial class CollisionEffects : Node3D
 {
@@ -69,12 +70,30 @@ public partial class CollisionEffects : Node3D
 	[Export] public float DriftMarkBrightness { get; set; } = D.Drift.MarkBrightness;
 	[Export] public float DriftMarkMinFactor { get; set; } = D.Drift.MarkMinFactor;  // brillo × (esto + (1 − esto) · d)
 	[Export] public int DriftMaxMarkSamples { get; set; } = D.Drift.MaxMarkSamples;  // por nave
+	[Export] public float DriftSparkRate { get; set; } = D.Drift.SparkRate;          // chispas por segundo × d, en HIGH
+	[Export] public float DriftSparkInherit { get; set; } = D.Drift.SparkInherit;    // de la velocidad de la nave
+	[Export] public float DriftSparkOutMin { get; set; } = D.Drift.SparkOutMin;      // m/s hacia fuera
+	[Export] public float DriftSparkOutMax { get; set; } = D.Drift.SparkOutMax;
+	[Export] public float DriftSparkUpMin { get; set; } = D.Drift.SparkUpMin;        // m/s hacia arriba
+	[Export] public float DriftSparkUpMax { get; set; } = D.Drift.SparkUpMax;
+	[Export] public float DriftSparkLifeMin { get; set; } = D.Drift.SparkLifeMin;    // s
+	[Export] public float DriftSparkLifeMax { get; set; } = D.Drift.SparkLifeMax;
+	[Export] public float DriftJetFraction { get; set; } = D.Drift.JetFraction;      // de las chispas, las del foco
+	[Export] public float DriftEmberRate { get; set; } = D.Drift.EmberRate;          // brasas por segundo × d
+	[Export] public float DriftFocusDrop { get; set; } = D.Drift.FocusDrop;          // m: foco y chispas, más bajos que el borde
+	[Export] public float DriftCoreSize { get; set; } = D.Drift.CoreSize;            // m: núcleo del foco
+	[Export] public float DriftCoreIntensity { get; set; } = D.Drift.CoreIntensity;
+	[Export] public float DriftFocusHaloSize { get; set; } = D.Drift.FocusHaloSize;  // m: halo del foco
+	[Export] public float DriftFocusHaloIntensity { get; set; } = D.Drift.FocusHaloIntensity;
 
 	private const int Bucket = 256;       // las mallas de líneas usan arrays de tamaño múltiplo de esto, para no crearlos cada frame
 	private const int QuadBucket = 32;    // ídem en cuadrados
 
 	private CollisionFx _fx;
 	private DriftMarks _drift;
+	private DriftSparkEmitter _driftSparks;
+	// Foco del derrape de cada nave en su último paso: intensidades del núcleo y del halo, y dónde está
+	private readonly Dictionary<int, (float Core, float Halo, NVector3 Point)> _driftFoci = new();
 	private CollisionFxSettings _settings;
 	private ICrashGround _ground;
 	private TrackFrame _frame;
@@ -87,11 +106,13 @@ public partial class CollisionEffects : Node3D
 	private MeshInstance3D _glowView;
 	private MeshInstance3D _smokeView;
 	private MeshInstance3D _markView;
+	private MeshInstance3D _driftGlowView;
 	private ArrayMesh _sparkMesh;
 	private ArrayMesh _lineMesh;
 	private ArrayMesh _glowMesh;
 	private ArrayMesh _smokeMesh;
 	private ArrayMesh _markMesh;
+	private ArrayMesh _driftGlowMesh;
 	private readonly Dictionary<int, (Vector3[] V, Color[] C)> _lineArrays = new();
 	private readonly Dictionary<int, (Vector3[] V, Color[] C, Vector2[] U)> _quadArrays = new();
 
@@ -105,6 +126,7 @@ public partial class CollisionEffects : Node3D
 		_settings = BuildSettings();
 		_fx = new CollisionFx(_settings, new Random());
 		_drift = new DriftMarks(_settings.Drift);
+		_driftSparks = new DriftSparkEmitter(_settings.Drift, new Random());
 		ApplyQuality();
 		BuildViews();
 	}
@@ -133,21 +155,32 @@ public partial class CollisionEffects : Node3D
 			_fx.Crash(crash.Value, dt);
 	}
 
-	// El derrape de una nave en este paso de física (spec docs/efectos-2-derrape.md). slipAngle: el de ShipDynamics, en
-	// radianes; position: la de la nave; forward: su morro en planta.
+	// El derrape de una nave en este paso de física de dt segundos (spec docs/efectos-2-derrape.md). slipAngle: el de
+	// ShipDynamics, en radianes; position: la de la nave; forward y velocity: su morro y su velocidad en planta; hull:
+	// la nave que se ve, con su inclinación (de ahí nacen chispas y foco).
 	public void DriftShip(int shipId, bool drifting, bool airborne, float slipAngle, NVector3 position, NVector2 forward,
-		float halfWidth, DriftContactShape contact)
+		NVector2 velocity, Transform3D hull, float halfWidth, DriftContactShape contact, float dt)
 	{
 		if (_drift == null)
 			return;
-		DriftState state = DriftIntensity.Evaluate(drifting, airborne, slipAngle, _settings.Drift);
+		DriftFxSettings s = _settings.Drift;
+		DriftState state = DriftIntensity.Evaluate(drifting, airborne, slipAngle, s);
+		var edge = new DriftEdge(halfWidth, contact.EdgeStartZ, contact.EdgeStartFraction, contact.EdgeEndZ,
+			contact.EdgeEndFraction, contact.EdgeY - s.FocusDrop, contact.FocusZ, contact.FocusFraction);
+		Basis b = hull.Basis;
+		var pose = new ShipPose(N(hull.Origin), N(b.X.Normalized()), N(b.Y.Normalized()), N(b.Z.Normalized()));
+		_driftSparks.Emit(shipId, state, _frame, pose, velocity, edge, _fx.Quality, dt, _fx.Sparks);
 		if (!state.Active)
 		{
 			_drift.Update(shipId, state, default, default);
+			_driftFoci.Remove(shipId);
 			return;
 		}
-		(NVector3 left, NVector3 right) = DriftContact.MarkPoints(_frame, position, forward, halfWidth, contact.TipZ, _settings.Drift);
+		(NVector3 left, NVector3 right) = DriftContact.MarkPoints(_frame, position, forward, halfWidth, contact.TipZ, s);
 		_drift.Update(shipId, state, left, right);
+		float now = _drift.Now;
+		_driftFoci[shipId] = (DriftFocus.Core(state, now, shipId, s), DriftFocus.Halo(state, now, shipId, s),
+			pose.Point(DriftContact.FocusPoint(edge, state.Side)));
 	}
 
 	// Recolocación: el trazo de esa nave se corta y las marcas se quedan
@@ -171,6 +204,7 @@ public partial class CollisionEffects : Node3D
 		DrawFlashLines(right, up);
 		DrawGlows(right, up);
 		DrawSmoke(right, up);
+		DrawDriftFoci(right, up);
 	}
 
 	private void ApplyQuality()
@@ -224,6 +258,22 @@ public partial class CollisionEffects : Node3D
 		s.Drift.MaxMarkSamples = DriftMaxMarkSamples;
 		Color orange = Palette.Orange;
 		s.Drift.MarkColor = new NVector3(orange.R, orange.G, orange.B);
+		s.Drift.FocusHaloColor = s.Drift.MarkColor;
+		s.Drift.SparkRate = DriftSparkRate;
+		s.Drift.SparkInherit = DriftSparkInherit;
+		s.Drift.SparkOutMin = DriftSparkOutMin;
+		s.Drift.SparkOutMax = DriftSparkOutMax;
+		s.Drift.SparkUpMin = DriftSparkUpMin;
+		s.Drift.SparkUpMax = DriftSparkUpMax;
+		s.Drift.SparkLifeMin = DriftSparkLifeMin;
+		s.Drift.SparkLifeMax = DriftSparkLifeMax;
+		s.Drift.JetFraction = DriftJetFraction;
+		s.Drift.EmberRate = DriftEmberRate;
+		s.Drift.FocusDrop = DriftFocusDrop;
+		s.Drift.CoreSize = DriftCoreSize;
+		s.Drift.CoreIntensity = DriftCoreIntensity;
+		s.Drift.FocusHaloSize = DriftFocusHaloSize;
+		s.Drift.FocusHaloIntensity = DriftFocusHaloIntensity;
 		return s;
 	}
 
@@ -261,6 +311,17 @@ public partial class CollisionEffects : Node3D
 		_glowView = View("FlashGlows", glow, out _glowMesh);
 		_smokeView = View("Smoke", smoke, out _smokeMesh);
 		_markView = View("DriftMarks", lines, out _markMesh);
+		var driftGlow = new StandardMaterial3D
+		{
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+			VertexColorUseAsAlbedo = true,
+			AlbedoTexture = Radial(new[] { 0f, 0.3f, 1f }, new[] { 1f, 0.5f, 0f }),
+			DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled,
+			CullMode = BaseMaterial3D.CullModeEnum.Disabled
+		};
+		_driftGlowView = View("DriftGlows", driftGlow, out _driftGlowMesh);
 	}
 
 	private MeshInstance3D View(string name, Material material, out ArrayMesh mesh)
@@ -353,6 +414,25 @@ public partial class CollisionEffects : Node3D
 		}
 		FillLines(v, c, k);
 		Commit(_markMesh, Mesh.PrimitiveType.Lines, v, c, null);
+	}
+
+	// Foco del derrape: el halo naranja y, encima, el núcleo blanco caliente, de cara a la cámara
+	private void DrawDriftFoci(Vector3 right, Vector3 up)
+	{
+		int count = _driftFoci.Count * 2;
+		if (!Begin(_driftGlowView, _driftGlowMesh, count))
+			return;
+		(Vector3[] v, Color[] c, Vector2[] u) = Quads(count);
+		DriftFxSettings s = _settings.Drift;
+		int q = 0;
+		foreach ((float core, float halo, NVector3 point) in _driftFoci.Values)
+		{
+			Vector3 center = G(point);
+			Quad(v, c, u, q++, center, right, up, s.FocusHaloSize * 0.5f, C(s.FocusHaloColor * halo));
+			Quad(v, c, u, q++, center, right, up, s.CoreSize * 0.5f, C(s.CoreColor * core));
+		}
+		FillQuads(v, c, u, q);
+		Commit(_driftGlowMesh, Mesh.PrimitiveType.Triangles, v, c, u);
 	}
 
 	private void DrawFlashLines(Vector3 right, Vector3 up)
@@ -536,5 +616,6 @@ public partial class CollisionEffects : Node3D
 	}
 
 	private static Vector3 G(NVector3 v) => new(v.X, v.Y, v.Z);
+	private static NVector3 N(Vector3 v) => new(v.X, v.Y, v.Z);
 	private static Color C(NVector3 v) => new(v.X, v.Y, v.Z);
 }

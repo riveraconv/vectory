@@ -388,6 +388,9 @@ public partial class Player : CharacterBody3D, IContactShip
 	public float CollisionHalfWidth => ExteriorVisual.CollisionHalfWidth;
 	public DriftContactShape DriftContact => ExteriorVisual.DriftContact;
 
+	// La nave que se ve en el mundo, con su inclinación y su cabeceo (de ahí nacen las chispas del derrape)
+	public Transform3D HullTransform => _ship.GlobalTransform;
+
 	// Distancia sobre el eje de la pista desde la meta (m), la de la superficie bajo la nave
 	public float TrackDistance => _physics.HasSurface ? _physics.Surface.Frame.Distance : 0f;
 

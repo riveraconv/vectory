@@ -441,7 +441,8 @@ public partial class Main : Node3D
 		_collisionFx.BarrierContact(_player.Id, _player.LastBarrierTouch, _player.PlanForward, _player.PlanVelocity, delta);
 		Vector3 p = _player.GlobalPosition;
 		_collisionFx.DriftShip(_player.Id, _player.Drifting, _player.IsAirborne, _player.SlipAngle,
-			new System.Numerics.Vector3(p.X, p.Y, p.Z), _player.PlanForward, _player.CollisionHalfWidth, _player.DriftContact);
+			new System.Numerics.Vector3(p.X, p.Y, p.Z), _player.PlanForward, _player.PlanVelocity, _player.HullTransform,
+			_player.CollisionHalfWidth, _player.DriftContact, delta);
 		if (_rivals != null)
 		{
 			foreach (RivalShip ship in _rivals.Ships)
@@ -450,7 +451,8 @@ public partial class Main : Node3D
 				_collisionFx.BarrierContact(car.Id, car.LastTouch, car.Dynamics.Forward, car.Dynamics.Velocity, delta);
 				// Los rivales no derrapan nunca (su piloto no pulsa la tecla); si un día lo hacen, ya dejan marcas
 				_collisionFx.DriftShip(car.Id, car.Dynamics.Drifting, car.Physics.Vertical.Airborne, car.Dynamics.SlipAngle,
-					car.Position, car.Dynamics.Forward, car.Ship.Visual.CollisionHalfWidth, car.Ship.Visual.DriftContact);
+					car.Position, car.Dynamics.Forward, car.Dynamics.Velocity, ship.HullTransform,
+					car.Ship.Visual.CollisionHalfWidth, car.Ship.Visual.DriftContact, delta);
 			}
 			foreach (ShipContactEvent e in _rivals.Contacts.Events)
 			{

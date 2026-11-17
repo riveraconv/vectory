@@ -51,9 +51,12 @@ public enum HullStyle
 	Industrial  // HAMMER (spec docs/cascos-3d-3-hammer.md)
 }
 
-// Dónde roza una nave al derrapar (spec docs/efectos-2-derrape.md, 4.1): TipZ, la z de las puntas de las alas (positivo
-// hacia la popa), donde van las marcas al TipFraction del semiancho de colisión
-public readonly record struct DriftContactShape(float TipZ);
+// Dónde roza una nave al derrapar (spec docs/efectos-2-derrape.md, 4.1, 5 y 6), con z positivo hacia la popa y los
+// laterales en fracción del semiancho de colisión. TipZ: las puntas de las alas, donde van las marcas (en la pista).
+// Borde que roza, por donde salen las chispas: de (EdgeStartZ, EdgeStartFraction) a (EdgeEndZ, EdgeEndFraction), en
+// línea recta, a la altura EdgeY de la nave (su parte de abajo). Foco de chispas: (FocusFraction, FocusZ), a esa altura.
+public readonly record struct DriftContactShape(float TipZ, float EdgeStartZ, float EdgeStartFraction, float EdgeEndZ,
+	float EdgeEndFraction, float EdgeY, float FocusZ, float FocusFraction);
 
 // Un casco 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
 // del que sale su contrato de piezas

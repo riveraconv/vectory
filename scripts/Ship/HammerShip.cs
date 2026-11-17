@@ -53,8 +53,9 @@ public static class HammerShip
 			// El semiancho del casco 3D (halfWidth del manifiesto, 2,502, al centímetro): las balizas de las puntas caídas
 			// del canard. Es el mismo del wireframe, que siguen usando el fantasma y el menú.
 			CollisionHalfWidth = 2.5f,
-			// No tiene alas detrás: los patines de las puntas caídas de los canards, delante (decisión del usuario)
-			DriftContact = new DriftContactShape(-2.2f),
+			// No tiene alas detrás: los patines de las puntas caídas de los canards, delante (decisión del usuario), de
+			// 0,3 m a 2,465 m del centro y con la base en y −0,52; el foco, en el centro del patín
+			DriftContact = new DriftContactShape(-2.2f, -2.35f, 0.986f, -2.05f, 0.986f, -0.52f, -2.2f, 0.986f),
 			// Caja total del manifiesto del casco 3D, al centímetro
 			CollisionFront = 3.83f,
 			CollisionBack = 3f,

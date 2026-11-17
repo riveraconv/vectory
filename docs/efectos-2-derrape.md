@@ -1,6 +1,8 @@
 # VECTORY — Spec: Efectos 2 · Derrape
 
-Versión 1.2 · 2026-11-17 · Estado: **etapa 1 hecha**
+Versión 1.3 · 2026-11-18 · Estado: **hecha**
+
+**Cambios en v1.3** (etapa 2, decisiones del usuario): el brillo de la sección 6 (mancha en la pista y halo) se sustituye por un **foco de chispas**, y chispas y foco nacen **en el ala, a su altura real**, no a 8 cm sobre la pista. Detalle en la sección 13.
 
 **Cambios en v1.2** (etapa 1): el brillo de levitación ya no existe (decisión del usuario); en HAMMER, que no tiene alas detrás, las marcas y el roce van en los **patines de los canards, delante** (decisión del usuario). Notas de la implementación en la sección 13.
 
@@ -277,3 +279,17 @@ No se empieza una etapa sin validar la anterior.
 - Las muestras se toman en el paso de física; su hora es la de un reloj propio de las marcas, que avanza en el frame y se para con la pausa.
 - Color desde `Palette.Orange` (#FF9D32), casi igual al (1; 0,62; 0,2) de la maqueta.
 
+### Etapa 2 · Chispas y foco
+
+- **Decisión del usuario**: la mancha y el halo de la sección 6 no gustaban. Los sustituye un **foco de chispas** en el punto que más roza: núcleo blanco caliente de **0,2 m** (1 × d × parpadeo) y halo naranja de **0,9 m** (0,35 × d × parpadeo), de cara a la cámara y en suma. Parpadeo: **0,7 + 0,3 · sen(97t) · sen(61t)**, más rápido que el de la sección 6, con desfase por nave. Del foco sale el **60 %** de las chispas, en chorro estrecho (±0,3 m/s), y **8 brasas por segundo × d** (hacia fuera 1–3 m/s, arriba 0,5–2 m/s, vida 0,5–0,9 s). La prueba 12 pasa a comprobar el foco: núcleo entre 0,4 y 1 con d = 1, 0 con d = 0.
+- **Decisión del usuario**: chispas y foco nacen **en el borde del ala, a su altura real** (con la inclinación y el cabeceo de la nave que se ve), **0,2 m** por debajo del borde (ajustado por el usuario), no a 8 cm sobre la pista: la nave levita a 2 m y se veían separadas de ella. Caen a la pista y rebotan. Las marcas siguen en la pista.
+- Borde y foco de cada nave (de los scripts de Blender; z positivo hacia la popa, lateral en fracción del semiancho):
+
+| Nave | Borde | Altura | Foco |
+|---|---|---|---|
+| VECTOR | z 0,2 (55 %) → z 2,7 (100 %) | −0,08 | z 2,45, 100 % |
+| BLADE | z 0,2 (70 %) → z 3,6 (100 %) | 0,01 | z 3,4, 99 % |
+| HAMMER | z −2,35 → −2,05 (98,6 %), el patín del canard | −0,52 | z −2,2, 98,6 % |
+
+- El ±1 m/s al azar de las chispas del borde va a lo largo de la nave y en vertical, no a los lados: así todas salen hacia fuera con al menos 2 m/s (prueba 10).
+- Versión **0.22.0**.

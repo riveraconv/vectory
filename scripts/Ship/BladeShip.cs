@@ -54,8 +54,9 @@ public static class BladeShip
 			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): las puntas traseras en flecha con su
 			// bisel. El wireframe, que siguen usando el fantasma y el menú, llega a 1,6.
 			CollisionHalfWidth = 1.61f,
-			// Final de las puntas traseras
-			DriftContact = new DriftContactShape(3.6f),
+			// Final de las puntas traseras; borde: el filo del fuselaje (≈ 70 % en z 0,2, y ≈ 0,01) hasta el final de las
+			// puntas; foco cerca de su final
+			DriftContact = new DriftContactShape(3.6f, 0.2f, 0.7f, 3.6f, 1f, 0.01f, 3.4f, 0.99f),
 			// Caja total del manifiesto del casco 3D sin la sonda, al centímetro
 			CollisionFront = 5.2f,
 			CollisionBack = 3.61f,

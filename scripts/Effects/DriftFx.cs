@@ -24,6 +24,33 @@ public sealed class DriftFxSettings
 	public Vector3 MarkColor = new(1f, 0.62f, 0.2f);
 	public int MaxMarkSamples = 700;           // por nave
 
+	// --- Chispas (5): las de los choques, con otro sitio y otra salida. Nacen en el borde del ala, a su altura real (con
+	// la inclinación de la nave), y caen a la pista (decisión del usuario). Valores en HIGH.
+	public float SparkRate = 160f;             // por segundo × d, entre el borde y el foco
+	public float JetFraction = 0.6f;           // parte de ellas que sale del foco, en chorro
+	public float SparkInherit = 0.6f;          // de la velocidad de la nave
+	public float SparkOutMin = 2f, SparkOutMax = 6f;   // m/s hacia fuera de la nave, por el lado del roce
+	public float SparkUpMin = 1f, SparkUpMax = 4f;     // m/s hacia arriba de la nave
+	public float SparkRandom = 1f;             // ±m/s a lo largo de la nave y en vertical (las del borde)
+	public float JetRandom = 0.3f;             // ídem en el chorro del foco: abanico estrecho
+	public float SparkLifeMin = 0.15f, SparkLifeMax = 0.4f;
+	public float EmberRate = 8f;               // brasas por segundo × d, desde el foco
+	public float EmberOutMin = 1f, EmberOutMax = 3f;
+	public float EmberUpMin = 0.5f, EmberUpMax = 2f;
+	public float EmberLifeMin = 0.5f, EmberLifeMax = 0.9f;
+
+	// --- Foco de chispas (6, decisión del usuario: sustituye a la mancha y al halo): núcleo blanco caliente en el punto
+	// que más roza y un halo naranja pequeño, de cara a la cámara, chisporroteando
+	public float FocusDrop = 0.2f;             // m que bajan foco y chispas por debajo del borde, hacia abajo de la nave
+	public float CoreSize = 0.2f;              // m
+	public float CoreIntensity = 1f;
+	public Vector3 CoreColor = new(1f, 0.95f, 0.82f);   // el blanco caliente de las chispas
+	public float FocusHaloSize = 0.9f;         // m
+	public float FocusHaloIntensity = 0.35f;
+	public Vector3 FocusHaloColor = new(1f, 0x9D / 255f, 0x32 / 255f);   // #FF9D32
+	public float FlickerA = 97f, FlickerB = 61f;   // 0,7 + 0,3 · sen(A·t) · sen(B·t): chisporroteo rápido
+	public float FlickerShipPhase = 1.37f;         // s de desfase por id de nave
+
 	public static DriftFxSettings Default => new();
 }
 
@@ -64,13 +91,138 @@ public static class DriftContact
 	// Un punto de la nave (lateral x a la derecha, z hacia la popa) en planta, llevado a la superficie y subido lift
 	public static Vector3 OnSurface(TrackFrame frame, Vector3 position, Vector2 forward, float x, float z, float lift)
 	{
+		GroundSpot g = Ground(frame, position, forward, x, z);
+		return g.Point + g.Up * lift;
+	}
+
+	// Un punto de la nave sobre la superficie, con su normal y su distancia sobre el eje. Sin pista (pruebas), el
+	// suelo plano en y = 0.
+	public static GroundSpot Ground(TrackFrame frame, Vector3 position, Vector2 forward, float x, float z)
+	{
 		var right = new Vector2(-forward.Y, forward.X);
 		Vector2 plan = new Vector2(position.X, position.Z) + right * x - forward * z;
 		if (frame == null)
-			return new Vector3(plan.X, lift, plan.Y);
+			return new GroundSpot(new Vector3(plan.X, 0f, plan.Y), Vector3.UnitY, -plan.Y);
 		SurfacePoint p = frame.SurfaceUnder(plan.X, plan.Y);
-		return new Vector3(plan.X, p.SurfaceY, plan.Y) + Vector3.Normalize(p.Frame.Normal) * lift;
+		return new GroundSpot(new Vector3(plan.X, p.SurfaceY, plan.Y), Vector3.Normalize(p.Frame.Normal), p.Distance);
 	}
+
+	// Lateral con signo del lado del roce: a la izquierda, negativo
+	public static float SideSign(BarrierSide side) => side == BarrierSide.Left ? -1f : 1f;
+
+	// Punto del borde que roza en la fracción t (0 delante… 1 detrás del tramo), en coordenadas de la nave
+	public static Vector3 EdgePoint(in DriftEdge edge, BarrierSide side, float t)
+	{
+		float fraction = edge.StartFraction + (edge.EndFraction - edge.StartFraction) * t;
+		return new Vector3(SideSign(side) * edge.HalfWidth * fraction, edge.Y, edge.StartZ + (edge.EndZ - edge.StartZ) * t);
+	}
+
+	// El foco, en coordenadas de la nave
+	public static Vector3 FocusPoint(in DriftEdge edge, BarrierSide side) =>
+		new(SideSign(side) * edge.HalfWidth * edge.FocusFraction, edge.Y, edge.FocusZ);
+}
+
+// Un punto sobre la superficie de la pista: el punto, su normal y su distancia sobre el eje
+public readonly record struct GroundSpot(Vector3 Point, Vector3 Up, float Distance);
+
+// Cómo está la nave que se ve (con su inclinación y su cabeceo): origen y ejes en el mundo; z positivo hacia la popa
+public readonly record struct ShipPose(Vector3 Origin, Vector3 Right, Vector3 Up, Vector3 Back)
+{
+	public Vector3 Point(Vector3 local) => Origin + Right * local.X + Up * local.Y + Back * local.Z;
+
+	// Nave sin girar sobre el suelo plano, mirando a −Z (pruebas)
+	public static ShipPose Flat(Vector3 origin) => new(origin, Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ);
+}
+
+// El borde de una nave que roza al derrapar (5), con su semiancho de colisión: de (StartZ, StartFraction) a (EndZ,
+// EndFraction) a la altura Y de la nave, y el foco en (FocusFraction, FocusZ)
+public readonly record struct DriftEdge(float HalfWidth, float StartZ, float StartFraction, float EndZ, float EndFraction,
+	float Y, float FocusZ, float FocusFraction);
+
+// Chispas del derrape (5): del borde que roza y, en chorro, del foco, con alguna brasa; se meten en las chispas de los
+// choques. Lleva un acumulador por nave, así el número no depende de los fps. Lógica pura.
+public sealed class DriftSparkEmitter
+{
+	private readonly DriftFxSettings _s;
+	private readonly Random _random;
+	private readonly Dictionary<int, (float Sparks, float Embers)> _accumulators = new();
+
+	public DriftSparkEmitter(DriftFxSettings settings, Random random)
+	{
+		_s = settings ?? throw new ArgumentNullException(nameof(settings));
+		_random = random ?? throw new ArgumentNullException(nameof(random));
+	}
+
+	// Un paso de dt segundos de una nave. pose: la nave que se ve; velocity: su velocidad en planta (X, Z); quality:
+	// PARTICLES; frame: para la distancia sobre el eje de cada chispa (null: suelo plano). Devuelve cuántas han salido.
+	public int Emit(int shipId, in DriftState state, TrackFrame frame, in ShipPose pose, Vector2 velocity, in DriftEdge edge,
+		float quality, float dt, SparkField field)
+	{
+		if (!state.Active)
+		{
+			_accumulators.Remove(shipId);
+			return 0;
+		}
+		_accumulators.TryGetValue(shipId, out (float Sparks, float Embers) acc);
+		acc.Sparks += _s.SparkRate * state.D * quality * dt;
+		acc.Embers += _s.EmberRate * state.D * quality * dt;
+		float sign = DriftContact.SideSign(state.Side);
+		Vector3 outward = pose.Right * sign;
+		Vector3 along = -pose.Back;
+		var inherited = new Vector3(velocity.X, 0f, velocity.Y) * _s.SparkInherit;
+		Vector3 focus = pose.Point(DriftContact.FocusPoint(edge, state.Side));
+		int added = 0;
+		while (acc.Sparks >= 1f)
+		{
+			acc.Sparks -= 1f;
+			bool jet = _random.NextSingle() < _s.JetFraction;
+			Vector3 position = jet ? focus : pose.Point(DriftContact.EdgePoint(edge, state.Side, _random.NextSingle()));
+			float spread = jet ? _s.JetRandom : _s.SparkRandom;
+			Vector3 v = inherited
+				+ outward * Range(_s.SparkOutMin, _s.SparkOutMax)
+				+ pose.Up * Range(_s.SparkUpMin, _s.SparkUpMax)
+				+ along * Range(-spread, spread)
+				+ Vector3.UnitY * Range(-spread, spread);
+			added += Add(field, frame, position, v, Range(_s.SparkLifeMin, _s.SparkLifeMax), false) ? 1 : 0;
+		}
+		while (acc.Embers >= 1f)
+		{
+			acc.Embers -= 1f;
+			Vector3 v = inherited
+				+ outward * Range(_s.EmberOutMin, _s.EmberOutMax)
+				+ pose.Up * Range(_s.EmberUpMin, _s.EmberUpMax);
+			added += Add(field, frame, focus, v, Range(_s.EmberLifeMin, _s.EmberLifeMax), true) ? 1 : 0;
+		}
+		_accumulators[shipId] = acc;
+		return added;
+	}
+
+	public void Clear() => _accumulators.Clear();
+
+	private static bool Add(SparkField field, TrackFrame frame, Vector3 position, Vector3 velocity, float life, bool ember)
+	{
+		float hint = frame != null ? frame.SurfaceUnder(position.X, position.Z).Distance : -position.Z;
+		return field.Add(new Spark { Position = position, Velocity = velocity, Age = 0f, Life = life, Ember = ember, Hint = hint });
+	}
+
+	private float Range(float min, float max) => min + (max - min) * _random.NextSingle();
+}
+
+// Foco de chispas (6): núcleo y halo del punto que más roza, chisporroteando. Lógica pura.
+public static class DriftFocus
+{
+	// 0,7 + 0,3 · sen(A·t) · sen(B·t), con el tiempo de la carrera y un desfase por nave
+	public static float Flicker(float time, int shipId, DriftFxSettings s)
+	{
+		float t = time + shipId * s.FlickerShipPhase;
+		return 0.7f + 0.3f * MathF.Sin(s.FlickerA * t) * MathF.Sin(s.FlickerB * t);
+	}
+
+	public static float Core(in DriftState state, float time, int shipId, DriftFxSettings s) =>
+		state.Active ? s.CoreIntensity * state.D * Flicker(time, shipId, s) : 0f;
+
+	public static float Halo(in DriftState state, float time, int shipId, DriftFxSettings s) =>
+		state.Active ? s.FocusHaloIntensity * state.D * Flicker(time, shipId, s) : 0f;
 }
 
 // Una muestra del rastro: los dos puntos, cuándo se tomó, su intensidad y su trazo
