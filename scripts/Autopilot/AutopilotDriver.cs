@@ -74,6 +74,11 @@ public sealed class AutopilotDriver
 	public bool LateBraking { get; set; }
 	public bool Boosting { get; set; }
 
+	// Errores de los rivales (spec docs/rivales-4-personalidades.md, 5.1): con HoldBrake no frena por el perfil (solo por
+	// speedCap, para no echarse encima de otra); con ForceThrottle pisa W aunque vaya por encima del objetivo
+	public bool HoldBrake { get; set; }
+	public bool ForceThrottle { get; set; }
+
 	private SpeedProfile Active => Boosting && BoostProfile != null ? BoostProfile
 		: LateBraking && LateProfile != null ? LateProfile : _profile;
 
@@ -112,14 +117,14 @@ public sealed class AutopilotDriver
 	{
 		float steer = RequiredSteer(state, lateralOffset, lateralLimit);
 		int steerInput = SteerInput(steer, state.Steer);
-		bool brake = MustBrake(state) || state.MotorSpeed > speedCap + BrakeTolerance;
+		bool brake = (!HoldBrake && MustBrake(state)) || state.MotorSpeed > speedCap + BrakeTolerance;
 		return new ShipInput
 		{
 			SteerLeft = steerInput > 0,
 			SteerRight = steerInput < 0,
 			Brake = brake,
 			// Con el impulso del boost (y su perfil) sigue pisando: la pasada hacia delante del perfil no sabe del boost
-			Accelerate = !brake && state.MotorSpeed < (Boosting && BoostProfile != null ? speedCap : MathF.Min(TargetAhead(state), speedCap))
+			Accelerate = !brake && state.MotorSpeed < ((Boosting && BoostProfile != null) || ForceThrottle ? speedCap : MathF.Min(TargetAhead(state), speedCap))
 		};
 	}
 

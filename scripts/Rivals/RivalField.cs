@@ -90,6 +90,7 @@ public partial class RivalField : Node3D
 		foreach (IContactShip ship in _contactShips)
 			ship.Slipstream.Settings = slipstream;
 		WarnGridOverlaps();
+
 	}
 
 	// Un paso de física de la carrera, después del del jugador: mueve los rivales, resuelve los contactos entre todas las
@@ -226,6 +227,16 @@ public partial class RivalField : Node3D
 	}
 
 	private static System.Numerics.Vector2 Plan(System.Numerics.Vector3 p) => new(p.X, p.Z);
+
+	// Errores de los rivales encendidos o no (ERRORS del panel de pruebas)
+	public bool ErrorsEnabled { get; private set; } = true;
+
+	public void SetErrorsEnabled(bool enabled)
+	{
+		ErrorsEnabled = enabled;
+		foreach (RivalShip ship in _ships)
+			ship.Car.Driver.Errors.Enabled = enabled;
+	}
 
 	// Cambia el ajuste global de ritmo de todos los rivales al momento (panel de pruebas)
 	public void SetPace(float paceOffset)

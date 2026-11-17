@@ -42,6 +42,9 @@ public sealed class RivalCar : IContactShip
 	private bool _wasInContact;
 	private bool _canDrive;
 
+	// Sus errores salen de otra semilla que sus decisiones al defender, así no cambian cuando defiende
+	private const int ErrorSeedMask = 0x2545F491;
+
 	public RivalEntry Entry { get; }
 	public ShipDefinition Ship { get; }
 	public RivalDriver Driver { get; }
@@ -93,7 +96,7 @@ public sealed class RivalCar : IContactShip
 		Shape = ShipShape.From(ship.Visual);
 
 		Driver = new RivalDriver(pilots.Get(ship), context.Frame, _tuning, context.Physics, context.StepTime,
-			entry.Pilot.Traits, paceOffset, context.BarrierOffset, new System.Random(entry.Seed))
+			entry.Pilot.Traits, paceOffset, context.BarrierOffset, new System.Random(entry.Seed), new System.Random(entry.Seed ^ ErrorSeedMask))
 		{
 			ReactionTime = entry.Reaction
 		};

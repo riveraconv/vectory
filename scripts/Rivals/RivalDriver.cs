@@ -28,9 +28,10 @@ public readonly record struct RivalStatus(int Charges, int MaxCharges, bool Impu
 //  - Duelo: la trazada clara con sus rasgos de ataque, defensa y contacto; atacando por dentro frena más tarde, y con el
 //    impulso del boost sigue pisando W (perfiles alternativos del piloto).
 //  - Boost: la estrategia de su piloto (RivalBoost), en rectas con recta por delante.
+//  - Errores (spec 5): frenada tardía, salida abierta y mala salida, con su PilotErrors (RivalDriver.Errors.cs).
 //  - Terminado: el piloto al CooldownPace de su objetivo y sin boost.
 // Lógica pura.
-public sealed class RivalDriver
+public sealed partial class RivalDriver
 {
 	public const float DefaultCooldownPace = 0.6f;
 
@@ -51,6 +52,10 @@ public sealed class RivalDriver
 	private bool[] _onStraight;
 	private int[] _nextBrake;
 	private int[] _insideAt;
+	private int[] _apexAfter;         // puntos de la trazada de cada frenada a su vértice
+	private int[] _exitAfter;         // y a la recta de después
+	private SpeedProfile _profile;
+	private int _curvesPerLap;
 	private static readonly TrafficShip[] NoTraffic = Array.Empty<TrafficShip>();
 
 	public PilotTraits Traits { get; }
@@ -70,10 +75,13 @@ public sealed class RivalDriver
 
 	// traits: los rasgos de su piloto; la reacción empieza siendo la suya. paceOffset: el ajuste global de depuración.
 	// barrierOffset: desplazamiento de la barrera, para el hueco al apartarse. random: para decidir si defiende.
+	// errorRandom: el de sus errores (otro, así no cambian con lo que decida al defender). errorScale: la dificultad.
 	public RivalDriver(PilotData data, TrackFrame frame, in ShipTuning tuning, in ShipPhysicsSettings physics, float stepTime,
-		in PilotTraits traits, float paceOffset = 0f, float barrierOffset = float.PositiveInfinity, Random random = null)
+		in PilotTraits traits, float paceOffset = 0f, float barrierOffset = float.PositiveInfinity, Random random = null,
+		Random errorRandom = null, float errorScale = 1f)
 	{
 		Traits = traits;
+		Errors = new PilotErrors(traits.Errors * errorScale, errorRandom ?? new Random(1));
 		ReactionTime = traits.Reaction;
 		_data = data;
 		_frame = frame;
@@ -138,9 +146,17 @@ public sealed class RivalDriver
 
 		bool finished = phase == RivalPhase.Finished;
 		_pilot.TargetScale = finished ? CooldownPace : 1f;
+		_pilot.HoldBrake = false;
+		_pilot.ForceThrottle = false;
 		_pilot.Boosting = !finished && status.ImpulseActive;
 
-		// En el GO, su reacción sin tocar nada (el boost se recarga igual: lo hace la física desde el GO)
+		// En el GO, su reacción sin tocar nada (el boost se recarga igual: lo hace la física desde el GO); una mala salida
+		// la alarga
+		if (!finished && !_startRolled)
+		{
+			_startRolled = true;
+			ReactionTime += Errors.StartDelay();
+		}
 		if (!finished && _runningTime < ReactionTime)
 		{
 			_runningTime += _stepTime;
@@ -150,6 +166,7 @@ public sealed class RivalDriver
 		if (finished)
 		{
 			_pilot.LateBraking = false;
+			EndError();
 			ClearLine.Reset();
 			return new RivalCommand(_pilot.Drive(state), false);
 		}
@@ -158,6 +175,7 @@ public sealed class RivalDriver
 		Ahead = ahead;
 		ClearLine.Update(self, traffic, _stepTime, ahead);
 		_pilot.LateBraking = ClearLine.LateBraking;
+		float errorOffset = UpdateError(state.Distance, ahead, self, traffic);
 
 		LineState line = ClearLine.State;
 		bool clear = ClearLine.Blocker < 0 && line is LineState.Clear or LineState.DefendLeft or LineState.DefendRight;
@@ -179,7 +197,8 @@ public sealed class RivalDriver
 			Boosts++;
 		}
 
-		return new RivalCommand(_pilot.Drive(state, ClearLine.Offset, ClearLine.SpeedCap, ClearLine.LateralLimit), boost);
+		float limit = ErrorActive ? ErrorLateralLimit(self) : ClearLine.LateralLimit;
+		return new RivalCommand(_pilot.Drive(state, ClearLine.Offset + errorOffset, ClearLine.SpeedCap, limit), boost);
 	}
 
 	// Roce de lado con otra nave (away: hacia dónde apartarse, −1 izquierda, +1 derecha)
@@ -190,6 +209,8 @@ public sealed class RivalDriver
 	{
 		ClearLine.Reset();
 		_pilot.LateBraking = false;
+		EndError();
+		_errorOffset = 0f;
 	}
 
 	// La pista por delante en un punto (m desde la meta)
@@ -241,6 +262,15 @@ public sealed class RivalDriver
 		}
 
 		_insideAt = new int[n];
+		_apexAfter = new int[n];
+		_exitAfter = new int[n];
+		_profile = profile;
+		_curvesPerLap = 0;
+		for (int i = 0; i < n; i++)
+		{
+			if (starts[i])
+				_curvesPerLap++;
+		}
 		int search = (int)MathF.Ceiling(InsideSearch / line.PointSpacing);
 		for (int i = 0; i < n; i++)
 		{
@@ -253,6 +283,11 @@ public sealed class RivalDriver
 				if (profile.CurveLimit[j] < profile.CurveLimit[slowest])
 					slowest = j;
 			}
+			_apexAfter[i] = slowest >= i ? slowest - i : slowest + n - i;
+			int exit = slowest;
+			for (int k = 0; k < n && !_onStraight[exit]; k++)
+				exit = line.Wrap(exit + 1);
+			_exitAfter[i] = exit >= i ? exit - i : exit + n - i;
 			float curvature = line.Curvature[slowest];
 			// Curvatura positiva: hacia la derecha la curva se abre, así que el interior queda a la izquierda
 			_insideAt[i] = MathF.Abs(curvature) < MinInsideCurvature ? 0 : -MathF.Sign(curvature);

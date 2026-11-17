@@ -47,6 +47,7 @@ public partial class TuningLabPanel : CanvasLayer
 	private const float RivalsRefreshTime = 0.25f;   // s entre repasos de las filas
 	private static float? _rivalPace;   // el del deslizador, si se ha movido
 	private static bool _contactEnabled = true;   // CONTACT: dura hasta cerrar el juego, no se guarda
+	private static bool _errorsEnabled = true;    // ERRORS (spec docs/rivales-4-personalidades.md, 8): ídem
 	private CheckBox _contactCheck;
 	private CheckBox _statesCheck;
 	private Row _rivalPaceRow;
@@ -84,6 +85,7 @@ public partial class TuningLabPanel : CanvasLayer
 			Rivals?.SetPace(pace);
 		if (Rivals != null)
 			Rivals.Contacts.Enabled = _contactEnabled;
+		Rivals?.SetErrorsEnabled(_errorsEnabled);
 
 		Build();
 		_root.Visible = false;
@@ -203,6 +205,14 @@ public partial class TuningLabPanel : CanvasLayer
 		GD.Print($"[TuningLab] Ship contact: {(enabled ? "ON" : "OFF")}");
 	}
 
+	// Errores de los rivales: sin ellos, para probar
+	private void OnErrorsToggled(bool enabled)
+	{
+		_errorsEnabled = enabled;
+		Rivals?.SetErrorsEnabled(enabled);
+		GD.Print($"[TuningLab] Rival errors: {(enabled ? "ON" : "OFF")}");
+	}
+
 	private void RefreshRivals()
 	{
 		if (Rivals == null)
@@ -227,7 +237,8 @@ public partial class TuningLabPanel : CanvasLayer
 				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}  "
 				+ string.Create(CultureInfo.InvariantCulture,
 					$"STR {driver.StraightMargin * 100f:0.0} CRV {driver.CurveMargin * 100f:0.0} BRK {driver.Traits.Braking:0.00} REA {driver.ReactionTime:0.00}  "
-					+ $"{StateName(driver.ClearLine.State),-8} R {car.Slipstream.Strength:0.00} BST {car.Boost.Charges} {PilotProfiles.ScreenName(driver.Traits.Boost),-8} USED {driver.Boosts} ABT {driver.ClearLine.Aborts}"));
+					+ $"{StateName(driver.ClearLine.State),-8} R {car.Slipstream.Strength:0.00} BST {car.Boost.Charges} {PilotProfiles.ScreenName(driver.Traits.Boost),-8} USED {driver.Boosts} ABT {driver.ClearLine.Aborts}  "
+					+ $"ERR LB {driver.Errors.LateBrakings} WX {driver.Errors.WideExits} BS {driver.Errors.BadStarts}"));
 		}
 		text.Append($"\nSHIP = RAMS / RECEIVED / MUTUAL · RIVAL VS RIVAL {Rivals.RivalHits}");
 		text.Append(string.Create(CultureInfo.InvariantCulture, $"\nYOUR SLIPSTREAM R {Player?.Slipstream.Strength ?? 0f:0.00}"));
@@ -413,6 +424,20 @@ public partial class TuningLabPanel : CanvasLayer
 			_contactCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
 			_contactCheck.Toggled += OnContactToggled;
 			column.AddChild(_contactCheck);
+			var errorsCheck = new CheckBox
+			{
+				Text = "ERRORS",
+				ButtonPressed = _errorsEnabled,
+				FocusMode = Control.FocusModeEnum.None
+			};
+			errorsCheck.AddThemeFontOverride("font", font);
+			errorsCheck.AddThemeFontSizeOverride("font_size", fontSize);
+			errorsCheck.AddThemeColorOverride("font_color", Palette.SelectLabel);
+			errorsCheck.AddThemeColorOverride("font_hover_color", Palette.SelectValue);
+			errorsCheck.AddThemeColorOverride("font_pressed_color", Palette.SelectValue);
+			errorsCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
+			errorsCheck.Toggled += OnErrorsToggled;
+			column.AddChild(errorsCheck);
 			_statesCheck = new CheckBox
 			{
 				Text = "LINE STATES",

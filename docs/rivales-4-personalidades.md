@@ -289,6 +289,13 @@ Sustituye a la regla de la spec 1 (y a la de la 3, que la limitaba a la trazada 
 - Con una nave detrás, sí puede haber error: la de detrás tiene que esquivar o frenar con la trazada clara.
 - En `BalanceRunner` los errores están **apagados** por defecto, para que el equilibrio no dependa del azar.
 
+### 5.3b Concreciones de la etapa 3 (v1.1)
+
+- La tirada de cada curva se hace a 200 m de su frenada, con la presión y las naves de al lado de ese momento. Mientras dura un error no se tira el de la curva siguiente.
+- **La pérdida se sortea (0,3–0,8 s) y se aplica**: medido con un rival solo en `circuit_01`, frenar 5–15 m tarde y acelerar antes en la salida apenas costaba tiempo (la frenada del perfil va al 90 % de la real y a la salida la trazada ya va por fuera). Así que, además de la frenada tardía o la salida abierta (que se ven), el objetivo de velocidad baja en el tramo del error (de la frenada, o del vértice, a la recta) lo que hace falta para perder ese tiempo. Medido: unos 0,45–0,6 s por error, con algún roce o golpe medio contra la barrera.
+- Con una nave al lado (solapadas a lo largo y a menos de 3 m entre cascos), el error se corta también si ya había empezado.
+- Errores, informe y adelantamientos: los adelantamientos se cuentan con la clasificación en directo, cuando dos naves que corren se cruzan. El informe sale en la consola cuando terminan todos los rivales, con el puesto de ese momento; del jugador solo puesto, adelantamientos y daño.
+
 ### 5.4 Criterio de aceptación de la etapa 3
 
 - En una carrera se ven de vez en cuando rivales que se van largos o rozan la barrera. Más los agresivos, casi nunca los conservadores.

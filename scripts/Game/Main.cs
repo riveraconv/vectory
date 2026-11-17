@@ -156,6 +156,8 @@ public partial class Main : Node3D
 
 	// Clasificación (solo RACE; null en TIME TRIAL): el jugador es el 0 y cada rival, su número
 	private const int PlayerStandingsId = 0;
+	private readonly OvertakeCounter _overtakes = new();
+	private bool _reportPrinted;
 	private RaceStandings _standings;
 	private int _playerGridPosition;
 	private readonly List<StandingsShip> _standingsShips = new();
@@ -594,6 +596,8 @@ public partial class Main : Node3D
 			}
 		}
 		_standings.Update(_standingsShips);
+		_overtakes.Update(_standings.Order, IsRacing);
+		PrintReportWhenAllFinished();
 
 		_intervalRefreshLeft -= delta;
 		if (_intervalRefreshLeft <= 0f || _intervalTexts.Count == 0)
@@ -610,6 +614,58 @@ public partial class Main : Node3D
 			id => _standingsNames.TryGetValue(id, out string name) ? name : "",
 			id => _intervalTexts.TryGetValue(id, out string text) ? text : StandingsFormat.NoData);
 		_hud.SetStandings(rows, _standings.Count);
+	}
+
+	// Corriendo de verdad (para los adelantamientos): ni en la previa ni terminada
+	private bool IsRacing(int id)
+	{
+		if (id == PlayerStandingsId)
+			return _race.Tracker?.State == RaceState.Running;
+		foreach (RivalShip ship in _rivals.Ships)
+		{
+			if (ship.Car.Entry.Number == id)
+				return ship.Car.Phase == RivalPhase.Running;
+		}
+		return false;
+	}
+
+	// Informe de carrera (spec docs/rivales-4-personalidades.md, 8) en la consola, una vez, cuando han terminado todos
+	// los rivales; el puesto es el de la clasificación en ese momento
+	private void PrintReportWhenAllFinished()
+	{
+		if (_reportPrinted || _rivals == null || _rivals.Ships.Count == 0)
+			return;
+		foreach (RivalShip ship in _rivals.Ships)
+		{
+			if (ship.Car.Phase != RivalPhase.Finished)
+				return;
+		}
+		_reportPrinted = true;
+
+		var rows = new List<RaceReportRow>();
+		IReadOnlyList<int> order = _standings.Order;
+		int PositionOf(int id)
+		{
+			for (int i = 0; i < order.Count; i++)
+			{
+				if (order[i] == id)
+					return i + 1;
+			}
+			return order.Count + 1;
+		}
+		rows.Add(new RaceReportRow(PositionOf(PlayerStandingsId), PilotCatalog.PlayerName, "—",
+			_standingsShipNames.GetValueOrDefault(PlayerStandingsId, ""), _overtakes.Made(PlayerStandingsId),
+			_overtakes.Suffered(PlayerStandingsId), null, null, null, _damage?.Points ?? 0, _damage?.Level ?? 0, null, null, null, null));
+		foreach (RivalShip ship in _rivals.Ships)
+		{
+			RivalCar car = ship.Car;
+			int id = car.Entry.Number;
+			PilotErrors errors = car.Driver.Errors;
+			rows.Add(new RaceReportRow(PositionOf(id), car.Entry.Pilot.Nickname, PilotProfiles.ScreenName(car.Entry.Pilot.Profile),
+				_standingsShipNames.GetValueOrDefault(id, ""), _overtakes.Made(id), _overtakes.Suffered(id), car.Rams, car.Received,
+				car.Mutual, car.Damage.Points, car.Damage.Level, car.Driver.Boosts, errors.LateBrakings, errors.WideExits, errors.BadStarts));
+		}
+		GD.Print(RaceReport.Text(rows));
 	}
 
 	private StandingsShip ToStandings(int id, int grid, RaceTracker tracker, float trackDistance) =>
