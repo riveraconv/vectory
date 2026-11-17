@@ -63,6 +63,7 @@ public sealed class RivalCar : IContactShip
 	public Vector3 PreviousPosition => _previousPosition;
 	public PassableState Passable { get; } = new();
 	public bool CanCollide => _canDrive;
+	public Slipstream Slipstream { get; } = new();
 
 	public Vector3 Position => _position;
 	public TrackFrame Frame => _context.Frame;
@@ -91,9 +92,8 @@ public sealed class RivalCar : IContactShip
 		_halfWidth = ship.Visual.CollisionHalfWidth;
 		Shape = ShipShape.From(ship.Visual);
 
-		(float straightStart, float straightLength) = RivalDriver.LongestStraight(context.Frame);
 		Driver = new RivalDriver(pilots.Get(ship), context.Frame, _tuning, context.Physics, context.StepTime,
-			straightStart, entry.Pilot.Traits, paceOffset, straightLength, context.BarrierOffset)
+			entry.Pilot.Traits, paceOffset, context.BarrierOffset, new System.Random(entry.Seed))
 		{
 			ReactionTime = entry.Reaction
 		};
@@ -152,15 +152,16 @@ public sealed class RivalCar : IContactShip
 		_previousPosition = _position;
 
 		ShipTuning tuning = _tuning;
-		tuning.MaxSpeed *= Damage.TopSpeedFactor;
+		tuning.MaxSpeed *= Damage.TopSpeedFactor * Slipstream.TopFactor;
+		tuning.Drag *= Slipstream.DragFactor;
 		tuning.TurnRate *= Damage.TurnFactor;
 		_physics.Boost.ActivationAllowed = Damage.BoostAllowed;
 
 		var state = new PilotState(new Vector2(_position.X, _position.Z), Dynamics.Velocity, Dynamics.Yaw, Dynamics.Steer,
 			Dynamics.Speed, _physics.Surface.Distance, _physics.Surface.Frame.Bank);
-		RivalCommand command = traffic == null
-			? Driver.Decide(phase, state, Boost.CanActivate)
-			: Driver.Decide(phase, state, Boost.CanActivate, Traffic, traffic);
+		var status = new RivalStatus(Boost.Charges, _context.Physics.Boost.MaxCharges, Boost.IsImpulseActive,
+			Tracker.HasLapLimit && Tracker.CurrentLap >= Tracker.TotalLaps);
+		RivalCommand command = Driver.Decide(phase, state, Boost.CanActivate, Traffic, traffic ?? System.Array.Empty<TrafficShip>(), status);
 		_physics.Move(ref _position, command.Input, command.Boost, canDrive, tuning, _halfWidth, _context.Physics, dt);
 
 		_detector.Update(_context.Frame.NearestIndex(_position.X, _position.Z));
@@ -237,6 +238,7 @@ public sealed class RivalCar : IContactShip
 			TrackPlacement.Respawn(_context.Frame, _position, _context.Hover, out _position, out float yaw);
 			_physics.Respawn(_position, yaw);
 			Driver.Reset();
+			Slipstream.Reset();
 			_previousPosition = _position;
 			Passable.Respawned();
 			Respawns++;

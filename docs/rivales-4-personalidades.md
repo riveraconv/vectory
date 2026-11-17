@@ -242,6 +242,17 @@ Sustituye a la regla de la spec 1 (y a la de la 3, que la limitaba a la trazada 
 - Nunca con la trazada tapada y sin estar atacando.
 - **v1.1**: mientras dura el impulso, el piloto sigue pisando W aunque pase de su objetivo. Medido en la etapa 1: el perfil de velocidad tiene la punta como techo, así que hasta ahora soltaba W con el boost y lo perdía (le daba 0,02–0,05 s por vuelta).
 
+### 4.6b Concreciones de la etapa 2 (v1.1)
+
+- **Recta y frenada** para el piloto: un punto es recta si ahí manda la punta (no la curva) y no va frenando; la siguiente frenada es donde deja de serlo. El interior es el lado contrario al giro en el punto más lento de los 400 m siguientes.
+- **SLIP**: solo con las dos por encima de 150 km/h (sin rebufo no tiene sentido; con una nave parada se quedaba detrás para siempre) y con la de delante como mucho 15 km/h más lenta (si va mucho más lenta, se la pasa como en la spec 3). Hueco en el rebufo: el mayor de 6 m y 0,15 s.
+- **En frenada por dentro**: llegando a menos de 60 m de la frenada. Aborta 30 m después del punto de frenada (frena más tarde que el otro). Frena más tarde con un perfil propio: frenada + 0,05 × ataque.
+- **Defender**: se desplaza al 60 % de su límite lateral hacia el interior.
+- **Roce de lado con contacto < 0,5**: se aparta 1 m durante 1 s.
+- **Boost**: mientras dura el impulso, el piloto usa un perfil con la punta + el impulso y sin pasada de aceleración, y sigue pisando W.
+- **Arreglo de la spec 3**: apartado en recta, la trazada clara ya no le pone de tope el margen de curva de la punta (le quitaba el boost y lo dejaba al 97 % de la punta).
+- Medido sin ventana con el piloto de F7 en `circuit_01`: tiempos de los rivales iguales que en la etapa 1 (2:05–2:14) y unos 0,6 golpes medios o fuertes entre rivales por carrera (sin duelo, 0 en 10 carreras).
+
 ### 4.7 Criterio de aceptación de la etapa 2
 
 - El rebufo se nota: pegado detrás en recta ganas velocidad y puedes salir a adelantar. El de delante no pierde nada.

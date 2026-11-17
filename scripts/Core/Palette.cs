@@ -30,6 +30,9 @@ public static class Palette
 	public static readonly Color TrackEdge = Cyan;                  // bordes de la pista (spec docs/elementos-circuito.md, 2)
 	public static readonly Color BoostCharge = Orange;              // esfera de carga de boost disponible
 	public static readonly Color BoostChargeGlow = new Color(Orange, 0.25f); // halo de la carga disponible
+	public static readonly Color SlipstreamOn = Cyan;                         // chevron del rebufo encendido
+	public static readonly Color SlipstreamGlow = new Color(Cyan, 0.25f);     // su halo
+	public static readonly Color SlipstreamAirLine = Cyan;                    // líneas de aire del rebufo en la cabina
 	public static readonly Color BoostCooldownFill = new Color(Orange, 0.3f);    // relleno atenuado de la carga en cooldown
 	public static readonly Color BoostCooldownBorder = new Color(Orange, 0.55f); // borde atenuado de la carga en cooldown
 	public static readonly Color BoostEmpty = Blue;                 // borde de la esfera de carga vacía
@@ -45,6 +48,9 @@ public static class Palette
 	public static readonly Color RivalStateClear = Cyan;            // depuración: estado y pasillo de un rival con la trazada clara
 	public static readonly Color RivalStatePass = Magenta;          // ídem apartándose para pasar
 	public static readonly Color RivalStateFollow = Orange;         // ídem siguiendo a la de delante
+	public static readonly Color RivalStateSlip = Blue;             // ídem pegada detrás en el rebufo
+	public static readonly Color RivalStateAttack = BlueGray;       // ídem adelantando decidida
+	public static readonly Color RivalStateDefend = new Color(Cyan, 0.45f);   // ídem cubriendo el interior
 	public static readonly Color StartLightOn = Magenta;            // luz del semáforo 2D encendida (StartLightsView; el HUD ya no la usa)
 	public static readonly Color StartLightGlow = new Color(Magenta, 0.25f); // halo de la luz encendida
 	public static readonly Color StartLightOff = BoostEmpty;        // borde de la luz apagada (como la carga de boost vacía)

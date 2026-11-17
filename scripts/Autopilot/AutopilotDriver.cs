@@ -66,6 +66,17 @@ public sealed class AutopilotDriver
 	// enfriamiento (spec docs/rivales-1-parrilla.md, 4.4).
 	public float TargetScale { get; set; } = 1f;
 
+	// Perfiles alternativos de los rivales (spec docs/rivales-4-personalidades.md, 4.3 y 4.6): con LateBraking, el de
+	// frenar más tarde (atacando por dentro); con Boosting, el de la punta más el impulso, para seguir pisando W con el
+	// boost en vez de soltarlo al pasar de la punta. Sin ellos (el piloto de F7), el perfil de siempre.
+	public SpeedProfile LateProfile { get; set; }
+	public SpeedProfile BoostProfile { get; set; }
+	public bool LateBraking { get; set; }
+	public bool Boosting { get; set; }
+
+	private SpeedProfile Active => Boosting && BoostProfile != null ? BoostProfile
+		: LateBraking && LateProfile != null ? LateProfile : _profile;
+
 	// boostAt: m desde la meta en los que gasta una carga (negativo = nunca)
 	public AutopilotDriver(RacingLine line, SpeedProfile profile, in ShipTuning tuning, in BankGripSettings bankGrip, float stepTime, float boostAt = -1f)
 	{
@@ -107,7 +118,8 @@ public sealed class AutopilotDriver
 			SteerLeft = steerInput > 0,
 			SteerRight = steerInput < 0,
 			Brake = brake,
-			Accelerate = !brake && state.MotorSpeed < MathF.Min(TargetAhead(state), speedCap)
+			// Con el impulso del boost (y su perfil) sigue pisando: la pasada hacia delante del perfil no sabe del boost
+			Accelerate = !brake && state.MotorSpeed < (Boosting && BoostProfile != null ? speedCap : MathF.Min(TargetAhead(state), speedCap))
 		};
 	}
 
@@ -125,7 +137,7 @@ public sealed class AutopilotDriver
 	}
 
 	private float TargetAhead(in PilotState state) =>
-		_profile.Target[_line.IndexAt(state.Distance + state.MotorSpeed * _lag)] * TargetScale;
+		Active.Target[_line.IndexAt(state.Distance + state.MotorSpeed * _lag)] * TargetScale;
 
 	// Giro de -1 a 1 (izquierda positivo) que hace falta para llegar al punto de delante
 	private float RequiredSteer(in PilotState state, float lateralOffset, float lateralLimit)
@@ -188,8 +200,9 @@ public sealed class AutopilotDriver
 	// Si, frenando desde ahora, se pasaría de algún punto próximo
 	private bool MustBrake(in PilotState state)
 	{
+		SpeedProfile profile = Active;
 		float speed = state.MotorSpeed;
-		float brake = _profile.Braking;
+		float brake = profile.Braking;
 		float lead = speed * _lag;
 		float reach = lead + speed * speed / (2f * brake);
 		int points = Math.Min(_line.Count - 1, (int)MathF.Ceiling(reach / _line.PointSpacing));
@@ -197,7 +210,7 @@ public sealed class AutopilotDriver
 
 		for (int k = 0; k <= points; k++)
 		{
-			float target = _profile.Target[_line.Wrap(start + k)] * TargetScale + BrakeTolerance;
+			float target = profile.Target[_line.Wrap(start + k)] * TargetScale + BrakeTolerance;
 			float braking = MathF.Max(0f, k * _line.PointSpacing - lead);
 			if (speed * speed - 2f * brake * braking > target * target)
 				return true;

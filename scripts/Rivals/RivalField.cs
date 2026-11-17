@@ -20,6 +20,8 @@ public partial class RivalField : Node3D
 	private readonly List<RivalShip> _ships = new();
 	private readonly List<IContactShip> _contactShips = new();
 	private readonly List<TrafficShip> _traffic = new();
+	private readonly List<bool> _airborne = new();
+	private float _lapLength;
 	private RaceShipList _raceShips;
 	private IContactShip _player;
 	private ContactDamageSettings _contactDamage = ContactDamageSettings.Default;
@@ -48,6 +50,7 @@ public partial class RivalField : Node3D
 		_raceShips = raceShips;
 		_player = player;
 		_contactDamage = contactDamage;
+		_lapLength = context.LapLength;
 		Contacts.Settings = player.BuildShipContactSettings();
 		player.Passable.RespawnTime = passableTime;
 		PaceOffset = paceOffset;
@@ -83,6 +86,9 @@ public partial class RivalField : Node3D
 		_contactShips.Add(player);
 		foreach (RivalShip ship in _ships)
 			_contactShips.Add(ship.Car);
+		SlipstreamSettings slipstream = player.BuildSlipstreamSettings();
+		foreach (IContactShip ship in _contactShips)
+			ship.Slipstream.Settings = slipstream;
 		WarnGridOverlaps();
 	}
 
@@ -93,13 +99,19 @@ public partial class RivalField : Node3D
 	{
 		// Todas las naves al empezar el paso, para la trazada clara: así no importa en qué orden se mueven
 		_traffic.Clear();
+		_airborne.Clear();
 		foreach (IContactShip ship in _contactShips)
+		{
 			_traffic.Add(RivalCar.TrafficOf(ship));
+			_airborne.Add(ship.Physics.Vertical.Airborne);
+		}
+		UpdateSlipstreams(dt);
 		foreach (RivalShip ship in _ships)
 			ship.Car.Move(raceStarted, _traffic);
 
 		Contacts.Solve(_contactShips, dt);
 		UpdatePlayerGraze(dt);
+		YieldOnSideGrazes();
 		foreach (ShipContactEvent e in Contacts.Events)
 		{
 			if (!e.IsNewImpact)
@@ -113,6 +125,45 @@ public partial class RivalField : Node3D
 
 		foreach (RivalShip ship in _ships)
 			ship.Car.AfterContacts(Contacts.Touched(ship.Car.Id));
+	}
+
+	// El rebufo de cada nave con las demás al empezar el paso (spec docs/rivales-4-personalidades.md, 4.1). Los rivales lo
+	// usan en este paso; el jugador, que ya se ha movido, en el siguiente.
+	private void UpdateSlipstreams(float dt)
+	{
+		for (int i = 0; i < _contactShips.Count; i++)
+		{
+			IContactShip ship = _contactShips[i];
+			float target = Slipstream.Target(_traffic[i], _airborne[i], _traffic, _airborne, ship.Slipstream.Settings, _lapLength, out int source);
+			ship.Slipstream.Update(target, source, ship.Physics.Boost.IsImpulseActive, dt);
+		}
+	}
+
+	// Roce de lado: cada rival con poco contacto se aparta de la otra (spec docs/rivales-4-personalidades.md, 4.5)
+	private void YieldOnSideGrazes()
+	{
+		foreach (ShipContactEvent e in Contacts.Events)
+		{
+			if (e.Graze != GrazeKind.Side)
+				continue;
+			int a = IndexOfShip(e.A);
+			int b = IndexOfShip(e.B);
+			if (a < 0 || b < 0)
+				continue;
+			int away = System.Math.Sign(_traffic[a].Lateral - _traffic[b].Lateral);
+			CarOf(e.A)?.Driver.OnSideGraze(away);
+			CarOf(e.B)?.Driver.OnSideGraze(-away);
+		}
+	}
+
+	private int IndexOfShip(int id)
+	{
+		for (int i = 0; i < _contactShips.Count; i++)
+		{
+			if (_contactShips[i].Id == id)
+				return i;
+		}
+		return -1;
 	}
 
 	private void UpdatePlayerGraze(float dt)

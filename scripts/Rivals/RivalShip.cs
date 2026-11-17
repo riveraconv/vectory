@@ -198,6 +198,11 @@ public partial class RivalShip : Node3D
 			LineState.PassLeft => ("PASS L", Palette.RivalStatePass),
 			LineState.PassRight => ("PASS R", Palette.RivalStatePass),
 			LineState.Follow => ("FOLLOW", Palette.RivalStateFollow),
+			LineState.Slip => ("SLIP", Palette.RivalStateSlip),
+			LineState.AttackLeft => ("ATTACK L", Palette.RivalStateAttack),
+			LineState.AttackRight => ("ATTACK R", Palette.RivalStateAttack),
+			LineState.DefendLeft => ("DEFEND L", Palette.RivalStateDefend),
+			LineState.DefendRight => ("DEFEND R", Palette.RivalStateDefend),
 			_ => ("CLEAR", Palette.RivalStateClear)
 		};
 		_stateLabel.Visible = true;

@@ -29,8 +29,22 @@ public class RivalDriverTests
 	private static ShipDefinition Vector => ShipDefinitions.Find(ShipCatalog.Ship01);
 
 	// Con los rasgos del piloto automático (sin reacción en el GO) y el ajuste global de ritmo
-	private static RivalDriver Driver(float paceOffset = 0f, float boostAt = 100f) =>
-		new(Cache.Value.Get(Vector), Oval.Value.Frame, Vector.Technical, Physics, Step, boostAt, PilotTraits.Autopilot, paceOffset);
+	private static RivalDriver Driver(float paceOffset = 0f) =>
+		new(Cache.Value.Get(Vector), Oval.Value.Frame, Vector.Technical, Physics, Step, PilotTraits.Autopilot, paceOffset);
+
+	// Un punto en recta con al menos la recta mínima del boost por delante
+	private static float StraightPoint(RivalDriver driver)
+	{
+		for (float d = 0f; d < Oval.Value.Frame.LapLength; d += 5f)
+		{
+			TrackAhead a = driver.AheadAt(d);
+			if (a.OnStraight && a.ToBraking >= RivalBoost.MinStraight + 20f)
+				return d;
+		}
+		throw new InvalidOperationException("no straight");
+	}
+
+	private static RivalStatus Charges(int charges) => new(charges, 3, false, false);
 
 	private static PilotState At(float distance, float speed = 0f)
 	{
@@ -77,21 +91,22 @@ public class RivalDriverTests
 		Assert.False(running.Input.Drift);
 	}
 
-	// 6
+	// 6 (spec docs/rivales-4-personalidades.md, 4.6: sustituye a la carga al entrar en la recta más larga)
 	[Fact]
-	public void Boost_only_when_entering_the_longest_straight_with_a_charge_one_at_a_time()
+	public void With_all_charges_and_a_clear_line_it_spends_one_on_a_straight()
 	{
-		RivalDriver driver = Driver(boostAt: 100f);
+		RivalDriver driver = Driver();
+		float d = StraightPoint(driver);
+		var none = Array.Empty<TrafficShip>();
 
-		Assert.False(driver.Decide(RivalPhase.Running, At(90f, 50f), true).Boost);
-		Assert.True(driver.Decide(RivalPhase.Running, At(101f, 50f), true).Boost);
-		Assert.False(driver.Decide(RivalPhase.Running, At(102f, 50f), true).Boost);
+		// Con 3 cargas y la trazada clara, sea cual sea su estrategia; sin poder activarla, no
+		Assert.False(driver.Decide(RivalPhase.Running, At(d, 80f), false, default, none, Charges(3)).Boost);
+		Assert.True(driver.Decide(RivalPhase.Running, At(d + 1f, 80f), true, default, none, Charges(3)).Boost);
+		Assert.Equal(1, driver.Boosts);
 
-		// Sin carga o con cooldown, pasa de largo y no lo gasta más tarde
-		RivalDriver empty = Driver(boostAt: 100f);
-		empty.Decide(RivalPhase.Running, At(90f, 50f), false);
-		Assert.False(empty.Decide(RivalPhase.Running, At(101f, 50f), false).Boost);
-		Assert.False(empty.Decide(RivalPhase.Running, At(102f, 50f), true).Boost);
+		// Con una carga, sin nadie delante a quien adelantar, ADELANTAR se la guarda
+		RivalDriver one = Driver();
+		Assert.False(one.Decide(RivalPhase.Running, At(d, 80f), true, default, none, Charges(1)).Boost);
 	}
 
 	[Fact]
@@ -106,16 +121,16 @@ public class RivalDriverTests
 		boost.Reset(Physics.Boost with { InitialCharges = 3 });
 		boost.ActivationAllowed = damage.BoostAllowed;
 
-		RivalDriver driver = Driver(boostAt: 100f);
-		driver.Decide(RivalPhase.Running, At(90f, 50f), boost.CanActivate);
-		Assert.False(driver.Decide(RivalPhase.Running, At(101f, 50f), boost.CanActivate).Boost);
+		RivalDriver driver = Driver();
+		float d = StraightPoint(driver);
+		Assert.False(driver.Decide(RivalPhase.Running, At(d, 80f), boost.CanActivate, default, Array.Empty<TrafficShip>(), Charges(3)).Boost);
 	}
 
 	// 7
 	[Fact]
 	public void Finished_goes_at_60_percent_without_boost()
 	{
-		RivalDriver driver = Driver(boostAt: 100f);
+		RivalDriver driver = Driver();
 		driver.Decide(RivalPhase.Finished, At(90f, 50f), true);
 		RivalCommand command = driver.Decide(RivalPhase.Finished, At(101f, 50f), true);
 

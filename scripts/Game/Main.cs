@@ -366,6 +366,7 @@ public partial class Main : Node3D
 		{
 			_hud.SetSpeed(_player.Speed, _player.BoostedTopSpeed);
 			_hud.SetBoostCharges(_player.BoostCharges, _player.BoostMaxCharges, _player.BoostCooldownActive, _player.BoostBlocked);
+			_hud.SetSlipstream(_player.Slipstream.Strength);
 			_hud.SetStartSequence(_race.StartSequence);
 			_hud.SetReadySequence(_race.ReadySequence);
 			UpdateLapInfo();

@@ -135,6 +135,16 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export(PropertyHint.Range, "0,90,1")] public float ShipContactSideGrazeAngle = ShipContactSettings.DefaultSideGrazeAngle;   // grados entre la normal y la marcha: por encima, roce de lado (frena); si no, por detrás (no frena)
 	[Export] public float ShipContactCooldown = ShipPhysicsDefaults.ImpactCooldown;   // segundos sin contar otro golpe medio o fuerte de la misma pareja
 
+	// Rebufo de todas las naves (spec docs/rivales-4-personalidades.md, 4.1): los rivales usan estos mismos valores
+	[ExportGroup("Rebufo")]
+	[Export] public float SlipstreamMaxDistance = SlipstreamSettings.DefaultMaxDistance;    // m de tu morro a su cola: más lejos, nada
+	[Export] public float SlipstreamFullDistance = SlipstreamSettings.DefaultFullDistance;  // m: más cerca, rebufo entero
+	[Export] public float SlipstreamMinSpeed = SlipstreamSettings.DefaultMinSpeedKmh;       // km/h, las dos naves
+	[Export(PropertyHint.Range, "0,0.2,0.005")] public float SlipstreamTopGain = SlipstreamSettings.DefaultTopGain;   // punta × (1 + esto × r)
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SlipstreamDragCut = SlipstreamSettings.DefaultDragCut;      // Drag × (1 − esto × r)
+	[Export] public float SlipstreamRiseTime = SlipstreamSettings.DefaultRiseTime;          // s de 0 a 1
+	[Export] public float SlipstreamFallTime = SlipstreamSettings.DefaultFallTime;          // s de 1 a 0
+
 	[ExportGroup("Recolocación")]
 	[Export(PropertyHint.Range, "0,1,0.01")] public float RespawnBlinkOpacity = RespawnBlink.DefaultOpacity;   // la nave atravesable tras recolocarla baja a esta opacidad
 	[Export] public float RespawnBlinkFrequency = RespawnBlink.DefaultFrequency;                              // Hz del parpadeo
@@ -167,6 +177,8 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitBoostTintIntensity = 1f;    // multiplica el tinte naranja del diseño (0 = apagado)
 	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitDamageTintIntensity = 1f;   // multiplica el tinte rojo del diseño (0 = apagado)
 	[Export(PropertyHint.Range, "0,2,0.01")] public float CockpitScreenGlowIntensity = 1f;   // multiplica el brillo de las pantallas (0 = apagado)
+	[Export(PropertyHint.Range, "8,12,1")] public int AirLineCount = AirLineSettings.DefaultCount;                 // líneas de aire del rebufo
+	[Export(PropertyHint.Range, "0,1,0.01")] public float AirLineIntensity = AirLineSettings.DefaultIntensity;   // su brillo con rebufo entero
 
 	[ExportGroup("Cabina 3D")]
 	[Export] public float Cockpit3DFov = 70f;                 // grados, en vertical: no cambia con los efectos del mundo
@@ -279,6 +291,11 @@ public partial class Player : CharacterBody3D, IContactShip
 	System.Numerics.Vector3 IContactShip.Position => ToNumerics(GlobalPosition);
 	public System.Numerics.Vector3 PreviousPosition { get; private set; }
 	public PassableState Passable { get; } = new();
+
+	// Rebufo (spec docs/rivales-4-personalidades.md, 4.1): lo actualiza RivalField con las demás naves; lo usa el paso
+	// siguiente al montar ShipTuning. En TIME TRIAL no hay nadie: siempre 0.
+	public Slipstream Slipstream { get; } = new();
+	private float _airLineTime;
 	public bool CanCollide => _race != null && _race.CanDrive;
 	private float _blinkTime;
 	private float _hullOpacity = 1f;
@@ -491,6 +508,7 @@ public partial class Player : CharacterBody3D, IContactShip
 	{
 		GlobalPosition = position;
 		_physics.Place(ToNumerics(GlobalPosition), yaw, initialSpeed, BuildBoostTuning());
+		Slipstream.Reset();
 		PreviousPosition = ToNumerics(GlobalPosition);
 		_bank.Reset();
 		ResetCameraEffects();
@@ -507,6 +525,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		_physics.Respawn(ToNumerics(GlobalPosition), yaw);
 		PreviousPosition = ToNumerics(GlobalPosition);
 		Passable.Respawned();
+		Slipstream.Reset();
 		_ship.ClearHullSmoke();
 		_bank.Reset();
 		ResetCameraEffects();
@@ -630,6 +649,25 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	public RespawnBlink BuildRespawnBlink() => new(RespawnBlinkOpacity, RespawnBlinkFrequency);
 
+	public AirLineSettings BuildAirLineSettings()
+	{
+		AirLineSettings settings = AirLineSettings.Default;
+		settings.Count = AirLineCount;
+		settings.Intensity = AirLineIntensity;
+		return settings;
+	}
+
+	public SlipstreamSettings BuildSlipstreamSettings() => new()
+	{
+		MaxDistance = SlipstreamMaxDistance,
+		FullDistance = SlipstreamFullDistance,
+		MinSpeed = SlipstreamMinSpeed / KmhPerMs,
+		TopGain = SlipstreamTopGain,
+		DragCut = SlipstreamDragCut,
+		RiseTime = SlipstreamRiseTime,
+		FallTime = SlipstreamFallTime
+	};
+
 	public override void _PhysicsProcess(double delta)
 	{
 		float dt = (float)delta;
@@ -693,6 +731,8 @@ public partial class Player : CharacterBody3D, IContactShip
 		// 6. Efectos de cámara, sacudida (más suave en cabina) y cámara de tercera persona
 		float shipBankTarget = ShipBank.Target(Dynamics.Steer, speedRatio, Dynamics.Drifting, bankSettings);
 		UpdateCameraEffects(shipBankTarget, baseTuning.MaxSpeed, dt);
+		_airLineTime += dt;
+		_cockpit.UpdateAirLines(Slipstream.Strength, Dynamics.RealSpeed, _airLineTime, BuildAirLineSettings());
 		UpdateShake(dt);
 		_chaseCam.UpdateFollow(dt, GlobalPosition, Dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
 
@@ -824,11 +864,12 @@ public partial class Player : CharacterBody3D, IContactShip
 		};
 	}
 
-	// El perfil técnico de la nave con los factores de los daños
+	// El perfil técnico de la nave con los factores de los daños y del rebufo (la punta del rebufo sale de la ya reducida)
 	private ShipTuning BuildTuning()
 	{
 		ShipTuning tuning = Technical;
-		tuning.MaxSpeed *= TopSpeedFactor;
+		tuning.MaxSpeed *= TopSpeedFactor * Slipstream.TopFactor;
+		tuning.Drag *= Slipstream.DragFactor;
 		tuning.TurnRate *= TurnRateFactor;
 		return tuning;
 	}

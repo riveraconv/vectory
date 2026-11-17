@@ -17,6 +17,7 @@ public interface IContactShip
 	Vector3 PreviousPosition { get; }   // al empezar el paso de física
 	PassableState Passable { get; }
 	bool CanCollide { get; }            // conduce (en la previa nadie choca)
+	Slipstream Slipstream { get; }      // su rebufo (spec docs/rivales-4-personalidades.md, 4.1): lo calcula quien lleva la carrera
 	void MoveBy(Vector2 delta);
 }
 

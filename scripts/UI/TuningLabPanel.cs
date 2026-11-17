@@ -179,6 +179,19 @@ public partial class TuningLabPanel : CanvasLayer
 		GD.Print($"[TuningLab] Rival pace offset: {Signed(Mathf.RoundToInt(value))} points");
 	}
 
+	private static string StateName(Autopilot.LineState state) => state switch
+	{
+		Autopilot.LineState.PassLeft => "PASS L",
+		Autopilot.LineState.PassRight => "PASS R",
+		Autopilot.LineState.Follow => "FOLLOW",
+		Autopilot.LineState.Slip => "SLIP",
+		Autopilot.LineState.AttackLeft => "ATTACK L",
+		Autopilot.LineState.AttackRight => "ATTACK R",
+		Autopilot.LineState.DefendLeft => "DEFEND L",
+		Autopilot.LineState.DefendRight => "DEFEND R",
+		_ => "CLEAR"
+	};
+
 	private static string Signed(int points) => points > 0 ? "+" + points : points < 0 ? "−" + (-points) : "±0";
 
 	// Choques entre naves: sin ellos se vuelven a atravesar, para comparar
@@ -213,9 +226,11 @@ public partial class TuningLabPanel : CanvasLayer
 				+ $"LAP {lap,-4} DMG {car.Damage.Level} {car.Damage.Points,2}P  HIT {car.Contacts,-3} RSP {car.Respawns,-2} "
 				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}  "
 				+ string.Create(CultureInfo.InvariantCulture,
-					$"STR {driver.StraightMargin * 100f:0.0} CRV {driver.CurveMargin * 100f:0.0} BRK {driver.Traits.Braking:0.00} REA {driver.ReactionTime:0.00}"));
+					$"STR {driver.StraightMargin * 100f:0.0} CRV {driver.CurveMargin * 100f:0.0} BRK {driver.Traits.Braking:0.00} REA {driver.ReactionTime:0.00}  "
+					+ $"{StateName(driver.ClearLine.State),-8} R {car.Slipstream.Strength:0.00} BST {car.Boost.Charges} {PilotProfiles.ScreenName(driver.Traits.Boost),-8} USED {driver.Boosts} ABT {driver.ClearLine.Aborts}"));
 		}
 		text.Append($"\nSHIP = RAMS / RECEIVED / MUTUAL · RIVAL VS RIVAL {Rivals.RivalHits}");
+		text.Append(string.Create(CultureInfo.InvariantCulture, $"\nYOUR SLIPSTREAM R {Player?.Slipstream.Strength ?? 0f:0.00}"));
 		Contact.GrazeLossMeter graze = Rivals.PlayerGraze;
 		string kind = graze.Kind switch { Contact.GrazeKind.Side => "SIDE", Contact.GrazeKind.Rear => "REAR", _ => "—" };
 		text.Append($"\nYOUR GRAZE {kind,-5} LOST {graze.Total * 3.6f:0.0} KM/H IN {graze.Window:0} S");

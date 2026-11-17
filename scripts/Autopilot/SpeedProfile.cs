@@ -39,9 +39,12 @@ public sealed class SpeedProfile
 	}
 
 	// curveMargin: fracción de la velocidad de curva; straightMargin: fracción de la punta; brakingShare: fracción de
-	// la frenada con la que se calcula (sobre BrakingShare)
+	// la frenada con la que se calcula (sobre BrakingShare). El perfil del impulso del boost lleva extraTop (m/s sobre la
+	// punta donde manda la punta) y va sin accelerationPass: solo límites y frenadas, porque acelera más de lo que sabe la
+	// curva de aceleración.
 	public static SpeedProfile Build(RacingLine line, TrackFrame frame, in ShipTuning tuning, CurveTable table,
-		in ShipPhysicsSettings physics, float curveMargin, float straightMargin = 1f, float brakingShare = 1f)
+		in ShipPhysicsSettings physics, float curveMargin, float straightMargin = 1f, float brakingShare = 1f,
+		bool accelerationPass = true, float extraTop = 0f)
 	{
 		int count = line.Count;
 		float ds = line.PointSpacing;
@@ -53,7 +56,7 @@ public sealed class SpeedProfile
 			float curvature = line.Curvature[i];
 			slopeFactor[i] = SlopeEffect.Factor(MathF.Atan(f.Slope), physics.Slope);
 			float top = tuning.MaxSpeed * slopeFactor[i];
-			float straightTop = top * straightMargin;
+			float straightTop = top * straightMargin + extraTop * slopeFactor[i];
 
 			float radius = 1f / MathF.Max(MathF.Abs(curvature), MinRadiusCurvature);
 			// Con el giro que da el peralte a favor (o quita en contra); el agarre apenas cambia el radio que se aguanta
@@ -71,7 +74,7 @@ public sealed class SpeedProfile
 		}
 
 		var target = (float[])limit.Clone();
-		for (int k = 0; k < count; k++)
+		for (int k = 0; accelerationPass && k < count; k++)
 		{
 			int i = line.Wrap(slowest + k);
 			int next = line.Wrap(i + 1);

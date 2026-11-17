@@ -9,9 +9,10 @@ namespace Vectory.Rivals;
 // rival_7), su número para la lista de naves en carrera (1 a 7), su marca de parrilla (1..N), su nave y su pintura
 // (una de las 40 combinaciones de esa nave, como índice y como elección) y su piloto (spec docs/rivales-2-clasificacion.md,
 // 3.1), que no decide ni la nave ni la pintura, y lo que su reacción en el GO se aparta esta vez de la de su piloto
-// (spec docs/rivales-4-personalidades.md, 3.6). El ritmo es el de su piloto (perfil y variación fija).
+// (spec docs/rivales-4-personalidades.md, 3.6) y la semilla de sus decisiones al azar en esta carrera (defensa). El ritmo
+// es el de su piloto (perfil y variación fija).
 public sealed record RivalEntry(string Id, int Number, int GridPosition, string ShipDesignId, int PaintIndex, PaintChoice Paint,
-	RivalPilot Pilot, float ReactionJitter = 0f)
+	RivalPilot Pilot, float ReactionJitter = 0f, int Seed = 0)
 {
 	// s desde el GO hasta que pisa W: la de su piloto más lo de esta salida, nunca negativa
 	public float Reaction => System.MathF.Max(0f, Pilot.Traits.Reaction + ReactionJitter);
@@ -64,12 +65,17 @@ public static class RivalLineup
 		for (int i = 0; i < reactions.Length; i++)
 			reactions[i] = (float)(rng.NextDouble() * 2.0 - 1.0) * ReactionSpread;
 
+		// Las semillas de sus decisiones, al final: lo de antes sale igual
+		var seeds = new int[picks.Length];
+		for (int i = 0; i < seeds.Length; i++)
+			seeds[i] = rng.Next();
+
 		var rivals = new List<RivalEntry>(picks.Length);
 		for (int i = 0; i < picks.Length; i++)
 		{
 			(string ship, int paint) = picks[i];
 			HullStyle style = HullPaints.StyleOf(ship).Value;
-			rivals.Add(new RivalEntry(IdPrefix + (i + 1), i + 1, gridOrder[i + 1], ship, paint, HullPaints.ChoiceAt(style, paint), pilots[i], reactions[i]));
+			rivals.Add(new RivalEntry(IdPrefix + (i + 1), i + 1, gridOrder[i + 1], ship, paint, HullPaints.ChoiceAt(style, paint), pilots[i], reactions[i], seeds[i]));
 		}
 		return rivals;
 	}

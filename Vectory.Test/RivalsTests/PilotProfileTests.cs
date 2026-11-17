@@ -186,7 +186,7 @@ public class PilotProfileTests
 	{
 		(TrackFrame frame, PilotData data) = Oval.Value;
 		PilotTraits traits = PilotTraits.Autopilot with { Reaction = 0.25f };
-		var driver = new RivalDriver(data, frame, Vector.Technical, Physics, Step, -1f, traits);
+		var driver = new RivalDriver(data, frame, Vector.Technical, Physics, Step, traits);
 		Assert.Equal(0.25f, driver.ReactionTime);
 
 		FramePoint p = frame.At(10f);

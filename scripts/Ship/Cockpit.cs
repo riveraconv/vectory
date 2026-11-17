@@ -44,6 +44,7 @@ public partial class Cockpit : Node3D
 	private Vector2 _vibration;
 	private float _push;
 	private float _fovExtra;
+	private AirLinesView _airLines;
 
 	public override void _Ready()
 	{
@@ -56,6 +57,8 @@ public partial class Cockpit : Node3D
 			Fov = BaseFov
 		};
 		AddChild(Camera);
+		_airLines = new AirLinesView { Name = "AirLines", Position = CameraPosition };
+		AddChild(_airLines);
 
 		EnsureCockpit();
 		ApplyRules(CockpitViewRules.For(CameraView.Chase, Screens3DShowHud));
@@ -70,6 +73,8 @@ public partial class Cockpit : Node3D
 		Visual = visual;
 		EnsureCockpit();
 		ApplyCamera();
+		if (_airLines != null)
+			_airLines.Position = CameraPosition;
 	}
 
 	// Crea lo que necesite la cabina actual. Una cabina 3D por nave: no se destruye al cambiar de nave, se queda parada,
@@ -112,6 +117,10 @@ public partial class Cockpit : Node3D
 		Camera.Rotation = new Vector3(Pitch, 0f, _shakeRoll + _bank);
 		Camera.Fov = BaseFov + _fovExtra;
 	}
+
+	// Líneas de aire del rebufo (spec docs/rivales-4-personalidades.md, 4.2): solo en la vista de cabina
+	public void UpdateAirLines(float strength, float speed, float time, in AirLineSettings settings) =>
+		_airLines?.UpdateLines(_rules.Cockpit3D, strength, speed, time, settings);
 
 	// Movimiento propio de la cámara de la cabina 3D y sus ajustes
 	public void Update3D(in CockpitCameraPose pose, in Cockpit3DSettings settings)

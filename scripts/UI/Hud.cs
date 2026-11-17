@@ -48,6 +48,13 @@ public partial class Hud : CanvasLayer
 	public float DamageSegmentHeight = 8f;
 	public float DamageSegmentGap = 4f;
 	public float DamageIndicatorGap = 24f;   // separación entre el indicador y las esferas de boost
+	// Indicador de rebufo, sobre 1280×720 (spec docs/rivales-4-personalidades.md, 4.2)
+	public float SlipstreamHeight = 10f;       // alto de los chevrons
+	public float SlipstreamGap = 8f;           // por encima de la fila del daño y las esferas
+	public float SlipstreamChevronWidth = 5f;
+	public float SlipstreamChevronGap = 4f;
+	public float SlipstreamLineWidth = 1.5f;
+	public float SlipstreamGlowWidth = 4f;
 	public float DamageBlinkFrequency = 2f;
 
 	// Radar: diámetro y margen a la parte de abajo de la pantalla (px sobre 1280×720). A la izquierda, alineado con la posición.
@@ -80,6 +87,7 @@ public partial class Hud : CanvasLayer
 	private Control _speedBar;
 	private BoostChargesView _boostCharges;
 	private DamageIndicatorView _damage;
+	private SlipstreamIndicatorView _slipstream;
 	private bool _damageEnabled;
 	private bool _driveHudVisible = true;
 	private StartLightsView _startLights;
@@ -139,6 +147,9 @@ public partial class Hud : CanvasLayer
 		_boostCharges.SetCharges(charges, maxCharges, cooldownActive, blocked);
 		_damage.SetRightInset(BoostChargesView.WidthFor(maxCharges) + DamageIndicatorGap * UiScale.Factor);
 	}
+
+	// Fuerza del rebufo de tu nave (0–1): enciende un chevron por tercio; con 0, nada
+	public void SetSlipstream(float strength) => _slipstream.SetStrength(strength);
 
 	// RACE: muestra el indicador de daño (en TIME TRIAL no se llama y no se ve)
 	public void ShowDamageIndicator()
@@ -440,6 +451,21 @@ public partial class Hud : CanvasLayer
 		Place(_damage, Corner.BottomRight, Margin, rowCenter - height * 0.5f, BarWidth, height);
 		_damage.SetRightInset(BoostChargesView.WidthFor(3) + DamageIndicatorGap * scale);
 		root.AddChild(_damage);
+
+		// Rebufo (spec docs/rivales-4-personalidades.md, 4.2): encima de la fila de daño y esferas, alineado a la derecha,
+		// 8 px por encima y 10 de alto (sobre 1280×720). También en cabina: no se oculta con el resto.
+		_slipstream = new SlipstreamIndicatorView
+		{
+			Name = "SlipstreamIndicator",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			ChevronWidth = SlipstreamChevronWidth * scale,
+			ChevronGap = SlipstreamChevronGap * scale,
+			LineWidth = SlipstreamLineWidth * scale,
+			GlowWidth = SlipstreamGlowWidth * scale
+		};
+		float slipHeight = SlipstreamHeight * scale;
+		Place(_slipstream, Corner.BottomRight, Margin, 124f + BoostChargesView.Diameter + SlipstreamGap * scale, BarWidth, slipHeight);
+		root.AddChild(_slipstream);
 	}
 
 	// Abajo a la izquierda. El origen del nodo es el centro del círculo (ver RadarView).

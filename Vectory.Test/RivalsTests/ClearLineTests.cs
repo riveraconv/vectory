@@ -179,31 +179,30 @@ public class ClearLineTests
 		Assert.Equal(0f, line.Offset);
 	}
 
-	// 24
+	// 24 (spec docs/rivales-4-personalidades.md, 4.6: nunca con la trazada tapada sin estar atacando)
 	[Fact]
-	public void The_boost_waits_for_a_clear_line_while_still_on_the_straight()
+	public void The_boost_is_never_spent_with_a_blocked_line_unless_attacking()
 	{
 		(TrackFrame frame, float barrier, PilotData pilot) = Oval.Value;
-		const float BoostAt = 150f;
-		var driver = new RivalDriver(pilot, frame, Vector.Technical, Physics, Step, BoostAt, PilotTraits.Autopilot, 0f, 200f, barrier);
-		var blocked = new[] { Ship(1, BoostAt + 30f, 0f, 40f) };
+		var driver = new RivalDriver(pilot, frame, Vector.Technical, Physics, Step, PilotTraits.Autopilot, 0f, barrier);
+		float d = 0f;
+		for (; d < frame.LapLength; d += 5f)
+		{
+			TrackAhead a = driver.AheadAt(d);
+			if (a.OnStraight && a.ToBraking > 200f && a.ToBraking < 230f)
+				break;
+		}
+		var status = new RivalStatus(3, 3, false, false);
 
-		driver.Decide(RivalPhase.Running, State(BoostAt - 1f), true, Ship(0, BoostAt - 1f, 0f, 60f), blocked);
-		RivalCommand entering = driver.Decide(RivalPhase.Running, State(BoostAt + 1f), true, Ship(0, BoostAt + 1f, 0f, 60f), blocked);
-		Assert.False(entering.Boost);
+		// Una nave mucho más lenta justo delante, en su carril y sin sitio a los lados para atacar: la sigue, sin boost
+		var blocked = new[] { Ship(1, d + 15f, 0f, 20f), Ship(2, d + 12f, -9f, 20f), Ship(3, d + 12f, 9f, 20f) };
+		RivalCommand command = driver.Decide(RivalPhase.Running, State(d), true, Ship(0, d, 0f, 60f), blocked, status);
+		Assert.False(driver.ClearLine.IsAttacking);
+		Assert.False(command.Boost);
 
-		// Todavía en la recta y ya clara: lo gasta, una vez
-		RivalCommand clear = driver.Decide(RivalPhase.Running, State(BoostAt + 50f), true, Ship(0, BoostAt + 50f, 0f, 60f), Array.Empty<TrafficShip>());
+		// Con la trazada clara, sí
+		RivalCommand clear = driver.Decide(RivalPhase.Running, State(d + 1f), true, Ship(0, d + 1f, 0f, 60f), Array.Empty<TrafficShip>(), status);
 		Assert.True(clear.Boost);
-		RivalCommand again = driver.Decide(RivalPhase.Running, State(BoostAt + 51f), true, Ship(0, BoostAt + 51f, 0f, 60f), Array.Empty<TrafficShip>());
-		Assert.False(again.Boost);
-
-		// Si la recta se acaba tapada, esa vuelta no lo gasta
-		driver = new RivalDriver(pilot, frame, Vector.Technical, Physics, Step, BoostAt, PilotTraits.Autopilot, 0f, 200f, barrier);
-		driver.Decide(RivalPhase.Running, State(BoostAt - 1f), true, Ship(0, BoostAt - 1f, 0f, 60f), blocked);
-		driver.Decide(RivalPhase.Running, State(BoostAt + 1f), true, Ship(0, BoostAt + 1f, 0f, 60f), blocked);
-		RivalCommand after = driver.Decide(RivalPhase.Running, State(BoostAt + 210f), true, Ship(0, BoostAt + 210f, 0f, 60f), Array.Empty<TrafficShip>());
-		Assert.False(after.Boost);
 	}
 
 	private static PilotState State(float distance, float speed = 60f)

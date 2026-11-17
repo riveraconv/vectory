@@ -9,7 +9,74 @@ public enum LineState
 	Clear,      // nadie le tapa la trazada
 	PassLeft,   // se aparta por la izquierda
 	PassRight,  // se aparta por la derecha
-	Follow      // sin hueco: se queda detrás
+	Follow,     // sin hueco: se queda detrás
+	// Duelo (spec docs/rivales-4-personalidades.md, 4.3 y 4.4)
+	Slip,         // pegada detrás en recta, en el rebufo, preparando el adelantamiento
+	AttackLeft,   // adelantamiento decidido por la izquierda
+	AttackRight,  // ídem por la derecha
+	DefendLeft,   // cubre el interior de la curva, a la izquierda
+	DefendRight   // ídem a la derecha
+}
+
+// Los rasgos de duelo de un piloto (spec docs/rivales-4-personalidades.md, 3.1), de 0 a 1
+public readonly record struct DuelTraits(float Attack, float Defense, float Contact);
+
+// Lo que el piloto sabe de la pista por delante en un paso: si va en recta (manda la punta), los m hasta la siguiente
+// frenada, a qué lado queda el interior de la curva de después (−1 izquierda, +1 derecha, 0 ninguno) y qué frenada es
+// (su índice en la trazada). Sin Valid, no hay duelo.
+public readonly record struct TrackAhead(bool Valid, bool OnStraight, float ToBraking, int InsideSide, int BrakingIndex);
+
+// Parámetros del duelo (spec 4.3–4.5 y 7), en m, s y m/s
+public struct DuelSettings
+{
+	public float SlipMinStraight;      // recta que tiene que quedar para pegarse al rebufo
+	public float SlipMinSpeed;         // m/s, las dos: por debajo no hay rebufo
+	public float SlipSpeedDifference;  // la de delante, como mucho esto más lenta: si no, se la pasa sin más
+	public float SlipGapMin;           // hueco al ir en el rebufo…
+	public float SlipGapTime;          // …o estos segundos a su velocidad, lo mayor
+	public float SlipExitBase;         // sale del rebufo a esto de la frenada…
+	public float SlipExitPerAttack;    // …más esto × ataque
+	public float MinAttackToWait;      // con menos ataque y sin hueco, se queda detrás (FOLLOW)
+	public float BrakingAttackDistance;   // por dentro en la frenada: a menos de esto de la de delante…
+	public float BrakingAttackWindow;     // …llegando a menos de esto de la frenada…
+	public float MinBrakingAttack;        // …y con este ataque como mínimo
+	public float BrakingAttackCheck;      // m después del punto de frenada en los que se mira si aborta (por dentro)
+	public float LateBrakingPerAttack;    // frenada + esto × ataque (como mucho 1)
+	public float AbortWait;               // s antes de volver a intentarlo con la misma
+	public float DefendDistance;          // le persigue a menos de esto
+	public float DefendMinToBraking;      // y quedan al menos esto hasta la frenada
+	public float DefendFraction;          // fracción de su límite lateral hacia el interior al cubrir
+	public float MaxClosingSpeed;         // m/s: nunca se mueve de lado si el cierre con la de al lado llega a esto
+	public float ChasingDistance;         // ADELANTAR gasta boost con la trazada clara si tiene a alguien delante a menos de esto
+	public float ChasedBoostDistance;     // DEFENDER gasta boost si alguien le persigue a menos de esto
+	public float YieldDistance;           // contacto < 0,5: al rozar de lado se aparta esto…
+	public float YieldTime;               // …durante estos segundos
+
+	public static DuelSettings Default => new()
+	{
+		SlipMinStraight = 150f,
+		SlipMinSpeed = 150f / 3.6f,
+		SlipSpeedDifference = 15f / 3.6f,
+		SlipGapMin = 6f,
+		SlipGapTime = 0.15f,
+		SlipExitBase = 120f,
+		SlipExitPerAttack = 120f,
+		MinAttackToWait = 0.3f,
+		BrakingAttackDistance = 15f,
+		BrakingAttackWindow = 60f,
+		MinBrakingAttack = 0.5f,
+		BrakingAttackCheck = 30f,
+		LateBrakingPerAttack = 0.05f,
+		AbortWait = 5f,
+		DefendDistance = 20f,
+		DefendMinToBraking = 100f,
+		DefendFraction = 0.6f,
+		MaxClosingSpeed = 30f / 3.6f,
+		ChasingDistance = 40f,
+		ChasedBoostDistance = 15f,
+		YieldDistance = 1f,
+		YieldTime = 1f
+	};
 }
 
 // Una nave de la carrera vista desde la pista: distancia sobre el eje desde la meta, lateral sobre la superficie
@@ -69,7 +136,7 @@ public struct ClearLineSettings
 // desplazamiento empieza donde está la nave (en la salida, su columna de la parrilla; tras recolocarla, el centro): llega
 // a la trazada a MaxLateralSpeed y solo con ese lado libre, como al volver de pasar, sin cerrarse en diagonal sobre otra.
 // Lógica pura: no depende de Godot.
-public sealed class ClearLine
+public sealed partial class ClearLine
 {
 	private const float MinRadius = 5f;          // m: la línea desplazada nunca se cuenta más cerrada
 	private const float MaxCapDistance = 300f;   // m por delante que se miran para frenar a tiempo por fuera
@@ -83,6 +150,7 @@ public sealed class ClearLine
 	private readonly float _lapLength;
 	private readonly float _barrierOffset;
 	private readonly float _braking;
+	private readonly float _tableTop;
 	private float _targetOffset;
 	private bool _placed;
 	private bool _holding;
@@ -116,6 +184,7 @@ public sealed class ClearLine
 		_lapLength = lapLength;
 		_barrierOffset = barrierOffset;
 		_braking = braking;
+		_tableTop = table.Speeds[table.Speeds.Count - 1] - 0.01f;
 	}
 
 	// Sin nadie (al recolocar o al terminar): vuelve a la trazada al momento
@@ -128,11 +197,16 @@ public sealed class ClearLine
 		_targetOffset = 0f;
 		SpeedCap = float.PositiveInfinity;
 		Blocker = -1;
+		EndDuel();
 	}
 
-	public void Update(in TrafficShip self, IReadOnlyList<TrafficShip> others, float dt)
+	public void Update(in TrafficShip self, IReadOnlyList<TrafficShip> others, float dt) => Update(self, others, dt, default);
+
+	// Con lo que sabe de la pista por delante: con Duel y ahead.Valid, además el duelo (spec 4)
+	public void Update(in TrafficShip self, IReadOnlyList<TrafficShip> others, float dt, in TrackAhead ahead)
 	{
 		ClearLineSettings s = Settings;
+		_time += dt;
 		float speed = MathF.Max(0f, self.Speed);
 		Lookahead = MathF.Max(s.MinLookahead, s.LookaheadTime * speed);
 		LateralLimit = MathF.Max(0f, _barrierOffset - s.BarrierMargin - self.HalfWidth);
@@ -153,7 +227,23 @@ public sealed class ClearLine
 		int blocker = FindBlocker(self, others);
 		Blocker = blocker >= 0 ? others[blocker].Id : -1;
 
-		if (blocker >= 0)
+		bool duel = Duel.HasValue && ahead.Valid;
+		bool defending = false;
+		LateBraking = false;
+		if (duel)
+			MeasureGaps(self, others);
+		else
+			EndDuel();
+
+		if (duel && UpdateAttack(self, others, ahead, aimLine, ref hold))
+		{
+			// Sigue atacando, o acaba de abortar y vuelve detrás
+		}
+		else if (blocker >= 0 && duel && DecideDuel(self, others[blocker], others, ahead, aimLine, ref hold))
+		{
+			// SLIP, ATTACK o FOLLOW por el duelo
+		}
+		else if (blocker >= 0)
 		{
 			TrafficShip b = others[blocker];
 			int side = ChooseSide(self, b, others);
@@ -176,6 +266,10 @@ public sealed class ClearLine
 				_targetOffset = 0f;
 			}
 		}
+		else if (duel && UpdateDefense(self, others, ahead, aimLine))
+		{
+			defending = true;
+		}
 		else
 		{
 			// Nadie le tapa: vuelve a la trazada si ese lado está libre; si no, se queda en su carril
@@ -187,7 +281,14 @@ public sealed class ClearLine
 		// Nunca se mueve de lado hacia donde ya hay una nave a su lado: ni al apartarse o volver, ni al seguir su trazada,
 		// que en las curvas va de lado y no es la misma en todas las naves. Quedarse en su carril es apuntar a su mismo
 		// lateral (no a la trazada con el desplazamiento de antes, que en una curva lo llevaría hacia la barrera).
-		if (hold || !LaneFree(self, others, aimLine + _targetOffset))
+		// Al rozar de lado con poco contacto, se aparta un poco (spec 4.5)
+		if (_yieldSide != 0 && _time < _yieldUntil)
+			_targetOffset = Math.Clamp(aimLine + _targetOffset + _yieldSide * DuelSettings.YieldDistance, -LateralLimit, LateralLimit) - aimLine;
+		else
+			_yieldSide = 0;
+
+		bool free = defending ? CanCover(self, others, aimLine + _targetOffset) : LaneFree(self, others, aimLine + _targetOffset);
+		if (hold || !free)
 		{
 			_holding = true;
 			Offset = _targetOffset = deviation;
@@ -353,7 +454,12 @@ public sealed class ClearLine
 			float curvature = _line.Curvature[i];
 			float denominator = 1f + curvature * offset;
 			float radius = denominator > 0f ? MathF.Abs(denominator / MathF.Max(MathF.Abs(curvature), 1e-6f)) : MinRadius;
-			float v = _table.SpeedFor(MathF.Max(MinRadius, radius)) * Pace;
+			float tableSpeed = _table.SpeedFor(MathF.Max(MinRadius, radius));
+			// Donde la tabla ya da su máximo (en recta, la punta) la curva no limita, como en el perfil de velocidad: si no,
+			// apartada en una recta iría al margen de curva de la punta y perdería el boost
+			if (tableSpeed >= _tableTop)
+				continue;
+			float v = tableSpeed * Pace;
 			float distance = k * _line.PointSpacing;
 			cap = MathF.Min(cap, MathF.Sqrt(v * v + 2f * _braking * distance));
 		}

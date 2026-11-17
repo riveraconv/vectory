@@ -32,6 +32,8 @@ public class ShipContactTests
 	{
 		private Vector3 _position;
 
+		public Slipstream Slipstream { get; } = new();
+
 		public FakeShip(int id, ShipShape shape, Vector3 position, float yaw = 0f, float speed = 0f, bool onTrack = false)
 		{
 			Id = id;
