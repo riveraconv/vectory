@@ -35,22 +35,22 @@ public partial class RivalField : Node3D
 
 	public IReadOnlyList<RivalShip> Ships => _ships;
 
-	// Ritmo de todos los rivales: el margen de velocidad del piloto en las curvas
-	public float Pace { get; private set; } = RivalDriver.DefaultPace;
+	// Ajuste global de depuración sobre los márgenes de todos los pilotos (fracción; 0 = los de cada piloto)
+	public float PaceOffset { get; private set; }
 
 	// Las cargas de los destellos de la barrera de cada rival, para pintarlos con el del jugador
 	public IEnumerable<BarrierFlash> Flashes => _ships.Select(s => s.Car.Flash);
 
 	// Después de añadirlo al árbol: con el circuito ya generado, el jugador ya creado y la carrera ya montada
 	public void Setup(IReadOnlyList<RivalEntry> lineup, Track track, Player player, RaceSession race, RaceShipList raceShips,
-		RivalRaceContext context, float pace, float cooldownPace, ContactDamageSettings contactDamage, float passableTime)
+		RivalRaceContext context, float paceOffset, float cooldownPace, ContactDamageSettings contactDamage, float passableTime)
 	{
 		_raceShips = raceShips;
 		_player = player;
 		_contactDamage = contactDamage;
 		Contacts.Settings = player.BuildShipContactSettings();
 		player.Passable.RespawnTime = passableTime;
-		Pace = pace;
+		PaceOffset = paceOffset;
 		Hull3DSettings hullSettings = player.BuildHull3DSettings();
 		var look = new RivalLook(hullSettings, player.BuildBankSettings(), player.BuildAttitudeSettings(),
 			player.BuildFlickerSettings(), player.BuildIndustrialLampSettings());
@@ -67,14 +67,15 @@ public partial class RivalField : Node3D
 		{
 			RivalEntry entry = lineup[i];
 			ShipDefinition definition = definitions[i];
-			var car = new RivalCar(entry, definition, pilots, context, pace);
+			var car = new RivalCar(entry, definition, pilots, context, paceOffset);
 			car.Driver.CooldownPace = cooldownPace;
 			car.Passable.RespawnTime = passableTime;
 			var ship = new RivalShip();
 			ship.Setup(car, race, raceShips, look, player.FlickerOpacity, player.BuildRespawnBlink());
 			AddChild(ship);
 			_ships.Add(ship);
-			GD.Print($"[Race] {entry.Id} {entry.Pilot.Nickname}: grid {entry.GridPosition}, {ShipCatalog.Find(entry.ShipDesignId)?.Name ?? entry.ShipDesignId}, "
+			GD.Print($"[Race] {entry.Id} {entry.Pilot.Nickname} ({PilotProfiles.ScreenName(entry.Pilot.Profile)}): grid {entry.GridPosition}, "
+				+ $"{ShipCatalog.Find(entry.ShipDesignId)?.Name ?? entry.ShipDesignId}, "
 				+ $"{HullPaints.DisplayName(HullPaints.StyleOf(entry.ShipDesignId) ?? HullStyle.Racing, entry.PaintIndex)}");
 		}
 		GD.Print($"[Race] Rival pilots ready: {pilots.ComputedShips.Count} ships in {(Time.GetTicksUsec() - start) / 1000.0:0} ms");
@@ -175,12 +176,12 @@ public partial class RivalField : Node3D
 
 	private static System.Numerics.Vector2 Plan(System.Numerics.Vector3 p) => new(p.X, p.Z);
 
-	// Cambia el ritmo de todos los rivales al momento (panel de pruebas)
-	public void SetPace(float pace)
+	// Cambia el ajuste global de ritmo de todos los rivales al momento (panel de pruebas)
+	public void SetPace(float paceOffset)
 	{
-		Pace = pace;
+		PaceOffset = paceOffset;
 		foreach (RivalShip ship in _ships)
-			ship.Car.Driver.SetPace(RivalDriver.PaceFor(pace, ship.Car.Entry.PaceOffset));
+			ship.Car.Driver.SetPace(paceOffset);
 	}
 
 	// Al salir de la escena, fuera de la lista

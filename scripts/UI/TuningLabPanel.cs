@@ -42,8 +42,8 @@ public partial class TuningLabPanel : CanvasLayer
 	// Los rivales de la carrera (null en TIME TRIAL: sin bloque RIVALS)
 	public RivalField Rivals { get; set; }
 
-	private const int MinRivalPace = 85;
-	private const int MaxRivalPace = 100;
+	private const int MinRivalPace = -15;   // puntos sobre los márgenes de cada piloto
+	private const int MaxRivalPace = 5;
 	private const float RivalsRefreshTime = 0.25f;   // s entre repasos de las filas
 	private static float? _rivalPace;   // el del deslizador, si se ha movido
 	private static bool _contactEnabled = true;   // CONTACT: dura hasta cerrar el juego, no se guarda
@@ -176,8 +176,10 @@ public partial class TuningLabPanel : CanvasLayer
 		_rivalPace = pace;
 		Rivals?.SetPace(pace);
 		RefreshRivals();
-		GD.Print($"[TuningLab] Rival pace: {Mathf.RoundToInt(value)} %");
+		GD.Print($"[TuningLab] Rival pace offset: {Signed(Mathf.RoundToInt(value))} points");
 	}
+
+	private static string Signed(int points) => points > 0 ? "+" + points : points < 0 ? "−" + (-points) : "±0";
 
 	// Choques entre naves: sin ellos se vuelven a atravesar, para comparar
 	private void OnContactToggled(bool enabled)
@@ -192,9 +194,9 @@ public partial class TuningLabPanel : CanvasLayer
 	{
 		if (Rivals == null)
 			return;
-		int pace = Mathf.RoundToInt(Rivals.Pace * 100f);
+		int pace = Mathf.RoundToInt(Rivals.PaceOffset * 100f);
 		_rivalPaceRow.Slider.SetValueNoSignal(pace);
-		_rivalPaceRow.Percent.Text = pace.ToString(CultureInfo.InvariantCulture) + " %";
+		_rivalPaceRow.Percent.Text = Signed(pace) + " PT";
 
 		var text = new System.Text.StringBuilder();
 		foreach (RivalShip ship in Rivals.Ships)
@@ -205,9 +207,13 @@ public partial class TuningLabPanel : CanvasLayer
 				: $"{car.Tracker.CurrentLap}/{car.Tracker.TotalLaps}";
 			if (text.Length > 0)
 				text.Append('\n');
-			text.Append($"{car.Entry.Pilot.Nickname,-8}{ShipCatalog.Find(car.Ship.Id)?.Name ?? car.Ship.Id,-7}{HullPaints.DisplayName(style, car.Entry.PaintIndex),-30}"
+			RivalDriver driver = car.Driver;
+			text.Append($"{car.Entry.Pilot.Nickname,-8}{PilotProfiles.ScreenName(car.Entry.Pilot.Profile),-13}{ShipCatalog.Find(car.Ship.Id)?.Name ?? car.Ship.Id,-7}"
+				+ $"{HullPaints.DisplayName(style, car.Entry.PaintIndex),-30}"
 				+ $"LAP {lap,-4} DMG {car.Damage.Level} {car.Damage.Points,2}P  HIT {car.Contacts,-3} RSP {car.Respawns,-2} "
-				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}  PACE {RivalDriver.PaceFor(Rivals.Pace, car.Entry.PaceOffset) * 100f:0.0}");
+				+ $"SHIP {car.Rams}/{car.Received}/{car.Mutual}  "
+				+ string.Create(CultureInfo.InvariantCulture,
+					$"STR {driver.StraightMargin * 100f:0.0} CRV {driver.CurveMargin * 100f:0.0} BRK {driver.Traits.Braking:0.00} REA {driver.ReactionTime:0.00}"));
 		}
 		text.Append($"\nSHIP = RAMS / RECEIVED / MUTUAL · RIVAL VS RIVAL {Rivals.RivalHits}");
 		Contact.GrazeLossMeter graze = Rivals.PlayerGraze;

@@ -6,6 +6,7 @@ using Vectory.Autopilot;
 using Vectory.Balance;
 using Vectory.Circuit;
 using Vectory.Core;
+using Vectory.Rivals;
 using Vectory.Ship;
 
 namespace Vectory.Tools;
@@ -16,14 +17,17 @@ namespace Vectory.Tools;
 //  - Normal: una tanda por nave y circuito; informe en la consola y CSV en user://balance/.
 //  - Sweep: la nave y el parámetro elegidos, entre dos valores; tabla en la consola.
 //  - Match: el valor con el que esa nave iguala a VECTOR; lo dice en la consola, o que no lo hay.
-// Sweep y Match solo proponen números: no cambian las definiciones.
+//  - Profiles: cada perfil y cada piloto de la IA con cada nave en el primer circuito que no es de pruebas, comparados
+//    con el perfil equilibrado (spec docs/rivales-4-personalidades.md, 3.5); tabla en la consola.
+// Sweep, Match y Profiles solo proponen números: no cambian las definiciones ni los perfiles.
 public partial class BalanceRunner : Control
 {
 	public enum RunMode
 	{
 		Normal,
 		Sweep,
-		Match
+		Match,
+		Profiles
 	}
 
 	private const string OutputFolder = "user://balance";
@@ -51,6 +55,9 @@ public partial class BalanceRunner : Control
 	private Label _progress;
 	private int _total;
 	private bool _matchShown;
+	private readonly Queue<ShipDefinition> _profileShips = new();
+	private readonly List<PaceRow> _paceRows = new();
+	private BalanceCircuit _profileCircuit;
 	private bool _finished;
 
 	public override void _Ready()
@@ -79,6 +86,21 @@ public partial class BalanceRunner : Control
 			}
 			_total = _pending.Count;
 			_progress.Text = $"BALANCE · 0 / {_total}";
+			return;
+		}
+
+		if (Mode == RunMode.Profiles)
+		{
+			_profileCircuit = _circuits.FirstOrDefault(c => !c.IsTest) ?? _circuits.FirstOrDefault();
+			if (_profileCircuit == null)
+			{
+				End("PROFILES · NO CIRCUIT");
+				return;
+			}
+			foreach (ShipDefinition ship in _ships)
+				_profileShips.Enqueue(ship);
+			_total = _profileShips.Count;
+			_progress.Text = $"PROFILES · 0 / {_total}";
 			return;
 		}
 
@@ -157,6 +179,9 @@ public partial class BalanceRunner : Control
 			case RunMode.Match:
 				StepMatch();
 				break;
+			case RunMode.Profiles:
+				StepProfiles();
+				break;
 		}
 	}
 
@@ -205,6 +230,43 @@ public partial class BalanceRunner : Control
 		MatchResult match = _sweep.Match(circuit);
 		GD.Print(SweepReport.MatchText(SweepShip, SweepParameter, circuit.Name, match));
 		End($"MATCH · DONE · {(match.Found ? $"{match.Value:0.0000}" : "NONE")}");
+	}
+
+	// Una nave por frame: los seis perfiles, los 20 pilotos y el piloto de F7, y las propuestas de lo que se salga
+	private void StepProfiles()
+	{
+		if (_profileShips.Count == 0)
+		{
+			GD.Print(ProfileComparison.Text(_profileCircuit.Name, _paceRows));
+			End($"PROFILES · DONE · {(ProfileComparison.AllPassed(_paceRows) ? "ALL ✓" : "SEE CONSOLE")}");
+			return;
+		}
+
+		ShipDefinition ship = _profileShips.Dequeue();
+		_paceRows.AddRange(ProfileComparison.Run(_profileCircuit, ship, PaceEntries(), Options()));
+		_progress.Text = $"PROFILES · {_total - _profileShips.Count} / {_total} · {ShipCatalog.Find(ship.Id)?.Name ?? ship.Id}";
+	}
+
+	// El equilibrado primero (la referencia), luego los demás perfiles, los pilotos y el piloto automático de F7
+	private static List<PaceEntry> PaceEntries()
+	{
+		var entries = new List<PaceEntry>();
+		foreach (PilotProfile profile in PilotProfiles.All)
+		{
+			PilotTraits t = PilotProfiles.Traits(profile);
+			string name = PilotProfiles.ScreenName(profile);
+			entries.Add(new PaceEntry(name, name, profile == PilotProfile.Balanced ? PaceKind.Reference : PaceKind.Profile,
+				t.StraightMargin, t.CurveMargin, t.Braking));
+		}
+		foreach (RivalPilot pilot in PilotCatalog.All)
+		{
+			PilotTraits t = pilot.Traits;
+			entries.Add(new PaceEntry(pilot.Nickname, PilotProfiles.ScreenName(pilot.Profile), PaceKind.Pilot,
+				t.StraightMargin, t.CurveMargin, t.Braking));
+		}
+		PilotTraits autopilot = PilotTraits.Autopilot;
+		entries.Add(new PaceEntry("AUTOPILOT F7", "—", PaceKind.Info, autopilot.StraightMargin, autopilot.CurveMargin, autopilot.Braking));
+		return entries;
 	}
 
 	// Lo que se sale de los rangos, en naranja, como en el panel de ajuste

@@ -185,7 +185,7 @@ public class ClearLineTests
 	{
 		(TrackFrame frame, float barrier, PilotData pilot) = Oval.Value;
 		const float BoostAt = 150f;
-		var driver = new RivalDriver(pilot, frame, Vector.Technical, Physics, Step, BoostAt, RivalDriver.DefaultPace, 200f, barrier);
+		var driver = new RivalDriver(pilot, frame, Vector.Technical, Physics, Step, BoostAt, PilotTraits.Autopilot, 0f, 200f, barrier);
 		var blocked = new[] { Ship(1, BoostAt + 30f, 0f, 40f) };
 
 		driver.Decide(RivalPhase.Running, State(BoostAt - 1f), true, Ship(0, BoostAt - 1f, 0f, 60f), blocked);
@@ -199,7 +199,7 @@ public class ClearLineTests
 		Assert.False(again.Boost);
 
 		// Si la recta se acaba tapada, esa vuelta no lo gasta
-		driver = new RivalDriver(pilot, frame, Vector.Technical, Physics, Step, BoostAt, RivalDriver.DefaultPace, 200f, barrier);
+		driver = new RivalDriver(pilot, frame, Vector.Technical, Physics, Step, BoostAt, PilotTraits.Autopilot, 0f, 200f, barrier);
 		driver.Decide(RivalPhase.Running, State(BoostAt - 1f), true, Ship(0, BoostAt - 1f, 0f, 60f), blocked);
 		driver.Decide(RivalPhase.Running, State(BoostAt + 1f), true, Ship(0, BoostAt + 1f, 0f, 60f), blocked);
 		RivalCommand after = driver.Decide(RivalPhase.Running, State(BoostAt + 210f), true, Ship(0, BoostAt + 210f, 0f, 60f), Array.Empty<TrafficShip>());
@@ -253,7 +253,7 @@ public class ClearLineTests
 		};
 		var cache = new PilotCache(frame, file.TrackWidth, Physics, AutopilotSettings.Default);
 		var entry = new RivalEntry("rival_1", 1, 8, ShipCatalog.Ship01, 0, HullPaints.ChoiceAt(HullStyle.Racing, 0), PilotCatalog.All[0]);
-		var car = new RivalCar(entry, Vector, cache, context, RivalDriver.DefaultPace);
+		var car = new RivalCar(entry, Vector, cache, context);
 
 		// Una VECTOR parada en el puesto 6, justo delante en la misma columna
 		TrackPlacement.GridStart(frame, 6, Vector.Visual.NoseDistance, file.TrackWidth, context.Grid, Track.ShipHover,
@@ -273,8 +273,9 @@ public class ClearLineTests
 		Assert.True(ahead > 0f, "the rival stayed behind the stopped ship");
 	}
 
+	// Spec docs/rivales-4-personalidades.md, 3.6: la reacción de cada salida se sortea después del resto de la alineación
 	[Fact]
-	public void Each_rival_gets_its_own_pace_after_the_rest_of_the_lineup()
+	public void Each_rival_gets_its_own_reaction_jitter_after_the_rest_of_the_lineup()
 	{
 		var order = GridLayout.RandomOrder(8, new Random(5));
 		IReadOnlyList<RivalEntry> rivals = RivalLineup.Build(order, new Random(5));
@@ -284,12 +285,11 @@ public class ClearLineTests
 		bool different = false;
 		foreach (RivalEntry rival in rivals)
 		{
-			Assert.InRange(rival.PaceOffset, -RivalLineup.PaceSpread, RivalLineup.PaceSpread);
-			different |= rival.PaceOffset != rivals[0].PaceOffset;
+			Assert.InRange(rival.ReactionJitter, -RivalLineup.ReactionSpread, RivalLineup.ReactionSpread);
+			Assert.Equal(MathF.Max(0f, rival.Pilot.Traits.Reaction + rival.ReactionJitter), rival.Reaction, 5);
+			different |= rival.ReactionJitter != rivals[0].ReactionJitter;
 		}
 		Assert.True(different);
-		Assert.Equal(0.99f, RivalDriver.PaceFor(0.97f, 0.02f), 5);
-		Assert.Equal(1f, RivalDriver.PaceFor(1f, 0.02f), 5);
 	}
 
 	[Fact]

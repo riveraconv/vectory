@@ -115,7 +115,7 @@ public partial class Main : Node3D
 
 	[ExportGroup("Rivales")]
 	[Export] public int RivalCount = 7;   // como mucho, una por marca libre de la parrilla (participantes − 1)
-	[Export(PropertyHint.Range, "0.5,1,0.01")] public float RivalPace = RivalDriver.DefaultPace;   // margen de velocidad del piloto en las curvas
+	[Export(PropertyHint.Range, "-15,5,0.5")] public float RivalPaceOffset = 0f;   // puntos sobre los márgenes de cada piloto (ajuste de depuración)
 	[Export(PropertyHint.Range, "0.1,1,0.01")] public float RivalCooldownPace = RivalDriver.DefaultCooldownPace;   // vuelta de enfriamiento: fracción de su objetivo
 
 	[ExportGroup("Recolocación")]
@@ -330,7 +330,7 @@ public partial class Main : Node3D
 		{
 			_rivals = new RivalField { Name = "Rivals" };
 			AddChild(_rivals);
-			_rivals.Setup(_lineup, _track, _player, _race, _raceShips, BuildRivalContext(), RivalPace, RivalCooldownPace,
+			_rivals.Setup(_lineup, _track, _player, _race, _raceShips, BuildRivalContext(), RivalPaceOffset / 100f, RivalCooldownPace,
 				BuildContactDamageSettings(), PassableAfterRespawn);
 		}
 		if (_mode == GameMode.Race)

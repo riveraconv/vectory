@@ -9,8 +9,13 @@ namespace Vectory.Autopilot;
 public struct AutopilotSettings
 {
 	public const float DefaultSpeedMargin = 0.97f;
+	// Lo más que puede usar de la velocidad de curva: la calibración es prudente y al 106 % aún no roza
+	// (spec docs/rivales-4-personalidades.md, 3.1)
+	public const float MaxCurveMargin = 1.05f;
 
 	public float SpeedMargin;    // fracción de la velocidad de curva que usa
+	public float StraightMargin; // fracción de la punta que usa (spec docs/rivales-4-personalidades.md, 3.1)
+	public float BrakingShare;   // fracción de la frenada con la que calcula dónde frenar (1 = la de la spec 6)
 	public float BarrierMargin;  // m entre la trazada y la barrera
 	public float StepTime;       // s: el paso de física
 	public bool UseBoost;
@@ -18,6 +23,8 @@ public struct AutopilotSettings
 	public static AutopilotSettings Default => new()
 	{
 		SpeedMargin = DefaultSpeedMargin,
+		StraightMargin = 1f,
+		BrakingShare = 1f,
 		BarrierMargin = 1f,
 		StepTime = 1f / 60f,
 		UseBoost = false
@@ -77,7 +84,8 @@ public sealed class AutopilotDriver
 	{
 		RacingLine line = RacingLine.Build(frame, trackWidth, halfWidth, settings.BarrierMargin);
 		CurveTable table = CurveCalibration.Measure(tuning, physics, settings.StepTime);
-		SpeedProfile profile = SpeedProfile.Build(line, frame, tuning, table, physics, settings.SpeedMargin);
+		SpeedProfile profile = SpeedProfile.Build(line, frame, tuning, table, physics, settings.SpeedMargin, settings.StraightMargin,
+			settings.BrakingShare);
 		return new AutopilotDriver(line, profile, tuning, physics.BankGrip, settings.StepTime, settings.UseBoost ? boostAt : -1f);
 	}
 

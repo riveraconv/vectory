@@ -28,8 +28,9 @@ public class RivalDriverTests
 
 	private static ShipDefinition Vector => ShipDefinitions.Find(ShipCatalog.Ship01);
 
-	private static RivalDriver Driver(float pace = RivalDriver.DefaultPace, float boostAt = 100f) =>
-		new(Cache.Value.Get(Vector), Oval.Value.Frame, Vector.Technical, Physics, Step, boostAt, pace);
+	// Con los rasgos del piloto automático (sin reacción en el GO) y el ajuste global de ritmo
+	private static RivalDriver Driver(float paceOffset = 0f, float boostAt = 100f) =>
+		new(Cache.Value.Get(Vector), Oval.Value.Frame, Vector.Technical, Physics, Step, boostAt, PilotTraits.Autopilot, paceOffset);
 
 	private static PilotState At(float distance, float speed = 0f)
 	{
@@ -129,8 +130,9 @@ public class RivalDriverTests
 	[Fact]
 	public void The_pace_scales_the_curve_speeds_of_the_table()
 	{
-		float[] full = Driver(1f).Pilot.Profile.CurveLimit;
-		RivalDriver slower = Driver(0.9f);
+		// Curva al 100 % y al 90 % (el piloto automático va al 97 %)
+		float[] full = Driver(0.03f).Pilot.Profile.CurveLimit;
+		RivalDriver slower = Driver(-0.07f);
 		float[] paced = slower.Pilot.Profile.CurveLimit;
 		float top = Vector.Technical.MaxSpeed;
 
@@ -143,9 +145,10 @@ public class RivalDriverTests
 			Assert.Equal(full[i] * 0.9f, paced[i], 3);
 		}
 		Assert.True(curvePoints > 10);
-		Assert.Equal(0.9f, slower.Pace);
+		Assert.Equal(0.9f, slower.CurveMargin, 5);
+		Assert.Equal(-0.07f, slower.PaceOffset, 5);
 
-		slower.SetPace(1f);
+		slower.SetPace(0.03f);
 		Assert.Equal(full, slower.Pilot.Profile.CurveLimit);
 	}
 
@@ -180,8 +183,8 @@ public class RivalDriverTests
 	public void Each_rival_counts_its_own_laps()
 	{
 		RivalRaceContext context = Context();
-		var leader = new RivalCar(Entry(1, 1), Vector, Cache.Value, context, RivalDriver.DefaultPace);
-		var waiting = new RivalCar(Entry(2, 2), Vector, Cache.Value, context, RivalDriver.DefaultPace);
+		var leader = new RivalCar(Entry(1, 1), Vector, Cache.Value, context);
+		var waiting = new RivalCar(Entry(2, 2), Vector, Cache.Value, context);
 		var player = new RaceTracker(context.CheckpointIndices.Count, context.Laps);
 
 		for (int i = 0; i < 60 * 90 && leader.Tracker.CurrentLap < 3; i++)
@@ -201,7 +204,7 @@ public class RivalDriverTests
 	public void A_rival_finishes_its_race_and_keeps_driving_slowly()
 	{
 		RivalRaceContext context = Context();
-		var car = new RivalCar(Entry(1, 3), Vector, Cache.Value, context, RivalDriver.DefaultPace);
+		var car = new RivalCar(Entry(1, 3), Vector, Cache.Value, context);
 
 		int steps = 0;
 		while (car.Tracker.State != RaceState.Finished && steps++ < 60 * 180)

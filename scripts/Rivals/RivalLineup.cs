@@ -8,10 +8,14 @@ namespace Vectory.Rivals;
 // Un rival de la carrera (spec docs/rivales-1-parrilla.md, 3.1): identificador fijo dentro de la carrera (rival_1 a
 // rival_7), su número para la lista de naves en carrera (1 a 7), su marca de parrilla (1..N), su nave y su pintura
 // (una de las 40 combinaciones de esa nave, como índice y como elección) y su piloto (spec docs/rivales-2-clasificacion.md,
-// 3.1), que no decide ni la nave ni la pintura, y lo que su ritmo se aparta del común (spec docs/rivales-3-contacto.md,
-// etapa 2: sin él, dos rivales con la misma nave no se alcanzan nunca)
+// 3.1), que no decide ni la nave ni la pintura, y lo que su reacción en el GO se aparta esta vez de la de su piloto
+// (spec docs/rivales-4-personalidades.md, 3.6). El ritmo es el de su piloto (perfil y variación fija).
 public sealed record RivalEntry(string Id, int Number, int GridPosition, string ShipDesignId, int PaintIndex, PaintChoice Paint,
-	RivalPilot Pilot, float PaceOffset = 0f);
+	RivalPilot Pilot, float ReactionJitter = 0f)
+{
+	// s desde el GO hasta que pisa W: la de su piloto más lo de esta salida, nunca negativa
+	public float Reaction => System.MathF.Max(0f, Pilot.Traits.Reaction + ReactionJitter);
+}
 
 // Alineación de una carrera de RACE: los rivales que ocupan las marcas que deja libres el jugador, cada uno con una nave
 // al azar (misma probabilidad, sin límite de repeticiones) y una pintura al azar de las 40 de esa nave. Todo sale del
@@ -22,8 +26,8 @@ public static class RivalLineup
 {
 	public const string IdPrefix = "rival_";
 
-	// Lo que el ritmo de cada rival se aparta del común, como mucho, a cada lado
-	public const float PaceSpread = 0.02f;
+	// Lo que la reacción de cada salida se aparta de la del piloto, como mucho, a cada lado (s)
+	public const float ReactionSpread = 0.05f;
 
 	// Cuántos rivales hay en una carrera: los pedidos, como mucho uno por marca libre; en TIME TRIAL, ninguno
 	public static int CountFor(Vectory.Game.GameMode mode, int participants, int requested) =>
@@ -55,17 +59,17 @@ public static class RivalLineup
 		}
 		IReadOnlyList<RivalPilot> pilots = PilotCatalog.Draw(rng, picks.Length);
 
-		// El ritmo, después de los pilotos: así naves, pinturas y pilotos salen igual que antes
-		var paces = new float[picks.Length];
-		for (int i = 0; i < paces.Length; i++)
-			paces[i] = (float)(rng.NextDouble() * 2.0 - 1.0) * PaceSpread;
+		// La reacción de esta salida, después de los pilotos: así naves, pinturas y pilotos salen igual que antes
+		var reactions = new float[picks.Length];
+		for (int i = 0; i < reactions.Length; i++)
+			reactions[i] = (float)(rng.NextDouble() * 2.0 - 1.0) * ReactionSpread;
 
 		var rivals = new List<RivalEntry>(picks.Length);
 		for (int i = 0; i < picks.Length; i++)
 		{
 			(string ship, int paint) = picks[i];
 			HullStyle style = HullPaints.StyleOf(ship).Value;
-			rivals.Add(new RivalEntry(IdPrefix + (i + 1), i + 1, gridOrder[i + 1], ship, paint, HullPaints.ChoiceAt(style, paint), pilots[i], paces[i]));
+			rivals.Add(new RivalEntry(IdPrefix + (i + 1), i + 1, gridOrder[i + 1], ship, paint, HullPaints.ChoiceAt(style, paint), pilots[i], reactions[i]));
 		}
 		return rivals;
 	}

@@ -81,7 +81,8 @@ public sealed class RivalCar : IContactShip
 		_ => RivalPhase.PreStart
 	};
 
-	public RivalCar(RivalEntry entry, ShipDefinition ship, PilotCache pilots, RivalRaceContext context, float pace)
+	// paceOffset: el ajuste global de depuración sobre los márgenes de su piloto (fracción)
+	public RivalCar(RivalEntry entry, ShipDefinition ship, PilotCache pilots, RivalRaceContext context, float paceOffset = 0f)
 	{
 		Entry = entry;
 		Ship = ship;
@@ -92,7 +93,10 @@ public sealed class RivalCar : IContactShip
 
 		(float straightStart, float straightLength) = RivalDriver.LongestStraight(context.Frame);
 		Driver = new RivalDriver(pilots.Get(ship), context.Frame, _tuning, context.Physics, context.StepTime,
-			straightStart, RivalDriver.PaceFor(pace, entry.PaceOffset), straightLength, context.BarrierOffset);
+			straightStart, entry.Pilot.Traits, paceOffset, straightLength, context.BarrierOffset)
+		{
+			ReactionTime = entry.Reaction
+		};
 		Tracker = new RaceTracker(context.CheckpointIndices.Count, context.Laps);
 		Damage = new DamageModel(context.Damage);
 		Flash = new BarrierFlash(context.LapLength, context.Flash);
