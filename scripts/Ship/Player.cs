@@ -1159,11 +1159,23 @@ public partial class Player : CharacterBody3D, IContactShip
 		RumbleFrequency = CrashRumbleFrequency
 	}, new System.Random());
 
-	// Contacto de este paso con la barrera, para la luz y el temblor de la cabina (lo llama Main con el toque final del paso)
-	public void FeelBarrier(in BarrierTouch touch, float dt)
+	// Contactos de este paso para la luz y el temblor de la cabina: los marca Main (barrera y otras naves) y luego
+	// llama a StepCrashFeel
+	public void FeelBarrier(in BarrierTouch touch)
 	{
 		if (touch.Contact)
 			CrashFeel.Contact(touch.Side, touch.Level, touch.IsNewImpact);
-		CrashFeel.Step(dt);
 	}
+
+	// Contacto con otra nave en point (planta): el lado sale de dónde queda respecto a tu nave
+	public void FeelShip(System.Numerics.Vector2 point, ImpactLevel level, bool isNewImpact)
+	{
+		NVec2 forward = Dynamics.Forward;
+		var right = new NVec2(-forward.Y, forward.X);
+		var rel = new NVec2(point.X - GlobalPosition.X, point.Y - GlobalPosition.Z);
+		BarrierSide side = NVec2.Dot(rel, right) >= 0f ? BarrierSide.Right : BarrierSide.Left;
+		CrashFeel.Contact(side, level, isNewImpact);
+	}
+
+	public void StepCrashFeel(float dt) => CrashFeel.Step(dt);
 }

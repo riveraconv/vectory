@@ -52,7 +52,7 @@ public sealed class CrashFlashes
 			Add(e, e.Level, 1f);
 			return;
 		}
-		if (e.Kind == CrashKind.Ships && e.Graze == Contact.GrazeKind.Rear)
+		if (e.Kind == CrashKind.Ships && e.Graze != Contact.GrazeKind.Side)
 			return;
 		if (_random.NextSingle() < dt * _s.GrazeFlashRate)
 			Add(e, ImpactLevel.Graze, _s.GrazeFlashMin + (_s.GrazeFlashMax - _s.GrazeFlashMin) * _random.NextSingle());

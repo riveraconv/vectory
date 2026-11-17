@@ -166,8 +166,8 @@ public sealed class SparkEmitter
 	// Chispas nuevas de un contacto en field. dt: el del paso, para el roce. Devuelve cuántas han salido.
 	public int Emit(in CrashEvent e, float quality, float dt, SparkField field)
 	{
-		// El roce por detrás entre naves no saca chispas: no hay fricción
-		if (e.Kind == CrashKind.Ships && !e.IsStart && e.Graze == GrazeKind.Rear)
+		// El roce por detrás entre naves no saca chispas: no hay fricción (ni cuando ya se separan)
+		if (e.Kind == CrashKind.Ships && !e.IsStart && e.Graze != GrazeKind.Side)
 			return 0;
 		SparkLevel level = LevelOf(e.Kind, e.IsStart ? e.Level : ImpactLevel.Graze);
 		SparkDirection direction = DirectionOf(e);

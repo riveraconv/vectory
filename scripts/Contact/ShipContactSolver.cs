@@ -22,8 +22,11 @@ public interface IContactShip
 }
 
 // Un contacto entre dos naves en un paso (A tiene el id menor). Graze: en un roce, de lado o por detrás; GrazeLossA / B: m/s que le ha quitado el roce a cada una.
+// Para los efectos (spec docs/efectos-1-choques.md, 3): Point, el centro del solape en planta (x, z) al detectarlo; Normal,
+// de A hacia B; Facing, de lado o por detrás con la misma regla del roce, también en los golpes.
 public readonly record struct ShipContactEvent(int A, int B, ImpactLevel Level, bool IsNewImpact, ContactRole RoleA, ContactRole RoleB,
-	float ClosingSpeed, GrazeKind Graze = GrazeKind.None, float GrazeLossA = 0f, float GrazeLossB = 0f);
+	float ClosingSpeed, GrazeKind Graze = GrazeKind.None, float GrazeLossA = 0f, float GrazeLossB = 0f,
+	Vector2 Point = default, Vector2 Normal = default, GrazeKind Facing = GrazeKind.None);
 
 // Paso de contactos entre naves (spec docs/rivales-3-contacto.md, 3.2): después de mover todas (barrera incluida), recorre
 // las parejas por orden de id, descarta las lejanas, detecta, separa, aplica el golpe y vuelve a pasar la barrera de las
@@ -110,6 +113,9 @@ public sealed class ShipContactSolver
 		ShipContactSettings s = Settings;
 		ShipDynamics da = a.Physics.Dynamics;
 		ShipDynamics db = b.Physics.Dynamics;
+		// Dónde se tocan, antes de separarlas (solo para los efectos: no cambia nada del choque)
+		Vector2 point = ContactPoint.Between(Plan(a), da.Yaw, a.Shape, Plan(b), db.Yaw, b.Shape);
+		GrazeKind facing = ContactResponse.Kind(hit.Normal, da.Forward, db.Forward, s.SideGrazeAngle);
 		ContactResult r = ContactResponse.Resolve(da.Velocity, db.Velocity, hit,
 			Blocked(a, -hit.Normal), Blocked(b, hit.Normal), state.InContact, _time < state.CooldownUntil - 1e-6, s, dt,
 			da.Forward, db.Forward);
@@ -125,8 +131,11 @@ public sealed class ShipContactSolver
 		Apply(b, r.B, s);
 		_touching.Add(a.Id);
 		_touching.Add(b.Id);
-		_events.Add(new ShipContactEvent(a.Id, b.Id, r.Level, r.IsNewImpact, r.A.Role, r.B.Role, r.ClosingSpeed, r.Graze, lossA, lossB));
+		_events.Add(new ShipContactEvent(a.Id, b.Id, r.Level, r.IsNewImpact, r.A.Role, r.B.Role, r.ClosingSpeed, r.Graze, lossA, lossB,
+			point, hit.Normal, facing));
 	}
+
+	private static Vector2 Plan(IContactShip ship) => new(ship.Position.X, ship.Position.Z);
 
 	// Lo que el roce le quita a una nave (m/s): la fracción de entrada y la fricción, sin el empujón
 	private static float GrazeLoss(float speed, in ContactShipEffect e) => speed * (1f - e.SpeedScale) + e.SpeedLoss;

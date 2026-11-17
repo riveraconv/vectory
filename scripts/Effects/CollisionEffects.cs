@@ -105,6 +105,16 @@ public partial class CollisionEffects : Node3D
 			_fx.Crash(e.Value, dt);
 	}
 
+	// Un contacto entre dos naves en este paso de física. velocity: la que heredan (ver CrashEvent.Ships)
+	public void ShipContact(in Contact.ShipContactEvent e, NVector2 velocity, float dt)
+	{
+		if (_fx == null)
+			return;
+		CrashEvent? crash = CrashEvent.Ships(_frame, e.A, e.B, e.Level, e.IsNewImpact, e.Graze, e.Facing, e.Point, velocity, _settings);
+		if (crash.HasValue)
+			_fx.Crash(crash.Value, dt);
+	}
+
 	public override void _Process(double delta)
 	{
 		if (_fx == null)

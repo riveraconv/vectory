@@ -40,4 +40,24 @@ public readonly record struct CrashEvent(CrashKind Kind, ImpactLevel Level, Graz
 			shipId * 2 + (side == BarrierSide.Right ? 1 : 0), point, -sign * f.Right, f.Normal, -f.Tangent,
 			new Vector3(velocity.X, 0f, velocity.Y), f.Distance);
 	}
+
+	// Contacto entre dos naves en este paso (spec 3): en el centro del solape (planta), ShipContactHeight sobre la
+	// superficie. Graze: el del roce (Side / Rear; None si ya se separan) o, en un golpe que cuenta, si es de lado o por
+	// detrás (facing). Normal: la derecha de la pista (las chispas salen a cualquiera de los dos lados).
+	// velocity: la del que embiste, o la media si es mutuo o un roce (planta).
+	public static CrashEvent? Ships(TrackFrame frame, int a, int b, ImpactLevel level, bool isNewImpact, GrazeKind graze,
+		GrazeKind facing, Vector2 point, Vector2 velocity, CollisionFxSettings s)
+	{
+		if (frame == null)
+			return null;
+		SurfacePoint surface = frame.SurfaceUnder(point.X, point.Y);
+		FramePoint f = surface.Frame;
+		Vector3 position = f.PointAt(surface.Lateral, s.ShipContactHeight);
+		bool start = isNewImpact && level != ImpactLevel.Graze;
+		return new CrashEvent(CrashKind.Ships, start ? level : ImpactLevel.Graze, start ? facing : graze, start,
+			ShipSource(a, b), position, f.Right, f.Normal, -f.Tangent, new Vector3(velocity.X, 0f, velocity.Y), f.Distance);
+	}
+
+	// Acumulador del roce de una pareja: aparte de los de la barrera (id × 2 + lado)
+	public static int ShipSource(int a, int b) => 1_000_000 + a * 1000 + b;
 }

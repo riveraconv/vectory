@@ -430,21 +430,53 @@ public partial class Main : Node3D
 			SampleGhost();
 	}
 
-	// Efectos de los choques de este paso contra la barrera: el jugador y los rivales (solo visual)
+	// Efectos de los choques de este paso (solo visual): contra la barrera, el jugador y los rivales; entre naves, los
+	// contactos del paso (solo RACE). Luz y temblor de la cabina con los tuyos.
 	private void UpdateCollisionEffects(float delta)
 	{
 		if (_collisionFx == null)
 			return;
-		_player.FeelBarrier(_player.LastBarrierTouch, delta);
+		_player.FeelBarrier(_player.LastBarrierTouch);
 		_collisionFx.SetReference(_player.PlanVelocity);
 		_collisionFx.BarrierContact(_player.Id, _player.LastBarrierTouch, _player.PlanForward, _player.PlanVelocity, delta);
-		if (_rivals == null)
-			return;
-		foreach (RivalShip ship in _rivals.Ships)
+		if (_rivals != null)
 		{
-			RivalCar car = ship.Car;
-			_collisionFx.BarrierContact(car.Id, car.LastTouch, car.Dynamics.Forward, car.Dynamics.Velocity, delta);
+			foreach (RivalShip ship in _rivals.Ships)
+			{
+				RivalCar car = ship.Car;
+				_collisionFx.BarrierContact(car.Id, car.LastTouch, car.Dynamics.Forward, car.Dynamics.Velocity, delta);
+			}
+			foreach (ShipContactEvent e in _rivals.Contacts.Events)
+			{
+				_collisionFx.ShipContact(e, ContactVelocity(e), delta);
+				bool felt = (e.IsNewImpact && e.Level != ImpactLevel.Graze) || e.Graze == GrazeKind.Side;
+				if (felt && (e.A == _player.Id || e.B == _player.Id))
+					_player.FeelShip(e.Point, e.IsNewImpact ? e.Level : ImpactLevel.Graze, e.IsNewImpact);
+			}
 		}
+		_player.StepCrashFeel(delta);
+	}
+
+	// La velocidad que heredan los efectos de un contacto entre naves: la del que embiste, o la media
+	private System.Numerics.Vector2 ContactVelocity(in ShipContactEvent e)
+	{
+		System.Numerics.Vector2 a = PlanVelocityOf(e.A);
+		System.Numerics.Vector2 b = PlanVelocityOf(e.B);
+		if (e.IsNewImpact && e.RoleA == ContactRole.Rammer)
+			return a;
+		if (e.IsNewImpact && e.RoleB == ContactRole.Rammer)
+			return b;
+		return (a + b) * 0.5f;
+	}
+
+	private System.Numerics.Vector2 PlanVelocityOf(int id)
+	{
+		if (id == _player.Id)
+			return _player.PlanVelocity;
+		foreach (RivalShip ship in _rivals.Ships)
+			if (ship.Car.Id == id)
+				return ship.Car.Dynamics.Velocity;
+		return System.Numerics.Vector2.Zero;
 	}
 
 	// Contacto de la nave con la barrera en este paso: destello en el lado tocado, sacudida en los

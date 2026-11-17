@@ -337,3 +337,11 @@ No se empieza una etapa sin validar la anterior.
 - El humo sube en la vertical del mundo; las chispas rebotan con la normal de la superficie.
 - Las mallas (chispas, rayos y onda, brillos y humo) se rehacen cada frame en `_Process`, con los cuadrados de cara a la cámara calculados en C#: la pausa lo congela todo.
 
+### Etapa 2 · Entre naves
+
+- `ShipContactEvent` gana `Point` (centro del solape de los dos rectángulos en planta, `ContactPoint.Between`, calculado antes de separarlas), `Normal` y `Facing` (de lado o por detrás con la regla del roce, también en los golpes). Solo para los efectos: las reglas del choque no cambian (aviso de la sección 10).
+- `CrashEvent.Ships`: punto a 0,7 m sobre la superficie; la normal es la derecha de la pista (las chispas salen a cualquiera de los dos lados); dirección de lado o de alcance por detrás según `Facing`; velocidad del que embiste, o la media si es mutuo o un roce.
+- Un golpe dentro de la espera de la pareja llega como roce: de lado saca las chispas del roce de ese paso; por detrás, nada. Un contacto en el que ya se separan tampoco saca nada.
+- La luz y el temblor de la cabina de la etapa 1 también valen entre naves: un roce de lado o un golpe con tu nave encienden el lado de la cabina donde queda el punto de contacto.
+- Comprobado con sondas en RACE: golpes medios y fuertes con rivales (destello entre las dos naves, onda y humo). A 144 Hz, 4 s de choques en la salida: 0–1 frames lentos, peor frame 15–28 ms, como antes.
+
