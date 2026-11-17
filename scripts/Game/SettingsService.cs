@@ -6,7 +6,8 @@ namespace Vectory.Game;
 
 // SETTINGS en el juego (spec docs/settings.md, 5 y 9): carga los ajustes al arrancar (desde el menú principal o desde
 // la carrera ejecutada sola), los aplica y los guarda junto a lo demás de settings.json. Aplicar: los multiplicadores
-// que lee el juego (ActiveSettings), el glow de las escenas y la dificultad de la siguiente carrera. Sin reglas: los
+// que lee el juego (ActiveSettings), el glow de las escenas, la dificultad de la siguiente carrera y el modo de
+// pantalla y la resolución (DisplayApplier). Sin reglas: los
 // valores y su validación están en SettingsModel y SettingsSerializer.
 public static class SettingsService
 {
@@ -22,6 +23,7 @@ public static class SettingsService
 			return;
 		_loaded = true;
 		SettingsStore store = NewStore();
+		store.ResolutionCount = DisplayApplier.ResolutionCount;
 		store.Load();
 		if (store.Warning != null)
 			GD.PushWarning($"[Settings] {store.Warning}");
@@ -59,6 +61,7 @@ public static class SettingsService
 		ActiveSettings.From(Current);
 		GameSession.Difficulty = Current.Difficulty;
 		WorldStyle.ApplyBloom();
+		DisplayApplier.Apply(Current);
 	}
 
 	private static SettingsStore NewStore() => new(new FileRecordStorage(SettingsStore.DefaultPath));

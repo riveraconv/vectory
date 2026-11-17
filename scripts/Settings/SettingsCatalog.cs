@@ -63,11 +63,11 @@ public static class SettingsCatalog
 		new SettingDef(Difficulty, Gameplay, "DIFFICULTY", SettingKind.Choice, Difficulties, 1,
 			"How good the rivals are. It only changes the [b]AI[/b], never the physics of any ship. Takes effect in the [b]next race[/b]."),
 
-		// El modo y la resolución se ven, pero se aplican en la etapa 2. BORDERLESS es lo de hoy (decisión del usuario).
+		// BORDERLESS es lo de antes de SETTINGS (decisión del usuario). La resolución, por defecto la mayor que cabe.
 		new SettingDef(DisplayMode, Video, "DISPLAY MODE", SettingKind.Choice, DisplayModes, 2,
-			"Windowed, exclusive fullscreen or a borderless window the size of the screen.", Applied: false),
+			"Windowed, exclusive fullscreen or a borderless window the size of the screen."),
 		new SettingDef(Resolution, Video, "RESOLUTION", SettingKind.Choice, Resolutions, 2,
-			"Render resolution. The HUD and the menus scale with it.", Applied: false),
+			"Render resolution. The HUD and the menus scale with it."),
 		new SettingDef(Bloom, Video, "BLOOM", SettingKind.Percent, null, PercentSteps,
 			"Glow of the lines of the track, the ships and the HUD. Lower it if the image looks blurry."),
 

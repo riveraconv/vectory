@@ -32,6 +32,8 @@ public partial class SettingsScreen : CanvasLayer
 	[Export] public int ActionFontSize = 16;
 	[Export] public int ConfirmTitleFontSize = 32;
 	[Export(PropertyHint.Range, "0,1,0.01")] public float ConfirmDimOpacity = 0.5f;
+	[Export] public float DisplayCountdown = 10f;   // s de KEEP THIS DISPLAY? antes de volver a lo de antes
+	[Export] public float DisplayDelay = 0.5f;      // s tras el último cambio de modo o resolución antes de preguntar
 
 	// Fondo del menú principal: se ve la rejilla, sin la nave
 	public MenuBackground Background { get; set; }
@@ -64,6 +66,16 @@ public partial class SettingsScreen : CanvasLayer
 	private PanelContainer _toast;
 	private Label _toastText;
 
+	// Confirmación de pantalla (spec 4.3)
+	private readonly DisplayConfirm _display = new();
+	private MenuBand _displayBand;
+	private Label _displayCountdown;
+	private OptionList _displayOptions;
+	private MenuModel _displayModel;
+	private (int Mode, int Resolution) _lastDisplay;
+	private bool _reverting;
+	private SettingsModel _watched;
+
 	public override void _Ready()
 	{
 		Layer = 3;   // por encima del menú principal (capa 2) y de la sombra del fondo (capa 1)
@@ -79,6 +91,11 @@ public partial class SettingsScreen : CanvasLayer
 		SettingsService.EnsureLoaded();
 		_logic = new SettingsScreenLogic(SettingsService.Current);
 		_logic.SelectFirst();
+		Watch(_logic.Model);
+		_display.Delay = DisplayDelay;
+		_display.Countdown = DisplayCountdown;
+		_display.Keep();
+		_displayBand.Visible = false;
 		_openedFrame = Engine.GetProcessFrames();   // el Enter que abre la pantalla no elige nada aquí
 		_confirm.Visible = false;
 		_toast.Visible = false;
@@ -89,6 +106,7 @@ public partial class SettingsScreen : CanvasLayer
 
 	private void Close()
 	{
+		Watch(null);
 		SettingsService.Save();
 		_root.Visible = false;
 		Background?.SetShipVisible(true);
@@ -105,10 +123,15 @@ public partial class SettingsScreen : CanvasLayer
 			_toast.Modulate = new Color(1f, 1f, 1f, Mathf.Clamp(_toastLeft / 0.25f, 0f, 1f));
 			_toast.Visible = _toastLeft > 0f;
 		}
+		if (UpdateDisplayConfirm((float)delta))
+			return;
 		if (Engine.GetProcessFrames() == _openedFrame)
 			return;
 
-		if (Input.IsActionJustPressed("menu_back"))
+		// Con un cambio de pantalla esperando su pregunta, salir la saca ya (no se guarda sin confirmar)
+		if (Input.IsActionJustPressed("menu_back") && _display.Pending)
+			_display.ShowNow();
+		else if (Input.IsActionJustPressed("menu_back"))
 			Apply(_logic.Back());
 		else if (Input.IsActionJustPressed("menu_up"))
 			Apply(_logic.Up());
@@ -186,7 +209,7 @@ public partial class SettingsScreen : CanvasLayer
 
 	private void OnRowHovered(string id)
 	{
-		if (_logic == null || _logic.Confirming)
+		if (Busy)
 			return;
 		_logic.Select(id);
 		UpdateView();
@@ -194,7 +217,7 @@ public partial class SettingsScreen : CanvasLayer
 
 	private void OnClicked(string id, SettingsClick click, int value)
 	{
-		if (_logic == null || _logic.Confirming)
+		if (Busy)
 			return;
 		_logic.Select(id);
 		SettingsModel model = _logic.Model;
@@ -218,7 +241,7 @@ public partial class SettingsScreen : CanvasLayer
 
 	private void OnWheel(int direction)
 	{
-		if (_logic == null || _logic.Confirming)
+		if (Busy)
 			return;
 		Apply(direction < 0 ? _logic.Up() : _logic.Down());
 	}
@@ -308,7 +331,7 @@ public partial class SettingsScreen : CanvasLayer
 		_actions.SetModel(_actionModel);
 		_actions.Hovered += index =>
 		{
-			if (_logic == null || _logic.Confirming)
+			if (Busy)
 				return;
 			_logic.Select(_actionModel.Options[index].Id);
 			UpdateView();
@@ -317,10 +340,20 @@ public partial class SettingsScreen : CanvasLayer
 		_kit.Footer(_root, "W/S SELECT · A/D CHANGE · ENTER · ESC BACK", 220f);
 
 		BuildConfirm();
+		BuildDisplayConfirm();
 		BuildToast();
 	}
 
 	private Label _crumbLabel;
+
+	// Con una pregunta en pantalla, el ratón no toca la lista
+	private bool Busy => _logic == null || _logic.Confirming || _display.Showing;
+
+	private void OnRowOptionChosen(string id)
+	{
+		if (!_display.Showing)
+			Apply(_logic.Choose(id));
+	}
 
 	// Opciones en fila con el estilo de los selectores (Horizontal antes de Setup: si no, salen en columna)
 	private OptionList RowOptions(int fontSize)
@@ -329,7 +362,7 @@ public partial class SettingsScreen : CanvasLayer
 		style.HideDisabledHint = true;
 		var options = new OptionList { Name = "OptionList", Horizontal = true };
 		options.Setup(style);
-		options.Chosen += id => Apply(_logic.Choose(id));
+		options.Chosen += OnRowOptionChosen;
 		return options;
 	}
 
@@ -345,6 +378,110 @@ public partial class SettingsScreen : CanvasLayer
 		_confirmOptions = RowOptions(22);
 		column.AddChild(_confirmOptions);
 		_confirm.Visible = false;
+	}
+
+	// ---------------------------------------------------------------
+	// Confirmación de pantalla
+	// ---------------------------------------------------------------
+
+	private void Watch(SettingsModel model)
+	{
+		if (_watched != null)
+			_watched.Changed -= OnModelChanged;
+		_watched = model;
+		if (model == null)
+			return;
+		model.Changed += OnModelChanged;
+		_lastDisplay = ((int)model.DisplayMode, model.Resolution);
+	}
+
+	// Cada cambio de modo o resolución (también con RESET DEFAULTS) pide confirmación; volver atrás no
+	private void OnModelChanged(string id)
+	{
+		if (id != SettingsCatalog.DisplayMode && id != SettingsCatalog.Resolution)
+			return;
+		(int Mode, int Resolution) before = _lastDisplay;
+		_lastDisplay = ((int)_watched.DisplayMode, _watched.Resolution);
+		if (!_reverting)
+			_display.Changed(before.Mode, before.Resolution);
+	}
+
+	// true si la pregunta está en pantalla y se lleva el teclado
+	private bool UpdateDisplayConfirm(float delta)
+	{
+		switch (_display.Update(delta))
+		{
+			case DisplayConfirmEvent.Show:
+				_displayModel = new MenuModel(new[] { new MenuOption("KEEP", "KEEP", true), new MenuOption("REVERT", "REVERT", true) });
+				_displayOptions.SetModel(_displayModel);
+				_displayBand.Visible = true;
+				break;
+			case DisplayConfirmEvent.Revert:
+				RevertDisplay(_display.Before);
+				return true;
+		}
+		if (!_display.Showing)
+			return false;
+
+		_displayCountdown.Text = $"REVERTING IN {_display.SecondsLeft}";
+		if (Input.IsActionJustPressed("menu_back"))
+			ChooseDisplay("REVERT");
+		else if (Input.IsActionJustPressed("menu_left") || Input.IsActionJustPressed("menu_up"))
+		{
+			_displayModel.MovePrevious();
+			_displayOptions.Refresh();
+		}
+		else if (Input.IsActionJustPressed("menu_right") || Input.IsActionJustPressed("menu_down"))
+		{
+			_displayModel.MoveNext();
+			_displayOptions.Refresh();
+		}
+		else if (Input.IsActionJustPressed("menu_accept"))
+			ChooseDisplay(_displayModel.Confirm());
+		return true;
+	}
+
+	private void ChooseDisplay(string id)
+	{
+		if (!_display.Showing)
+			return;
+		if (id == "KEEP")
+		{
+			_display.Keep();
+			_displayBand.Visible = false;
+		}
+		else
+		{
+			RevertDisplay(_display.Revert());
+		}
+	}
+
+	private void RevertDisplay((int Mode, int Resolution) before)
+	{
+		_reverting = true;
+		_logic.Model.Set(SettingsCatalog.DisplayMode, before.Mode);
+		_logic.Model.Set(SettingsCatalog.Resolution, before.Resolution);
+		_reverting = false;
+		_displayBand.Visible = false;
+		UpdateView();
+	}
+
+	private void BuildDisplayConfirm()
+	{
+		_displayBand = new MenuBand { Name = "DisplayConfirm" };
+		_root.AddChild(_displayBand);
+		_displayBand.Setup(200f, ConfirmDimOpacity, 0.94f);
+		_displayBand.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		VBoxContainer column = _displayBand.AddColumn("DisplayColumn", 440f, 14f);
+		column.AddChild(_kit.MakeLabel("KEEP THIS DISPLAY?", MenuFonts.Orbitron, 900, ConfirmTitleFontSize, 0.06f, Palette.Orange,
+			Palette.ConfirmTitleGlow, 14f));
+		_displayCountdown = _kit.MakeLabel("", MenuFonts.Mono, 400, 15f, 0.2f, Palette.SettingsGroupText);
+		column.AddChild(_displayCountdown);
+		_displayOptions = RowOptions(22);
+		_displayOptions.Chosen -= OnRowOptionChosen;
+		_displayOptions.Chosen += ChooseDisplay;
+		column.AddChild(_displayOptions);
+		_displayBand.Visible = false;
 	}
 
 	private void BuildToast()

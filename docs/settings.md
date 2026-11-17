@@ -1,6 +1,6 @@
 # VECTORY — Spec: Settings
 
-Versión 1.1 · 2026-11-17 · Estado: **etapa 1 en curso**
+Versión 1.1 · 2026-11-17 · Estado: **etapa 2 en curso**
 
 Añade la pantalla **SETTINGS**. Se entra desde el **menú principal** (deja de estar en COMING SOON) y desde la **pausa**. Tiene cinco grupos:
 
@@ -189,6 +189,15 @@ Los textos en inglés son los de la página.
 - **BLOOM** multiplica el glow de las escenas (también las que ya están en pantalla) y el de la cabina 3D. **SPEED FOV**: el FOV por velocidad de la cámara exterior (de `BaseFov` a `MaxFov`) y el FOV extra del boost en las dos. **COCKPIT SHAKE**: la vibración de las dos cámaras y la de la cabina 3D.
 - RESET DEFAULTS y BACK, y NO / YES, van con la barra lateral de los selectores del juego, no con el rombo de la página.
 - La dificultad se guarda en SETTINGS; F9 sigue cambiándola para la carrera siguiente sin guardarla, hasta el próximo cambio en SETTINGS.
+
+### 4.5 Concreciones de la etapa 2 (VIDEO)
+
+- **FULLSCREEN** es la pantalla completa exclusiva de Godot y **BORDERLESS** su pantalla completa (ventana sin marco). En WINDOWED se quita el marco sin bordes y la ventana se centra en su pantalla.
+- **Trampa de Godot en Windows**: una ventana del tamaño exacto de la pantalla se da por pantalla completa exclusiva, y al salir de pantalla completa Godot vuelve al tamaño de ventana con el que arrancó el juego (1920 × 1080, el de la pantalla del usuario). Por eso WINDOWED no salía nunca. Se arregla en `project.godot` con `window_width_override` / `window_height_override` = 1600 × 900: solo es el tamaño de la primera ventana; el juego sigue arrancando en pantalla completa y el lienzo sigue siendo de 1920 × 1080.
+- **WINDOWED a la resolución de la pantalla** (1920 × 1080 en una pantalla de 1920 × 1080): el interior de la ventana ocupa la pantalla y la barra del título queda fuera. Se deja así: la lista ya solo da lo que cabe.
+- La resolución por defecto es la mayor que cabe (la de antes de SETTINGS). La lista se calcula con la pantalla en la que está la ventana al arrancar.
+- Escala del 3D = ancho de la resolución / ancho de la pantalla, entre 0,1 y 1 (`Viewport.Scaling3DScale` de la ventana principal); en WINDOWED, 1.
+- La pregunta sale 0,5 s después del último cambio (`DisplayDelay`) con 10 s de cuenta atrás (`DisplayCountdown`), en el Inspector de `SettingsScreen`. Con un cambio esperando su pregunta, ESC no sale de SETTINGS: saca la pregunta ya. RESET DEFAULTS también la pide si cambia el modo o la resolución.
 
 ## 5. Guardar y cargar
 

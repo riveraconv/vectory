@@ -40,9 +40,11 @@ public static class SettingsSerializer
 	}
 
 	// Un modelo con lo que haya en las secciones; lo que falte o no valga, por defecto, con su aviso
-	public static SettingsModel Read(IReadOnlyDictionary<string, JsonElement> sections, List<string> warnings)
+	// resolutionCount: cuántas resoluciones caben en la pantalla (-1 = todas); una guardada que no cabe pasa a la mayor
+	// que cabe (spec 4.2)
+	public static SettingsModel Read(IReadOnlyDictionary<string, JsonElement> sections, List<string> warnings, int resolutionCount = -1)
 	{
-		var model = new SettingsModel();
+		var model = new SettingsModel(resolutionCount);
 		foreach (SettingDef def in SettingsCatalog.All.Where(SettingsModel.Holds))
 		{
 			string section = SectionOf(def.Group);
@@ -55,7 +57,14 @@ public static class SettingsSerializer
 				continue;
 			}
 			if (TryValue(def, element, out int value, out string problem))
+			{
+				if (def.Id == SettingsCatalog.Resolution && value > model.MaxOf(def))
+				{
+					warnings?.Add($"{section}.{def.Id} {def.Values[value]} does not fit on this screen; using {def.Values[model.MaxOf(def)]}");
+					value = model.MaxOf(def);
+				}
 				model.Set(def.Id, value);
+			}
 			else
 				warnings?.Add($"{section}.{def.Id} {problem}; using the default");
 		}

@@ -98,6 +98,9 @@ public sealed class SettingsStore
 	// Valores de SETTINGS que no valían y han tomado su valor por defecto (spec docs/settings.md, 5)
 	public List<string> OptionWarnings { get; } = new();
 
+	// Resoluciones que caben en la pantalla (spec docs/settings.md, 4.2); -1 = todas
+	public int ResolutionCount { get; set; } = -1;
+
 	public SettingsStore(IRecordStorage storage)
 	{
 		_storage = storage ?? throw new ArgumentNullException(nameof(storage));
@@ -107,7 +110,7 @@ public sealed class SettingsStore
 	{
 		Warning = null;
 		OptionWarnings.Clear();
-		Settings = new GameSettings();
+		Settings = new GameSettings { Options = new SettingsModel(ResolutionCount) };
 
 		string text;
 		try
@@ -132,7 +135,7 @@ public sealed class SettingsStore
 				Settings.GhostEnabled = file.GhostEnabled ?? true;
 				Settings.LastShipDesignId = file.LastShipDesignId;
 				ReadShipPaints(file.ShipPaints, Settings);
-				Settings.Options = SettingsSerializer.Read(Sections(file), OptionWarnings);
+				Settings.Options = SettingsSerializer.Read(Sections(file), OptionWarnings, ResolutionCount);
 				return;
 			}
 			error = file == null ? "empty file" : $"unknown format version {file.Version}";

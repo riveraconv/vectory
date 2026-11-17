@@ -250,6 +250,98 @@ public class SettingsTests
 		}
 	}
 
+	// 12
+	[Fact]
+	public void The_resolution_list_only_has_the_ones_that_fit_on_the_screen()
+	{
+		Assert.Equal(3, DisplayRules.FittingCount(1920, 1080));
+		Assert.Equal(5, DisplayRules.FittingCount(3840, 2160));
+		Assert.Equal(4, DisplayRules.FittingCount(2560, 1600));
+		Assert.Equal(1, DisplayRules.FittingCount(1366, 768));
+		Assert.Equal(1, DisplayRules.FittingCount(800, 600));   // siempre al menos una
+
+		// En un 1920 × 1080, la lista acaba en 1920 × 1080 y es la de por defecto
+		var model = new SettingsModel(DisplayRules.FittingCount(1920, 1080));
+		Assert.Equal("1920 × 1080", model.ValueText(SettingsCatalog.Resolution));
+		Assert.False(model.Change(SettingsCatalog.Resolution, 1));
+		Assert.False(model.Set(SettingsCatalog.Resolution, 3));
+		Assert.True(model.Cycle(SettingsCatalog.Resolution));
+		Assert.Equal("1280 × 720", model.ValueText(SettingsCatalog.Resolution));
+
+		// Escala del 3D: en pantalla completa, la resolución respecto a la pantalla; en ventana, 1
+		Assert.Equal(1f, DisplayRules.Scale3D(DisplayMode.Borderless, 2, 1920));
+		Assert.Equal(1280f / 1920f, DisplayRules.Scale3D(DisplayMode.Fullscreen, 0, 1920), 5);
+		Assert.Equal(1f, DisplayRules.Scale3D(DisplayMode.Windowed, 0, 1920));
+	}
+
+	// 13
+	[Fact]
+	public void Keep_stays_and_revert_escape_or_the_10_seconds_go_back()
+	{
+		var confirm = new DisplayConfirm();
+		confirm.Changed(2, 2);
+		Assert.Equal(DisplayConfirmEvent.None, confirm.Update(0.4f));
+		Assert.Equal(DisplayConfirmEvent.Show, confirm.Update(0.2f));
+		Assert.Equal(10, confirm.SecondsLeft);
+		confirm.Update(3.2f);
+		Assert.Equal(7, confirm.SecondsLeft);
+		confirm.Keep();
+		Assert.False(confirm.Showing);
+		Assert.Equal(DisplayConfirmEvent.None, confirm.Update(20f));
+
+		// REVERT (o ESC, que hace lo mismo): a lo de antes
+		confirm.Changed(0, 1);
+		confirm.Update(0.6f);
+		Assert.Equal((0, 1), confirm.Revert());
+		Assert.False(confirm.Showing);
+
+		// Sin contestar, a los 10 s
+		confirm.Changed(1, 4);
+		confirm.Update(0.6f);
+		Assert.Equal(DisplayConfirmEvent.None, confirm.Update(9.9f));
+		Assert.Equal(DisplayConfirmEvent.Revert, confirm.Update(0.2f));
+		Assert.Equal((1, 4), confirm.Before);
+	}
+
+	// 14
+	[Fact]
+	public void Three_quick_changes_give_one_question_and_revert_goes_back_to_before_the_first()
+	{
+		var confirm = new DisplayConfirm();
+		confirm.Changed(2, 0);
+		confirm.Update(0.2f);
+		confirm.Changed(2, 1);
+		confirm.Update(0.2f);
+		confirm.Changed(2, 2);
+		Assert.Equal(DisplayConfirmEvent.None, confirm.Update(0.4f));
+		Assert.Equal(DisplayConfirmEvent.Show, confirm.Update(0.2f));
+		Assert.Equal(DisplayConfirmEvent.None, confirm.Update(0.5f));
+		Assert.Equal((2, 0), confirm.Revert());
+
+		// Salir con la pregunta pendiente la saca ya
+		confirm.Changed(2, 1);
+		confirm.ShowNow();
+		Assert.Equal(DisplayConfirmEvent.Show, confirm.Update(0.01f));
+	}
+
+	// 15
+	[Fact]
+	public void A_saved_resolution_that_does_not_fit_becomes_the_largest_that_fits()
+	{
+		var storage = new MemoryRecordStorage
+		{
+			Text = """
+			{ "version": 1, "video": { "displayMode": "WINDOWED", "resolution": "3840x2160", "bloom": 100 } }
+			"""
+		};
+		var store = new SettingsStore(storage) { ResolutionCount = DisplayRules.FittingCount(2560, 1440) };
+		store.Load();
+		Assert.Equal("2560 × 1440", store.Settings.Options.ValueText(SettingsCatalog.Resolution));
+		Assert.Equal(DisplayMode.Windowed, store.Settings.Options.DisplayMode);
+		Assert.Single(store.OptionWarnings);
+		Assert.Equal(DisplayRules.LargestFitting(2560, 1440), DisplayRules.Resolve(4, 2560, 1440));
+	}
+
 	// La pantalla: W/S saltan las de COMING SOON y dan la vuelta; RESET DEFAULTS pregunta con NO elegida
 	[Fact]
 	public void The_screen_skips_coming_soon_rows_wraps_and_asks_before_resetting()
