@@ -15,8 +15,7 @@ public sealed class Hull3DSettings
 	public float RimEnergy { get; init; } = 1.3f / Mathf.Pi;
 	public float FillEnergy { get; init; } = 0.55f / Mathf.Pi;
 	public float AmbientEnergy { get; init; } = 0.3f;
-	// Brillo de levitación (1 = el del prototipo, 0 = apagado) y fuerza del cambio de color de perla y camaleón
-	public float HoverGlowIntensity { get; init; } = 1f;
+	// Fuerza del cambio de color de perla y camaleón
 	public float IridescenceStrength { get; init; } = 1f;
 	// Anticolisión (solo los cascos que la tienen: BLADE)
 	public StrobeSettings Strobe { get; init; } = new();
@@ -33,7 +32,6 @@ public partial class ShipHull3D : Node3D
 	// Capa de los cascos de los rivales, con su propio juego de luces común (spec docs/rivales-1-parrilla.md)
 	public const uint RivalLayer = 1u << 11;
 
-	private const float GlowLift = 0.03f;   // m por encima de la pista
 	private const int SmokeMaxParticles = 40;
 
 	private static readonly string[] ScorchPaths =
@@ -61,18 +59,6 @@ void fragment() {
 	ALBEDO = film * edge * strength * (1.0 - texture(scorch, uv_scorch).a);
 }";
 
-	// Brillo bajo la nave: aditivo, caída radial (1 − d²)²
-	private const string GlowShader = @"
-shader_type spatial;
-render_mode blend_add, unshaded, cull_disabled, depth_draw_never, shadows_disabled;
-uniform float strength = 0.32;
-uniform vec3 tint = vec3(0.14, 0.36, 1.0);
-void fragment() {
-	vec2 d = (UV - 0.5) * 2.0;
-	float k = max(0.0, 1.0 - dot(d, d));
-	ALBEDO = tint * k * k * strength;
-}";
-
 	private readonly Dictionary<string, MeshInstance3D> _pieces = new();
 	private readonly Dictionary<string, Node3D> _empties = new();
 	private readonly Dictionary<string, float> _lightBase = new();
@@ -98,8 +84,6 @@ void fragment() {
 	private readonly Dictionary<string, (StandardMaterial3D Hazard, StandardMaterial3D Plate)> _leadingEdges = new();
 	private int _paintVersion;
 	private CpuParticles3D _smoke;
-	private MeshInstance3D _glow;
-	private ShaderMaterial _glowMaterial;
 	private int _scorchLevel;
 
 	public ShipHull3DProfile Profile { get; set; }
@@ -130,7 +114,6 @@ void fragment() {
 		BuildLights();
 		_built = true;
 		BuildSmoke();
-		BuildGlow();
 		ApplySettings(_settings);
 		if (IsLoaded)
 			SetPaint(_paintIndex);
@@ -659,9 +642,8 @@ void fragment() {
 		_smoke.Emitting = emitting;
 	}
 
-	// Cada frame: brillo bajo la nave (sobre la pista, con su inclinación), tamaño del humo según la velocidad y
-	// anticolisión (time: el de la nave, que la pausa congela)
-	public void UpdateEffects(Transform3D glowTransform, float glowStrength, float speed, float time)
+	// Cada frame: tamaño del humo según la velocidad y anticolisión (time: el de la nave, que la pausa congela)
+	public void UpdateEffects(float speed, float time)
 	{
 		IReadOnlyList<string> strobes = Profile.Contract.Strobes;
 		for (int i = 0; i < strobes.Count; i++)
@@ -669,12 +651,6 @@ void fragment() {
 			StandardMaterial3D material = MaterialOf(strobes[i]);
 			if (material != null)
 				material.EmissionEnergyMultiplier = StrobeLights.Intensity(time, i, _settings.Strobe);
-		}
-		if (_glow != null)
-		{
-			_glow.GlobalTransform = glowTransform;
-			_glow.Visible = glowStrength > 0.001f;
-			_glowMaterial.SetShaderParameter("strength", glowStrength);
 		}
 		if (_smoke != null)
 		{
@@ -914,34 +890,6 @@ void fragment() {
 			Position = EmptyPosition(HullPieces.Smoke)
 		};
 		AddChild(_smoke);
-	}
-
-	// Brillo de levitación: un plano sobre la pista; lo coloca la nave cada frame (no sigue su inclinación)
-	private void BuildGlow()
-	{
-		_glowMaterial = new ShaderMaterial { Shader = new Shader { Code = GlowShader } };
-		_glowMaterial.SetShaderParameter("tint", new Vector3(HoverGlow.ColorR, HoverGlow.ColorG, HoverGlow.ColorB));
-		var mesh = new PlaneMesh { Size = new Vector2(Profile.Glow.Width, Profile.Glow.Length), Material = _glowMaterial };
-		_glow = new MeshInstance3D
-		{
-			Name = "HoverGlow",
-			Mesh = mesh,
-			TopLevel = true,
-			Visible = false,
-			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
-		};
-		AddChild(_glow);
-	}
-
-	// Dónde va el brillo de levitación: sobre la pista bajo la nave, con la inclinación de la pista (no la de la nave)
-	public static Transform3D GlowTransform(Vectory.Circuit.SurfacePoint surface, Vector3 position, float yaw, float centerZ)
-	{
-		Vector3 up = ShipLineMesh.ToGodot(surface.Frame.Normal).Normalized();
-		var back = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
-		back = (back - up * back.Dot(up)).Normalized();
-		Vector3 right = up.Cross(back).Normalized();
-		Vector3 origin = new Vector3(position.X, surface.SurfaceY, position.Z) + up * GlowLift + back * centerZ;
-		return new Transform3D(new Basis(right, up, back), origin);
 	}
 
 	// Reflejos y luz ambiente del casco: el cielo del entorno, solo para reflejos, con el fondo de color de siempre.

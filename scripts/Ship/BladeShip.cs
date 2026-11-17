@@ -37,13 +37,12 @@ public static class BladeShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			// Casco 3D ASALTO; su panorama es el de su cabina (mismo buildEnv). Brillo de levitación de 3 × 9 m, centrado
-			// 0,7 m por delante del origen
+			// Casco 3D ASALTO; su panorama es el de su cabina (mismo buildEnv)
 			Hull3D = new ShipHull3DProfile(
 				"res://assets/ships/hull_blade.glb",
 				"res://assets/ships/hull_blade.manifest.json",
 				"res://assets/cockpits/cockpit_blade_env.png",
-				HullStyle.Military) { Glow = new HoverGlowShape(3.0f, 9.0f, -0.7f) },
+				HullStyle.Military),
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_blade.glb",
 				"res://assets/cockpits/cockpit_blade.manifest.json",
@@ -55,6 +54,8 @@ public static class BladeShip
 			// El semiancho del casco 3D (halfWidth del manifiesto, al centímetro): las puntas traseras en flecha con su
 			// bisel. El wireframe, que siguen usando el fantasma y el menú, llega a 1,6.
 			CollisionHalfWidth = 1.61f,
+			// Final de las puntas traseras
+			DriftContact = new DriftContactShape(3.6f),
 			// Caja total del manifiesto del casco 3D sin la sonda, al centímetro
 			CollisionFront = 5.2f,
 			CollisionBack = 3.61f,

@@ -225,19 +225,4 @@ public class HullPaintTests
         Assert.Equal(1.95f, HullDamage.SmokeFinalSize(0f));
         Assert.True(HullDamage.SmokeFinalSize(100f) > HullDamage.SmokeFinalSize(0f));
     }
-
-    // ---------- Brillo de levitación ----------
-
-    [Fact]
-    public void HoverGlow_PulsesAround032_AndFadesOutInTheAir()
-    {
-        Assert.Equal(0.32f, HoverGlow.Strength(0f, 1f), 5);
-        Assert.Equal(0.38f, HoverGlow.Strength(MathF.PI / 6f, 1f), 4);
-        Assert.Equal(0f, HoverGlow.Strength(1f, 0f));
-        Assert.Equal(1f, HoverGlow.AirFade(0f));
-        Assert.Equal(0.5f, HoverGlow.AirFade(1.5f), 5);
-        Assert.Equal(0f, HoverGlow.AirFade(3f));
-        Assert.Equal(1f, HoverGlow.Falloff(0f, 0f));
-        Assert.Equal(0f, HoverGlow.Falloff(1f, 0f));
-    }
 }

@@ -85,11 +85,10 @@ public partial class Spaceship : Node3D
 		_hull3D?.SetOpacity(opacity);
 	}
 
-	// Brillo de levitación (transformación sobre la pista y fuerza), velocidad para el tamaño del humo y tiempo de la
-	// nave para la anticolisión
-	public void UpdateHullEffects(Transform3D glow, float glowStrength, float speed, float time)
+	// Velocidad para el tamaño del humo y tiempo de la nave para la anticolisión
+	public void UpdateHullEffects(float speed, float time)
 	{
-		_hull3D?.UpdateEffects(glow, glowStrength, speed, time);
+		_hull3D?.UpdateEffects(speed, time);
 	}
 
 	// Balizas del techo del casco 3D (HAMMER): intensidad de la ámbar y de la roja; sin balizas no hace nada

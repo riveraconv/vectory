@@ -36,13 +36,12 @@ public static class HammerShip
 		VectorShip.Definition.Visual with
 		{
 			BuildHull = BuildHull,
-			// Casco 3D MINERO; su panorama es el de BLADE (mismo buildEnv). Brillo de levitación de 3,4 × 7,4 m, centrado
-			// 0,5 m por delante del origen
+			// Casco 3D MINERO; su panorama es el de BLADE (mismo buildEnv)
 			Hull3D = new ShipHull3DProfile(
 				"res://assets/ships/hull_hammer.glb",
 				"res://assets/ships/hull_hammer.manifest.json",
 				"res://assets/cockpits/cockpit_blade_env.png",
-				HullStyle.Industrial) { Glow = new HoverGlowShape(3.4f, 7.4f, -0.5f) },
+				HullStyle.Industrial),
 			Cockpit3D = new Cockpit3DProfile(
 				"res://assets/cockpits/cockpit_hammer.glb",
 				"res://assets/cockpits/cockpit_hammer.manifest.json",
@@ -54,6 +53,8 @@ public static class HammerShip
 			// El semiancho del casco 3D (halfWidth del manifiesto, 2,502, al centímetro): las balizas de las puntas caídas
 			// del canard. Es el mismo del wireframe, que siguen usando el fantasma y el menú.
 			CollisionHalfWidth = 2.5f,
+			// No tiene alas detrás: los patines de las puntas caídas de los canards, delante (decisión del usuario)
+			DriftContact = new DriftContactShape(-2.2f),
 			// Caja total del manifiesto del casco 3D, al centímetro
 			CollisionFront = 3.83f,
 			CollisionBack = 3f,

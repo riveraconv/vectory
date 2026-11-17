@@ -149,7 +149,6 @@ public class Hull3DHammerTests
         Assert.EndsWith(Manifest.Environment, hull.EnvironmentPath);
         Assert.Equal(HullStyle.Industrial, hull.Style);
         Assert.Same(HullContract.Industrial, hull.Contract);
-        Assert.Equal(new HoverGlowShape(3.4f, 7.4f, -0.5f), hull.Glow);
     }
 
     [Fact]

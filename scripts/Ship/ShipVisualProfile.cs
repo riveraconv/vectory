@@ -51,17 +51,15 @@ public enum HullStyle
 	Industrial  // HAMMER (spec docs/cascos-3d-3-hammer.md)
 }
 
-// Brillo de levitación bajo la nave: plano de Width × Length m centrado CenterZ m por detrás del origen
-public readonly record struct HoverGlowShape(float Width, float Length, float CenterZ);
+// Dónde roza una nave al derrapar (spec docs/efectos-2-derrape.md, 4.1): TipZ, la z de las puntas de las alas (positivo
+// hacia la popa), donde van las marcas al TipFraction del semiancho de colisión
+public readonly record struct DriftContactShape(float TipZ);
 
 // Un casco 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
 // del que sale su contrato de piezas
 public sealed record ShipHull3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath, HullStyle Style)
 {
 	public HullContract Contract => HullContract.For(Style);
-
-	// El de VECTOR por defecto
-	public HoverGlowShape Glow { get; init; } = new(HoverGlow.Width, HoverGlow.Length, HoverGlow.CenterZ);
 }
 
 // Cómo es y cómo se ve una nave (spec docs/naves-1-definicion.md, 3). El casco es un constructor: devuelve sus líneas,
@@ -83,6 +81,9 @@ public sealed record ShipVisualProfile
 
 	// Semiancho que usa la colisión con la barrera. Sale del diseño: el de una nave con alas llega a la punta del ala.
 	public required float CollisionHalfWidth { get; init; }
+
+	// Dónde roza al derrapar (spec docs/efectos-2-derrape.md): las puntas de las alas, a esta z (positivo hacia la popa)
+	public required DriftContactShape DriftContact { get; init; }
 
 	// Largo que usa el choque entre naves (spec docs/rivales-3-contacto.md, 3.1): del origen de la nave a lo más adelantado
 	// y a lo más atrasado de la caja total del manifiesto de su casco 3D (sin la sonda de BLADE). La caja no está centrada

@@ -45,30 +45,3 @@ public static class HullDamage
 	// Las luces que titilan (14): las de acento y los pilotos traseros, no las toberas
 	public static int FlickerLightCount => 14;
 }
-
-// Brillo de levitación bajo el casco 3D (spec 6.6). Lógica pura.
-public static class HoverGlow
-{
-	public const float Width = 3.2f;
-	public const float Length = 7.5f;
-	public const float CenterZ = 0.2f;
-	public const float Base = 0.32f;
-	public const float Pulse = 0.06f;
-	public const float PulseSpeed = 3f;          // rad/s de sen(3t)
-	public const float FadeOutHeight = 3f;       // m por encima de la altura de vuelo: del todo apagado
-	public const float ColorR = 0.14f, ColorG = 0.36f, ColorB = 1.0f;
-
-	// Fuerza en el tiempo t (s) con la intensidad del Inspector (1 = la del prototipo)
-	public static float Strength(float time, float intensity) => MathF.Max(0f, intensity * (Base + Pulse * MathF.Sin(PulseSpeed * time)));
-
-	// Cuánto queda en el aire: 1 a la altura de vuelo o por debajo, 0 a FadeOutHeight por encima
-	public static float AirFade(float heightAboveHover) => Math.Clamp(1f - heightAboveHover / FadeOutHeight, 0f, 1f);
-
-	// Caída radial del prototipo: (1 − d²)², con d de 0 en el centro a 1 en el borde del plano
-	public static float Falloff(float dx, float dy)
-	{
-		float d2 = dx * dx + dy * dy;
-		float k = MathF.Max(0f, 1f - d2);
-		return k * k;
-	}
-}

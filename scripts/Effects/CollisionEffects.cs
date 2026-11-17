@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using Vectory.Circuit;
+using Vectory.Core;
 using Vectory.Settings;
 using Vectory.Ship;
 using NVector2 = System.Numerics.Vector2;
@@ -12,7 +13,8 @@ namespace Vectory.Effects;
 // Nodo de los efectos de choque de la carrera (spec docs/efectos-1-choques.md, 10): recibe los contactos de Main,
 // llama a CollisionFx y solo dibuja. Chispas en una malla de líneas con color por vértice en suma; brillos de los
 // destellos en cuadrados de cara a la cámara en suma, y sus rayos y ondas en otra malla de líneas; humo en cuadrados de
-// cara a la cámara con mezcla normal. Las mallas se rehacen cada frame en _Process, así la pausa lo congela todo.
+// cara a la cámara con mezcla normal. También los efectos del derrape (spec docs/efectos-2-derrape.md): sus marcas en
+// otra malla de líneas en suma. Las mallas se rehacen cada frame en _Process, así la pausa lo congela todo.
 // Sin reglas propias.
 public partial class CollisionEffects : Node3D
 {
@@ -56,10 +58,23 @@ public partial class CollisionEffects : Node3D
 	[Export] public float SmokeOpacity { get; set; } = D.SmokeOpacity;
 	[Export] public int MaxPuffs { get; set; } = D.MaxPuffs;
 
+	[ExportGroup("Derrape")]
+	[Export] public float DriftStartAngle { get; set; } = D.Drift.StartAngle;        // grados: hasta aquí, sin efectos
+	[Export] public float DriftFullAngle { get; set; } = D.Drift.FullAngle;          // grados: intensidad completa
+	[Export] public float DriftTipFraction { get; set; } = D.Drift.TipFraction;      // marcas: fracción del semiancho
+	[Export] public float DriftMarkSpacing { get; set; } = D.Drift.MarkSpacing;      // m entre muestras
+	[Export] public float DriftMarkLift { get; set; } = D.Drift.MarkLift;            // m sobre la superficie
+	[Export] public float DriftMarkLife { get; set; } = D.Drift.MarkLife;            // s
+	[Export] public float DriftMarkFadeFrom { get; set; } = D.Drift.MarkFadeFrom;    // fracción de la vida
+	[Export] public float DriftMarkBrightness { get; set; } = D.Drift.MarkBrightness;
+	[Export] public float DriftMarkMinFactor { get; set; } = D.Drift.MarkMinFactor;  // brillo × (esto + (1 − esto) · d)
+	[Export] public int DriftMaxMarkSamples { get; set; } = D.Drift.MaxMarkSamples;  // por nave
+
 	private const int Bucket = 256;       // las mallas de líneas usan arrays de tamaño múltiplo de esto, para no crearlos cada frame
 	private const int QuadBucket = 32;    // ídem en cuadrados
 
 	private CollisionFx _fx;
+	private DriftMarks _drift;
 	private CollisionFxSettings _settings;
 	private ICrashGround _ground;
 	private TrackFrame _frame;
@@ -71,10 +86,12 @@ public partial class CollisionEffects : Node3D
 	private MeshInstance3D _lineView;
 	private MeshInstance3D _glowView;
 	private MeshInstance3D _smokeView;
+	private MeshInstance3D _markView;
 	private ArrayMesh _sparkMesh;
 	private ArrayMesh _lineMesh;
 	private ArrayMesh _glowMesh;
 	private ArrayMesh _smokeMesh;
+	private ArrayMesh _markMesh;
 	private readonly Dictionary<int, (Vector3[] V, Color[] C)> _lineArrays = new();
 	private readonly Dictionary<int, (Vector3[] V, Color[] C, Vector2[] U)> _quadArrays = new();
 
@@ -87,6 +104,7 @@ public partial class CollisionEffects : Node3D
 		_ground = new TrackCrashGround(_frame, _barrierOffset);
 		_settings = BuildSettings();
 		_fx = new CollisionFx(_settings, new Random());
+		_drift = new DriftMarks(_settings.Drift);
 		ApplyQuality();
 		BuildViews();
 	}
@@ -115,12 +133,34 @@ public partial class CollisionEffects : Node3D
 			_fx.Crash(crash.Value, dt);
 	}
 
+	// El derrape de una nave en este paso de física (spec docs/efectos-2-derrape.md). slipAngle: el de ShipDynamics, en
+	// radianes; position: la de la nave; forward: su morro en planta.
+	public void DriftShip(int shipId, bool drifting, bool airborne, float slipAngle, NVector3 position, NVector2 forward,
+		float halfWidth, DriftContactShape contact)
+	{
+		if (_drift == null)
+			return;
+		DriftState state = DriftIntensity.Evaluate(drifting, airborne, slipAngle, _settings.Drift);
+		if (!state.Active)
+		{
+			_drift.Update(shipId, state, default, default);
+			return;
+		}
+		(NVector3 left, NVector3 right) = DriftContact.MarkPoints(_frame, position, forward, halfWidth, contact.TipZ, _settings.Drift);
+		_drift.Update(shipId, state, left, right);
+	}
+
+	// Recolocación: el trazo de esa nave se corta y las marcas se quedan
+	public void CutDrift(int shipId) => _drift?.Cut(shipId);
+
 	public override void _Process(double delta)
 	{
 		if (_fx == null)
 			return;
 		ApplyQuality();
 		_fx.Update((float)delta, _ground);
+		_drift.Advance((float)delta);
+		DrawDriftMarks();
 		Camera3D camera = GetViewport().GetCamera3D();
 		if (camera == null)
 			return;
@@ -172,6 +212,18 @@ public partial class CollisionEffects : Node3D
 		s.SmokeBarrierInherit = SmokeBarrierInherit;
 		s.SmokeOpacity = SmokeOpacity;
 		s.MaxPuffs = MaxPuffs;
+		s.Drift.StartAngle = DriftStartAngle;
+		s.Drift.FullAngle = DriftFullAngle;
+		s.Drift.TipFraction = DriftTipFraction;
+		s.Drift.MarkSpacing = DriftMarkSpacing;
+		s.Drift.MarkLift = DriftMarkLift;
+		s.Drift.MarkLife = DriftMarkLife;
+		s.Drift.MarkFadeFrom = DriftMarkFadeFrom;
+		s.Drift.MarkBrightness = DriftMarkBrightness;
+		s.Drift.MarkMinFactor = DriftMarkMinFactor;
+		s.Drift.MaxMarkSamples = DriftMaxMarkSamples;
+		Color orange = Palette.Orange;
+		s.Drift.MarkColor = new NVector3(orange.R, orange.G, orange.B);
 		return s;
 	}
 
@@ -208,6 +260,7 @@ public partial class CollisionEffects : Node3D
 		_lineView = View("FlashLines", lines, out _lineMesh);
 		_glowView = View("FlashGlows", glow, out _glowMesh);
 		_smokeView = View("Smoke", smoke, out _smokeMesh);
+		_markView = View("DriftMarks", lines, out _markMesh);
 	}
 
 	private MeshInstance3D View(string name, Material material, out ArrayMesh mesh)
@@ -262,6 +315,44 @@ public partial class CollisionEffects : Node3D
 		}
 		FillLines(v, c, n * 2);
 		Commit(_sparkMesh, Mesh.PrimitiveType.Lines, v, c, null);
+	}
+
+	// Marcas del derrape: entre muestras seguidas del mismo trazo, una línea por punta, con el brillo de cada muestra
+	private void DrawDriftMarks()
+	{
+		float now = _drift.Now;
+		int count = 0;
+		foreach (DriftMarkTrail trail in _drift.Trails)
+		{
+			trail.Prune(now);
+			count += Math.Max(0, trail.Count - 1);
+		}
+		if (!Begin(_markView, _markMesh, count))
+			return;
+		(Vector3[] v, Color[] c) = Lines(count * 4);
+		NVector3 color = _settings.Drift.MarkColor;
+		int k = 0;
+		foreach (DriftMarkTrail trail in _drift.Trails)
+		{
+			for (int i = 1; i < trail.Count; i++)
+			{
+				DriftMarkSample a = trail[i - 1];
+				DriftMarkSample b = trail[i];
+				if (a.Stroke != b.Stroke)
+					continue;
+				float wa = trail.BrightnessOf(a, now);
+				float wb = trail.BrightnessOf(b, now);
+				if (wa <= 0f && wb <= 0f)
+					continue;
+				Color ca = C(color * wa), cb = C(color * wb);
+				v[k] = G(a.Left); c[k++] = ca;
+				v[k] = G(b.Left); c[k++] = cb;
+				v[k] = G(a.Right); c[k++] = ca;
+				v[k] = G(b.Right); c[k++] = cb;
+			}
+		}
+		FillLines(v, c, k);
+		Commit(_markMesh, Mesh.PrimitiveType.Lines, v, c, null);
 	}
 
 	private void DrawFlashLines(Vector3 right, Vector3 up)

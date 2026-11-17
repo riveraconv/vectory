@@ -114,7 +114,7 @@ public partial class RivalShip : Node3D
 		Publish();
 	}
 
-	// Efectos del casco: brillo de levitación, anticolisión, balizas y parpadeo. Con la pausa no avanzan.
+	// Efectos del casco: anticolisión, balizas y parpadeo. Con la pausa no avanzan.
 	public override void _Process(double delta)
 	{
 		float dt = (float)delta;
@@ -122,10 +122,7 @@ public partial class RivalShip : Node3D
 		ShipPhysics physics = _car.Physics;
 		if (_ship.HasHull3D && physics.HasSurface)
 		{
-			SurfacePoint surface = physics.Surface;
-			Transform3D glow = ShipHull3D.GlowTransform(surface, GlobalPosition, _car.Dynamics.Yaw, _ship.Visual.Hull3D.Glow.CenterZ);
-			float strength = HoverGlow.Strength(_time, _look.Hull.HoverGlowIntensity) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
-			_ship.UpdateHullEffects(glow, strength, _car.Dynamics.RealSpeed, _time);
+			_ship.UpdateHullEffects(_car.Dynamics.RealSpeed, _time);
 			(float boost, float damage) = IndustrialHullBeacons.Intensities(_car.Boost.IsImpulseActive, _damageLevel, true, _time, _look.Lamps);
 			_ship.SetHullBeacons(boost, damage);
 		}

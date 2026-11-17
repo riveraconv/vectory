@@ -134,10 +134,8 @@ public class Hull3DBladeTests
         Assert.EndsWith(Manifest.Environment, hull.EnvironmentPath);
         Assert.Equal(HullStyle.Military, hull.Style);
         Assert.Same(HullContract.Military, hull.Contract);
-        Assert.Equal(new HoverGlowShape(3.0f, 9.0f, -0.7f), hull.Glow);
 
         Assert.Equal(HullStyle.Racing, VectorShip.Definition.Visual.Hull3D!.Style);
-        Assert.Equal(new HoverGlowShape(HoverGlow.Width, HoverGlow.Length, HoverGlow.CenterZ), VectorShip.Definition.Visual.Hull3D!.Glow);
         Assert.Equal(HullStyle.Industrial, HammerShip.Definition.Visual.Hull3D!.Style);
     }
 

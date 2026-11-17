@@ -233,7 +233,6 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export] public float HullRimEnergy = Hull3DDefaults.RimEnergy;
 	[Export] public float HullFillEnergy = Hull3DDefaults.FillEnergy;
 	[Export] public float HullAmbientEnergy = Hull3DDefaults.AmbientEnergy;
-	[Export(PropertyHint.Range, "0,3,0.01")] public float HullHoverGlow = Hull3DDefaults.HoverGlowIntensity;   // brillo de levitación: 1 = 0,32 ± 0,06; 0 = apagado
 	[Export(PropertyHint.Range, "0,3,0.01")] public float HullIridescence = Hull3DDefaults.IridescenceStrength; // perla, camaleón y cúpula
 	// Anticolisión de BLADE (spec docs/cascos-3d-2-blade.md, 6.4): destello de Duration s cada Period s; la de abajo, Offset s después
 	[Export] public float HullStrobePeriod = Hull3DDefaults.Strobe.Period;
@@ -252,7 +251,6 @@ public partial class Player : CharacterBody3D, IContactShip
 			RimEnergy = HullRimEnergy,
 			FillEnergy = HullFillEnergy,
 			AmbientEnergy = HullAmbientEnergy,
-			HoverGlowIntensity = HullHoverGlow,
 			IridescenceStrength = HullIridescence,
 			Strobe = new StrobeSettings
 			{
@@ -381,6 +379,14 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	// Velocidad real en planta (X, Z del mundo): la que heredan las chispas de los choques
 	public System.Numerics.Vector2 PlanVelocity => Dynamics.Velocity;
+
+	// Derrape, para sus efectos: si derrapa y su ángulo de deslizamiento (radianes; positivo = desliza a la derecha)
+	public bool Drifting => Dynamics.Drifting;
+	public float SlipAngle => Dynamics.SlipAngle;
+
+	// La nave que se ve (con F10, la del panel): su semiancho y dónde roza al derrapar
+	public float CollisionHalfWidth => ExteriorVisual.CollisionHalfWidth;
+	public DriftContactShape DriftContact => ExteriorVisual.DriftContact;
 
 	// Distancia sobre el eje de la pista desde la meta (m), la de la superficie bajo la nave
 	public float TrackDistance => _physics.HasSurface ? _physics.Surface.Frame.Distance : 0f;
@@ -807,17 +813,14 @@ public partial class Player : CharacterBody3D, IContactShip
 	// Combinación de pintura que lleva el casco 3D de un estilo
 	public int HullPaint(HullStyle style) => _ship.HullPaint(style);
 
-	// Brillo de levitación sobre la pista bajo la nave, con la inclinación de la pista (no la de la nave) y apagándose
-	// en el aire; y la velocidad, que agranda el humo. Con la pausa no avanza: queda congelado.
+	// La velocidad, que agranda el humo, y el tiempo de la nave para la anticolisión. Con la pausa no avanza: queda
+	// congelado.
 	private void UpdateHullEffects(float dt)
 	{
 		if (!_ship.HasHull3D || !_physics.HasSurface)
 			return;
 		_hoverTime += dt;
-		SurfacePoint surface = _physics.Surface;
-		Transform3D glow = ShipHull3D.GlowTransform(surface, GlobalPosition, Dynamics.Yaw, _ship.Visual.Hull3D.Glow.CenterZ);
-		float strength = HoverGlow.Strength(_hoverTime, HullHoverGlow) * HoverGlow.AirFade(surface.Height - Track.ShipHover);
-		_ship.UpdateHullEffects(glow, strength, Dynamics.RealSpeed, _hoverTime);
+		_ship.UpdateHullEffects(Dynamics.RealSpeed, _hoverTime);
 		// Balizas del techo (HAMMER): las mismas reglas y ajustes que las de su cabina 3D
 		(float boostBeacon, float damageBeacon) = IndustrialHullBeacons.Intensities(Boost.IsImpulseActive, _damageLevel,
 			CockpitDamageEnabled, _hoverTime, BuildIndustrialLampSettings());

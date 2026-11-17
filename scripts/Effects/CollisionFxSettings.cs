@@ -199,5 +199,8 @@ public sealed class CollisionFxSettings
 	public float SmokeFadeIn = 0.1f;
 	public int MaxPuffs = 120;
 
+	// --- Derrape (spec docs/efectos-2-derrape.md)
+	public DriftFxSettings Drift = new();
+
 	public static CollisionFxSettings Default => new();
 }
