@@ -109,4 +109,35 @@ public class CockpitCrashFeelTests
         for (int i = 0; i < low.Sparks.Count; i++)
             Assert.True(low.Sparks[i].Velocity.Y < settings.HighSparkUpMin);
     }
+
+    // Roce por detrás: temblor a la mitad, sin luz en ningún sitio
+    [Fact]
+    public void A_rear_graze_only_rumbles_at_half()
+    {
+        var feel = Create();
+        for (int i = 0; i < 30; i++)
+        {
+            feel.RearGraze();
+            feel.Step(Dt);
+        }
+        Assert.InRange(feel.Rumble, 0.48f, 0.5f);
+        foreach (CrashLightSide side in Enum.GetValues<CrashLightSide>())
+            Assert.Equal(0f, feel.Light(side));
+    }
+
+    // Golpe por detrás: el fogonazo va detrás (o delante), no a los lados, y no tiembla
+    [Theory]
+    [InlineData(CrashLightSide.Rear)]
+    [InlineData(CrashLightSide.Front)]
+    public void A_rear_hit_lights_only_its_end(CrashLightSide end)
+    {
+        var feel = Create();
+        feel.Contact(end, ImpactLevel.Strong, true);
+        feel.Step(0.001f);
+        Assert.True(feel.Light(end) > 2.5f);
+        foreach (CrashLightSide side in Enum.GetValues<CrashLightSide>())
+            if (side != end)
+                Assert.Equal(0f, feel.Light(side));
+        Assert.Equal(0f, feel.Rumble);
+    }
 }

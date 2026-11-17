@@ -449,9 +449,8 @@ public partial class Main : Node3D
 			foreach (ShipContactEvent e in _rivals.Contacts.Events)
 			{
 				_collisionFx.ShipContact(e, ContactVelocity(e), delta);
-				bool felt = (e.IsNewImpact && e.Level != ImpactLevel.Graze) || e.Graze == GrazeKind.Side;
-				if (felt && (e.A == _player.Id || e.B == _player.Id))
-					_player.FeelShip(e.Point, e.IsNewImpact ? e.Level : ImpactLevel.Graze, e.IsNewImpact);
+				if (e.A == _player.Id || e.B == _player.Id)
+					_player.FeelShip(e.Point, e.Level, e.IsNewImpact, e.Graze, e.Facing);
 			}
 		}
 		_player.StepCrashFeel(delta);

@@ -71,6 +71,12 @@ public partial class Cockpit3DView : CanvasLayer
 	private static readonly Vector3 DamageLightPosition = new(0f, 0.1f, -0.35f);
 	// Luz de las chispas de un roce: por fuera de cada lado, algo por delante del ojo, a la altura del salpicadero
 	private static readonly Vector3 SparkLightPosition = new(1.05f, 0.15f, -0.6f);
+	// Alcance por detrás: si te embisten, desde detrás del asiento, una por arriba y otra a la altura de los mandos; si
+	// embistes tú, una delante y abajo, desde el morro
+	private static readonly Vector3 RearHighLightPosition = new(0f, 0.45f, 0.5f);
+	private static readonly Vector3 RearLowLightPosition = new(0f, -0.5f, 0.55f);
+	private const float RearLowFactor = 0.5f;   // la de abajo, más cerca de los mandos: a la mitad, para que no queme
+	private static readonly Vector3 FrontLightPosition = new(0f, 0.05f, -0.85f);
 	private const float SparkLightRange = 2.2f;
 	private const float SparkLightDecay = 1.4f;
 
@@ -107,6 +113,9 @@ public partial class Cockpit3DView : CanvasLayer
 	private TextureRect _sparkTintRight;
 	private OmniLight3D _sparkLeft;
 	private OmniLight3D _sparkRight;
+	private OmniLight3D _sparkRearHigh;
+	private OmniLight3D _sparkRearLow;
+	private OmniLight3D _sparkFront;
 	private Godot.Environment _environment;
 	private Cockpit3DSettings _settings;
 
@@ -639,6 +648,9 @@ public partial class Cockpit3DView : CanvasLayer
 		uint spark = ToHex(Palette.Orange);
 		_sparkLeft = NewOmni("SparkLeft", SparkLightPosition * new Vector3(-1f, 1f, 1f), spark, SparkLightRange, SparkLightDecay);
 		_sparkRight = NewOmni("SparkRight", SparkLightPosition, spark, SparkLightRange, SparkLightDecay);
+		_sparkRearHigh = NewOmni("SparkRearHigh", RearHighLightPosition, spark, SparkLightRange, SparkLightDecay);
+		_sparkRearLow = NewOmni("SparkRearLow", RearLowLightPosition, spark, SparkLightRange, SparkLightDecay);
+		_sparkFront = NewOmni("SparkFront", FrontLightPosition, spark, SparkLightRange, SparkLightDecay);
 	}
 
 	private static uint ToHex(Color c) =>
@@ -646,12 +658,16 @@ public partial class Cockpit3DView : CanvasLayer
 
 	// Luz de las chispas de un choque en cada lado (CockpitCrashFeel.Light): luz que ilumina pilar y salpicadero de ese
 	// lado y tinte naranja en ese borde de la pantalla. energy y tint: lo que vale 1 de luz.
-	public void SetCrashLight(float left, float right, float energy, float tint)
+	// front / rear: la luz de un alcance por detrás, con su energía (más suave, sin tinte)
+	public void SetCrashLight(float left, float right, float energy, float tint, float front, float rear, float endEnergy)
 	{
 		if (!_built || _sparkLeft == null)
 			return;
 		_sparkLeft.LightEnergy = left * energy;
 		_sparkRight.LightEnergy = right * energy;
+		_sparkRearHigh.LightEnergy = rear * endEnergy;
+		_sparkRearLow.LightEnergy = rear * endEnergy * RearLowFactor;
+		_sparkFront.LightEnergy = front * endEnergy;
 		SetTint(_sparkTintLeft, Mathf.Min(1f, left * tint));
 		SetTint(_sparkTintRight, Mathf.Min(1f, right * tint));
 	}

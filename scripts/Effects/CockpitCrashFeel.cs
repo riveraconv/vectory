@@ -21,17 +21,29 @@ public sealed class CockpitCrashFeelSettings
 	public float RumbleAmplitude = 0.012f;    // m mientras se roza
 	public float RumbleSmoothing = 0.05f;     // s: entra y sale casi al momento
 	public float RumbleFrequency = 31f;       // Hz base: más fino que la vibración por velocidad
+	public float RearGrazeRumble = 0.5f;      // fracción del temblor con un roce por detrás (sin luz ni chispas)
 
 	public static CockpitCrashFeelSettings Default => new();
 }
 
-// Luz de las chispas en la cabina por cada lado y temblor fino mientras se roza (solo la nave del jugador). Un paso de
-// física por llamada a Step; con dt 0 (pausa) no cambia nada. Random inyectado para el parpadeo. Lógica pura.
+// De dónde llega la luz de un choque a la cabina: los lados (barrera y roces o golpes de lado) o delante / detrás (un
+// alcance por detrás: delante si embistes tú, detrás si te embisten)
+public enum CrashLightSide
+{
+	Left,
+	Right,
+	Front,
+	Rear
+}
+
+// Luz de las chispas en la cabina por cada lado, delante y detrás, y temblor fino mientras se roza (solo la nave del
+// jugador). Un paso de física por llamada a Step; con dt 0 (pausa) no cambia nada. Random inyectado para el parpadeo.
+// Lógica pura.
 public sealed class CockpitCrashFeel
 {
 	private readonly CockpitCrashFeelSettings _s;
 	private readonly Random _random;
-	private readonly Side[] _sides = { new(), new() };
+	private readonly Side[] _sides = { new(), new(), new(), new() };
 	private float _rumbleTarget;
 
 	private sealed class Side
@@ -55,7 +67,13 @@ public sealed class CockpitCrashFeel
 	public float Time { get; private set; }
 
 	// Contacto de este paso en un lado: roce continuo o golpe medio / fuerte que cuenta
-	public void Contact(BarrierSide side, ImpactLevel level, bool isNewImpact)
+	public void Contact(BarrierSide side, ImpactLevel level, bool isNewImpact) =>
+		Contact(side == BarrierSide.Right ? CrashLightSide.Right : CrashLightSide.Left, level, isNewImpact);
+
+	// Roce por detrás con otra nave en este paso: solo un temblor más suave, sin luz
+	public void RearGraze() => _rumbleTarget = MathF.Max(_rumbleTarget, _s.RearGrazeRumble);
+
+	public void Contact(CrashLightSide side, ImpactLevel level, bool isNewImpact)
 	{
 		Side s = _sides[(int)side];
 		if (isNewImpact && level != ImpactLevel.Graze)
@@ -108,7 +126,9 @@ public sealed class CockpitCrashFeel
 	}
 
 	// Luz de las chispas de un lado (0 = nada): el mayor del roce y del golpe
-	public float Light(BarrierSide side)
+	public float Light(BarrierSide side) => Light(side == BarrierSide.Right ? CrashLightSide.Right : CrashLightSide.Left);
+
+	public float Light(CrashLightSide side)
 	{
 		Side s = _sides[(int)side];
 		float graze = s.Graze * s.Fade;

@@ -344,4 +344,7 @@ No se empieza una etapa sin validar la anterior.
 - Un golpe dentro de la espera de la pareja llega como roce: de lado saca las chispas del roce de ese paso; por detrás, nada. Un contacto en el que ya se separan tampoco saca nada.
 - La luz y el temblor de la cabina de la etapa 1 también valen entre naves: un roce de lado o un golpe con tu nave encienden el lado de la cabina donde queda el punto de contacto.
 - Comprobado con sondas en RACE: golpes medios y fuertes con rivales (destello entre las dos naves, onda y humo). A 144 Hz, 4 s de choques en la salida: 0–1 frames lentos, peor frame 15–28 ms, como antes.
+- **Decisión del usuario tras probarla, toques por detrás con tu nave** (fuera no cambia nada: el roce por detrás sigue sin chispas):
+  - Roce por detrás: solo un temblor en cabina a la mitad del de lado (`RearGrazeRumble` 0,5), sin luz.
+  - Golpe medio o fuerte por detrás: el fogonazo no va a un lado, sino detrás si te embisten (dos luces tras el asiento, una por arriba y otra a la altura de los mandos, esta a la mitad para que no queme) o delante si embistes tú (una luz delante, que ilumina los cantos de los pilares). Más suave que el de los lados (`CrashEndLightEnergy` 0,5) y sin tinte en los bordes.
 

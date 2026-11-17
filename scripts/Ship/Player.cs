@@ -166,6 +166,8 @@ public partial class Player : CharacterBody3D, IContactShip
 	[ExportGroup("Cabina: choques")]
 	[Export] public float CrashLightEnergy = 1.2f;       // energía de la luz de cada lado con el roce más fuerte
 	[Export] public float CrashLightTint = 0.8f;         // opacidad del tinte del borde con el roce más fuerte
+	[Export] public float CrashEndLightEnergy = 0.5f;    // energía de la luz de un alcance (detrás o delante), más suave
+	[Export(PropertyHint.Range, "0,1,0.01")] public float CrashRearGrazeRumble = 0.5f;   // temblor con un roce por detrás
 	[Export] public float CrashRumbleAmplitude = 0.012f; // m
 	[Export] public float CrashRumbleFrequency = 31f;    // Hz
 
@@ -1150,13 +1152,15 @@ public partial class Player : CharacterBody3D, IContactShip
 		_chaseCam.SetShake(offset, _shake.Roll);
 		System.Numerics.Vector2 rumble = CrashFeel.RumbleOffset(ActiveSettings.CockpitShake);
 		_cockpit.SetShake(offset * CockpitShakeFactor + new Vector2(rumble.X, rumble.Y), _shake.Roll * CockpitShakeFactor);
-		_cockpit.SetCrashLight(CrashFeel.Light(BarrierSide.Left), CrashFeel.Light(BarrierSide.Right), CrashLightEnergy, CrashLightTint);
+		_cockpit.SetCrashLight(CrashFeel.Light(BarrierSide.Left), CrashFeel.Light(BarrierSide.Right), CrashLightEnergy, CrashLightTint,
+			CrashFeel.Light(CrashLightSide.Front), CrashFeel.Light(CrashLightSide.Rear), CrashEndLightEnergy);
 	}
 
 	private CockpitCrashFeel CrashFeel => _crashFeel ??= new CockpitCrashFeel(new CockpitCrashFeelSettings
 	{
 		RumbleAmplitude = CrashRumbleAmplitude,
-		RumbleFrequency = CrashRumbleFrequency
+		RumbleFrequency = CrashRumbleFrequency,
+		RearGrazeRumble = CrashRearGrazeRumble
 	}, new System.Random());
 
 	// Contactos de este paso para la luz y el temblor de la cabina: los marca Main (barrera y otras naves) y luego
@@ -1168,13 +1172,35 @@ public partial class Player : CharacterBody3D, IContactShip
 	}
 
 	// Contacto con otra nave en point (planta): el lado sale de dónde queda respecto a tu nave
-	public void FeelShip(System.Numerics.Vector2 point, ImpactLevel level, bool isNewImpact)
+	// Un roce por detrás solo tiembla, más suave; un golpe por detrás (facing Rear) se enciende delante o detrás según
+	// quede el punto, y uno de lado, en ese lado.
+	public void FeelShip(System.Numerics.Vector2 point, ImpactLevel level, bool isNewImpact, GrazeKind graze, GrazeKind facing)
+	{
+		bool impact = isNewImpact && level != ImpactLevel.Graze;
+		if (!impact)
+		{
+			if (graze == GrazeKind.Rear)
+				CrashFeel.RearGraze();
+			else if (graze == GrazeKind.Side)
+				CrashFeel.Contact(SideOf(point), ImpactLevel.Graze, false);
+			return;
+		}
+		if (facing == GrazeKind.Rear)
+		{
+			var rel = new NVec2(point.X - GlobalPosition.X, point.Y - GlobalPosition.Z);
+			CrashLightSide end = NVec2.Dot(rel, Dynamics.Forward) >= 0f ? CrashLightSide.Front : CrashLightSide.Rear;
+			CrashFeel.Contact(end, level, true);
+			return;
+		}
+		CrashFeel.Contact(SideOf(point), level, true);
+	}
+
+	private BarrierSide SideOf(System.Numerics.Vector2 point)
 	{
 		NVec2 forward = Dynamics.Forward;
 		var right = new NVec2(-forward.Y, forward.X);
 		var rel = new NVec2(point.X - GlobalPosition.X, point.Y - GlobalPosition.Z);
-		BarrierSide side = NVec2.Dot(rel, right) >= 0f ? BarrierSide.Right : BarrierSide.Left;
-		CrashFeel.Contact(side, level, isNewImpact);
+		return NVec2.Dot(rel, right) >= 0f ? BarrierSide.Right : BarrierSide.Left;
 	}
 
 	public void StepCrashFeel(float dt) => CrashFeel.Step(dt);
