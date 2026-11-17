@@ -1,3 +1,4 @@
+using Vectory.Rivals;
 using Vectory.Ship;
 
 namespace Vectory.Game;
@@ -16,4 +17,8 @@ public static class GameSession
 	// Diseño de nave en uso (ShipCatalog), elegido en SELECT SHIP. MainMenu le da la última nave guardada la primera vez
 	// que se abre; la escena de carrera ejecutada sola desde el editor corre con la de por defecto.
 	public static string ShipDesignId { get; set; } = ShipCatalog.Default;
+
+	// Dificultad de los rivales (spec docs/rivales-4-personalidades.md, 6.2). La carrera la lee al montarse: cambiarla
+	// vale para la siguiente. Hasta que exista SETTINGS, la cambia el panel de pruebas (F9) y no se guarda.
+	public static Difficulty Difficulty { get; set; } = DifficultyRules.Default;
 }

@@ -96,20 +96,20 @@ public readonly record struct PilotTraits(float StraightMargin, float CurveMargi
 	public const float MinPaceMargin = 0.5f;
 }
 
-// Los seis perfiles con sus rasgos (spec 3.2). Los márgenes de la spec subidos 2 puntos (NORMAL al ritmo de los rivales
-// de antes) y corregidos con BalanceRunner en modo PERFILES (3.5), decisión del usuario. Lógica pura: solo datos.
+// Los seis perfiles con sus rasgos (spec 3.2). Márgenes ajustados con BalanceRunner en modo PERFILES (3.5) y la curva
+// subida 13 puntos en la etapa 4, para que NORMAL pelee con el usuario (decisiones del usuario). Lógica pura: solo datos.
 public static class PilotProfiles
 {
 	public static IReadOnlyList<PilotProfile> All { get; } = Array.AsReadOnly((PilotProfile[])Enum.GetValues(typeof(PilotProfile)));
 
 	public static PilotTraits Traits(PilotProfile profile) => profile switch
 	{
-		PilotProfile.Balanced => new(0.99f, 0.99f, 0.95f, 0.25f, 0.5f, 0.5f, 0.3f, BoostStrategy.Overtake, 1.0f),
-		PilotProfile.Sprinter => new(1.00f, 0.96f, 0.92f, 0.20f, 0.6f, 0.3f, 0.3f, BoostStrategy.Overtake, 1.0f),
-		PilotProfile.CornerSpecialist => new(0.98f, 1.02f, 1.00f, 0.25f, 0.5f, 0.6f, 0.3f, BoostStrategy.Defend, 1.0f),
-		PilotProfile.Aggressive => new(0.99f, 0.99f, 1.00f, 0.18f, 0.9f, 0.8f, 0.9f, BoostStrategy.Overtake, 1.5f),
-		PilotProfile.Conservative => new(0.99f, 0.99f, 0.88f, 0.32f, 0.2f, 0.2f, 0.0f, BoostStrategy.LastLap, 0.5f),
-		PilotProfile.Technical => new(0.98f, 1.00f, 0.98f, 0.25f, 0.6f, 0.7f, 0.2f, BoostStrategy.LastLap, 0.6f),
+		PilotProfile.Balanced => new(0.99f, 1.12f, 0.95f, 0.25f, 0.5f, 0.5f, 0.3f, BoostStrategy.Overtake, 1.0f),
+		PilotProfile.Sprinter => new(1.00f, 1.09f, 0.92f, 0.20f, 0.6f, 0.3f, 0.3f, BoostStrategy.Overtake, 1.0f),
+		PilotProfile.CornerSpecialist => new(0.98f, 1.15f, 1.00f, 0.25f, 0.5f, 0.6f, 0.3f, BoostStrategy.Defend, 1.0f),
+		PilotProfile.Aggressive => new(0.99f, 1.12f, 1.00f, 0.18f, 0.9f, 0.8f, 0.9f, BoostStrategy.Overtake, 1.5f),
+		PilotProfile.Conservative => new(0.99f, 1.12f, 0.88f, 0.32f, 0.2f, 0.2f, 0.0f, BoostStrategy.LastLap, 0.5f),
+		PilotProfile.Technical => new(0.98f, 1.13f, 0.98f, 0.25f, 0.6f, 0.7f, 0.2f, BoostStrategy.LastLap, 0.6f),
 		_ => throw new ArgumentOutOfRangeException(nameof(profile), profile, null)
 	};
 

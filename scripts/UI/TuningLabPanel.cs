@@ -49,6 +49,7 @@ public partial class TuningLabPanel : CanvasLayer
 	private static bool _contactEnabled = true;   // CONTACT: dura hasta cerrar el juego, no se guarda
 	private static bool _errorsEnabled = true;    // ERRORS (spec docs/rivales-4-personalidades.md, 8): ídem
 	private CheckBox _contactCheck;
+	private Button _difficultyButton;
 	private CheckBox _statesCheck;
 	private Row _rivalPaceRow;
 	private Label _rivalsLabel;
@@ -203,6 +204,25 @@ public partial class TuningLabPanel : CanvasLayer
 		if (Rivals != null)
 			Rivals.Contacts.Enabled = enabled;
 		GD.Print($"[TuningLab] Ship contact: {(enabled ? "ON" : "OFF")}");
+	}
+
+	// La dificultad de la carrera siguiente: la de esta no cambia
+	private void OnDifficultyPressed()
+	{
+		GameSession.Difficulty = DifficultyRules.Next(GameSession.Difficulty);
+		RefreshDifficulty();
+		GD.Print($"[TuningLab] Difficulty for the next race: {DifficultyRules.ScreenName(GameSession.Difficulty)}");
+	}
+
+	private void RefreshDifficulty()
+	{
+		if (_difficultyButton == null || Rivals == null)
+			return;
+		string now = DifficultyRules.ScreenName(Rivals.Difficulty);
+		string next = DifficultyRules.ScreenName(GameSession.Difficulty);
+		_difficultyButton.Text = Rivals.Difficulty == GameSession.Difficulty
+			? $"DIFFICULTY {now} · CLICK TO CHANGE"
+			: $"DIFFICULTY {now} · NEXT RACE {next} (RESTART)";
 	}
 
 	// Errores de los rivales: sin ellos, para probar
@@ -438,6 +458,16 @@ public partial class TuningLabPanel : CanvasLayer
 			errorsCheck.AddThemeColorOverride("font_hover_pressed_color", Palette.SelectValue);
 			errorsCheck.Toggled += OnErrorsToggled;
 			column.AddChild(errorsCheck);
+			// DIFFICULTY (spec docs/rivales-4-personalidades.md, 6.2): vale para la carrera siguiente (RESTART)
+			_difficultyButton = new Button { Flat = true, FocusMode = Control.FocusModeEnum.None, Alignment = HorizontalAlignment.Left };
+			_difficultyButton.AddThemeFontOverride("font", font);
+			_difficultyButton.AddThemeFontSizeOverride("font_size", fontSize);
+			_difficultyButton.AddThemeColorOverride("font_color", Palette.SelectLabel);
+			_difficultyButton.AddThemeColorOverride("font_hover_color", Palette.SelectValue);
+			_difficultyButton.AddThemeColorOverride("font_pressed_color", Palette.SelectValue);
+			_difficultyButton.Pressed += OnDifficultyPressed;
+			column.AddChild(_difficultyButton);
+			RefreshDifficulty();
 			_statesCheck = new CheckBox
 			{
 				Text = "LINE STATES",

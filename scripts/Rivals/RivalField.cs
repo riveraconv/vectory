@@ -81,7 +81,9 @@ public partial class RivalField : Node3D
 				+ $"{ShipCatalog.Find(entry.ShipDesignId)?.Name ?? entry.ShipDesignId}, "
 				+ $"{HullPaints.DisplayName(HullPaints.StyleOf(entry.ShipDesignId) ?? HullStyle.Racing, entry.PaintIndex)}");
 		}
-		GD.Print($"[Race] Rival pilots ready: {pilots.ComputedShips.Count} ships in {(Time.GetTicksUsec() - start) / 1000.0:0} ms");
+		GD.Print($"[Race] Rival pilots ready: {pilots.ComputedShips.Count} ships in {(Time.GetTicksUsec() - start) / 1000.0:0} ms, "
+			+ $"difficulty {DifficultyRules.ScreenName(context.Difficulty)}");
+		Difficulty = context.Difficulty;
 
 		_contactShips.Add(player);
 		foreach (RivalShip ship in _ships)
@@ -227,6 +229,9 @@ public partial class RivalField : Node3D
 	}
 
 	private static System.Numerics.Vector2 Plan(System.Numerics.Vector3 p) => new(p.X, p.Z);
+
+	// Dificultad con la que se montó esta carrera
+	public Difficulty Difficulty { get; private set; } = DifficultyRules.Default;
 
 	// Errores de los rivales encendidos o no (ERRORS del panel de pruebas)
 	public bool ErrorsEnabled { get; private set; } = true;

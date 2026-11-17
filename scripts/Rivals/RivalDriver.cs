@@ -49,6 +49,7 @@ public sealed partial class RivalDriver
 	private AutopilotDriver _pilot;
 	private float _runningTime;
 	private int _boostedAt = -1;      // la frenada de la recta en la que gastó la última carga
+	private float _lastCurveAt = float.NaN;   // m sobre el eje del último punto de curva por el que pasó
 	private bool[] _onStraight;
 	private int[] _nextBrake;
 	private int[] _insideAt;
@@ -179,6 +180,12 @@ public sealed partial class RivalDriver
 
 		LineState line = ClearLine.State;
 		bool clear = ClearLine.Blocker < 0 && line is LineState.Clear or LineState.DefendLeft or LineState.DefendRight;
+		// A la salida de una curva hacia una recta larga: el mejor momento para el boost
+		if (!ahead.OnStraight)
+			_lastCurveAt = state.Distance;
+		bool curveExit = ahead.OnStraight && ahead.ToBraking >= RivalBoost.LongStraight && !float.IsNaN(_lastCurveAt)
+			&& Relative(state.Distance - _lastCurveAt) is >= 0f and <= RivalBoost.ExitWindow;
+
 		var situation = new BoostSituation(
 			boostAvailable,
 			status.Charges,
@@ -189,7 +196,8 @@ public sealed partial class RivalDriver
 			ClearLine.AheadGap,
 			ClearLine.BehindGap,
 			status.LastLap,
-			_boostedAt == ahead.BrakingIndex);
+			_boostedAt == ahead.BrakingIndex,
+			curveExit);
 		bool boost = RivalBoost.Wants(Traits.Boost, situation);
 		if (boost)
 		{
@@ -297,7 +305,7 @@ public sealed partial class RivalDriver
 
 // Lo que mira la estrategia de boost en un paso (spec docs/rivales-4-personalidades.md, 4.6)
 public readonly record struct BoostSituation(bool Available, int Charges, int MaxCharges, bool StraightAhead, bool Clear,
-	bool Attacking, float AheadGap, float BehindGap, bool LastLap, bool UsedThisStraight);
+	bool Attacking, float AheadGap, float BehindGap, bool LastLap, bool UsedThisStraight, bool CurveExit = false);
 
 // Cuándo gasta un rival una carga de boost (spec 4.6). Solo en una recta con al menos MinStraight por delante, una cada vez
 // (Available: carga, sin cooldown ni daño de nivel 3) y nunca con la trazada tapada sin estar atacando. Con todas las
@@ -307,6 +315,8 @@ public static class RivalBoost
 	public const float MinStraight = 150f;       // m de recta por delante
 	public const float ChasingDistance = 40f;    // ADELANTAR, con la trazada clara: alguien delante a menos de esto
 	public const float ChasedDistance = 15f;     // DEFENDER: alguien detrás a menos de esto
+	public const float LongStraight = 500f;      // m de recta por delante para el mejor momento
+	public const float ExitWindow = 150f;        // m desde la curva en los que cuenta como su salida
 
 	public static bool Wants(BoostStrategy strategy, in BoostSituation s)
 	{
@@ -314,10 +324,13 @@ public static class RivalBoost
 			return false;
 		if (s.MaxCharges > 0 && s.Charges >= s.MaxCharges && s.Clear)
 			return true;
+		// El mejor momento (v1.1): a la salida de una curva hacia una recta larga, con la trazada clara. ADELANTAR y
+		// DEFENDER, si les queda más de una carga (se guardan una para lo suyo); ÚLTIMA VUELTA, en la última.
+		bool bestMoment = s.CurveExit && s.Clear && !s.UsedThisStraight;
 		return strategy switch
 		{
-			BoostStrategy.Overtake => s.Attacking || (s.Clear && s.AheadGap <= ChasingDistance),
-			BoostStrategy.Defend => s.BehindGap <= ChasedDistance,
+			BoostStrategy.Overtake => s.Attacking || (s.Clear && s.AheadGap <= ChasingDistance) || (bestMoment && s.Charges >= 2),
+			BoostStrategy.Defend => s.BehindGap <= ChasedDistance || (bestMoment && s.Charges >= 2),
 			BoostStrategy.LastLap => s.LastLap && !s.UsedThisStraight,
 			_ => false
 		};

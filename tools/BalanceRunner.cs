@@ -38,6 +38,9 @@ public partial class BalanceRunner : Control
 	[Export] public bool UseBoost;
 	[Export(PropertyHint.Range, "0.5,1,0.01")] public float SpeedMargin = AutopilotSettings.DefaultSpeedMargin;
 
+	[ExportGroup("Profiles")]
+	[Export] public bool ProfilesAllDifficulties;   // también FÁCIL y DIFÍCIL (la regla se mira en NORMAL), con la vuelta media de cada una
+
 	[ExportGroup("Sweep y Match")]
 	[Export(PropertyHint.Enum, "ship_02,ship_01,ship_03")] public string SweepShip = "ship_03";
 	[Export] public BalanceParameter SweepParameter = BalanceParameter.MaxSpeed;
@@ -55,8 +58,8 @@ public partial class BalanceRunner : Control
 	private Label _progress;
 	private int _total;
 	private bool _matchShown;
-	private readonly Queue<ShipDefinition> _profileShips = new();
-	private readonly List<PaceRow> _paceRows = new();
+	private readonly Queue<(Difficulty Difficulty, ShipDefinition Ship)> _profileShips = new();
+	private readonly Dictionary<Difficulty, List<PaceRow>> _paceRows = new();
 	private BalanceCircuit _profileCircuit;
 	private bool _finished;
 
@@ -97,8 +100,15 @@ public partial class BalanceRunner : Control
 				End("PROFILES · NO CIRCUIT");
 				return;
 			}
-			foreach (ShipDefinition ship in _ships)
-				_profileShips.Enqueue(ship);
+			Difficulty[] difficulties = ProfilesAllDifficulties
+				? new[] { Difficulty.Normal, Difficulty.Easy, Difficulty.Hard }
+				: new[] { Difficulty.Normal };
+			foreach (Difficulty difficulty in difficulties)
+			{
+				_paceRows[difficulty] = new List<PaceRow>();
+				foreach (ShipDefinition ship in _ships)
+					_profileShips.Enqueue((difficulty, ship));
+			}
 			_total = _profileShips.Count;
 			_progress.Text = $"PROFILES · 0 / {_total}";
 			return;
@@ -237,30 +247,38 @@ public partial class BalanceRunner : Control
 	{
 		if (_profileShips.Count == 0)
 		{
-			GD.Print(ProfileComparison.Text(_profileCircuit.Name, _paceRows));
-			End($"PROFILES · DONE · {(ProfileComparison.AllPassed(_paceRows) ? "ALL ✓" : "SEE CONSOLE")}");
+			foreach ((Difficulty difficulty, List<PaceRow> rows) in _paceRows)
+			{
+				GD.Print($"\n##### DIFFICULTY {DifficultyRules.ScreenName(difficulty)} #####");
+				GD.Print(ProfileComparison.Text(_profileCircuit.Name, rows));
+			}
+			foreach ((Difficulty difficulty, List<PaceRow> rows) in _paceRows)
+				GD.Print($"[Balance] {DifficultyRules.ScreenName(difficulty)}: mean flying lap of profiles and pilots {ProfileComparison.MeanLap(rows).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)} s");
+			bool passed = ProfileComparison.AllPassed(_paceRows[Difficulty.Normal]);
+			End($"PROFILES · DONE · {(passed ? "NORMAL ✓" : "SEE CONSOLE")}");
 			return;
 		}
 
-		ShipDefinition ship = _profileShips.Dequeue();
-		_paceRows.AddRange(ProfileComparison.Run(_profileCircuit, ship, PaceEntries(), Options()));
-		_progress.Text = $"PROFILES · {_total - _profileShips.Count} / {_total} · {ShipCatalog.Find(ship.Id)?.Name ?? ship.Id}";
+		(Difficulty level, ShipDefinition ship) = _profileShips.Dequeue();
+		_paceRows[level].AddRange(ProfileComparison.Run(_profileCircuit, ship, PaceEntries(level), Options()));
+		_progress.Text = $"PROFILES · {_total - _profileShips.Count} / {_total} · {DifficultyRules.ScreenName(level)} · {ShipCatalog.Find(ship.Id)?.Name ?? ship.Id}";
 	}
 
-	// El equilibrado primero (la referencia), luego los demás perfiles, los pilotos y el piloto automático de F7
-	private static List<PaceEntry> PaceEntries()
+	// El equilibrado primero (la referencia), luego los demás perfiles, los pilotos y el piloto automático de F7, con los
+	// rasgos de esa dificultad
+	private static List<PaceEntry> PaceEntries(Difficulty difficulty)
 	{
 		var entries = new List<PaceEntry>();
 		foreach (PilotProfile profile in PilotProfiles.All)
 		{
-			PilotTraits t = PilotProfiles.Traits(profile);
+			PilotTraits t = DifficultyRules.Apply(PilotProfiles.Traits(profile), difficulty);
 			string name = PilotProfiles.ScreenName(profile);
 			entries.Add(new PaceEntry(name, name, profile == PilotProfile.Balanced ? PaceKind.Reference : PaceKind.Profile,
 				t.StraightMargin, t.CurveMargin, t.Braking));
 		}
 		foreach (RivalPilot pilot in PilotCatalog.All)
 		{
-			PilotTraits t = pilot.Traits;
+			PilotTraits t = DifficultyRules.Apply(pilot.Traits, difficulty);
 			entries.Add(new PaceEntry(pilot.Nickname, PilotProfiles.ScreenName(pilot.Profile), PaceKind.Pilot,
 				t.StraightMargin, t.CurveMargin, t.Braking));
 		}

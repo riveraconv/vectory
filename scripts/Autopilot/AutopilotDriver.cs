@@ -9,9 +9,9 @@ namespace Vectory.Autopilot;
 public struct AutopilotSettings
 {
 	public const float DefaultSpeedMargin = 0.97f;
-	// Lo más que puede usar de la velocidad de curva: la calibración es prudente y al 106 % aún no roza
-	// (spec docs/rivales-4-personalidades.md, 3.1)
-	public const float MaxCurveMargin = 1.05f;
+	// Lo más que puede usar de la velocidad de curva: la calibración es prudente y al 130 % aún no roza en circuit_01;
+	// al 140 % VECTOR y HAMMER ya golpean (spec docs/rivales-4-personalidades.md, 3.1 y 6.3b)
+	public const float MaxCurveMargin = 1.30f;
 
 	public float SpeedMargin;    // fracción de la velocidad de curva que usa
 	public float StraightMargin; // fracción de la punta que usa (spec docs/rivales-4-personalidades.md, 3.1)

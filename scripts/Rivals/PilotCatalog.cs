@@ -32,7 +32,7 @@ public static class PilotCatalog
 		new RivalPilot("pilot_09", "JACKAL", PilotProfile.Balanced, new PilotVariation(0.001f, 0.006f, 0.012f, -0.001f, -0.08f, -0.02f, -0.08f, -0.01f)),
 		new RivalPilot("pilot_10", "ONYX", PilotProfile.Balanced, new PilotVariation(0.009f, 0.001f, 0.011f, 0.005f, -0.04f, -0.09f, 0.04f, -0.01f)),
 		new RivalPilot("pilot_11", "RIPTIDE", PilotProfile.CornerSpecialist, new PilotVariation(-0.001f, -0.01f, -0.001f, 0.009f, 0.04f, 0.09f, -0.05f, -0.02f)),
-		new RivalPilot("pilot_12", "WRAITH", PilotProfile.Technical, new PilotVariation(-0.004f, -0.004f, -0.014f, -0.028f, 0.04f, 0f, 0.1f, -0.08f)),
+		new RivalPilot("pilot_12", "WRAITH", PilotProfile.Technical, new PilotVariation(0f, -0.004f, -0.014f, -0.028f, 0.04f, 0f, 0.1f, -0.08f)),
 		new RivalPilot("pilot_13", "KESTREL", PilotProfile.CornerSpecialist, new PilotVariation(0.001f, 0.007f, -0.009f, -0.02f, -0.01f, 0.01f, 0.04f, 0.05f)),
 		new RivalPilot("pilot_14", "SPARK", PilotProfile.Sprinter, new PilotVariation(-0.002f, -0.007f, -0.009f, 0.002f, 0.07f, -0.05f, -0.08f, -0.09f)),
 		new RivalPilot("pilot_15", "TITAN", PilotProfile.Balanced, new PilotVariation(-0.005f, -0.002f, 0.009f, 0.003f, -0.09f, 0f, 0.08f, -0.08f)),

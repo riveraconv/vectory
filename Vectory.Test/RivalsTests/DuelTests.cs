@@ -301,6 +301,15 @@ public class DuelTests
 		Assert.True(RivalBoost.Wants(BoostStrategy.LastLap, none with { LastLap = true }));
 		Assert.False(RivalBoost.Wants(BoostStrategy.LastLap, none with { LastLap = true, UsedThisStraight = true }));
 
+		// El mejor momento: a la salida de una curva hacia una recta larga, con la trazada clara. ADELANTAR y DEFENDER con más
+		// de una carga; ÚLTIMA VUELTA, solo en la última
+		BoostSituation exit = none with { CurveExit = true, Charges = 2 };
+		Assert.True(RivalBoost.Wants(BoostStrategy.Overtake, exit));
+		Assert.True(RivalBoost.Wants(BoostStrategy.Defend, exit));
+		Assert.False(RivalBoost.Wants(BoostStrategy.Overtake, exit with { Charges = 1 }));
+		Assert.False(RivalBoost.Wants(BoostStrategy.LastLap, exit));
+		Assert.False(RivalBoost.Wants(BoostStrategy.Overtake, exit with { UsedThisStraight = true }));
+
 		// Con todas las cargas y la trazada clara, sea cual sea la estrategia
 		foreach (BoostStrategy strategy in new[] { BoostStrategy.Overtake, BoostStrategy.Defend, BoostStrategy.LastLap })
 			Assert.True(RivalBoost.Wants(strategy, none with { Charges = 3 }));

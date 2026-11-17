@@ -863,7 +863,8 @@ public partial class Main : Node3D
 			Damage = BuildDamageSettings(),
 			Respawn = BuildRespawnSettings(),
 			Flash = _track.BarrierFlashSettings,
-			StepTime = 1f / Engine.PhysicsTicksPerSecond
+			StepTime = 1f / Engine.PhysicsTicksPerSecond,
+			Difficulty = GameSession.Difficulty
 		};
 	}
 

@@ -23,6 +23,7 @@ public sealed class RivalRaceContext
 	public RespawnSettings Respawn { get; init; }
 	public BarrierFlashSettings Flash { get; init; } = BarrierFlashSettings.Default;
 	public float StepTime { get; init; } = 1f / 60f;
+	public Difficulty Difficulty { get; init; } = DifficultyRules.Default;   // leída al montar la carrera
 }
 
 // La carrera de un rival, sin nodos (spec docs/rivales-1-parrilla.md, 4): su nave en su marca, su conductor, la física
@@ -95,10 +96,12 @@ public sealed class RivalCar : IContactShip
 		_halfWidth = ship.Visual.CollisionHalfWidth;
 		Shape = ShipShape.From(ship.Visual);
 
+		// Los rasgos de su piloto con la dificultad de la carrera; la reacción, con lo de esta salida
+		PilotTraits traits = DifficultyRules.Apply(entry.Pilot.Traits, context.Difficulty);
 		Driver = new RivalDriver(pilots.Get(ship), context.Frame, _tuning, context.Physics, context.StepTime,
-			entry.Pilot.Traits, paceOffset, context.BarrierOffset, new System.Random(entry.Seed), new System.Random(entry.Seed ^ ErrorSeedMask))
+			traits, paceOffset, context.BarrierOffset, new System.Random(entry.Seed), new System.Random(entry.Seed ^ ErrorSeedMask))
 		{
-			ReactionTime = entry.Reaction
+			ReactionTime = System.MathF.Max(0f, traits.Reaction + entry.ReactionJitter)
 		};
 		Tracker = new RaceTracker(context.CheckpointIndices.Count, context.Laps);
 		Damage = new DamageModel(context.Damage);

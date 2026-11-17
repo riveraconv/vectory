@@ -1,6 +1,6 @@
 # VECTORY — Spec: Rivales 4 · Personalidades y dificultad
 
-Versión 1.1 · 2026-11-17 · Estado: **etapa 1 en curso**
+Versión 1.1 · 2026-11-17 · Estado: **etapas 1–4 hechas**
 
 Cuarta y última spec de rivales. Cada piloto gana una **personalidad**: cómo va en recta y en curva, cómo frena, cómo ataca y defiende, si le importa tocarte, cuándo gasta el boost y cuánto se equivoca. Llega el **rebufo** para todos, tú incluido. Y la **dificultad** FÁCIL / NORMAL / DIFÍCIL, que cambia **solo la IA**, sin *rubber banding*.
 
@@ -330,6 +330,21 @@ Solo la IA, **nunca la física**: ni la tuya ni la de los rivales. Sin *rubber b
 ### 6.3 Récords
 
 - Los récords **no se separan** por dificultad. Son tus tiempos.
+
+### 6.3b Concreciones de la etapa 4 (v1.1)
+
+- La dificultad va en `GameSession.Difficulty` (NORMAL por defecto, no se guarda): SETTINGS solo tendrá que leerla y guardarla. La carrera la lee al montarse (`RivalRaceContext`).
+- Solo se limitan los máximos de la tabla (recta 100 %, curva 130 %, frenada 1, ataque, defensa y contacto 1); en FÁCIL una frenada puede bajar de 0,85.
+- `BalanceRunner` en modo PERFILES con `ProfilesAllDifficulties`: la regla se mira solo en NORMAL. Medido en `circuit_01`, vuelta media de perfiles y pilotos: NORMAL 40,598 s, FÁCIL 41,960 s (+1,36), DIFÍCIL 40,212 s (−0,39). En DIFÍCIL el velocista ya va al 100 % en recta y queda algo por detrás (+0,32 s en una nave).
+
+### 6.3c Reajuste tras la prueba del usuario (v1.1)
+
+- **Con la primera tabla, el usuario ganaba por ~5 s en las tres dificultades** (su mejor vuelta en carrera, 38,55 s; la de los rivales, 40,2–40,6 s). La calibración de curva es muy prudente: con un rival solo en `circuit_01`, al 130 % de su velocidad de curva aún no roza la barrera (al 140 %, VECTOR y HAMMER golpean).
+- Objetivos acordados con el usuario, ganador de la carrera: FÁCIL ~2:08, NORMAL 2:03–2:04 (su mejor carrera, 2:03.7), DIFÍCIL 2:00–2:01.
+- **Margen de curva hasta 130 %** y la curva de los seis perfiles **+13 puntos** (equilibrado 99 / 112, velocista 100 / 109, especialista 98 / 115, agresivo 99 / 112, conservador 99 / 112, técnico 98 / 113). WRAITH, sin variación de recta.
+- **La dificultad mueve recta y curva por separado**: FÁCIL −3 / −12 puntos, DIFÍCIL +1 / +13 (la recta casi no tiene sitio: es la punta de la nave). El resto de la tabla 6.1 no cambia.
+- **Boost en el mejor momento** (4.6): a la salida de una curva (a menos de 150 m) hacia una recta de al menos 500 m, con la trazada clara. ADELANTAR y DEFENDER gastan ahí si les queda más de una carga; ÚLTIMA VUELTA, solo en la última vuelta. Es lo que hace el usuario.
+- Medido sin ventana, con solo los rivales en pista (5 carreras por dificultad): ganador FÁCIL 2:06.5–2:10.4, NORMAL 2:02.9–2:05.7, DIFÍCIL 2:00.2–2:01.9. PERFILES: NORMAL ✓ (vuelta media 39,77 s), FÁCIL 41,33 s, DIFÍCIL 38,94 s. Golpes medios o fuertes entre rivales: ~1,2 por carrera en NORMAL y ~1,8 en DIFÍCIL (antes ~0,6), por la mayor velocidad en curva.
 
 ### 6.4 Criterio de aceptación de la etapa 4
 

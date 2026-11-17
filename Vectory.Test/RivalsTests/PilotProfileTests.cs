@@ -76,7 +76,7 @@ public class PilotProfileTests
 		var variation = new PilotVariation(0.01f, -0.01f, 0.02f, -0.03f, 0.1f, -0.1f, 0.1f, -0.1f);
 		PilotTraits t = PilotTraits.Effective(sprinter, variation);
 		Assert.Equal(1.00f, t.StraightMargin, 5);   // 1,00 + 0,01, con tope en la punta
-		Assert.Equal(0.95f, t.CurveMargin, 5);
+		Assert.Equal(1.08f, t.CurveMargin, 5);
 		Assert.Equal(0.94f, t.Braking, 5);
 		Assert.Equal(0.17f, t.Reaction, 5);
 		Assert.Equal(0.7f, t.Attack, 5);
@@ -85,11 +85,11 @@ public class PilotProfileTests
 		Assert.Equal(0.9f, t.Errors, 5);
 		Assert.Equal(BoostStrategy.Overtake, t.Boost);
 
-		// Limitados: recta ≤ 100 %, curva ≤ 105 %, frenada ≤ 1, reacción ≥ 0,15 s, defensa ≥ 0
-		var extreme = new PilotTraits(0.99f, 1.05f, 0.99f, 0.15f, 0.95f, 0.05f, 0.05f, BoostStrategy.Defend, 0.35f);
+		// Limitados: recta ≤ 100 %, curva ≤ 130 %, frenada ≤ 1, reacción ≥ 0,15 s, defensa ≥ 0
+		var extreme = new PilotTraits(0.99f, 1.30f, 0.99f, 0.15f, 0.95f, 0.05f, 0.05f, BoostStrategy.Defend, 0.35f);
 		PilotTraits clamped = PilotTraits.Effective(extreme, variation with { CurveMargin = 0.01f });
 		Assert.Equal(1f, clamped.StraightMargin, 5);
-		Assert.Equal(1.05f, clamped.CurveMargin, 5);
+		Assert.Equal(1.30f, clamped.CurveMargin, 5);
 		Assert.Equal(1f, clamped.Braking, 5);
 		Assert.Equal(PilotTraits.MinReaction, clamped.Reaction, 5);
 		Assert.Equal(1f, clamped.Attack, 5);
@@ -102,8 +102,8 @@ public class PilotProfileTests
 
 		// El ajuste de depuración se suma a los márgenes sin pasar de sus topes
 		Assert.Equal(1f, t.StraightWith(0.02f), 5);
-		Assert.Equal(0.93f, t.CurveWith(-0.02f), 5);
-		Assert.Equal(1.05f, t.CurveWith(0.2f), 5);
+		Assert.Equal(1.06f, t.CurveWith(-0.02f), 5);
+		Assert.Equal(1.30f, t.CurveWith(0.3f), 5);
 	}
 
 	// 4

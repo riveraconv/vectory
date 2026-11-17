@@ -98,6 +98,13 @@ public static class ProfileComparison
 
 	public static bool AllPassed(IEnumerable<PaceRow> rows) => rows.All(r => r.Passed);
 
+	// Vuelta media de perfiles y pilotos (sin el piloto de F7), de las tandas que valen; NaN si ninguna
+	public static double MeanLap(IEnumerable<PaceRow> rows)
+	{
+		var laps = rows.Where(r => r.Entry.Kind != PaceKind.Info && r.Valid).Select(r => r.FlyingLap).ToList();
+		return laps.Count > 0 ? laps.Average() : double.NaN;
+	}
+
 	// Tabla de la consola: una por nave y, al final, la propuesta media de cada perfil que se sale
 	public static string Text(string circuitName, IReadOnlyList<PaceRow> rows)
 	{
