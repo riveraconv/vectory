@@ -12,6 +12,8 @@ public partial class Cockpit : Node3D
 {
 	private Cockpit3DView _view3D;   // la de la nave actual
 	private readonly Dictionary<Cockpit3DProfile, Cockpit3DView> _views3D = new();
+	private int _glassLevel;
+	private int _glassSeed;
 	private CockpitViewRules _rules;
 	private RadarSweep _radarSweep;
 	private MinimapPath _minimapPath;
@@ -89,6 +91,7 @@ public partial class Cockpit : Node3D
 		AddChild(_view3D);
 		if (_radarSweep != null)
 			_view3D.SetRadar(_radarSweep, _minimapPath, _minimapWindowRadius, _radarShips);
+		_view3D.SetGlassDamage(_glassLevel, _glassSeed);
 	}
 
 	// Sacudida de la cámara de cabina (desplazamiento en el plano de la vista, en m, y giro sobre la vista, en rad)
@@ -165,6 +168,15 @@ public partial class Cockpit : Node3D
 	public void SetCrashLight(float left, float right, float energy, float tint, float front, float rear, float endEnergy)
 	{
 		_view3D?.SetCrashLight(left, right, energy, tint, front, rear, endEnergy);
+	}
+
+	// Daños: grietas y manchas en el cristal de todas las cabinas (también las que no se ven, por F10)
+	public void SetGlassDamage(int level, int seed)
+	{
+		_glassLevel = level;
+		_glassSeed = seed;
+		foreach (Cockpit3DView view in _views3D.Values)
+			view.SetGlassDamage(level, seed);
 	}
 
 	// Daños: las luces apagadas del parpadeo bajan (Cockpit3DView)

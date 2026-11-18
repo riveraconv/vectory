@@ -339,6 +339,7 @@ public partial class Player : CharacterBody3D, IContactShip
 	private EdgeFlicker _shipFlicker;
 	private EdgeFlicker _cockpitFlicker;
 	private readonly System.Random _flickerRandom = new();
+	private readonly int _glassSeed = System.Random.Shared.Next();   // sitio de las grietas del cristal, una vez por carrera
 	private int _damageLevel;
 
 	// Factores de la velocidad punta y del giro (los daños los bajan; 1 = sin efecto).
@@ -633,6 +634,7 @@ public partial class Player : CharacterBody3D, IContactShip
 	{
 		_damageLevel = level;
 		_ship.SetHullDamage(level, !CockpitDamageEnabled);
+		_cockpit.SetGlassDamage(CockpitDamageEnabled ? level : 0, _glassSeed);
 		if (level <= 0 && _shipFlicker == null)
 			return;
 

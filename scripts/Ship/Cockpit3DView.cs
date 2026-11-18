@@ -151,6 +151,11 @@ public partial class Cockpit3DView : CanvasLayer
 	// Setas y balizas de HAMMER: material, cómo se enciende y lo último que se le puso
 	private readonly List<(StandardMaterial3D Material, Cockpit3DStatusLamp Lamp, IndustrialLamp Shown)> _statusLamps = new();
 
+	// Cristal dañado (spec docs/efectos-5-danos-casco.md, 6)
+	private ShaderMaterial _glassPass;
+	private int _glassLevel;
+	private int _glassSeed;
+
 	private float _time;
 	private bool _shown;
 	private bool _screensDirty = true;
@@ -201,6 +206,16 @@ public partial class Cockpit3DView : CanvasLayer
 	public override void _ExitTree()
 	{
 		GetWindow().SizeChanged -= FitToWindow;
+	}
+
+	// Grietas y manchas del cristal según el nivel de daño (0 = limpio), en sitios que salen de la semilla
+	public void SetGlassDamage(int level, int seed)
+	{
+		if (level == _glassLevel && seed == _glassSeed)
+			return;
+		_glassLevel = level;
+		_glassSeed = seed;
+		CockpitGlass.Apply(_glassPass, level, seed, CockpitGlassSettings.Default);
 	}
 
 	// Sin dibujarse en la cámara exterior: un SubViewport oculto seguiría costando lo mismo
@@ -791,6 +806,9 @@ public partial class Cockpit3DView : CanvasLayer
 				_shiftMaterials[i].EmissionEnergyMultiplier = 0f;
 			_shiftShown[i] = new ShiftLight(ShiftLights.BaseColor(i), 0f);
 		}
+
+		_glassPass = CockpitGlass.Attach(_pieces.GetValueOrDefault(CockpitGlass.GlassPiece));
+		CockpitGlass.Apply(_glassPass, _glassLevel, _glassSeed, CockpitGlassSettings.Default);
 
 		// La sombra interior de las pantallas no recibe luz
 		foreach (string shade in _layout.Shades)

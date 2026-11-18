@@ -1,6 +1,6 @@
 # VECTORY — Spec: Efectos 5 · Daño visible del casco
 
-Versión 1.0 · 2026-11-19 · Estado: **implementada y validada** (propuesta del agente, aceptada por el usuario sin maqueta)
+Versión 1.1 · 2026-11-19 · Estado: **implementada y validada** (propuesta del agente, aceptada por el usuario sin maqueta)
 
 Sustituye las **quemaduras de máscara** de las specs de los cascos 3D (`cascos-3d-1-vector`, `-2-blade`, `-3-hammer`, sección 6.5: tres máscaras de ruido por nivel que oscurecían la pintura en todo el casco). Se leían como un camuflaje de manchas, no como daño. El **parpadeo de las luces** de esas secciones no cambia. Las reglas del daño (`danos`) tampoco: es solo visual.
 
@@ -51,4 +51,24 @@ Solo en **RACE**, para **todas las naves**, como el daño. En TIME TRIAL, nada. 
 ## 5. Pruebas
 
 - Unitarias (`HullWearTests`): costado de la barrera, roce por segundo y golpe solo al empezar, tope en 1 y versión, zona de un punto de contacto (también con la nave girada), hollín por nivel y foco en la piel, sin hollín en TIME TRIAL.
-- Manual (el usuario, en RACE): rozar la barrera de un lado y ver arañazos solo en ese costado; un golpe de morro o de popa con un rival; daño 2 y 3 con su hollín y las grietas; las tres naves y varias pinturas (también las perladas de VECTOR); la pausa; rivales dañados; los fps.
+- Unitarias (`CockpitGlassDamageTests`): picadas, grietas y manchas por nivel, mismo sitio al subir de nivel, cada grieta desde su picada, dentro de la zona del cristal y según la semilla, y reparto hacia los bordes.
+- Manual (el usuario, en RACE): rozar la barrera de un lado y ver arañazos solo en ese costado; un golpe de morro o de popa con un rival; daño 2 y 3 con su hollín y las grietas; las tres naves y varias pinturas (también las perladas de VECTOR); la pausa; rivales dañados; los fps; el cristal de las tres cabinas con daño 1, 2 y 3.
+
+## 6. Cristal de la cabina (v1.1)
+
+Pedido por el usuario: la cabina también se daña, con **picadas** y **grietas largas irregulares** en el cristal y alguna mancha. Solo **RACE**, solo tu nave (los rivales no tienen cabina); en TIME TRIAL, nada.
+
+| Nivel | Picadas | Grietas largas (largo, en altos del cristal) | Manchas |
+|---|---|---|---|
+| 0 | — | — | — |
+| 1 | 3 | 1 (0,22) | — |
+| 2 | 6 | 2 (0,42 · 0,22) | 1 |
+| 3 | 10 | 3 (0,65 · 0,42 · 0,30) | 3 |
+
+- **Picada**: centro machacado de borde irregular (radio 0,006–0,014), medio anillo de ojo de buey y seis grietillas cortas alrededor.
+- **Grieta larga**: sale de una picada (la de su mismo índice) hacia el centro del cristal (con un desvío al azar), así cruza el cristal desde los bordes, en una línea quebrada de tramos de 2–4 cm con giros al azar, que se estrecha y se apaga hacia la punta y suelta alguna rama corta. Al subir de nivel se **alarga por el mismo camino**.
+- Grietas y picadas en **gris humo** (elegido por el usuario) al 45 %, con un brillo tenue alrededor, ~1,5 px de ancho en pantalla. **Mancha**: suciedad gris parda al 30 %, de borde irregular, con salpicaduras alrededor.
+- **Para que no parezcan pegatinas** (pedido por el usuario): a trozos se ven más y a trozos menos (ruido a lo largo de la grieta, 30–100 %), y **cogen la luz de la cabina**: cada tramo es una cara de la fractura inclinada a su manera (normal desviada × 0,7, rugosidad 0,18, especular 0,9), así la luz principal, la del boost, la roja de los daños y la de las chispas las encienden a trozos y de su color. Sin brillo propio: con poca luz casi no se ven, y con la luz roja de los daños se encienden a trozos en rojo (validado así por el usuario; un brillo base las hacía demasiado visibles). El mundo de fuera no llega a esta pasada (la cabina se pinta en su propio `SubViewport`): no hay refracción real.
+- Los sitios se sortean **una vez por carrera** (semilla del `Player`) por casi todo el cristal (x 0,04–0,96, y 0,04–0,80 del cristal, 0 arriba), **empujados hacia los bordes** (`Spread`: raíz de la distancia al centro, del todo en x y a medias en y), para no quedarse en el centro ni tapar lo que se mira; al subir de nivel, lo que había sigue en su sitio y sale más.
+- Van **pegadas al cristal**: una pasada de shader detrás del material de la mancha del cristal (`Glass_Smudge`, que tienen las tres cabinas), en los ejes de esa pieza, puesta al cargar la cabina (sin tirón en el primer golpe). Lo que tapa el cristal (pilares, arco, bloque colgante) las tapa también.
+- **Puro**: `CockpitGlassDamage` + `CockpitGlassSettings` + `GlassMark` (`Ship/CockpitGlassDamage.cs`). **Godot**: `CockpitGlass` (shader), `Cockpit3DView.SetGlassDamage` y `Cockpit.SetGlassDamage` (todas las cabinas, también las que no se ven, por F10), que llama `Player.SetFlickerLevel`.
