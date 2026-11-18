@@ -1103,7 +1103,7 @@ public partial class Main : Node3D
 	// El casco del fantasma es el de la nave con la que se hizo la vuelta, no el de la que corre ahora
 	private void ShowGhostShipHull()
 	{
-		_ghostShip.SetVisual(_ghost.Ship(message => GD.PushWarning(message)).Visual);
+		_ghostShip.SetShip(_ghost.Ship(message => GD.PushWarning(message)));
 	}
 
 	private void OnGhostToggled(bool enabled)

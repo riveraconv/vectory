@@ -3,6 +3,7 @@ using Vectory.Autopilot;
 using Vectory.Core;
 using Vectory.Circuit;
 using Vectory.Contact;
+using Vectory.Effects;
 using Vectory.Radar;
 using Vectory.Ship;
 using NVec3 = System.Numerics.Vector3;
@@ -12,7 +13,7 @@ namespace Vectory.Rivals;
 // Lo que la nave de un rival toma de la del jugador, para verse igual: casco 3D, inclinación, orientación, parpadeo del
 // daño y balizas de HAMMER (con los valores del Inspector del Player)
 public sealed record RivalLook(Hull3DSettings Hull, BankSettings Bank, AttitudeSettings Attitude, EdgeFlickerSettings Flicker,
-	IndustrialLampSettings Lamps);
+	IndustrialLampSettings Lamps, ThrusterFxSettings Thrusters);
 
 // Nave de un rival (spec docs/rivales-1-parrilla.md, 3.3 y 4): pinta la carrera de su RivalCar, que lleva toda la lógica.
 // Su casco 3D con su pintura, en la capa de los rivales (ShipHull3D.RivalLayer, iluminada por un juego de luces común),
@@ -106,6 +107,7 @@ public partial class RivalShip : Node3D
 			Hull3DOwnLights = false
 		};
 		_ship.SetHull3DSettings(_look.Hull);
+		_ship.EnableThrusters(_look.Thrusters, 1.7f * _car.Entry.Number);
 		if (definition.Visual.Hull3D != null)
 			_ship.SetHullPaint(definition.Visual.Hull3D.Style, _car.Entry.PaintIndex);
 		AddChild(_ship);
@@ -125,6 +127,7 @@ public partial class RivalShip : Node3D
 		{
 			_respawns = _car.Respawns;
 			_bank.Reset();
+			_ship.ResetThrusters();
 			SettleOnSurface();
 		}
 		else
@@ -140,6 +143,18 @@ public partial class RivalShip : Node3D
 					physics.Vertical.VerticalSpeed, d.RealSpeed, _look.Attitude, (float)delta);
 			}
 			ApplyTransform();
+			ShipInput input = _car.LastInput;
+			_ship.FeedThrusters(new ThrusterInput
+			{
+				Accelerate = input.Accelerate,
+				Brake = input.Brake,
+				Steer = ThrusterInput.SteerOf(input),
+				Drifting = d.Drifting,
+				SlipAngle = d.SlipAngle,
+				Boosting = _car.Boost.IsImpulseActive,
+				Speed = d.RealSpeed,
+				TopSpeed = _car.Ship.Technical.MaxSpeed
+			});
 		}
 		Publish();
 	}

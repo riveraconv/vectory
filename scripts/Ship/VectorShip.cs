@@ -45,6 +45,8 @@ public static class VectorShip
 			// mitad trasera, 5 cm sobre la piel
 			SmokeFoci = new DamageSmokeFoci(new(0.75f, 0.5f, 2.2f), new(-0.75f, 0.5f, 2.2f), new(1.84f, 0.18f, 1.6f),
 				new(0.22f, 0.22f, 0.05f)),
+			// Bocas Exhaust_L/R; boca 1,2 × 0,55 (spec docs/cascos-3d-1-vector.md, 4.2); retroempuje en el borde del morro
+			Thrusters = new ThrusterShape(new(0.75f, 0.10f, 3.20f), 1f, 0.46f, 1f, new(0.46f, 0.12f, -2.9f), ThrusterColors.Standard),
 			NoseDistance = 4f,
 			PhysicsBoxSize = new Vector3(6.8f, 1.2f, 7.2f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.4f)

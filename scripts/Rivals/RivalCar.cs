@@ -56,6 +56,9 @@ public sealed class RivalCar : IContactShip
 	public int Contacts { get; private set; }   // veces que ha empezado a tocar la barrera
 	public int Respawns { get; private set; }
 
+	// Lo que pidió su piloto en el último paso (para la llama de sus toberas; sin control, nada)
+	public ShipInput LastInput { get; private set; }
+
 	// Golpes medios y fuertes con otras naves (spec docs/rivales-3-contacto.md, 9): embestidas, recibidos y mutuos
 	public int Rams { get; private set; }
 	public int Received { get; private set; }
@@ -169,6 +172,7 @@ public sealed class RivalCar : IContactShip
 			Tracker.HasLapLimit && Tracker.CurrentLap >= Tracker.TotalLaps);
 		RivalCommand command = Driver.Decide(phase, state, Boost.CanActivate, Traffic, traffic ?? System.Array.Empty<TrafficShip>(), status);
 		_physics.Move(ref _position, command.Input, command.Boost, canDrive, tuning, _halfWidth, _context.Physics, dt);
+		LastInput = canDrive ? command.Input : default;
 
 		_detector.Update(_context.Frame.NearestIndex(_position.X, _position.Z));
 		if (Tracker.State == RaceState.Running)

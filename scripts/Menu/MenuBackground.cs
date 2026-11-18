@@ -38,7 +38,7 @@ public partial class MenuBackground : Node3D
 	[Export] public float ShadeWidth = 0.594f;      // fracción del ancho de pantalla (760 de 1280)
 
 	private Camera3D _camera;
-	private Node3D _ship;
+	private Spaceship _ship;
 	private MeshInstance3D _grid;
 	private MeshInstance3D _horizon;
 	private CanvasLayer _shade;
@@ -55,6 +55,8 @@ public partial class MenuBackground : Node3D
 		GetViewport().SizeChanged += ApplyLensShift;
 
 		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual };
+		// Al ralentí: nadie le pasa nada (spec docs/efectos-6-toberas.md, 9)
+		_ship.EnableThrusters(Effects.ThrusterFxSettings.Default, 0f);
 		AddChild(_ship);
 
 		var grid = new HorizonGridSettings

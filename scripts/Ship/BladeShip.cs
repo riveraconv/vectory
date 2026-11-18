@@ -66,6 +66,8 @@ public static class BladeShip
 			// su mitad trasera, 5 cm sobre la piel
 			SmokeFoci = new DamageSmokeFoci(new(0.6f, 0.35f, 2.4f), new(-0.6f, 0.35f, 2.4f), new(1.1f, 0.19f, 2f),
 				new(0.13f, 0.13f, 0.05f)),
+			// Bocas Exhaust_L/R; boca 0,80 × 0,28 y largo × 0,85 respecto a la de VECTOR (spec docs/cascos-3d-2-blade.md, 4.2)
+			Thrusters = new ThrusterShape(new(0.60f, 0.08f, 3.30f), 0.67f, 0.35f, 0.85f, new(0.37f, 0.08f, -3.8f), ThrusterColors.Standard),
 			NoseDistance = 5.2f,
 			PhysicsBoxSize = new Vector3(3.2f, 0.62f, 8.8f),
 			PhysicsBoxCenter = new Vector3(0f, 0.17f, -0.8f)

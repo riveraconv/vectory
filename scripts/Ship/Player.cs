@@ -272,6 +272,50 @@ public partial class Player : CharacterBody3D, IContactShip
 		};
 	}
 
+	[ExportGroup("Toberas")]   // llama de las toberas (spec docs/efectos-6-toberas.md, 10); también la de los rivales
+	[Export] public float ThrusterBrightness = ThrusterDefaults.Brightness;       // ajuste a ojo con el glow
+	[Export] public float ThrusterPowerRise = ThrusterDefaults.PowerRise;         // s
+	[Export] public float ThrusterPowerFall = ThrusterDefaults.PowerFall;         // s, sin gas
+	[Export] public float ThrusterPowerBrakeFall = ThrusterDefaults.PowerBrakeFall; // s, frenando
+	[Export] public float ThrusterBoostRise = ThrusterDefaults.BoostRise;         // s
+	[Export] public float ThrusterBoostFall = ThrusterDefaults.BoostFall;         // s
+	[Export] public float ThrusterKickGain = ThrusterDefaults.KickGain;           // largo extra al empezar un boost
+	[Export] public float ThrusterKickTau = ThrusterDefaults.KickTau;             // s
+	[Export] public float ThrusterLengthBase = ThrusterDefaults.LengthBase;       // m
+	[Export] public float ThrusterLengthPower = ThrusterDefaults.LengthPower;     // m × potencia
+	[Export] public float ThrusterLengthBoost = ThrusterDefaults.LengthBoost;     // m × boost
+	[Export] public float ThrusterOuterPush = ThrusterDefaults.OuterPush;         // la de fuera, más larga al girar
+	[Export] public float ThrusterBendDrift = ThrusterDefaults.BendDrift;         // doblado de la punta al derrapar, × largo
+	[Export] public float ThrusterMaxSlip = ThrusterDefaults.MaxSlipDegrees;      // grados: doblada del todo desde aquí
+	[Export] public float ThrusterRingSize = ThrusterDefaults.RingEnd;            // m, tamaño final del anillo del boost
+	[Export] public float ThrusterRingDuration = ThrusterDefaults.RingDuration;   // s
+
+	private static readonly ThrusterFxSettings ThrusterDefaults = new();
+
+	// Ajustes de las toberas (grupo Toberas): también los de los rivales
+	public ThrusterFxSettings BuildThrusterSettings()
+	{
+		return new ThrusterFxSettings
+		{
+			Brightness = ThrusterBrightness,
+			PowerRise = ThrusterPowerRise,
+			PowerFall = ThrusterPowerFall,
+			PowerBrakeFall = ThrusterPowerBrakeFall,
+			BoostRise = ThrusterBoostRise,
+			BoostFall = ThrusterBoostFall,
+			KickGain = ThrusterKickGain,
+			KickTau = ThrusterKickTau,
+			LengthBase = ThrusterLengthBase,
+			LengthPower = ThrusterLengthPower,
+			LengthBoost = ThrusterLengthBoost,
+			OuterPush = ThrusterOuterPush,
+			BendDrift = ThrusterBendDrift,
+			MaxSlipDegrees = ThrusterMaxSlip,
+			RingEnd = ThrusterRingSize,
+			RingDuration = ThrusterRingDuration
+		};
+	}
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -465,6 +509,7 @@ public partial class Player : CharacterBody3D, IContactShip
 
 		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual, Use3DHull = true };
 		_ship.SetHull3DSettings(BuildHull3DSettings());
+		_ship.EnableThrusters(BuildThrusterSettings(), 0f);
 		AddChild(_ship);
 
 		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual, Settings3D = BuildCockpit3DSettings() };
@@ -584,6 +629,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		Slipstream.Reset();
 		PreviousPosition = ToNumerics(GlobalPosition);
 		_bank.Reset();
+		_ship.ResetThrusters();
 		ResetCameraEffects();
 		SettleOnSurface();
 		_chaseCam.Snap(GlobalPosition, Dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
@@ -600,6 +646,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		Passable.Respawned();
 		Slipstream.Reset();
 		_bank.Reset();
+		_ship.ResetThrusters();
 		ResetCameraEffects();
 		SettleOnSurface();
 		_chaseCam.Snap(GlobalPosition, Dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
@@ -770,6 +817,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		bool boostPressed = !AutopilotActive && !_inputBlocked && Input.IsActionJustPressed(SnBoost);
 		_physics.BeginStep(input, boostPressed, canDrive, baseTuning, physics, dt);
 		ApplyBodyRotation();
+		FeedThrusters(input, canDrive);
 
 		// 2. Mover el cuerpo en Godot con la velocidad real (en planta; la altura la pone la capa vertical)
 		Velocity = new Vector3(Dynamics.Velocity.X, 0f, Dynamics.Velocity.Y);
@@ -900,6 +948,26 @@ public partial class Player : CharacterBody3D, IContactShip
 	}
 
 	private static System.Numerics.Vector3 ToNumerics(Vector3 v) => new(v.X, v.Y, v.Z);
+
+	// Lo que hace la nave, para la llama de sus toberas (spec docs/efectos-6-toberas.md, 3 y 8). En la cuenta atrás la
+	// nave no recibe input, pero la llama sí ruge con W (solo visual); terminada, sin gas.
+	private void FeedThrusters(in ShipInput input, bool canDrive)
+	{
+		ShipInput shown = input;
+		if (!canDrive && _race != null && _race.State == RaceState.PreStart && !AutopilotActive)
+			shown = ReadInput();
+		_ship.FeedThrusters(new ThrusterInput
+		{
+			Accelerate = shown.Accelerate,
+			Brake = shown.Brake,
+			Steer = ThrusterInput.SteerOf(shown),
+			Drifting = Dynamics.Drifting,
+			SlipAngle = Dynamics.SlipAngle,
+			Boosting = Boost.IsImpulseActive,
+			Speed = Dynamics.RealSpeed,
+			TopSpeed = MaxSpeed
+		});
+	}
 
 	// Traduce el teclado a intenciones de conducción (acciones del mapa de entrada; SETTINGS cambia sus teclas)
 	private static ShipInput ReadInput()

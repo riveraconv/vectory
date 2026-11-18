@@ -64,6 +64,24 @@ public readonly record struct DriftContactShape(float TipZ, float EdgeStartZ, fl
 // fuego nace ahí, pegado al casco, y el humo en el foco
 public readonly record struct DamageSmokeFoci(Vector3 Smoke, Vector3 Smoke2, Vector3 Smoke3, Vector3 SkinGaps = default);
 
+// Colores de la llama de las toberas sin boost (spec docs/efectos-6-toberas.md, 4.4): núcleo, medio y fuera, como los da
+// la maqueta (se pasan tal cual al shader). El medio es también el de la boca del casco 3D.
+public readonly record struct ThrusterColors(Vector3 Core, Vector3 Mid, Vector3 Out)
+{
+	// VECTOR y BLADE: blanco cian, cian y azul
+	public static readonly ThrusterColors Standard = new(new(0.85f, 0.97f, 1f), new(0.21f, 0.90f, 1f), new(0.14f, 0.36f, 1f));
+
+	// HAMMER, a juego con sus bocas naranjas (spec docs/cascos-3d-3-hammer.md, 4.2): #FFB46A, #FF5A14 y rojo oscuro
+	public static readonly ThrusterColors Industrial = new(new(1f, 0.706f, 0.416f), new(1f, 0.353f, 0.078f), new(0.55f, 0.10f, 0.04f));
+}
+
+// Toberas de una nave (spec docs/efectos-6-toberas.md, 2.1 y 4.2), en sus ejes: Nozzle es la boca derecha (la izquierda,
+// con x cambiada de signo; las bocas Exhaust_L/R del casco 3D, en el mismo sitio que las del wireframe), con la llama
+// hacia +Z. Scale: radio de la boca respecto a VECTOR; Squash: alto / ancho de la boca; LengthScale: largo de la llama.
+// Retro: punto derecho del retroempuje en el morro (etapa 3). Colors: los de la llama sin boost.
+public readonly record struct ThrusterShape(Vector3 Nozzle, float Scale, float Squash, float LengthScale, Vector3 Retro,
+	ThrusterColors Colors);
+
 // Un casco 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
 // del que sale su contrato de piezas
 public sealed record ShipHull3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath, HullStyle Style)
@@ -106,6 +124,9 @@ public sealed record ShipVisualProfile
 
 	// De dónde sale el humo de daños (spec docs/efectos-4-humo-danos.md, 3)
 	public required DamageSmokeFoci SmokeFoci { get; init; }
+
+	// Toberas: dónde salen las llamas, su tamaño y sus colores (spec docs/efectos-6-toberas.md)
+	public required ThrusterShape Thrusters { get; init; }
 
 	// Distancia del origen de la nave a la punta del morro (colocación en la parrilla)
 	public required float NoseDistance { get; init; }

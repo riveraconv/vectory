@@ -1,4 +1,5 @@
 using Godot;
+using Vectory.Effects;
 
 namespace Vectory.Ship;
 
@@ -35,6 +36,12 @@ public partial class Spaceship : Node3D
 	private bool _hullTimeTrial;
 	private int _wireEdgeCount;
 
+	// Llamas de las toberas (spec docs/efectos-6-toberas.md): solo si la nave las pide (carrera, fantasma y menú; el
+	// holograma y las naves de prueba, no)
+	private ThrusterFlames _thrusters;
+	private ThrusterFxSettings _thrusterSettings;
+	private float _thrusterPhase;
+
 	// Número de aristas que pueden parpadear por su cuenta con los daños: las líneas del wireframe o, con casco 3D,
 	// sus luces (14 en VECTOR, 9 en BLADE)
 	public int EdgeCount => _hull3D != null ? _hull3D.FlickerLightCount : _wireEdgeCount;
@@ -45,7 +52,42 @@ public partial class Spaceship : Node3D
 	{
 		_meshInstance = new MeshInstance3D { Name = "MeshInstance3D", Mesh = BuildMesh() };
 		AddChild(_meshInstance);
+		if (_thrusterSettings != null)
+			CreateThrusters();
 		RebuildHull3D();
+	}
+
+	// Enciende las llamas de las toberas, con sus ajustes y un desfase de tiempo propio. Antes o después de _Ready.
+	public void EnableThrusters(ThrusterFxSettings settings, float phase)
+	{
+		_thrusterSettings = settings ?? ThrusterFxSettings.Default;
+		_thrusterPhase = phase;
+		if (_meshInstance != null && _thrusters == null)
+		{
+			CreateThrusters();
+			_thrusters.Hull = _hull3D;
+			ApplyVisibility();
+		}
+	}
+
+	private void CreateThrusters()
+	{
+		_thrusters = new ThrusterFlames { Name = "Thrusters" };
+		_thrusters.Setup(_thrusterSettings, Visual.Thrusters, _thrusterPhase);
+		AddChild(_thrusters);
+	}
+
+	// Lo que hace la nave en este paso, para sus toberas
+	public void FeedThrusters(in ThrusterInput input) => _thrusters?.Feed(input);
+
+	// Recolocación: las toberas, al ralentí al momento
+	public void ResetThrusters() => _thrusters?.ResetState();
+
+	// Intensidad de las llamas (el fantasma: su transparencia)
+	public void SetThrusterOpacity(float opacity)
+	{
+		if (_thrusters != null)
+			_thrusters.Opacity = opacity;
 	}
 
 	public void SetHull3DSettings(Hull3DSettings settings)
@@ -126,6 +168,8 @@ public partial class Spaceship : Node3D
 			_hull3D.SetWear(_hullWear);
 		}
 		_hull3D?.SetDamageShape(Visual.SmokeFoci, Visual.CollisionHalfWidth, Visual.CollisionFront, Visual.CollisionBack);
+		if (_thrusters != null)
+			_thrusters.Hull = _hull3D;
 		ApplyVisibility();
 	}
 
@@ -134,6 +178,8 @@ public partial class Spaceship : Node3D
 		_meshInstance.Visible = _exteriorVisible && _hull3D == null;
 		if (_hull3D != null)
 			_hull3D.Visible = _exteriorVisible;
+		if (_thrusters != null)
+			_thrusters.Visible = _exteriorVisible;
 	}
 
 	// Cambia la nave dibujada. Con el mismo perfil no rehace nada. El material sustituido sigue puesto; el de parpadeo
@@ -144,6 +190,7 @@ public partial class Spaceship : Node3D
 			return;
 		Visual = visual;
 		_meshInstance.Mesh = BuildMesh();
+		_thrusters?.SetShape(visual.Thrusters);
 		if (_flickerMaterial != null)
 		{
 			_flickerMaterial = null;

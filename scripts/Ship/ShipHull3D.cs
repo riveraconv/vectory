@@ -526,6 +526,27 @@ void fragment() {
 		}
 	}
 
+	private static readonly string[][] NozzlePieces =
+	{
+		new[] { "Nozzle_Glow_L", "Nozzle_Core_L" },
+		new[] { "Nozzle_Glow_R", "Nozzle_Core_R" }
+	};
+
+	// Boca de una tobera (0 izquierda, 1 derecha; spec docs/efectos-6-toberas.md, 4.6): fondo y núcleo luminosos con el
+	// color medio de la llama y su emisión de siempre × factor (con potencia de crucero y sin boost, 1)
+	public void SetNozzleGlow(int side, Color color, float factor)
+	{
+		string[] pieces = NozzlePieces[side];
+		for (int i = 0; i < pieces.Length; i++)
+		{
+			StandardMaterial3D material = MaterialOf(pieces[i]);
+			if (material == null || !_lightBase.TryGetValue(pieces[i], out float baseEnergy))
+				continue;
+			material.Emission = color;
+			material.EmissionEnergyMultiplier = baseEnergy * factor;
+		}
+	}
+
 	// Balizas del techo (HAMMER, spec 6.4): intensidad de cada lente según su papel; sin balizas no hace nada. No
 	// titilan con el daño.
 	public void SetBeacons(float boost, float damage)
