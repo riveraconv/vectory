@@ -154,8 +154,8 @@ public class DriftFxTests
     private static readonly ShipPose Pose = ShipPose.Flat(new Vector3(0f, 2f, 0f));
     private static readonly Vector2 Velocity = new(10f, -60f);
 
-    private static int EmitFor(float seconds, float dt, float d, float quality, SparkField field = null, int seed = 1,
-        BarrierSide side = BarrierSide.Left, DriftFxSettings settings = null)
+    private static int EmitFor(float seconds, float dt, float d, float quality, SparkField? field = null, int seed = 1,
+        BarrierSide side = BarrierSide.Left, DriftFxSettings? settings = null)
     {
         field ??= new SparkField(CollisionFxSettings.Default);
         var emitter = new DriftSparkEmitter(settings ?? S, new Random(seed));
