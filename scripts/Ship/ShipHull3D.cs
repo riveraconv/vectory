@@ -195,6 +195,11 @@ void fragment() {
 	private readonly Dictionary<string, (StandardMaterial3D Hazard, StandardMaterial3D Plate)> _leadingEdges = new();
 	private int _paintVersion;
 	private int _scorchLevel;
+	// Cristal de la cabina por fuera (spec docs/efectos-5-danos-casco.md, 7): sus pasadas y la semilla de sus grietas
+	private readonly List<ShaderMaterial> _glassPasses = new();
+	private readonly int _glassSeed = System.Random.Shared.Next();
+	private int _glassLevel;
+	private static readonly CockpitGlassSettings GlassSettings = CockpitGlassSettings.Hull;
 	// Daño visible: la pasada (una por casco, en todos los materiales pintados), la raíz del modelo, focos y medidas
 	private ShaderMaterial _wearPass;
 	private Node3D _modelRoot;
@@ -237,6 +242,7 @@ void fragment() {
 		// La pasada del daño va puesta desde el principio (sin nada que pintar): así su shader se compila al cargar y el
 		// primer golpe no da un tirón
 		AttachWear();
+		AttachGlass();
 		ApplyScorch();
 		// Al final del árbol: la WorldEnvironment de la escena se crea en el _Ready de Main, después de este nodo
 		CallDeferred(MethodName.SetUpWorldReflections);
@@ -708,6 +714,7 @@ void fragment() {
 	{
 		_scorchLevel = HullDamage.ScorchMask(level, timeTrial);
 		ApplyScorch();
+		ApplyGlass();
 	}
 
 	// Focos del humo de la nave (el hollín sale de ellos) y medidas de su caja (para morro, popa y costados)
@@ -772,6 +779,32 @@ void fragment() {
 	}
 
 	private ShaderMaterial NewWearPass() => new() { Shader = new Shader { Code = WearShader } };
+
+	// Las piezas de cristal de la cabina: la cúpula de VECTOR y BLADE, las ventanas de HAMMER
+	private void AttachGlass()
+	{
+		if (_manifest == null || _glassPasses.Count > 0)
+			return;
+		if (_manifest.Glass.Count > 0)
+		{
+			foreach (string name in _manifest.Glass)
+				CockpitGlass.AttachHull(_pieces.GetValueOrDefault(name), _glassPasses);
+		}
+		else
+			CockpitGlass.AttachHull(_pieces.GetValueOrDefault(HullPieces.Canopy), _glassPasses);   // VECTOR y BLADE la llaman igual
+		_glassLevel = -1;
+		ApplyGlass();
+	}
+
+	// Grietas del nivel de ahora; solo cuando cambia (rehace sus listas de marcas)
+	private void ApplyGlass()
+	{
+		if (_glassLevel == _scorchLevel)
+			return;
+		_glassLevel = _scorchLevel;
+		for (int i = 0; i < _glassPasses.Count; i++)
+			CockpitGlass.Apply(_glassPasses[i], _scorchLevel, _glassSeed + i * 7919, GlassSettings);
+	}
 
 	// La pasada del daño detrás de cada material pintado (y detrás de su iridiscencia, si la tiene)
 	private void AttachWear()

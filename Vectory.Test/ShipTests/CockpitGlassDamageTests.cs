@@ -100,6 +100,15 @@ public class CockpitGlassDamageTests
     }
 
     [Fact]
+    public void Hull_glass_uses_the_same_marks_but_more_opaque()
+    {
+        CockpitGlassSettings hull = CockpitGlassSettings.Hull;
+        Assert.True(hull.CrackOpacity > S.CrackOpacity);
+        Assert.Equal(CockpitGlassDamage.Crack(3, 0, 5, S), CockpitGlassDamage.Crack(3, 0, 5, hull));
+        Assert.Equal(CockpitGlassDamage.Chip(2, 4, 5, S), CockpitGlassDamage.Chip(2, 4, 5, hull));
+    }
+
+    [Fact]
     public void Out_of_range_index_is_empty()
     {
         Assert.Equal(0f, CockpitGlassDamage.Chip(3, 10, 1, S).Size);

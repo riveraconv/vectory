@@ -2,7 +2,7 @@ using Godot;
 
 namespace Vectory.Ship;
 
-// Cristal dañado de la cabina 3D (spec docs/efectos-5-danos-casco.md, 6): una pasada de shader detrás del material de la
+// Cristal dañado de la cabina 3D y de la cabina de los cascos 3D por fuera (spec docs/efectos-5-danos-casco.md, 6 y 7): una pasada de shader detrás del material de la
 // mancha del cristal (Glass_Smudge), puesta al cargar la cabina para que se compile entonces y el primer golpe no dé un
 // tirón. Pinta picadas, grietas largas irregulares y manchas en los ejes del propio cristal (así van pegadas a él), con
 // los sitios de CockpitGlassDamage. Sin reglas.
@@ -19,26 +19,18 @@ public static class CockpitGlass
 	private static readonly StringName SizeParam = "glass_size";
 
 	private static Shader _shader;
+	private static Shader _hullShader;
+	private static readonly StringName AxisUParam = "axis_u";
+	private static readonly StringName AxisVParam = "axis_v";
 
-	private const string Code = @"
+	// Cabecera de la cabina: el cristal se mide en los ejes de su pieza, con su lado largo en x y el otro en su plano
+	private const string CockpitHead = @"
 shader_type spatial;
 render_mode blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
 
-uniform vec4 chip[10];
-uniform vec4 crack[3];
-uniform vec4 stain[3];
-uniform float crack_opacity = 0.45;
-uniform float stain_opacity = 0.3;
 uniform vec3 glass_center;
 uniform vec3 glass_size = vec3(1.0);
 uniform vec3 crack_color : source_color = vec3(0.30, 0.30, 0.31);
-uniform vec3 stain_color : source_color = vec3(0.30, 0.27, 0.24);
-// Cada tramo de una grieta es una cara de la fractura, inclinada a su manera: así coge la luz de la cabina (la principal,
-// la del boost, la de los daños y la de las chispas) a trozos, y no como una pegatina
-uniform float facet_tilt = 0.7;
-uniform float crack_roughness = 0.18;
-uniform float crack_specular = 0.9;
-
 varying vec2 glass_uv;
 
 void vertex() {
@@ -49,6 +41,41 @@ void vertex() {
 	vec3 d = VERTEX - glass_center;
 	glass_uv = vec2(d.x / max(glass_size.x, 0.0001) + 0.5, 0.5 - dot(d, up) / h);
 }
+";
+
+	// Cabecera de los cascos 3D (vista exterior): el cristal, curvo, se proyecta sobre el plano de sus dos medidas más
+	// largas (en glass_size van esas dos medidas: x y luego y)
+	private const string HullHead = @"
+shader_type spatial;
+render_mode blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
+
+uniform vec3 glass_center;
+uniform vec3 glass_size = vec3(1.0);
+uniform vec3 axis_u = vec3(1.0, 0.0, 0.0);
+uniform vec3 axis_v = vec3(0.0, 0.0, 1.0);
+// Por fuera las grietas se ven claras: dispersan la luz que les da
+uniform vec3 crack_color : source_color = vec3(0.72, 0.74, 0.76);
+varying vec2 glass_uv;
+
+void vertex() {
+	vec3 d = VERTEX - glass_center;
+	glass_uv = vec2(dot(d, axis_u) / max(glass_size.x, 0.0001) + 0.5, 0.5 - dot(d, axis_v) / max(glass_size.y, 0.0001));
+}
+";
+
+	// Lo común: picadas, grietas y manchas en glass_uv
+	private const string Body = @"
+uniform vec4 chip[10];
+uniform vec4 crack[3];
+uniform vec4 stain[3];
+uniform float crack_opacity = 0.45;
+uniform float stain_opacity = 0.3;
+uniform vec3 stain_color : source_color = vec3(0.30, 0.27, 0.24);
+// Cada tramo de una grieta es una cara de la fractura, inclinada a su manera: así coge la luz de la cabina (la principal,
+// la del boost, la de los daños y la de las chispas) a trozos, y no como una pegatina
+uniform float facet_tilt = 0.7;
+uniform float crack_roughness = 0.18;
+uniform float crack_specular = 0.9;
 
 float hash(float n) { return fract(sin(n) * 43758.5453123); }
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
@@ -209,7 +236,7 @@ void fragment() {
 	{
 		if (glass?.Mesh == null || glass.GetActiveMaterial(0) is not BaseMaterial3D material)
 			return null;
-		_shader ??= new Shader { Code = Code };
+		_shader ??= new Shader { Code = CockpitHead + Body };
 		var pass = new ShaderMaterial { Shader = _shader, RenderPriority = 1 };
 		Aabb box = glass.Mesh.GetAabb();
 		pass.SetShaderParameter(CenterParam, box.GetCenter());
@@ -217,6 +244,39 @@ void fragment() {
 		material.NextPass = pass;
 		Apply(pass, 0, 0, CockpitGlassSettings.Default);
 		return pass;
+	}
+
+	// Casco 3D: pone la pasada al final de la cadena de cada material del cristal (detrás de la iridiscencia, si la
+	// tiene), proyectado sobre el plano de sus dos medidas más largas. Devuelve las pasadas puestas.
+	public static void AttachHull(MeshInstance3D glass, System.Collections.Generic.List<ShaderMaterial> passes)
+	{
+		if (glass?.Mesh == null)
+			return;
+		_hullShader ??= new Shader { Code = HullHead + Body };
+		Aabb box = glass.Mesh.GetAabb();
+		Vector3 size = box.Size;
+		// El eje más corto es el de su grosor (el que mira hacia fuera): se proyecta sobre los otros dos
+		int thin = size.X <= size.Y && size.X <= size.Z ? 0 : size.Y <= size.Z ? 1 : 2;
+		Vector3 u = thin == 0 ? Vector3.Back : Vector3.Right;
+		Vector3 v = thin == 1 ? Vector3.Back : Vector3.Up;
+		float su = thin == 0 ? size.Z : size.X;
+		float sv = thin == 1 ? size.Z : size.Y;
+		for (int i = 0; i < glass.GetSurfaceOverrideMaterialCount(); i++)
+		{
+			if (glass.GetSurfaceOverrideMaterial(i) is not BaseMaterial3D material)
+				continue;
+			var pass = new ShaderMaterial { Shader = _hullShader, RenderPriority = 1 };
+			pass.SetShaderParameter(CenterParam, box.GetCenter());
+			pass.SetShaderParameter(SizeParam, new Vector3(su, sv, 0f));
+			pass.SetShaderParameter(AxisUParam, u);
+			pass.SetShaderParameter(AxisVParam, v);
+			Material last = material;
+			while (last.NextPass != null)
+				last = last.NextPass;
+			last.NextPass = pass;
+			Apply(pass, 0, 0, CockpitGlassSettings.Hull);
+			passes.Add(pass);
+		}
 	}
 
 	// Solo al cambiar de nivel: no corre cada frame

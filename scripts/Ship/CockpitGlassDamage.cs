@@ -29,6 +29,9 @@ public sealed class CockpitGlassSettings
 	public float StainOpacity = 0.3f;
 
 	public static CockpitGlassSettings Default => new();
+
+	// Por fuera (casco 3D): más opacas, porque el cristal curvo y brillante refleja el entorno y se las comía
+	public static CockpitGlassSettings Hull => new() { CrackOpacity = 0.85f, StainOpacity = 0.35f };
 }
 
 // Picadas, grietas largas y manchas del cristal de la cabina según el nivel de daño (spec docs/efectos-5-danos-casco.md,

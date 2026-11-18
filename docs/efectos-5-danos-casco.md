@@ -1,6 +1,6 @@
 # VECTORY — Spec: Efectos 5 · Daño visible del casco
 
-Versión 1.1 · 2026-11-19 · Estado: **implementada y validada** (propuesta del agente, aceptada por el usuario sin maqueta)
+Versión 1.2 · 2026-11-19 · Estado: **implementada y validada** (propuesta del agente, aceptada por el usuario sin maqueta)
 
 Sustituye las **quemaduras de máscara** de las specs de los cascos 3D (`cascos-3d-1-vector`, `-2-blade`, `-3-hammer`, sección 6.5: tres máscaras de ruido por nivel que oscurecían la pintura en todo el casco). Se leían como un camuflaje de manchas, no como daño. El **parpadeo de las luces** de esas secciones no cambia. Las reglas del daño (`danos`) tampoco: es solo visual.
 
@@ -72,3 +72,13 @@ Pedido por el usuario: la cabina también se daña, con **picadas** y **grietas 
 - Los sitios se sortean **una vez por carrera** (semilla del `Player`) por casi todo el cristal (x 0,04–0,96, y 0,04–0,80 del cristal, 0 arriba), **empujados hacia los bordes** (`Spread`: raíz de la distancia al centro, del todo en x y a medias en y), para no quedarse en el centro ni tapar lo que se mira; al subir de nivel, lo que había sigue en su sitio y sale más.
 - Van **pegadas al cristal**: una pasada de shader detrás del material de la mancha del cristal (`Glass_Smudge`, que tienen las tres cabinas), en los ejes de esa pieza, puesta al cargar la cabina (sin tirón en el primer golpe). Lo que tapa el cristal (pilares, arco, bloque colgante) las tapa también.
 - **Puro**: `CockpitGlassDamage` + `CockpitGlassSettings` + `GlassMark` (`Ship/CockpitGlassDamage.cs`). **Godot**: `CockpitGlass` (shader), `Cockpit3DView.SetGlassDamage` y `Cockpit.SetGlassDamage` (todas las cabinas, también las que no se ven, por F10), que llama `Player.SetFlickerLevel`.
+
+## 7. Cristal de la cabina por fuera (v1.2)
+
+Pedido por el usuario: las mismas grietas, en la cabina de los cascos 3D, para la vista exterior. **Todas las naves** en RACE (como el resto del daño visible); en TIME TRIAL, el fantasma, el menú y el holograma, nada.
+
+- Mismas picadas, grietas largas y manchas por nivel que en la sección 6, en las piezas de cristal de cada casco: `Canopy_Glass` en VECTOR y BLADE, las tres de `glass` del manifiesto en HAMMER (`Cab_Windshield`, `Cab_SideWindow_L` / `_R`), cada pieza con sus sitios (semilla propia de cada casco).
+- El cristal es curvo: se proyecta sobre el plano de sus **dos medidas más largas** (la más corta es su grosor), en los ejes de la propia pieza, así van pegadas a ella.
+- **Más claras y más opacas que dentro** (gris claro `0,72 · 0,74 · 0,76` al 85 %): por fuera el cristal roto dispersa la luz, y el cristal brillante e iridiscente se comía el gris humo de dentro. Con la misma luz que el casco (sus tres direccionales).
+- La pasada va al final de la cadena del material del cristal (detrás de la iridiscencia de la cúpula de VECTOR), puesta al cargar el casco. **Godot**: `CockpitGlass.AttachHull` y `ShipHull3D` (`AttachGlass`, `ApplyGlass` con el nivel de `SetDamage`).
+- Unitaria: los mismos sitios con los ajustes de dentro y de fuera, y más opacas por fuera.
