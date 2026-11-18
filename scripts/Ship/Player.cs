@@ -977,7 +977,8 @@ public partial class Player : CharacterBody3D, IContactShip
 			SlipAngle = Dynamics.SlipAngle,
 			Boosting = Boost.IsImpulseActive,
 			Speed = Dynamics.RealSpeed,
-			TopSpeed = MaxSpeed
+			TopSpeed = MaxSpeed,
+			DamageLevel = CockpitDamageEnabled ? _damageLevel : 0
 		});
 	}
 

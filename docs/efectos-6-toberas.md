@@ -260,6 +260,12 @@ Solo con **nivel de daño 3** (RACE). Por cada tobera, por separado:
 - El corte multiplica la llama (parpadeo `q`), la boca, la luz y el calor.
 - Convive con el fuego y el humo del daño 3 (`efectos-4-humo-danos`).
 
+### 7.3 Resultado de la etapa 3
+
+- Retroempuje en los puntos del perfil de cada nave (2.1), con su propio ruido (velocidad 12) y sin escalar con la boca. Solo en carrera (tú y los rivales); en tu cabina no se ve, como el resto de tu llama.
+- Daño 3: el nivel llega por `ThrusterInput.DamageLevel` (el tuyo solo en RACE; el de cada rival, el suyo). El azar de cortes y chasquidos sale de una semilla por nave (de su desfase), así que con la misma semilla salen en los mismos momentos. El corte también baja la boca (va con `q`). Los chasquidos se escalan con la boca, como el anillo; sin daño 3 no salen nuevos y el que haya se apaga solo.
+- Comprobado con capturas en RACE con VECTOR y daño 3 forzado con una sonda: cortes en una tobera y chasquidos naranjas, junto al humo; al frenar, los dos chorros en el morro (cámara orbital F4). Fantasma, pausa y recolocación, el usuario jugando.
+
 ## 8. Interacción con otros sistemas
 
 - **Partículas de las toberas y chispas del boost** (`efectos-velocidad` 6.1): no existen todavía y no entran aquí. Cuando se hagan, salen de las mismas bocas.

@@ -14,8 +14,9 @@ public class ThrusterFxTests
     private const float Dt = 1f / 60f;
 
     private static ThrusterInput Drive(bool accelerate = false, bool brake = false, float speed = Top, float steer = 0f,
-        bool boost = false, bool drift = false, float slip = 0f) => new()
+        bool boost = false, bool drift = false, float slip = 0f, int damage = 0) => new()
     {
+        DamageLevel = damage,
         Accelerate = accelerate,
         Brake = brake,
         Steer = steer,
@@ -277,6 +278,94 @@ public class ThrusterFxTests
         ThrusterFlame flame = state.Flame(0, HammerShip.Definition.Visual.Thrusters, S);
         Assert.Equal(ThrusterColors.Industrial.Mid, flame.Mid);
         Assert.True(flame.Mid.X > flame.Mid.Z * 5f);
+    }
+
+    [Fact]
+    public void Retro_thrust_fires_braking_above_20_kmh()
+    {
+        var fast = new ThrusterState();
+        Run(fast, Drive(brake: true, speed: 100f / 3.6f), 0.5f);
+        Assert.True(fast.Retro > 0.99f, $"R = {fast.Retro}");
+        Assert.True(fast.RetroLength(0, S) > S.RetroLengthBase);
+
+        var slow = new ThrusterState();
+        Run(slow, Drive(brake: true, speed: 10f / 3.6f), 0.5f);
+        Assert.True(slow.Retro < S.RetroVisible);
+
+        // Al soltar, baja con τ 0,15 s
+        fast.Update(S.RetroFall, Drive(speed: 100f / 3.6f), S);
+        Assert.Equal(MathF.Exp(-1f), fast.Retro, 2);
+        fast.Reset(S);
+        Assert.Equal(0f, fast.Retro);
+    }
+
+    private static (int cuts, int pops, string trace) Damage(int seed, int level)
+    {
+        var state = new ThrusterState(0f, S, seed);
+        int cuts = 0, pops = 0;
+        var trace = new System.Text.StringBuilder();
+        float lastCut = 1f;
+        for (int i = 0; i < 600; i++)
+        {
+            state.Update(Dt, Drive(accelerate: true, damage: level), S);
+            for (int k = 0; k < ThrusterState.Nozzles; k++)
+            {
+                if (state.Cut(k) < 1f && (k == 1 || lastCut == 1f))
+                    trace.Append($"c{k}:{i} ");
+                if (state.Pop(k) == 1f)
+                {
+                    pops++;
+                    trace.Append($"p{k}:{i} ");
+                }
+            }
+            if (state.Cut(0) < 1f && lastCut == 1f)
+                cuts++;
+            lastCut = state.Cut(0);
+        }
+        return (cuts, pops, trace.ToString());
+    }
+
+    [Fact]
+    public void Damage_3_stutters_the_same_way_with_the_same_seed()
+    {
+        (int cuts, int pops, string trace) a = Damage(5, 3);
+        (int _, int _, string traceB) = Damage(5, 3);
+        Assert.Equal(a.trace, traceB);
+        Assert.True(a.cuts > 0, "sin cortes en 10 s");
+        // Chasquidos cada 0,4–1,2 s en cada tobera: en 10 s, entre 8 y 25 por tobera
+        Assert.InRange(a.pops, 16, 50);
+        Assert.NotEqual(a.trace, Damage(6, 3).trace);
+
+        (int cuts2, int pops2, string _) = Damage(5, 2);
+        Assert.Equal(0, cuts2);
+        Assert.Equal(0, pops2);
+    }
+
+    [Fact]
+    public void A_cut_lowers_flicker_light_and_heat()
+    {
+        var state = new ThrusterState(0f, S, 3);
+        ThrusterFlame normal = default, cut = default;
+        bool found = false;
+        for (int i = 0; i < 2000 && !found; i++)
+        {
+            state.Update(Dt, Drive(accelerate: true, damage: 3), S);
+            if (state.Cut(0) < 1f)
+            {
+                cut = state.Flame(0, Shape(), S);
+                found = true;
+            }
+            else
+            {
+                normal = state.Flame(0, Shape(), S);
+            }
+        }
+        Assert.True(found);
+        Assert.Equal(S.CutFactor, cut.Cut);
+        Assert.True(cut.Flicker < 0.2f, $"q = {cut.Flicker}");
+        Assert.True(cut.LightEnergy < normal.LightEnergy * 0.2f);
+        Assert.Equal(ThrusterState.HeatStrength(state.Power, state.Boost, S) * S.CutFactor, cut.Heat, 4);
+        Assert.True(cut.Mouth < normal.Mouth * 0.2f);
     }
 
     [Fact]

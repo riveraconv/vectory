@@ -86,6 +86,32 @@ public sealed class ThrusterFxSettings
 	public float LightEnergy = 4f;                               // E0, ajustado a ojo (con 1 la popa apenas se ilumina)
 	public float LightBase = 0.3f, LightPower = 0.9f, LightBoost = 1f;
 
+	// --- Retroempuje (6): fuerza R con S por encima de RetroMinSpeed m/s; largo (base + R × …) × (1 + vaivén × sen)
+	public float RetroMinSpeed = 20f / 3.6f;
+	public float RetroRise = 0.05f, RetroFall = 0.15f;
+	public float RetroLengthBase = 0.35f, RetroLengthForce = 0.9f, RetroWobble = 0.25f;
+	public float RetroCoreLength = 0.6f;
+	public float RetroPlumeMouthRadius = 0.13f, RetroPlumeTipRadius = 0.03f;
+	public float RetroCoreMouthRadius = 0.07f, RetroCoreTipRadius = 0.03f;
+	public float RetroWidth = 0.55f;
+	public float RetroPlumeBrightness = 1.8f, RetroCoreBrightness = 2.6f;   // × R (en el shader, el núcleo × 1,6)
+	public float RetroNoiseSpeed = 12f;
+	public float RetroVisible = 0.01f;                                      // con menos fuerza no se ve
+	public Vector3 RetroCore = new(0.9f, 0.98f, 1f);
+	public Vector3 RetroMid = new(0.45f, 0.8f, 1f);
+	public Vector3 RetroOut = new(0.14f, 0.36f, 1f);
+
+	// --- Daño 3 (7): chasquidos cada PopMin–PopMax s, que saltan a 1 y caen con PopTau; cortes: al acabar su espera, con
+	// CutChance la llama baja a CutFactor durante CutMin–CutMax s; si no, otra espera de WaitMin–WaitMax s
+	public float PopMin = 0.4f, PopMax = 1.2f, PopTau = 0.08f;
+	public float PopIntensity = 1.6f;
+	public float PopSize = 0.6f, PopGrow = 1.2f;                            // m: tamaño + crecimiento × (1 − fuerza)
+	public float PopBehind = 0.6f;                                          // m por detrás de la boca
+	public Vector3 PopColor = new(1f, 0.195f, 0.024f);                     // #FF7A2A (hexadecimal de la maqueta: pasa a lineal)
+	public float CutChance = 0.18f, CutFactor = 0.15f;
+	public float CutMin = 0.05f, CutMax = 0.12f;
+	public float WaitMin = 0.12f, WaitMax = 0.5f;
+
 	public static ThrusterFxSettings Default => new();
 }
 
@@ -101,6 +127,7 @@ public struct ThrusterInput
 	public bool Boosting;
 	public float Speed;
 	public float TopSpeed;
+	public int DamageLevel;   // 0–3; solo RACE (en TIME TRIAL, 0)
 
 	public static float SteerOf(in ShipInput input) => (input.SteerLeft ? 1f : 0f) - (input.SteerRight ? 1f : 0f);
 }
@@ -125,6 +152,9 @@ public struct ThrusterFlame
 	public float Diamonds;     // D (5.1)
 	public float Heat;         // k (5.2); 0 = no se dibuja
 	public float LightEnergy;  // energía de su luz (5.3)
+	public float Cut;          // corte del daño 3 (7.2): 1, o CutFactor
+	public float PopIntensity; // chasquido del daño 3 (7.1): 0 = no se ve
+	public float PopSize;
 }
 
 // Estado de las dos toberas de una nave (spec docs/efectos-6-toberas.md, 3): potencia, boost de la llama, encendido,
@@ -135,6 +165,11 @@ public sealed class ThrusterState
 
 	private readonly float[] _ringAge = new float[Nozzles];
 	private bool _wasBoosting;
+	private readonly Random _random;
+	private readonly float[] _cut = new float[Nozzles];
+	private readonly float[] _cutTimer = new float[Nozzles];
+	private readonly float[] _pop = new float[Nozzles];
+	private readonly float[] _popTimer = new float[Nozzles];
 
 	public float Power { get; private set; }
 	public float Boost { get; private set; }
@@ -149,11 +184,22 @@ public sealed class ThrusterState
 	public float Time { get; private set; }
 	public float Scroll { get; private set; }
 
-	public ThrusterState(float phase = 0f, ThrusterFxSettings settings = null)
+	// Retroempuje (6) y lo que ha corrido su ruido
+	public float Retro { get; private set; }
+	public float RetroScroll { get; private set; }
+
+	// seed: el azar de los cortes y chasquidos del daño 3 (misma semilla, mismos momentos)
+	public ThrusterState(float phase = 0f, ThrusterFxSettings settings = null, int seed = 0)
 	{
 		Time = phase;
+		_random = new Random(seed);
+		for (int k = 0; k < Nozzles; k++)
+			_cut[k] = 1f;
 		Reset(settings ?? ThrusterFxSettings.Default);
 	}
+
+	public float Cut(int k) => _cut[k];
+	public float Pop(int k) => _pop[k];
 
 	// Recolocación (8): al ralentí y sin encendido ni frenada, al momento
 	public void Reset(ThrusterFxSettings s)
@@ -162,8 +208,13 @@ public sealed class ThrusterState
 		Kick = 0f;
 		BrakeFlick = 0f;
 		Steer = 0f;
+		Retro = 0f;
 		for (int k = 0; k < Nozzles; k++)
+		{
 			_ringAge[k] = float.NaN;
+			_pop[k] = 0f;
+			_cut[k] = 1f;
+		}
 	}
 
 	public void Update(float dt, in ThrusterInput input, ThrusterFxSettings s)
@@ -203,9 +254,49 @@ public sealed class ThrusterState
 		Slip = input.SlipAngle;
 		Drifting = input.Drifting;
 
+		bool retro = input.Brake && input.Speed > s.RetroMinSpeed;
+		Retro = Approach(Retro, retro ? 1f : 0f, input.Brake ? s.RetroRise : s.RetroFall, dt);
+		RetroScroll += s.RetroNoiseSpeed * dt;
+
+		UpdateDamage(dt, input.DamageLevel >= 3, s);
+
 		Time += dt;
 		Scroll += (s.NoiseBase + s.NoisePower * Power + s.NoiseBoost * Boost) * dt;
 	}
+
+	// Daño 3 (7): cada tobera, por separado, con sus cortes y sus chasquidos; sin daño 3, ni cortes ni chasquidos nuevos
+	private void UpdateDamage(float dt, bool damaged, ThrusterFxSettings s)
+	{
+		for (int k = 0; k < Nozzles; k++)
+		{
+			_pop[k] = Approach(_pop[k], 0f, s.PopTau, dt);
+			if (!damaged)
+			{
+				_cut[k] = 1f;
+				_cutTimer[k] = 0f;
+				_popTimer[k] = 0f;
+				continue;
+			}
+			_cutTimer[k] -= dt;
+			if (_cutTimer[k] <= 0f)
+			{
+				_cut[k] = _random.NextDouble() < s.CutChance ? s.CutFactor : 1f;
+				_cutTimer[k] = _cut[k] < 1f ? Between(s.CutMin, s.CutMax) : Between(s.WaitMin, s.WaitMax);
+			}
+			_popTimer[k] -= dt;
+			if (_popTimer[k] <= 0f)
+			{
+				_pop[k] = 1f;
+				_popTimer[k] = Between(s.PopMin, s.PopMax);
+			}
+		}
+	}
+
+	private float Between(float a, float b) => a + (b - a) * (float)_random.NextDouble();
+
+	// Largo del chorro k del retroempuje (6), en m
+	public float RetroLength(int k, ThrusterFxSettings s) =>
+		(s.RetroLengthBase + s.RetroLengthForce * Retro) * (1f + s.RetroWobble * MathF.Sin(53f * Time + 2f * k));
 
 	// Cómo se ve la tobera k con la forma y los colores de su nave
 	// heat: false con PARTICLES en LOW (5.2), y el calor no se dibuja
@@ -233,12 +324,15 @@ public sealed class ThrusterState
 			RingSize = ring ? s.RingStart + (s.RingEnd - s.RingStart) * ringT : 0f,
 			RingIntensity = ring ? s.RingIntensity * (1f - ringT) : 0f,
 			Diamonds = Diamonds(Power, Boost, s),
-			Heat = heat ? HeatStrength(Power, Boost, s) : 0f,
-			LightEnergy = LightEnergyOf(Power, Boost, s) * flicker
+			Heat = heat ? HeatStrength(Power, Boost, s) * _cut[k] : 0f,
+			LightEnergy = LightEnergyOf(Power, Boost, s) * flicker,
+			Cut = _cut[k],
+			PopIntensity = s.PopIntensity * _pop[k],
+			PopSize = s.PopSize + s.PopGrow * (1f - _pop[k])
 		};
 	}
 
-	// Parpadeo q de la tobera k (3.4); el corte del daño 3 llegará en la etapa 3
+	// Parpadeo q de la tobera k (3.4), con el corte del daño 3 (7.2)
 	public float Flicker(int k, ThrusterFxSettings s)
 	{
 		float t = Time;
@@ -247,6 +341,7 @@ public sealed class ThrusterState
 			q *= 1f + s.FlickerDrift * MathF.Sin(61f * t + 3f * k);
 		if (BrakeFlick > 0.01f)
 			q *= 1f - s.FlickerBrake * BrakeFlick * (0.5f + 0.5f * MathF.Sin(47f * t + k));
+		q *= _cut[k];
 		return q;
 	}
 

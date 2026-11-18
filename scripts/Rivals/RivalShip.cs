@@ -153,7 +153,8 @@ public partial class RivalShip : Node3D
 				SlipAngle = d.SlipAngle,
 				Boosting = _car.Boost.IsImpulseActive,
 				Speed = d.RealSpeed,
-				TopSpeed = _car.Ship.Technical.MaxSpeed
+				TopSpeed = _car.Ship.Technical.MaxSpeed,
+				DamageLevel = _damageLevel
 			});
 		}
 		Publish();

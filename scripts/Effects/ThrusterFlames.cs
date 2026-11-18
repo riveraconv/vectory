@@ -22,12 +22,15 @@ public partial class ThrusterFlames : Node3D
 	private static readonly StringName SnOut = "col_out";
 	private static readonly StringName SnRing = "ring";
 	private static readonly StringName SnHeat = "heat";
+	private static readonly StringName SnPop = "pop";
+	private static readonly StringName SnSize = "size";
 
 	private static ArrayMesh _cone;
 	private static QuadMesh _quad;
 	private static Shader _flameShader;
 	private static Shader _ringShader;
 	private static Shader _heatShader;
+	private static Shader _popShader;
 
 	private sealed class Nozzle
 	{
@@ -39,7 +42,19 @@ public partial class ThrusterFlames : Node3D
 		public MeshInstance3D Heat;
 		public ShaderMaterial HeatMaterial;
 		public OmniLight3D Light;
+		public MeshInstance3D Pop;
+		public ShaderMaterial PopMaterial;
 	}
+
+	// Chorro del retroempuje (6), en el morro, apuntando hacia delante
+	private sealed class RetroJet
+	{
+		public Node3D Pivot;
+		public ShaderMaterial Plume;
+		public ShaderMaterial Core;
+	}
+
+	private readonly RetroJet[] _retros = new RetroJet[ThrusterState.Nozzles];
 
 	private readonly Nozzle[] _nozzles = new Nozzle[ThrusterState.Nozzles];
 	private ThrusterFxSettings _settings = ThrusterFxSettings.Default;
@@ -85,12 +100,13 @@ public partial class ThrusterFlames : Node3D
 
 	public override void _Ready()
 	{
-		_state = new ThrusterState(_phase, _settings);
+		_state = new ThrusterState(_phase, _settings, 17 + (int)(_phase * 1000f));
 		_cone ??= BuildCone();
 		_quad ??= new QuadMesh { Size = Vector2.One };
 		_flameShader ??= new Shader { Code = FlameShader };
 		_ringShader ??= new Shader { Code = RingShader };
 		_heatShader ??= new Shader { Code = HeatShader };
+		_popShader ??= new Shader { Code = PopShader };
 
 		for (int k = 0; k < ThrusterState.Nozzles; k++)
 		{
@@ -134,6 +150,28 @@ public partial class ThrusterFlames : Node3D
 					Visible = false
 				};
 				nozzle.Pivot.AddChild(nozzle.Light);
+				nozzle.PopMaterial = new ShaderMaterial { Shader = _popShader };
+				nozzle.Pop = new MeshInstance3D
+				{
+					Name = "Pop",
+					Mesh = _quad,
+					MaterialOverride = nozzle.PopMaterial,
+					CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+					Position = new Vector3(0f, 0f, _settings.PopBehind),
+					ExtraCullMargin = 2f,
+					Visible = false
+				};
+				nozzle.Pivot.AddChild(nozzle.Pop);
+
+				// Retroempuje: girado media vuelta, así el cono (hacia +Z) apunta hacia el morro
+				var retro = new RetroJet
+				{
+					Pivot = new Node3D { Name = k == 0 ? "Retro_L" : "Retro_R", Rotation = new Vector3(0f, Mathf.Pi, 0f), Visible = false }
+				};
+				AddChild(retro.Pivot);
+				retro.Plume = AddCone(retro.Pivot, "Plume");
+				retro.Core = AddCone(retro.Pivot, "Core");
+				_retros[k] = retro;
 			}
 			_nozzles[k] = nozzle;
 		}
@@ -161,6 +199,11 @@ public partial class ThrusterFlames : Node3D
 		{
 			NVector3 p = _shape.Nozzle;
 			_nozzles[k].Pivot.Position = new Vector3(k == 0 ? -p.X : p.X, p.Y, p.Z);
+			if (_retros[k] != null)
+			{
+				NVector3 r = _shape.Retro;
+				_retros[k].Pivot.Position = new Vector3(k == 0 ? -r.X : r.X, r.Y, r.Z);
+			}
 		}
 	}
 
@@ -231,11 +274,51 @@ public partial class ThrusterFlames : Node3D
 					n.Light.LightColor = new Color(f.Mid.X, f.Mid.Y, f.Mid.Z);
 					n.Light.LightEnergy = f.LightEnergy;
 				}
+
+				// Chasquido del daño 3 (7.1)
+				bool pop = f.PopIntensity > 0.01f;
+				n.Pop.Visible = pop;
+				if (pop)
+				{
+					n.PopMaterial.SetShaderParameter(SnPop, new Vector4(s.PopColor.X, s.PopColor.Y, s.PopColor.Z, f.PopIntensity * Opacity));
+					n.PopMaterial.SetShaderParameter(SnSize, f.PopSize * scale);
+				}
+
+				UpdateRetro(k, s);
 			}
 
 			// La boca toma el color medio (el de la maqueta, tal cual, como color de la emisión)
 			Hull?.SetNozzleGlow(k, new Color(f.Mid.X, f.Mid.Y, f.Mid.Z), f.Mouth);
 		}
+	}
+
+	// Retroempuje (6): la misma llama, sin diamantes ni doblado, redonda, con sus colores; no se ve con poca fuerza
+	private void UpdateRetro(int k, ThrusterFxSettings s)
+	{
+		RetroJet r = _retros[k];
+		float force = _state.Retro;
+		bool visible = force >= s.RetroVisible;
+		r.Pivot.Visible = visible;
+		if (!visible)
+			return;
+		float length = _state.RetroLength(k, s);
+		float time = _state.Time * 1.3f + k;
+		float scroll = _state.RetroScroll + k * 7.3f;
+		Vector3 core = ToVector(s.RetroCore), mid = ToVector(s.RetroMid), outer = ToVector(s.RetroOut);
+
+		r.Plume.SetShaderParameter(SnShape, new Vector4(length, s.RetroWidth, 0f, 1f));
+		r.Plume.SetShaderParameter(SnForm, new Vector4(s.RetroPlumeMouthRadius, s.RetroPlumeTipRadius, 0f, 0f));
+		r.Plume.SetShaderParameter(SnGlow, new Vector4(s.RetroPlumeBrightness * force * Opacity, 1f, scroll, time));
+		r.Plume.SetShaderParameter(SnCore, core);
+		r.Plume.SetShaderParameter(SnMid, mid);
+		r.Plume.SetShaderParameter(SnOut, outer);
+
+		r.Core.SetShaderParameter(SnShape, new Vector4(length * s.RetroCoreLength, s.RetroWidth, 0f, 1f));
+		r.Core.SetShaderParameter(SnForm, new Vector4(s.RetroCoreMouthRadius, s.RetroCoreTipRadius, 1f, 0f));
+		r.Core.SetShaderParameter(SnGlow, new Vector4(s.RetroCoreBrightness * force * Opacity, 1f, scroll, time));
+		r.Core.SetShaderParameter(SnCore, core);
+		r.Core.SetShaderParameter(SnMid, core);
+		r.Core.SetShaderParameter(SnOut, mid);
 	}
 
 	private static Vector3 ToVector(NVector3 v) => new(v.X, v.Y, v.Z);
@@ -385,6 +468,24 @@ void fragment() {
 	vec2 o = vec2(a - 0.5, b - 0.5) * m * heat.z;
 	ALBEDO = texture(screen_tex, SCREEN_UV + o).rgb;
 	ALPHA = m;
+}
+";
+
+	// Chasquido del daño 3 (7.1): un sprite redondo y suave de cara a la cámara. pop = (color, intensidad); size: lado en m.
+	private const string PopShader = @"
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+uniform vec4 pop;
+uniform float size;
+void vertex() {
+	vec3 center = MODEL_MATRIX[3].xyz;
+	vec3 world = center + INV_VIEW_MATRIX[0].xyz * VERTEX.x * size + INV_VIEW_MATRIX[1].xyz * VERTEX.y * size;
+	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(world, 1.0);
+}
+void fragment() {
+	float d = length(UV - 0.5) * 2.0;
+	float a = d < 0.3 ? mix(1.0, 0.5, d / 0.3) : d < 1.0 ? mix(0.5, 0.0, (d - 0.3) / 0.7) : 0.0;
+	ALBEDO = pop.rgb * pop.a * a;
 }
 ";
 }
