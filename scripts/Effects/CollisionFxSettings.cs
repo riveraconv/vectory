@@ -205,5 +205,8 @@ public sealed class CollisionFxSettings
 	// --- Aterrizaje (spec docs/efectos-3-aterrizaje.md)
 	public LandingFxSettings Landing = new();
 
+	// --- Humo de daños (spec docs/efectos-4-humo-danos.md)
+	public DamageSmokeSettings DamageSmoke = new();
+
 	public static CollisionFxSettings Default => new();
 }

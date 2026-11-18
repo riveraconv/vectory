@@ -9,6 +9,10 @@ namespace Vectory.UI;
 // lo hace el Player con el piloto. Se puede pulsar también con la pausa, como el panel de ajuste.
 public partial class AutopilotToggle : CanvasLayer
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnDebugAutopilot = "debug_autopilot";
+
 	private const int ToggleLayer = 11;   // por encima de la pausa (10), como el panel de ajuste
 	private const float MarginX = 40f;    // medidas sobre 1280×720
 	private const float MarginY = 142f;   // justo debajo del panel de clasificación
@@ -36,7 +40,7 @@ public partial class AutopilotToggle : CanvasLayer
 
 	public override void _Input(InputEvent @event)
 	{
-		if (!@event.IsActionPressed("debug_autopilot") || Player == null)
+		if (!@event.IsActionPressed(SnDebugAutopilot) || Player == null)
 			return;
 
 		Player.SetAutopilot(!Player.AutopilotActive);

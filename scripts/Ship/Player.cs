@@ -35,6 +35,16 @@ namespace Vectory.Ship;
 // C: alternar cabina / tercera persona
 public partial class Player : CharacterBody3D, IContactShip
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnAccelerate = "accelerate";
+	private static readonly StringName SnBoost = "boost";
+	private static readonly StringName SnBrake = "brake";
+	private static readonly StringName SnCamera = "camera";
+	private static readonly StringName SnDrift = "drift";
+	private static readonly StringName SnSteerLeft = "steer_left";
+	private static readonly StringName SnSteerRight = "steer_right";
+
 	// Misma conversión que usa el HUD para mostrar la velocidad
 	private const float KmhPerMs = 3.6f;
 
@@ -363,6 +373,8 @@ public partial class Player : CharacterBody3D, IContactShip
 	// En el último paso de física: si aterrizó y con qué velocidad de caída contra la superficie (m/s)
 	public bool JustLanded => Vertical.Landed;
 	public float LandingSpeed => Vertical.LandingSpeed;
+	// m/s, positiva hacia arriba (con la planta, la velocidad en el mundo)
+	public float VerticalSpeed => Vertical.VerticalSpeed;
 	// Umbrales del aterrizaje (spec docs/pista-3d.md, 3.4), también para los efectos de los rivales
 	public LandingSettings LandingThresholds => BuildLandingSettings();
 
@@ -558,7 +570,6 @@ public partial class Player : CharacterBody3D, IContactShip
 		PreviousPosition = ToNumerics(GlobalPosition);
 		Passable.Respawned();
 		Slipstream.Reset();
-		_ship.ClearHullSmoke();
 		_bank.Reset();
 		ResetCameraEffects();
 		SettleOnSurface();
@@ -617,7 +628,7 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	public override void _UnhandledKeyInput(InputEvent @event)
 	{
-		if (@event.IsActionPressed("camera"))
+		if (@event.IsActionPressed(SnCamera))
 		{
 			_chaseView = !_chaseView;
 			ApplyView();
@@ -718,7 +729,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		}
 		else if (_inputBlocked)
 		{
-			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || input.Drift || Input.IsActionPressed("boost"))
+			if (input.Accelerate || input.Brake || input.SteerLeft || input.SteerRight || input.Drift || Input.IsActionPressed(SnBoost))
 				input = default;
 			else
 				_inputBlocked = false;
@@ -726,7 +737,7 @@ public partial class Player : CharacterBody3D, IContactShip
 
 		ShipTuning baseTuning = BuildTuning();
 		ShipPhysicsSettings physics = BuildPhysicsSettings();
-		bool boostPressed = !AutopilotActive && !_inputBlocked && Input.IsActionJustPressed("boost");
+		bool boostPressed = !AutopilotActive && !_inputBlocked && Input.IsActionJustPressed(SnBoost);
 		_physics.BeginStep(input, boostPressed, canDrive, baseTuning, physics, dt);
 		ApplyBodyRotation();
 
@@ -823,14 +834,13 @@ public partial class Player : CharacterBody3D, IContactShip
 	// Combinación de pintura que lleva el casco 3D de un estilo
 	public int HullPaint(HullStyle style) => _ship.HullPaint(style);
 
-	// La velocidad, que agranda el humo, y el tiempo de la nave para la anticolisión. Con la pausa no avanza: queda
-	// congelado.
+	// El tiempo de la nave para la anticolisión. Con la pausa no avanza: queda congelado.
 	private void UpdateHullEffects(float dt)
 	{
 		if (!_ship.HasHull3D || !_physics.HasSurface)
 			return;
 		_hoverTime += dt;
-		_ship.UpdateHullEffects(Dynamics.RealSpeed, _hoverTime);
+		_ship.UpdateHullEffects(_hoverTime);
 		// Balizas del techo (HAMMER): las mismas reglas y ajustes que las de su cabina 3D
 		(float boostBeacon, float damageBeacon) = IndustrialHullBeacons.Intensities(Boost.IsImpulseActive, _damageLevel,
 			CockpitDamageEnabled, _hoverTime, BuildIndustrialLampSettings());
@@ -866,11 +876,11 @@ public partial class Player : CharacterBody3D, IContactShip
 	{
 		return new ShipInput
 		{
-			Accelerate = Input.IsActionPressed("accelerate"),
-			Brake = Input.IsActionPressed("brake"),
-			SteerLeft = Input.IsActionPressed("steer_left"),
-			SteerRight = Input.IsActionPressed("steer_right"),
-			Drift = Input.IsActionPressed("drift")
+			Accelerate = Input.IsActionPressed(SnAccelerate),
+			Brake = Input.IsActionPressed(SnBrake),
+			SteerLeft = Input.IsActionPressed(SnSteerLeft),
+			SteerRight = Input.IsActionPressed(SnSteerRight),
+			Drift = Input.IsActionPressed(SnDrift)
 		};
 	}
 

@@ -27,18 +27,25 @@ public sealed class Hull3DSettings
 // instancia lleva sus propios materiales, así dos naves pueden ir pintadas distinto a la vez.
 public partial class ShipHull3D : Node3D
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnScorch = "scorch";
+	private static readonly StringName SnStrength = "strength";
+
 	// Capa visual propia del casco: sus luces solo afectan a ella y solo ella proyecta su sombra
 	public const uint HullLayer = 1u << 10;
 	// Capa de los cascos de los rivales, con su propio juego de luces común (spec docs/rivales-1-parrilla.md)
 	public const uint RivalLayer = 1u << 11;
 
-	private const int SmokeMaxParticles = 40;
 
 	private static readonly string[] ScorchPaths =
 	{
 		"res://assets/ships/hull_scorch_1.png", "res://assets/ships/hull_scorch_2.png", "res://assets/ships/hull_scorch_3.png"
 	};
 	private static readonly Texture2D[] ScorchTextures = new Texture2D[3];
+	// Sin quemaduras: un píxel transparente. El detalle va siempre encendido y al subir el daño solo cambia la textura;
+	// encenderlo entonces cambiaba de shader y Godot compilaba sus pipelines en pleno golpe (~7 ms por nave)
+	private static Texture2D _noScorch;
 
 	private static readonly Color HemisphereSky = Color.FromHtml("#B0B8C8");
 	private static readonly Color HemisphereGround = Color.FromHtml("#101010");
@@ -83,7 +90,6 @@ void fragment() {
 	// Bordes del canard de HAMMER: franjas con marcas; sin ellas, copia de la chapa oscura con la escala de sus UV
 	private readonly Dictionary<string, (StandardMaterial3D Hazard, StandardMaterial3D Plate)> _leadingEdges = new();
 	private int _paintVersion;
-	private CpuParticles3D _smoke;
 	private int _scorchLevel;
 
 	public ShipHull3DProfile Profile { get; set; }
@@ -113,13 +119,14 @@ void fragment() {
 		IsLoaded = LoadModel();
 		BuildLights();
 		_built = true;
-		BuildSmoke();
 		ApplySettings(_settings);
 		if (IsLoaded)
 			SetPaint(_paintIndex);
-		// Las máscaras se preparan ya: así el primer golpe de la carrera no da un tirón
+		// Las máscaras se preparan ya y el detalle se enciende sin quemaduras: así el primer golpe de la carrera no da un
+		// tirón
 		for (int level = 1; level <= DamageModel.MaxLevel; level++)
 			ScorchTexture(level);
+		ApplyScorch();
 		// Al final del árbol: la WorldEnvironment de la escena se crea en el _Ready de Main, después de este nodo
 		CallDeferred(MethodName.SetUpWorldReflections);
 	}
@@ -541,7 +548,7 @@ void fragment() {
 		if (!IsLoaded)
 			return;
 		foreach ((ShaderMaterial pass, float factor) in _materialIris)
-			pass.SetShaderParameter("strength", IridescenceOfCanopy * factor * _settings.IridescenceStrength);
+			pass.SetShaderParameter(SnStrength, IridescenceOfCanopy * factor * _settings.IridescenceStrength);
 		if (Profile.Style != HullStyle.Racing)
 			return;
 		float paint = _paint.Paint.Finish.Iridescence * _settings.IridescenceStrength;
@@ -570,8 +577,8 @@ void fragment() {
 			pass = NewIridescencePass();
 			material.NextPass = pass;
 		}
-		pass.SetShaderParameter("strength", amount * IridescenceOfPaint);
-		pass.SetShaderParameter("scorch", ScorchTexture(_scorchLevel));
+		pass.SetShaderParameter(SnStrength, amount * IridescenceOfPaint);
+		pass.SetShaderParameter(SnScorch, ScorchTexture(_scorchLevel));
 	}
 
 	private ShaderMaterial NewIridescencePass()
@@ -585,29 +592,25 @@ void fragment() {
 	// Daño visible (spec 6.5)
 	// ---------------------------------------------------------------
 
-	// Nivel de daño (0–3; en TIME TRIAL, 0): quemaduras y humo
+	// Nivel de daño (0–3; en TIME TRIAL, 0): quemaduras
 	public void SetDamage(int level, bool timeTrial)
 	{
 		_scorchLevel = HullDamage.ScorchMask(level, timeTrial);
+		ApplyScorch();
+	}
+
+	// Quemaduras del nivel de ahora en el detalle de los materiales (siempre encendido) y en las pasadas de iridiscencia
+	private void ApplyScorch()
+	{
 		Texture2D scorch = ScorchTexture(_scorchLevel);
+		Texture2D detail = scorch ?? NoScorch();
 		foreach (StandardMaterial3D material in _scorchMaterials)
 		{
-			material.DetailEnabled = scorch != null;
-			material.DetailAlbedo = scorch;
+			material.DetailEnabled = true;
+			material.DetailAlbedo = detail;
 		}
 		foreach (ShaderMaterial pass in _irisPasses)
-			pass.SetShaderParameter("scorch", scorch);
-
-		float rate = HullDamage.SmokePerSecond(level, timeTrial);
-		if (_smoke != null)
-		{
-			_smoke.Emitting = rate > 0f;
-			if (rate > 0f)
-			{
-				_smoke.Amount = Mathf.Clamp(Mathf.CeilToInt(rate * HullDamage.SmokeLifetime) + 1, 1, SmokeMaxParticles);
-				_smoke.Color = HullDecalPainter.ToColor(HullDamage.SmokeColor(level));
-			}
-		}
+			pass.SetShaderParameter(SnScorch, scorch);
 	}
 
 	// Parpadeo de las luces de su contrato: el mismo EdgeFlicker de los daños, con una "arista" por luz
@@ -623,7 +626,6 @@ void fragment() {
 		}
 	}
 
-	// La recolocación borra el humo que había
 	// Opacidad de todo el casco (1 = normal), para el parpadeo de la nave atravesable tras recolocarla (spec
 	// docs/rivales-3-contacto.md, 5.2): la transparencia de cada malla, sin tocar sus materiales
 	public void SetOpacity(float opacity)
@@ -633,17 +635,8 @@ void fragment() {
 			mesh.Transparency = transparency;
 	}
 
-	public void ClearSmoke()
-	{
-		if (_smoke == null)
-			return;
-		bool emitting = _smoke.Emitting;
-		_smoke.Restart();
-		_smoke.Emitting = emitting;
-	}
-
-	// Cada frame: tamaño del humo según la velocidad y anticolisión (time: el de la nave, que la pausa congela)
-	public void UpdateEffects(float speed, float time)
+	// Cada frame: anticolisión (time: el de la nave, que la pausa congela)
+	public void UpdateEffects(float time)
 	{
 		IReadOnlyList<string> strobes = Profile.Contract.Strobes;
 		for (int i = 0; i < strobes.Count; i++)
@@ -652,12 +645,13 @@ void fragment() {
 			if (material != null)
 				material.EmissionEnergyMultiplier = StrobeLights.Intensity(time, i, _settings.Strobe);
 		}
-		if (_smoke != null)
-		{
-			float final = HullDamage.SmokeFinalSize(speed);
-			_smoke.ScaleAmountMin = final;
-			_smoke.ScaleAmountMax = final;
-		}
+	}
+
+	private static Texture2D NoScorch()
+	{
+		if (_noScorch == null)
+			_noScorch = ImageTexture.CreateFromImage(Image.CreateFromData(1, 1, false, Image.Format.Rgba8, new byte[4]));
+		return _noScorch;
 	}
 
 	private static Texture2D ScorchTexture(int level)
@@ -838,58 +832,6 @@ void fragment() {
 		_lights = new HullLightRig { Name = "Lights", Layer = Layer, FollowParent = LightsFollowShip };
 		_lights.Apply(_settings);
 		AddChild(_lights);
-	}
-
-	// Humo con daño, desde Smoke, en el espacio del mundo: se queda atrás al avanzar. La pausa lo congela.
-	private void BuildSmoke()
-	{
-		var texture = new GradientTexture2D
-		{
-			Width = 64,
-			Height = 64,
-			Fill = GradientTexture2D.FillEnum.Radial,
-			FillFrom = new Vector2(0.5f, 0.5f),
-			FillTo = new Vector2(1f, 0.5f),
-			Gradient = new Gradient { Colors = new[] { new Color(1f, 1f, 1f, 0.9f), new Color(1f, 1f, 1f, 0f) }, Offsets = new[] { 0f, 1f } }
-		};
-		var material = new StandardMaterial3D
-		{
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
-			VertexColorUseAsAlbedo = true,
-			AlbedoTexture = texture,
-			DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled
-		};
-		var scale = new Curve();
-		scale.AddPoint(new Vector2(0f, HullDamage.SmokeStartSize / HullDamage.SmokeEndSize));
-		scale.AddPoint(new Vector2(1f, 1f));
-		var fade = new Gradient
-		{
-			Colors = new[] { new Color(1f, 1f, 1f, HullDamage.SmokeStartOpacity), new Color(1f, 1f, 1f, 0f) },
-			Offsets = new[] { 0f, 1f }
-		};
-		float spread = Mathf.RadToDeg(Mathf.Atan2(HullDamage.SmokeSideSpread, (HullDamage.SmokeRiseMin + HullDamage.SmokeRiseMax) / 2f));
-		_smoke = new CpuParticles3D
-		{
-			Name = "Smoke",
-			Emitting = false,
-			Amount = 1,
-			Lifetime = HullDamage.SmokeLifetime,
-			LocalCoords = false,
-			Mesh = new QuadMesh { Size = Vector2.One, Material = material },
-			Direction = Vector3.Up,
-			Spread = spread,
-			Gravity = Vector3.Zero,
-			InitialVelocityMin = HullDamage.SmokeRiseMin,
-			InitialVelocityMax = HullDamage.SmokeRiseMax,
-			ScaleAmountMin = HullDamage.SmokeEndSize,
-			ScaleAmountMax = HullDamage.SmokeEndSize,
-			ScaleAmountCurve = scale,
-			ColorRamp = fade,
-			Position = EmptyPosition(HullPieces.Smoke)
-		};
-		AddChild(_smoke);
 	}
 
 	// Reflejos y luz ambiente del casco: el cielo del entorno, solo para reflejos, con el fondo de color de siempre.

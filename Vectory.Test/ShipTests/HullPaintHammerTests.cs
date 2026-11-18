@@ -279,10 +279,8 @@ public class HullPaintHammerTests
     }
 
     [Fact]
-    public void Smoke_0_0_7_20_AndNothingInTimeTrial()
+    public void No_scorch_in_time_trial()
     {
-        Assert.Equal(new[] { 0f, 0f, 7f, 20f }, Enumerable.Range(0, 4).Select(level => HullDamage.SmokePerSecond(level, false)));
-        Assert.All(Enumerable.Range(0, 4), level => Assert.Equal(0f, HullDamage.SmokePerSecond(level, true)));
         Assert.All(Enumerable.Range(0, 4), level => Assert.Equal(0, HullDamage.ScorchMask(level, true)));
     }
 

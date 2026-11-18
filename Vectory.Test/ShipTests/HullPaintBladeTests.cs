@@ -213,13 +213,11 @@ public class HullPaintBladeTests
     // ---------- 10. Daño visible ----------
 
     [Fact]
-    public void Damage_FlickerOnlyPicksTheNineLights_SmokeAndScorchAsVector()
+    public void Damage_FlickerOnlyPicksTheNineLights_ScorchAsVector()
     {
         Assert.Equal(9, HullContract.Military.FlickerLights.Count);
         Assert.Equal(MilitaryHullPieces.Accents.Concat(MilitaryHullPieces.NavLights).Concat(MilitaryHullPieces.TailLights),
             HullContract.Military.FlickerLights);
-        Assert.Equal(new[] { 0f, 0f, 7f, 20f }, Enumerable.Range(0, 4).Select(level => HullDamage.SmokePerSecond(level, false)));
-        Assert.All(Enumerable.Range(0, 4), level => Assert.Equal(0f, HullDamage.SmokePerSecond(level, true)));
         Assert.All(Enumerable.Range(0, 4), level => Assert.Equal(0, HullDamage.ScorchMask(level, true)));
     }
 

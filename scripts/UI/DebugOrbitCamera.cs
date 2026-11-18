@@ -9,6 +9,10 @@ namespace Vectory.UI;
 // pierde al moverse. Main solo la crea en compilaciones de depuración. Sin reglas: solo mueve su cámara.
 public partial class DebugOrbitCamera : Node3D
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnDebugOrbitCamera = "debug_orbit_camera";
+
 	private const float RadiansPerPixel = 0.008f;
 	private const float MinDistance = 3f;
 	private const float MaxDistance = 30f;
@@ -49,7 +53,7 @@ public partial class DebugOrbitCamera : Node3D
 
 	public override void _Input(InputEvent @event)
 	{
-		if (@event.IsActionPressed("debug_orbit_camera"))
+		if (@event.IsActionPressed(SnDebugOrbitCamera))
 		{
 			Toggle();
 			GetViewport().SetInputAsHandled();

@@ -11,6 +11,11 @@ namespace Vectory.Ship;
 // La usan Spaceship y Cockpit; la lógica del parpadeo vive en EdgeFlicker.
 public class EdgeFlickerMaterial
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnDimOpacity = "dim_opacity";
+	private static readonly StringName SnEdgeState = "edge_state";
+
 	private const string ShaderCode = @"
 shader_type spatial;
 render_mode unshaded, cull_disabled, blend_mix;
@@ -38,7 +43,7 @@ void fragment() {
 		_texture = ImageTexture.CreateFromImage(_image);
 
 		Material = new ShaderMaterial { Shader = _shader };
-		Material.SetShaderParameter("edge_state", _texture);
+		Material.SetShaderParameter(SnEdgeState, _texture);
 	}
 
 	public ShaderMaterial Material { get; }
@@ -46,7 +51,7 @@ void fragment() {
 	// Opacidad de una arista apagada (0–1)
 	public void SetDimOpacity(float opacity)
 	{
-		Material.SetShaderParameter("dim_opacity", Mathf.Clamp(opacity, 0f, 1f));
+		Material.SetShaderParameter(SnDimOpacity, Mathf.Clamp(opacity, 0f, 1f));
 	}
 
 	// Copia a la textura qué aristas están apagadas ahora

@@ -66,17 +66,12 @@ public partial class Spaceship : Node3D
 	public int HullPaint(HullStyle style) =>
 		_hullPaints.TryGetValue(style, out int index) && index >= 0 ? HullPaints.Step(style, index, 0) : HullPaints.DefaultIndex(style);
 
-	// Daño visible del casco 3D: quemaduras y humo (en TIME TRIAL, nada)
+	// Daño visible del casco 3D: quemaduras (en TIME TRIAL, nada)
 	public void SetHullDamage(int level, bool timeTrial)
 	{
 		_hullDamage = level;
 		_hullTimeTrial = timeTrial;
 		_hull3D?.SetDamage(level, timeTrial);
-	}
-
-	public void ClearHullSmoke()
-	{
-		_hull3D?.ClearSmoke();
 	}
 
 	// Opacidad del casco 3D (parpadeo tras recolocar); el wireframe no la usa
@@ -85,10 +80,10 @@ public partial class Spaceship : Node3D
 		_hull3D?.SetOpacity(opacity);
 	}
 
-	// Velocidad para el tamaño del humo y tiempo de la nave para la anticolisión
-	public void UpdateHullEffects(float speed, float time)
+	// Tiempo de la nave para la anticolisión
+	public void UpdateHullEffects(float time)
 	{
-		_hull3D?.UpdateEffects(speed, time);
+		_hull3D?.UpdateEffects(time);
 	}
 
 	// Balizas del techo del casco 3D (HAMMER): intensidad de la ámbar y de la roja; sin balizas no hace nada

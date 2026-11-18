@@ -58,6 +58,10 @@ public enum HullStyle
 public readonly record struct DriftContactShape(float TipZ, float EdgeStartZ, float EdgeStartFraction, float EdgeEndZ,
 	float EdgeEndFraction, float EdgeY, float FocusZ, float FocusFraction);
 
+// Focos del humo de daños (spec docs/efectos-4-humo-danos.md, 3), en los ejes de la nave: Smoke es el vacío del
+// manifiesto de su casco (una prueba lo compara); Smoke2 y Smoke3, dos puntos más sobre la piel, solo para el nivel 3
+public readonly record struct DamageSmokeFoci(Vector3 Smoke, Vector3 Smoke2, Vector3 Smoke3);
+
 // Un casco 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
 // del que sale su contrato de piezas
 public sealed record ShipHull3DProfile(string ModelPath, string ManifestPath, string EnvironmentPath, HullStyle Style)
@@ -97,6 +101,9 @@ public sealed record ShipVisualProfile
 	// Altura de lo más bajo del casco 3D en los ejes de la nave (la y mínima de su manifiesto): de ahí salen las chispas
 	// del aterrizaje (spec docs/efectos-3-aterrizaje.md, 3). Una prueba lo compara con el manifiesto.
 	public required float BellyY { get; init; }
+
+	// De dónde sale el humo de daños (spec docs/efectos-4-humo-danos.md, 3)
+	public required DamageSmokeFoci SmokeFoci { get; init; }
 
 	// Distancia del origen de la nave a la punta del morro (colocación en la parrilla)
 	public required float NoseDistance { get; init; }

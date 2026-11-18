@@ -32,6 +32,14 @@ namespace Vectory.Game;
 // ESC abre la pausa (PauseMenu) en cualquier momento. Las reglas de récords viven en RecordBook.
 public partial class Main : Node3D
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnMenuAccept = "menu_accept";
+	private static readonly StringName SnMenuDown = "menu_down";
+	private static readonly StringName SnMenuLeft = "menu_left";
+	private static readonly StringName SnMenuRight = "menu_right";
+	private static readonly StringName SnMenuUp = "menu_up";
+
 	private const float GridStep = 10f;
 	private const float GridHalf = 500f;
 	private const float GridY = -4f;
@@ -146,6 +154,7 @@ public partial class Main : Node3D
 
 	// Daños (solo RACE; null en TIME TRIAL)
 	private DamageModel _damage;
+	private int _playerRespawns;   // para borrar su humo de daños al recolocarla
 
 	// Las demás naves de la carrera (rivales y naves de prueba; el fantasma no entra) y el radar que las lee
 	private readonly RaceShipList _raceShips = new();
@@ -431,7 +440,7 @@ public partial class Main : Node3D
 	}
 
 	// Efectos de los choques de este paso (solo visual): contra la barrera, el jugador y los rivales; entre naves, los
-	// contactos del paso (solo RACE); y los aterrizajes de todas. Luz y temblor de la cabina con los tuyos.
+	// contactos del paso (solo RACE); los aterrizajes de todas; y el humo de daños de todas (solo RACE tiene daño). Luz y temblor de la cabina con los tuyos.
 	private void UpdateCollisionEffects(float delta)
 	{
 		if (_collisionFx == null)
@@ -446,10 +455,14 @@ public partial class Main : Node3D
 		LandingSettings landing = _player.LandingThresholds;
 		if (_player.JustLanded)
 			_collisionFx.Landing(_player.LandingSpeed, landing, _player.HullTransform, _player.PlanVelocity, _player.ExteriorProfile);
+		System.Numerics.Vector2 pv = _player.PlanVelocity;
+		_collisionFx.DamageShip(_player.Id, _damage?.Level ?? 0, _playerRespawns, _player.HullTransform,
+			new System.Numerics.Vector3(pv.X, _player.VerticalSpeed, pv.Y), _player.ExteriorProfile, delta);
 		if (_rivals != null)
 		{
-			foreach (RivalShip ship in _rivals.Ships)
+			for (int ri = 0; ri < _rivals.Ships.Count; ri++)
 			{
+				RivalShip ship = _rivals.Ships[ri];
 				RivalCar car = ship.Car;
 				_collisionFx.BarrierContact(car.Id, car.LastTouch, car.Dynamics.Forward, car.Dynamics.Velocity, delta);
 				// Los rivales no derrapan nunca (su piloto no pulsa la tecla); si un día lo hacen, ya dejan marcas
@@ -459,9 +472,13 @@ public partial class Main : Node3D
 				if (car.Physics.Vertical.Landed)
 					_collisionFx.Landing(car.Physics.Vertical.LandingSpeed, landing, ship.HullTransform, car.Dynamics.Velocity,
 						car.Ship.Visual);
+				System.Numerics.Vector2 rv = car.Dynamics.Velocity;
+				_collisionFx.DamageShip(car.Id, car.Damage.Level, car.Respawns, ship.HullTransform,
+					new System.Numerics.Vector3(rv.X, car.Physics.Vertical.VerticalSpeed, rv.Y), car.Ship.Visual, delta);
 			}
-			foreach (ShipContactEvent e in _rivals.Contacts.Events)
+			for (int ci = 0; ci < _rivals.Contacts.Events.Count; ci++)
 			{
+				ShipContactEvent e = _rivals.Contacts.Events[ci];
 				_collisionFx.ShipContact(e, ContactVelocity(e), delta);
 				if (e.A == _player.Id || e.B == _player.Id)
 					_player.FeelShip(e.Point, e.Level, e.IsNewImpact, e.Graze, e.Facing);
@@ -486,9 +503,9 @@ public partial class Main : Node3D
 	{
 		if (id == _player.Id)
 			return _player.PlanVelocity;
-		foreach (RivalShip ship in _rivals.Ships)
-			if (ship.Car.Id == id)
-				return ship.Car.Dynamics.Velocity;
+		for (int ri = 0; ri < _rivals.Ships.Count; ri++)
+			if (_rivals.Ships[ri].Car.Id == id)
+				return _rivals.Ships[ri].Car.Dynamics.Velocity;
 		return System.Numerics.Vector2.Zero;
 	}
 
@@ -532,6 +549,7 @@ public partial class Main : Node3D
 			_track.GetRespawn(_player.GlobalPosition, out Vector3 position, out float yaw);
 			_player.Respawn(position, yaw);
 			_collisionFx?.CutDrift(_player.Id);
+			_playerRespawns++;
 			GD.Print("[Race] Ship repositioned on the track");
 		}
 	}
@@ -540,8 +558,9 @@ public partial class Main : Node3D
 	// (solo en carrera)
 	private void UpdatePlayerShipContacts()
 	{
-		foreach (ShipContactEvent e in _rivals.Contacts.Events)
+		for (int ci = 0; ci < _rivals.Contacts.Events.Count; ci++)
 		{
+			ShipContactEvent e = _rivals.Contacts.Events[ci];
 			if (!e.IsNewImpact || (e.A != _player.Id && e.B != _player.Id))
 				continue;
 			ContactRole role = e.A == _player.Id ? e.RoleA : e.RoleB;
@@ -575,17 +594,17 @@ public partial class Main : Node3D
 		}
 
 		// Opciones en fila: también ← →
-		if (Input.IsActionJustPressed("menu_down") || Input.IsActionJustPressed("menu_right"))
+		if (Input.IsActionJustPressed(SnMenuDown) || Input.IsActionJustPressed(SnMenuRight))
 		{
 			_resultsMenu.MoveNext();
 			_hud.RefreshResultsOptions();
 		}
-		else if (Input.IsActionJustPressed("menu_up") || Input.IsActionJustPressed("menu_left"))
+		else if (Input.IsActionJustPressed(SnMenuUp) || Input.IsActionJustPressed(SnMenuLeft))
 		{
 			_resultsMenu.MovePrevious();
 			_hud.RefreshResultsOptions();
 		}
-		else if (Input.IsActionJustPressed("menu_accept"))
+		else if (Input.IsActionJustPressed(SnMenuAccept))
 		{
 			ExecuteResultsOption(_resultsMenu.Confirm());
 		}
@@ -646,8 +665,9 @@ public partial class Main : Node3D
 		_standingsShipNames[PlayerStandingsId] = ShipCatalog.Find(_player.Definition.Id)?.Name ?? "";
 		if (_rivals != null)
 		{
-			foreach (RivalShip ship in _rivals.Ships)
+			for (int ri = 0; ri < _rivals.Ships.Count; ri++)
 			{
+				RivalShip ship = _rivals.Ships[ri];
 				_standingsNames[ship.Car.Entry.Number] = ship.Car.Entry.Pilot.Nickname;
 				_standingsShipNames[ship.Car.Entry.Number] = ShipCatalog.Find(ship.Car.Ship.Id)?.Name ?? ship.Car.Ship.Id;
 			}
@@ -667,8 +687,9 @@ public partial class Main : Node3D
 			_standingsShips.Add(ToStandings(PlayerStandingsId, _playerGridPosition, tracker, _player.TrackDistance));
 		if (_rivals != null)
 		{
-			foreach (RivalShip ship in _rivals.Ships)
+			for (int ri = 0; ri < _rivals.Ships.Count; ri++)
 			{
+				RivalShip ship = _rivals.Ships[ri];
 				RivalCar car = ship.Car;
 				_standingsShips.Add(ToStandings(car.Entry.Number, car.Entry.GridPosition, car.Tracker, car.TrackDistance));
 			}
@@ -695,12 +716,14 @@ public partial class Main : Node3D
 	}
 
 	// Corriendo de verdad (para los adelantamientos): ni en la previa ni terminada
+	// Con bucles for sobre las naves: un foreach sobre la lista crea un enumerador en cada vuelta, y esto va en cada frame
 	private bool IsRacing(int id)
 	{
 		if (id == PlayerStandingsId)
 			return _race.Tracker?.State == RaceState.Running;
-		foreach (RivalShip ship in _rivals.Ships)
+		for (int ri = 0; ri < _rivals.Ships.Count; ri++)
 		{
+			RivalShip ship = _rivals.Ships[ri];
 			if (ship.Car.Entry.Number == id)
 				return ship.Car.Phase == RivalPhase.Running;
 		}
@@ -713,8 +736,9 @@ public partial class Main : Node3D
 	{
 		if (_reportPrinted || _rivals == null || _rivals.Ships.Count == 0)
 			return;
-		foreach (RivalShip ship in _rivals.Ships)
+		for (int ri = 0; ri < _rivals.Ships.Count; ri++)
 		{
+			RivalShip ship = _rivals.Ships[ri];
 			if (ship.Car.Phase != RivalPhase.Finished)
 				return;
 		}
@@ -734,8 +758,9 @@ public partial class Main : Node3D
 		rows.Add(new RaceReportRow(PositionOf(PlayerStandingsId), PilotCatalog.PlayerName, "—",
 			_standingsShipNames.GetValueOrDefault(PlayerStandingsId, ""), _overtakes.Made(PlayerStandingsId),
 			_overtakes.Suffered(PlayerStandingsId), null, null, null, _damage?.Points ?? 0, _damage?.Level ?? 0, null, null, null, null));
-		foreach (RivalShip ship in _rivals.Ships)
+		for (int ri = 0; ri < _rivals.Ships.Count; ri++)
 		{
+			RivalShip ship = _rivals.Ships[ri];
 			RivalCar car = ship.Car;
 			int id = car.Entry.Number;
 			PilotErrors errors = car.Driver.Errors;

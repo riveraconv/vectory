@@ -18,6 +18,13 @@ namespace Vectory.Menu;
 // Medidas sobre 1280×720, multiplicadas por UiScale.Factor (como el menú principal).
 public partial class PauseMenu : CanvasLayer
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnMenuAccept = "menu_accept";
+	private static readonly StringName SnMenuDown = "menu_down";
+	private static readonly StringName SnMenuUp = "menu_up";
+	private static readonly StringName SnPause = "pause";
+
 	private const string PausedText = "PAUSED";
 	private const string PausedHint = "ESC  ·  CONTINUE";
 	private const string ConfirmHint = "CURRENT RACE PROGRESS WILL BE LOST";
@@ -100,7 +107,7 @@ public partial class PauseMenu : CanvasLayer
 		if (_logic.State == PauseState.Settings)
 			return;
 
-		if (Input.IsActionJustPressed("pause"))
+		if (Input.IsActionJustPressed(SnPause))
 		{
 			if (_logic.State == PauseState.Closed)
 				_logic.GhostAvailable = _ghostAvailable?.Invoke() ?? false;
@@ -111,17 +118,17 @@ public partial class PauseMenu : CanvasLayer
 		if (_logic.State == PauseState.Closed)
 			return;
 
-		if (Input.IsActionJustPressed("menu_down"))
+		if (Input.IsActionJustPressed(SnMenuDown))
 		{
 			_logic.Menu.MoveNext();
 			_options.Refresh();
 		}
-		else if (Input.IsActionJustPressed("menu_up"))
+		else if (Input.IsActionJustPressed(SnMenuUp))
 		{
 			_logic.Menu.MovePrevious();
 			_options.Refresh();
 		}
-		else if (Input.IsActionJustPressed("menu_accept"))
+		else if (Input.IsActionJustPressed(SnMenuAccept))
 		{
 			Apply(_logic.Choose(_logic.Menu.Confirm()));
 		}

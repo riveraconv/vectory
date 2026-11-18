@@ -12,6 +12,10 @@ namespace Vectory.Radar;
 // pausa, y el número dura hasta cerrar el juego, como el panel de ajuste. El cálculo está en TestShipFleet.
 public partial class TestShips : Node3D
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnDebugTestShips = "debug_test_ships";
+
 	private static int _count;
 
 	private readonly Spaceship[] _hulls = new Spaceship[TestShipPattern.Specs.Count];
@@ -55,7 +59,7 @@ public partial class TestShips : Node3D
 
 	public override void _Input(InputEvent @event)
 	{
-		if (!@event.IsActionPressed("debug_test_ships") || _fleet == null)
+		if (!@event.IsActionPressed(SnDebugTestShips) || _fleet == null)
 			return;
 
 		_count = TestShipPattern.NextCount(_fleet.Count);

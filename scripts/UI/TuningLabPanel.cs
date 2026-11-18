@@ -19,6 +19,15 @@ namespace Vectory.UI;
 // Sigue funcionando con la pausa (por encima de ella), para poder ajustar con la carrera parada.
 public partial class TuningLabPanel : CanvasLayer
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnDebugHullPaintNext = "debug_hull_paint_next";
+	private static readonly StringName SnDebugHullPaintPrevious = "debug_hull_paint_previous";
+	private static readonly StringName SnDebugTuningCycle = "debug_tuning_cycle";
+	private static readonly StringName SnDebugTuningDump = "debug_tuning_dump";
+	private static readonly StringName SnDebugTuningReset = "debug_tuning_reset";
+	private static readonly StringName SnDebugTuningToggle = "debug_tuning_toggle";
+
 	private const int PanelLayer = 11;    // por encima de la pausa (10)
 	private const float PanelX = 40f;     // medidas sobre 1280×720
 	private const float PanelY = 110f;
@@ -122,11 +131,11 @@ public partial class TuningLabPanel : CanvasLayer
 
 	public override void _Input(InputEvent @event)
 	{
-		if (@event.IsActionPressed("debug_tuning_toggle"))
+		if (@event.IsActionPressed(SnDebugTuningToggle))
 		{
 			_root.Visible = !_root.Visible;
 		}
-		else if (@event.IsActionPressed("debug_tuning_cycle"))
+		else if (@event.IsActionPressed(SnDebugTuningCycle))
 		{
 			_lab.Cycle();
 			ApplyToPlayer();
@@ -134,19 +143,19 @@ public partial class TuningLabPanel : CanvasLayer
 			GD.Print($"[TuningLab] Ship: {ShipCatalog.Find(_lab.Current.Id).Name}");
 		}
 		// Mayúsculas + F5 antes que F5: las dos con las teclas exactas
-		else if (@event.IsActionPressed("debug_hull_paint_previous", false, true))
+		else if (@event.IsActionPressed(SnDebugHullPaintPrevious, false, true))
 		{
 			StepPaint(-1);
 		}
-		else if (@event.IsActionPressed("debug_hull_paint_next", false, true))
+		else if (@event.IsActionPressed(SnDebugHullPaintNext, false, true))
 		{
 			StepPaint(1);
 		}
-		else if (@event.IsActionPressed("debug_tuning_dump"))
+		else if (@event.IsActionPressed(SnDebugTuningDump))
 		{
 			GD.Print(_lab.DumpText());
 		}
-		else if (@event.IsActionPressed("debug_tuning_reset"))
+		else if (@event.IsActionPressed(SnDebugTuningReset))
 		{
 			_lab.Reset(_lab.Current.Id);
 			if (_lab.Touched)

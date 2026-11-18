@@ -18,6 +18,15 @@ namespace Vectory.Circuit;
 // sobre el marco local de la pista (TrackFrame: adelante, arriba y lado), así que sube, baja y se ladea con ella.
 public partial class Track : Node3D
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnCrestBeat = "crest_beat";
+	private static readonly StringName SnFlashColor = "flash_color";
+	private static readonly StringName SnFlashGlow = "flash_glow";
+	private static readonly StringName SnLapLength = "lap_length";
+	private static readonly StringName SnLeftFlash = "left_flash";
+	private static readonly StringName SnRightFlash = "right_flash";
+
 	// Circuito que se usa si no se asigna ninguno en el Inspector
 	// Circuito por defecto: el primero de la lista de circuitos
 	private static string DefaultDefinitionPath => CircuitCatalog.Default;
@@ -318,7 +327,7 @@ void fragment() {
 	// Brillo del tramo de barrera naranja de las crestas (latido; lo pasa TrackElements cada frame)
 	public void SetCrestBarrierBrightness(float brightness)
 	{
-		_barrierMaterial?.SetShaderParameter("crest_beat", brightness);
+		_barrierMaterial?.SetShaderParameter(SnCrestBeat, brightness);
 	}
 
 	// Pasa el destello actual al shader de la barrera (no rehace la malla)
@@ -343,8 +352,8 @@ void fragment() {
 			_rightFlashes[i] = FlashUniform(flash, BarrierSide.Right);
 			i++;
 		}
-		_barrierMaterial.SetShaderParameter("left_flash", _leftFlashes);
-		_barrierMaterial.SetShaderParameter("right_flash", _rightFlashes);
+		_barrierMaterial.SetShaderParameter(SnLeftFlash, _leftFlashes);
+		_barrierMaterial.SetShaderParameter(SnRightFlash, _rightFlashes);
 	}
 
 	private static Vector3 FlashUniform(BarrierFlash flash, BarrierSide side)
@@ -620,9 +629,9 @@ void fragment() {
 		mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);
 
 		_barrierMaterial = new ShaderMaterial { Shader = new Shader { Code = BarrierShaderCode } };
-		_barrierMaterial.SetShaderParameter("lap_length", LapLength);
-		_barrierMaterial.SetShaderParameter("flash_color", new Vector3(Palette.BarrierFlash.R, Palette.BarrierFlash.G, Palette.BarrierFlash.B));
-		_barrierMaterial.SetShaderParameter("flash_glow", FlashGlow);
+		_barrierMaterial.SetShaderParameter(SnLapLength, LapLength);
+		_barrierMaterial.SetShaderParameter(SnFlashColor, new Vector3(Palette.BarrierFlash.R, Palette.BarrierFlash.G, Palette.BarrierFlash.B));
+		_barrierMaterial.SetShaderParameter(SnFlashGlow, FlashGlow);
 		mesh.SurfaceSetMaterial(0, _barrierMaterial);
 		return mesh;
 	}

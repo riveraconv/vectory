@@ -17,6 +17,29 @@ namespace Vectory.Circuit;
 // TimedDisplay) y avanzan en _Process, así la pausa las congela. No tiene lógica de carrera: solo escucha.
 public partial class TrackElements : Node3D
 {
+	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
+	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
+	private static readonly StringName SnBaseBrightness = "base_brightness";
+	private static readonly StringName SnBrightness = "brightness";
+	private static readonly StringName SnCycleLength = "cycle_length";
+	private static readonly StringName SnFade = "fade";
+	private static readonly StringName SnFrequency = "frequency";
+	private static readonly StringName SnGoColor = "go_color";
+	private static readonly StringName SnGoFlash = "go_flash";
+	private static readonly StringName SnLampColor = "lamp_color";
+	private static readonly StringName SnLightsOn = "lights_on";
+	private static readonly StringName SnLitColor = "lit_color";
+	private static readonly StringName SnPeakBrightness = "peak_brightness";
+	private static readonly StringName SnPeakWhite = "peak_white";
+	private static readonly StringName SnPulseColor = "pulse_color";
+	private static readonly StringName SnPulseCount = "pulse_count";
+	private static readonly StringName SnPulseSpeed = "pulse_speed";
+	private static readonly StringName SnPulseTime = "pulse_time";
+	private static readonly StringName SnPulseWidth = "pulse_width";
+	private static readonly StringName SnWaveTime = "wave_time";
+	private static readonly StringName SnWhiteColor = "white_color";
+	private static readonly StringName SnWhiteMix = "white_mix";
+
 	// Líneas con brillo, mezcla con blanco y desvanecido; el color sale de los vértices.
 	// La "opacidad" multiplica el color (sin ALPHA, así sigue en la pasada opaca y con glow).
 	private const string GlowShaderCode = @"
@@ -325,14 +348,14 @@ void fragment() {
 		}
 
 		StartLightsState lights = StartLightsState.From(_startSequence, _track.StartLightsFlashDuration);
-		_lightsMaterial.SetShaderParameter("lights_on", (float)lights.LightsOn);
-		_lightsMaterial.SetShaderParameter("go_flash", lights.GoFlash);
+		_lightsMaterial.SetShaderParameter(SnLightsOn, (float)lights.LightsOn);
+		_lightsMaterial.SetShaderParameter(SnGoFlash, lights.GoFlash);
 
 		UpdateGrid();
 
-		_tunnelMaterial?.SetShaderParameter("pulse_time", _time);
-		_chevronMaterial?.SetShaderParameter("wave_time", _time);
-		_beaconMaterial?.SetShaderParameter("brightness", Heartbeat.Brightness(_time, BeaconBeatFrequency, 1f, 1.5f));
+		_tunnelMaterial?.SetShaderParameter(SnPulseTime, _time);
+		_chevronMaterial?.SetShaderParameter(SnWaveTime, _time);
+		_beaconMaterial?.SetShaderParameter(SnBrightness, Heartbeat.Brightness(_time, BeaconBeatFrequency, 1f, 1.5f));
 		if (_track.CrestWarnings.Count > 0)
 			_track.SetCrestBarrierBrightness(Heartbeat.Brightness(_time, CrestBarrierBeatFrequency, 0.9f, 1.5f));
 	}
@@ -356,7 +379,7 @@ void fragment() {
 			return;
 
 		float opacity = GridMarksFade.Opacity(GridMarksFade.TimeSinceGo(_startSequence), _track.GridFadeTime);
-		_gridMaterial.SetShaderParameter("fade", opacity);
+		_gridMaterial.SetShaderParameter(SnFade, opacity);
 		foreach (var (label, color) in _gridNumbers)
 			label.Modulate = new Color(color, opacity);
 		if (opacity <= 0f)
@@ -485,9 +508,9 @@ void fragment() {
 		}
 
 		_lightsMaterial = new ShaderMaterial { Shader = new Shader { Code = LightsShaderCode } };
-		_lightsMaterial.SetShaderParameter("lamp_color", Rgb(Palette.StartLamp));
-		_lightsMaterial.SetShaderParameter("lit_color", Rgb(Palette.StartLampLit));
-		_lightsMaterial.SetShaderParameter("go_color", Rgb(Palette.StartLampGo));
+		_lightsMaterial.SetShaderParameter(SnLampColor, Rgb(Palette.StartLamp));
+		_lightsMaterial.SetShaderParameter(SnLitColor, Rgb(Palette.StartLampLit));
+		_lightsMaterial.SetShaderParameter(SnGoColor, Rgb(Palette.StartLampGo));
 		AddMesh("StartLights", lamps, _lightsMaterial);
 	}
 
@@ -560,10 +583,10 @@ void fragment() {
 		}
 
 		_tunnelMaterial = new ShaderMaterial { Shader = new Shader { Code = TunnelShaderCode } };
-		_tunnelMaterial.SetShaderParameter("pulse_speed", _track.TunnelPulseSpeed);
-		_tunnelMaterial.SetShaderParameter("pulse_count", Mathf.Max(0, _track.TunnelPulseCount));
-		_tunnelMaterial.SetShaderParameter("pulse_width", TunnelPulse.DefaultWidth);
-		_tunnelMaterial.SetShaderParameter("pulse_color", Rgb(Palette.TunnelPulse));
+		_tunnelMaterial.SetShaderParameter(SnPulseSpeed, _track.TunnelPulseSpeed);
+		_tunnelMaterial.SetShaderParameter(SnPulseCount, Mathf.Max(0, _track.TunnelPulseCount));
+		_tunnelMaterial.SetShaderParameter(SnPulseWidth, TunnelPulse.DefaultWidth);
+		_tunnelMaterial.SetShaderParameter(SnPulseColor, Rgb(Palette.TunnelPulse));
 		AddMesh("Tunnels", lines, _tunnelMaterial);
 	}
 
@@ -621,12 +644,12 @@ void fragment() {
 		}
 
 		_chevronMaterial = new ShaderMaterial { Shader = new Shader { Code = ChevronShaderCode } };
-		_chevronMaterial.SetShaderParameter("frequency", _track.ChevronWaveFrequency);
-		_chevronMaterial.SetShaderParameter("cycle_length", ChevronCycleLength);
-		_chevronMaterial.SetShaderParameter("base_brightness", ChevronWave.BaseBrightness);
-		_chevronMaterial.SetShaderParameter("peak_brightness", ChevronWave.PeakBrightness);
-		_chevronMaterial.SetShaderParameter("peak_white", ChevronWave.PeakWhite);
-		_chevronMaterial.SetShaderParameter("white_color", Rgb(Palette.White));
+		_chevronMaterial.SetShaderParameter(SnFrequency, _track.ChevronWaveFrequency);
+		_chevronMaterial.SetShaderParameter(SnCycleLength, ChevronCycleLength);
+		_chevronMaterial.SetShaderParameter(SnBaseBrightness, ChevronWave.BaseBrightness);
+		_chevronMaterial.SetShaderParameter(SnPeakBrightness, ChevronWave.PeakBrightness);
+		_chevronMaterial.SetShaderParameter(SnPeakWhite, ChevronWave.PeakWhite);
+		_chevronMaterial.SetShaderParameter(SnWhiteColor, Rgb(Palette.White));
 		AddMesh("Chevrons", lines, _chevronMaterial);
 	}
 
@@ -708,14 +731,14 @@ void fragment() {
 	private ShaderMaterial GlowMaterial()
 	{
 		var material = new ShaderMaterial { Shader = _glowShader };
-		material.SetShaderParameter("white_color", Rgb(Palette.GateFlashWhite));
+		material.SetShaderParameter(SnWhiteColor, Rgb(Palette.GateFlashWhite));
 		return material;
 	}
 
 	private static void SetGlow(ShaderMaterial material, float brightness, float whiteMix)
 	{
-		material.SetShaderParameter("brightness", brightness);
-		material.SetShaderParameter("white_mix", whiteMix);
+		material.SetShaderParameter(SnBrightness, brightness);
+		material.SetShaderParameter(SnWhiteMix, whiteMix);
 	}
 
 	private void AddMesh(string name, LineBatch lines, Material material)

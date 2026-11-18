@@ -99,12 +99,30 @@ public partial class CollisionEffects : Node3D
 	[Export] public float LandingDustInherit { get; set; } = D.Landing.DustInherit;
 	[Export] public float LandingDustOpacity { get; set; } = D.Landing.Dust.Opacity;
 
+	[ExportGroup("Humo de daños")]
+	[Export] public float DamageSmokeMediumRate { get; set; } = D.DamageSmoke.Medium.Rate;         // por segundo en Smoke
+	[Export] public float DamageSmokeStrongRate { get; set; } = D.DamageSmoke.Strong.Rate;
+	[Export] public float DamageSmokeStrongSecondaryRate { get; set; } = D.DamageSmoke.Strong.SecondaryRate;   // en Smoke2 y Smoke3
+	[Export] public float DamageSmokeMediumOpacity { get; set; } = D.DamageSmoke.Medium.Opacity;
+	[Export] public float DamageSmokeStrongOpacity { get; set; } = D.DamageSmoke.Strong.Opacity;
+	[Export] public float DamageSmokeLagFraction { get; set; } = D.DamageSmoke.LagFraction;        // de la velocidad de la nave
+	[Export] public float DamageSmokeLagMin { get; set; } = D.DamageSmoke.LagMin;                  // m/s
+	[Export] public float DamageSmokeLagMax { get; set; } = D.DamageSmoke.LagMax;                  // m/s
+	[Export] public float DamageSmokeSwirlSide { get; set; } = D.DamageSmoke.SwirlSide;            // m/s
+	[Export] public float DamageSmokeSwirlUp { get; set; } = D.DamageSmoke.SwirlUp;                // m/s
+	[Export] public int DamageSmokeMaxPuffs { get; set; } = D.DamageSmoke.MaxPuffs;
+
 	private const int Bucket = 256;       // las mallas de líneas usan arrays de tamaño múltiplo de esto, para no crearlos cada frame
 	private const int QuadBucket = 32;    // ídem en cuadrados
 
 	private CollisionFx _fx;
 	private DriftMarks _drift;
 	private DriftSparkEmitter _driftSparks;
+	private DamageSmoke _damageSmoke;
+	// Recolocaciones de cada nave vistas la última vez: al cambiar, se borra su humo de daños
+	private readonly Dictionary<int, int> _respawns = new();
+	private int[] _smokeOrder;
+	private float[] _smokeDepth;
 	// Foco del derrape de cada nave en su último paso: intensidades del núcleo y del halo, y dónde está
 	private readonly Dictionary<int, (float Core, float Halo, NVector3 Point)> _driftFoci = new();
 	private CollisionFxSettings _settings;
@@ -120,6 +138,10 @@ public partial class CollisionEffects : Node3D
 	private MeshInstance3D _smokeView;
 	private MeshInstance3D _markView;
 	private MeshInstance3D _driftGlowView;
+	private MultiMeshInstance3D _damageSmokeView;
+	private MultiMesh _damageSmokeMulti;
+	private float[] _damageSmokeBuffer;
+	private const int SmokeStride = 20;   // floats por bocanada: transformación 12, color 4, datos propios 4
 	private ArrayMesh _sparkMesh;
 	private ArrayMesh _lineMesh;
 	private ArrayMesh _glowMesh;
@@ -140,6 +162,7 @@ public partial class CollisionEffects : Node3D
 		_fx = new CollisionFx(_settings, new Random());
 		_drift = new DriftMarks(_settings.Drift);
 		_driftSparks = new DriftSparkEmitter(_settings.Drift, new Random());
+		_damageSmoke = new DamageSmoke(_settings.DamageSmoke, new Random());
 		ApplyQuality();
 		BuildViews();
 	}
@@ -212,6 +235,24 @@ public partial class CollisionEffects : Node3D
 		_fx.Land(level, _frame, pose, velocity, visual.CollisionHalfWidth, visual.CollisionBack, visual.BellyY);
 	}
 
+	// El humo de daños de una nave en este paso de física (spec docs/efectos-4-humo-danos.md): level, su nivel de daño
+	// (0 fuera de RACE); respawns, cuántas veces se ha recolocado (al cambiar, su humo se borra); hull: la nave que se ve;
+	// velocity: su velocidad en el mundo.
+	public void DamageShip(int shipId, int level, int respawns, Transform3D hull, NVector3 velocity, ShipVisualProfile visual,
+		float dt)
+	{
+		if (_damageSmoke == null)
+			return;
+		if (_respawns.TryGetValue(shipId, out int seen) && seen != respawns)
+			_damageSmoke.Clear(shipId);
+		_respawns[shipId] = respawns;
+		if (level < 2)
+			return;
+		Basis b = hull.Basis;
+		var pose = new ShipPose(N(hull.Origin), N(b.X.Normalized()), N(b.Y.Normalized()), N(b.Z.Normalized()));
+		_damageSmoke.Emit(shipId, level, visual.SmokeFoci, pose, velocity, _fx.Quality, dt);
+	}
+
 	// Recolocación: el trazo de esa nave se corta y las marcas se quedan
 	public void CutDrift(int shipId) => _drift?.Cut(shipId);
 
@@ -222,6 +263,7 @@ public partial class CollisionEffects : Node3D
 		ApplyQuality();
 		_fx.Update((float)delta, _ground);
 		_drift.Advance((float)delta);
+		_damageSmoke.Update((float)delta);
 		DrawDriftMarks();
 		Camera3D camera = GetViewport().GetCamera3D();
 		if (camera == null)
@@ -233,6 +275,7 @@ public partial class CollisionEffects : Node3D
 		DrawFlashLines(right, up);
 		DrawGlows(right, up);
 		DrawSmoke(right, up);
+		DrawDamageSmoke(camera.GlobalPosition);
 		DrawDriftFoci(right, up);
 	}
 
@@ -313,6 +356,17 @@ public partial class CollisionEffects : Node3D
 		s.Landing.DustLift = LandingDustLift;
 		s.Landing.DustInherit = LandingDustInherit;
 		s.Landing.Dust.Opacity = LandingDustOpacity;
+		s.DamageSmoke.Medium.Rate = DamageSmokeMediumRate;
+		s.DamageSmoke.Strong.Rate = DamageSmokeStrongRate;
+		s.DamageSmoke.Strong.SecondaryRate = DamageSmokeStrongSecondaryRate;
+		s.DamageSmoke.Medium.Opacity = DamageSmokeMediumOpacity;
+		s.DamageSmoke.Strong.Opacity = DamageSmokeStrongOpacity;
+		s.DamageSmoke.LagFraction = DamageSmokeLagFraction;
+		s.DamageSmoke.LagMin = DamageSmokeLagMin;
+		s.DamageSmoke.LagMax = DamageSmokeLagMax;
+		s.DamageSmoke.SwirlSide = DamageSmokeSwirlSide;
+		s.DamageSmoke.SwirlUp = DamageSmokeSwirlUp;
+		s.DamageSmoke.MaxPuffs = DamageSmokeMaxPuffs;
 		return s;
 	}
 
@@ -361,6 +415,88 @@ public partial class CollisionEffects : Node3D
 			CullMode = BaseMaterial3D.CullModeEnum.Disabled
 		};
 		_driftGlowView = View("DriftGlows", driftGlow, out _driftGlowMesh);
+		BuildDamageSmokeView();
+	}
+
+	// Cuadrado de cara a la cámara, girado y con su nube del atlas de 2 × 2, desde los datos de cada instancia
+	private const string DamageSmokeShader = @"
+shader_type spatial;
+render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
+uniform sampler2D atlas : source_color, filter_linear_mipmap, repeat_disable;
+varying vec4 tint;
+void vertex() {
+	float a = INSTANCE_CUSTOM.x;
+	float tile = INSTANCE_CUSTOM.y;
+	float radius = INSTANCE_CUSTOM.z;
+	vec2 p = VERTEX.xy * 2.0 * radius;
+	vec2 q = vec2(p.x * cos(a) - p.y * sin(a), p.x * sin(a) + p.y * cos(a));
+	vec3 center = MODEL_MATRIX[3].xyz;
+	vec3 world = center + INV_VIEW_MATRIX[0].xyz * q.x + INV_VIEW_MATRIX[1].xyz * q.y;
+	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(world, 1.0);
+	UV = vec2(mod(tile, 2.0), floor(tile / 2.0)) * 0.5 + UV * 0.5;
+	tint = COLOR;
+}
+void fragment() {
+	vec4 t = texture(atlas, UV);
+	ALBEDO = tint.rgb * t.rgb;
+	ALPHA = tint.a * t.a;
+}
+";
+
+	private void BuildDamageSmokeView()
+	{
+		int max = Math.Max(1, _settings.DamageSmoke.MaxPuffs);
+		var material = new ShaderMaterial { Shader = new Shader { Code = DamageSmokeShader } };
+		material.SetShaderParameter("atlas", CloudAtlas());
+		_damageSmokeMulti = new MultiMesh
+		{
+			TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+			UseColors = true,
+			UseCustomData = true,
+			Mesh = new QuadMesh { Size = Vector2.One },
+			InstanceCount = max,
+			VisibleInstanceCount = 0
+		};
+		_damageSmokeBuffer = new float[max * SmokeStride];
+		_smokeOrder = new int[max];
+		_smokeDepth = new float[max];
+		_damageSmokeView = new MultiMeshInstance3D
+		{
+			Name = "DamageSmoke",
+			Multimesh = _damageSmokeMulti,
+			MaterialOverride = material,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			// El cuadrado se coloca en el shader: sin una caja grande, Godot lo descartaría fuera de su sitio
+			CustomAabb = new Aabb(new Vector3(-1e5f, -1e5f, -1e5f), new Vector3(2e5f, 2e5f, 2e5f)),
+			Visible = false
+		};
+		AddChild(_damageSmokeView);
+	}
+
+	// Las 4 nubes del humo de daños en una textura de 2 × 2, con mipmaps
+	private static ImageTexture CloudAtlas()
+	{
+		int n = CloudTexture.Size;
+		var data = new byte[4 * n * n * 4];
+		for (int k = 0; k < CloudTexture.Seeds.Length; k++)
+		{
+			(float Light, float Alpha)[] pixels = CloudTexture.Pixels(CloudTexture.Seeds[k]);
+			int ox = (k % 2) * n, oy = (k / 2) * n;
+			for (int j = 0; j < n; j++)
+				for (int i = 0; i < n; i++)
+				{
+					(float light, float alpha) = pixels[j * n + i];
+					int o = ((oy + j) * 2 * n + ox + i) * 4;
+					byte l = (byte)Math.Round(255f * light);
+					data[o] = l;
+					data[o + 1] = l;
+					data[o + 2] = l;
+					data[o + 3] = (byte)Math.Round(255f * alpha);
+				}
+		}
+		Image image = Image.CreateFromData(2 * n, 2 * n, false, Image.Format.Rgba8, data);
+		image.GenerateMipmaps();
+		return ImageTexture.CreateFromImage(image);
 	}
 
 	private MeshInstance3D View(string name, Material material, out ArrayMesh mesh)
@@ -570,6 +706,47 @@ public partial class CollisionEffects : Node3D
 		Commit(_smokeMesh, Mesh.PrimitiveType.Triangles, v, c, u);
 	}
 
+	// Humo de daños: de lejos a cerca de la cámara (es oscuro y con mezcla normal: el orden se nota), cada bocanada con su
+	// nube del atlas y su giro. Va en un MultiMesh con un búfer de floats que no cambia de tamaño: rehacer una malla con
+	// arrays de Godot crea objetos en cada frame, y el humo se dibuja durante toda la carrera.
+	private void DrawDamageSmoke(Vector3 cameraPosition)
+	{
+		DamageSmoke smoke = _damageSmoke;
+		int count = Math.Min(smoke.Count, _damageSmokeMulti.InstanceCount);
+		if (count == 0)
+		{
+			if (_damageSmokeView.Visible)
+			{
+				_damageSmokeMulti.VisibleInstanceCount = 0;
+				_damageSmokeView.Visible = false;
+			}
+			return;
+		}
+		_damageSmokeView.Visible = true;
+		NVector3 eye = N(cameraPosition);
+		for (int i = 0; i < count; i++)
+		{
+			_smokeOrder[i] = i;
+			_smokeDepth[i] = -NVector3.DistanceSquared(smoke[i].Position, eye);
+		}
+		Array.Sort(_smokeDepth, _smokeOrder, 0, count);
+		float[] buffer = _damageSmokeBuffer;
+		for (int q = 0; q < count; q++)
+		{
+			DamagePuff p = smoke[_smokeOrder[q]];
+			NVector3 col = smoke.Color(p);
+			int o = q * SmokeStride;
+			// Transformación (base identidad y el centro), color y datos propios: giro, nube y radio
+			buffer[o] = 1f; buffer[o + 1] = 0f; buffer[o + 2] = 0f; buffer[o + 3] = p.Position.X;
+			buffer[o + 4] = 0f; buffer[o + 5] = 1f; buffer[o + 6] = 0f; buffer[o + 7] = p.Position.Y;
+			buffer[o + 8] = 0f; buffer[o + 9] = 0f; buffer[o + 10] = 1f; buffer[o + 11] = p.Position.Z;
+			buffer[o + 12] = col.X; buffer[o + 13] = col.Y; buffer[o + 14] = col.Z; buffer[o + 15] = smoke.Opacity(p);
+			buffer[o + 16] = DamageSmoke.RotationOf(p); buffer[o + 17] = p.Texture; buffer[o + 18] = smoke.Radius(p); buffer[o + 19] = 0f;
+		}
+		RenderingServer.MultimeshSetBuffer(_damageSmokeMulti.GetRid(), new ReadOnlySpan<float>(buffer));
+		_damageSmokeMulti.VisibleInstanceCount = count;
+	}
+
 	// Sin nada que dibujar, la malla se vacía una vez y se oculta
 	private static bool Begin(MeshInstance3D view, ArrayMesh mesh, int count)
 	{
@@ -648,16 +825,30 @@ public partial class CollisionEffects : Node3D
 			c[o + i] = color;
 	}
 
-	private static void Commit(ArrayMesh mesh, Mesh.PrimitiveType primitive, Vector3[] v, Color[] c, Vector2[] u)
+	// Siempre los mismos dos arrays de Godot (con y sin UV): crear uno por malla y frame dejaba basura todo el rato
+	// mientras hubiera efectos (con el humo de daños, toda la carrera) y adelantaba las pausas del recolector
+	private readonly Godot.Collections.Array _surfaceLines = NewSurfaceArrays();
+	private readonly Godot.Collections.Array _surfaceQuads = NewSurfaceArrays();
+	// También los opcionales de AddSurfaceFromArrays: sin pasarlos, Godot crea los suyos en cada llamada
+	private readonly Godot.Collections.Array<Godot.Collections.Array> _noBlendShapes = new();
+	private readonly Godot.Collections.Dictionary _noLods = new();
+
+	private static Godot.Collections.Array NewSurfaceArrays()
 	{
 		var arrays = new Godot.Collections.Array();
 		arrays.Resize((int)Mesh.ArrayType.Max);
+		return arrays;
+	}
+
+	private void Commit(ArrayMesh mesh, Mesh.PrimitiveType primitive, Vector3[] v, Color[] c, Vector2[] u)
+	{
+		Godot.Collections.Array arrays = u != null ? _surfaceQuads : _surfaceLines;
 		arrays[(int)Mesh.ArrayType.Vertex] = v;
 		arrays[(int)Mesh.ArrayType.Color] = c;
 		if (u != null)
 			arrays[(int)Mesh.ArrayType.TexUV] = u;
 		mesh.ClearSurfaces();
-		mesh.AddSurfaceFromArrays(primitive, arrays);
+		mesh.AddSurfaceFromArrays(primitive, arrays, _noBlendShapes, _noLods);
 	}
 
 	private static Vector3 G(NVector3 v) => new(v.X, v.Y, v.Z);

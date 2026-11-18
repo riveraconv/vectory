@@ -183,23 +183,12 @@ public class HullPaintTests
         Assert.Equal(mask, HullDamage.ScorchMask(level, false));
     }
 
-    [Theory]
-    [InlineData(0, 0f)]
-    [InlineData(1, 0f)]
-    [InlineData(2, 7f)]
-    [InlineData(3, 20f)]
-    public void Smoke_PerSecondByLevel(int level, float rate)
-    {
-        Assert.Equal(rate, HullDamage.SmokePerSecond(level, false));
-    }
-
     [Fact]
     public void TimeTrial_HasNoDamageAtAll()
     {
         for (int level = 0; level <= 3; level++)
         {
             Assert.Equal(0, HullDamage.ScorchMask(level, true));
-            Assert.Equal(0f, HullDamage.SmokePerSecond(level, true));
         }
     }
 
@@ -215,14 +204,5 @@ public class HullPaintTests
         flicker.SetLevel(3);
         Assert.All(flicker.AffectedEdges, e => Assert.InRange(e, 0, lights.Length - 1));
         Assert.Equal((int)MathF.Round(0.35f * 14), flicker.AffectedEdges.Count);
-    }
-
-    [Fact]
-    public void Smoke_IsDarkerAtLevel3_AndGrowsWithSpeed()
-    {
-        Assert.Equal(0x4A4A4Au, HullDamage.SmokeColor(2));
-        Assert.Equal(0x262626u, HullDamage.SmokeColor(3));
-        Assert.Equal(1.95f, HullDamage.SmokeFinalSize(0f));
-        Assert.True(HullDamage.SmokeFinalSize(100f) > HullDamage.SmokeFinalSize(0f));
     }
 }

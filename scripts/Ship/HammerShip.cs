@@ -61,6 +61,9 @@ public static class HammerShip
 			CollisionBack = 3f,
 			// Lo más bajo de la caja del manifiesto del casco 3D
 			BellyY = -0.52f,
+			// Smoke en la boca del escape; Smoke2 y Smoke3 sobre los motores izquierdo y derecho, cerca de la tobera, 5 cm
+			// sobre la piel
+			SmokeFoci = new DamageSmokeFoci(new(0.4f, 1.33f, -0.06f), new(-0.45f, 0.72f, 2.5f), new(0.45f, 0.72f, 2.5f)),
 			NoseDistance = 3.6f,
 			PhysicsBoxSize = new Vector3(5f, 1.4f, 6.6f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.3f)

@@ -62,6 +62,9 @@ public static class BladeShip
 			CollisionBack = 3.61f,
 			// Lo más bajo de la caja del manifiesto del casco 3D
 			BellyY = -0.234f,
+			// Smoke sobre la góndola derecha; Smoke2 en la izquierda; Smoke3 sobre el ala derecha, al 70 % del semiancho, en
+			// su mitad trasera, 5 cm sobre la piel
+			SmokeFoci = new DamageSmokeFoci(new(0.6f, 0.35f, 2.4f), new(-0.6f, 0.35f, 2.4f), new(1.1f, 0.19f, 2f)),
 			NoseDistance = 5.2f,
 			PhysicsBoxSize = new Vector3(3.2f, 0.62f, 8.8f),
 			PhysicsBoxCenter = new Vector3(0f, 0.17f, -0.8f)

@@ -96,7 +96,6 @@ public partial class RivalShip : Node3D
 		if (_car.Respawns != _respawns)
 		{
 			_respawns = _car.Respawns;
-			_ship.ClearHullSmoke();
 			_bank.Reset();
 			SettleOnSurface();
 		}
@@ -125,7 +124,7 @@ public partial class RivalShip : Node3D
 		ShipPhysics physics = _car.Physics;
 		if (_ship.HasHull3D && physics.HasSurface)
 		{
-			_ship.UpdateHullEffects(_car.Dynamics.RealSpeed, _time);
+			_ship.UpdateHullEffects(_time);
 			(float boost, float damage) = IndustrialHullBeacons.Intensities(_car.Boost.IsImpulseActive, _damageLevel, true, _time, _look.Lamps);
 			_ship.SetHullBeacons(boost, damage);
 		}

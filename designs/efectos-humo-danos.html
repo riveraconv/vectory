@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>VECTORY · Humo de daños · Maqueta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { --cyan:#36E7FF; --blue:#245BFF; --mag:#FF43D0; --orange:#FF9D32; --bg:#05070D; --grey:#A6B8D8; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--grey); font-family:'Share Tech Mono', monospace; overflow:hidden; user-select:none; -webkit-user-select:none; }
+  body { display:flex; flex-direction:column; }
+  #stage { flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:0; }
+  #view { position:relative; }
+  #view canvas { position:absolute; inset:0; display:block; width:100%; height:100%; }
+  #mode { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(var(--u) * 70); font-size:calc(var(--u) * 15); letter-spacing:.08em; color:var(--grey); opacity:0; transition:opacity .3s; pointer-events:none; background:rgba(5,7,13,.85); padding:6px 12px; border:1px solid rgba(54,231,255,.3); max-width:90%; text-align:center; }
+  #bar { flex:none; display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; align-items:center; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid rgba(36,91,255,.35); background:#070B16; }
+  .grp { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+  .grp b { font-weight:normal; font-size:11px; letter-spacing:.12em; opacity:.6; margin-right:2px; }
+  #bar button { font-family:inherit; font-size:12px; letter-spacing:.08em; color:var(--cyan); background:#0C1324; border:1px solid rgba(54,231,255,.35); padding:7px 9px; cursor:pointer; }
+  #bar button.on { background:rgba(54,231,255,.18); border-color:rgba(54,231,255,.9); }
+  #help { flex-basis:100%; text-align:center; font-size:11px; letter-spacing:.05em; opacity:.55; }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+</head>
+<body>
+<div id="stage">
+  <div id="view">
+    <canvas id="gl"></canvas>
+    <canvas id="hud"></canvas>
+    <div id="mode"></div>
+  </div>
+</div>
+<div id="bar">
+  <div class="grp"><b>DAÑO</b>
+    <button data-g="dmg" data-v="auto" class="on">AUTO</button>
+    <button data-g="dmg" data-v="2">2 · MEDIO</button>
+    <button data-g="dmg" data-v="3">3 · GRAVE</button>
+  </div>
+  <div class="grp"><b>HUMO</b>
+    <button data-g="style" data-v="today">HOY</button>
+    <button data-g="style" data-v="plume" class="on">A·PENACHO</button>
+    <button data-g="style" data-v="wrap">B·ENVUELTO</button>
+  </div>
+  <div class="grp"><b>FOCOS EN 3</b>
+    <button data-g="foci" data-v="1">1</button>
+    <button data-g="foci" data-v="3" class="on">3</button>
+  </div>
+  <div class="grp"><b>FUEGO EN 3</b>
+    <button data-g="fire" data-v="on" class="on">SÍ</button>
+    <button data-g="fire" data-v="off">NO</button>
+  </div>
+  <div class="grp"><b>BRASAS</b>
+    <button data-g="emb" data-v="on" class="on">SÍ</button>
+    <button data-g="emb" data-v="off">NO</button>
+  </div>
+  <div class="grp"><b>VELOCIDAD</b>
+    <button data-g="speed" data-v="150">150</button>
+    <button data-g="speed" data-v="300" class="on">300</button>
+    <button data-g="speed" data-v="400">400</button>
+  </div>
+  <div class="grp"><b>VISTA</b>
+    <button data-g="view" data-v="chase">PERSECUCIÓN</button>
+    <button data-g="view" data-v="side">LATERAL</button>
+    <button data-g="view" data-v="both" class="on">LAS DOS</button>
+  </div>
+  <div class="grp"><b>PARTICLES</b>
+    <button data-g="q" data-v="LOW">LOW</button>
+    <button data-g="q" data-v="MEDIUM">MEDIUM</button>
+    <button data-g="q" data-v="HIGH" class="on">HIGH</button>
+  </div>
+  <div class="grp"><button id="bSlow">LENTO ×0,25</button><button id="bPause">PAUSA</button></div>
+  <div id="help">La nave es una silueta aproximada de VECTOR (7,3 m) · HOY = el humo de los cascos 3D (7 / 20 por s, se queda quieto en el mundo) · Espacio pausa · L lento</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+const opt = { dmg:'auto', style:'plume', foci:'3', fire:'on', emb:'on', speed:300, view:'both', q:'HIGH', slow:false, paused:false };
+const QK = { LOW:0.25, MEDIUM:0.5, HIGH:1 };
+const HALF = 11, BAR = 11.5;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const lerp = (a, b, u) => a + (b - a) * u;
+
+// Todo se simula en el marco de la nave: la nave va casi quieta y el mundo pasa hacia +z a la velocidad de la nave.
+// Algo «quieto en el mundo» se mueve a +v; algo que hereda el k % de la velocidad de la nave, a (1 − k)·v.
+
+// ================= ESCENA =================
+const glc = document.getElementById('gl'), hud = document.getElementById('hud'), hx = hud.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas:glc, antialias:true });
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+renderer.setPixelRatio(DPR); renderer.setClearColor(0x05070D, 1); renderer.autoClear = false;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x05070D, 80, 1100);
+const camA = new THREE.PerspectiveCamera(62, 16/9, 0.1, 4000);
+const camB = new THREE.PerspectiveCamera(40, 16/9, 0.1, 4000);
+const lm = (c, o, fog = true) => new THREE.LineBasicMaterial({ color:c, transparent:o < 1, opacity:o, fog });
+const seg = arr => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); return g; };
+const ADD = { blending:THREE.AdditiveBlending, transparent:true, depthWrite:false };
+
+let sky;
+{
+  const g = new THREE.SphereGeometry(2500, 48, 32), col = [], p = g.attributes.position, c = new THREE.Color();
+  const dark = new THREE.Color(0x05070D), warm = new THREE.Color(0x2A1A0E), mid = new THREE.Color(0x140D0A);
+  for (let i = 0; i < p.count; i++) {
+    const h = p.getY(i) / 2500;
+    if (h < -0.01) c.copy(dark); else if (h < 0.03) c.copy(warm); else if (h < 0.12) c.copy(warm).lerp(mid, (h-0.03)/0.09); else if (h < 0.3) c.copy(mid).lerp(dark, (h-0.12)/0.18); else c.copy(dark);
+    col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  sky = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors:true, side:THREE.BackSide, fog:false, depthWrite:false }));
+  scene.add(sky);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshBasicMaterial({ color:0x03050A }));
+  ground.rotation.x = -Math.PI/2; ground.position.y = -0.05; scene.add(ground);
+}
+// pista que pasa (se repite cada 40 m)
+const PER = 40, ZA = 120, ZB = -1200;
+const track = new THREE.Group(); scene.add(track);
+{
+  const asph = new THREE.Mesh(new THREE.PlaneGeometry(2*HALF, ZA - ZB + PER), new THREE.MeshBasicMaterial({ color:0x060A16 }));
+  asph.rotation.x = -Math.PI/2; asph.position.set(0, 0, (ZA + ZB - PER)/2); track.add(asph);
+  const add = (arr, c, o) => track.add(new THREE.LineSegments(seg(arr), lm(c, o)));
+  const L = (x, y, c, o) => add([x, y, ZA, x, y, ZB - PER], c, o);
+  [-1, 1].forEach(k => {
+    L(k*HALF, 0.02, 0x5A82FF, 1); L(k*HALF*0.474, 0.02, 0x245BFF, 0.8);
+    [[0,0x36E7FF,1],[0.04,0x36E7FF,1],[0.4,0x36E7FF,0.85],[1.4,0x245BFF,0.5],[2.4,0x36E7FF,0.85],[2.96,0x36E7FF,1],[3,0x36E7FF,1]].forEach(([y, c, o]) => L(k*BAR, y, c, o));
+    const a = [], b = []; for (let z = ZA; z > ZB - PER; z -= 4) { const x = k*BAR; a.push(x,0,z, x,0.4,z, x,2.4,z, x,3,z); b.push(x,0.4,z, x,2.4,z); }
+    add(a, 0x36E7FF, 0.6); add(b, 0x245BFF, 0.4);
+  });
+  L(0, 0.02, 0x245BFF, 0.8);
+  const cross = []; for (let z = ZA; z > ZB - PER; z -= 10) cross.push(-HALF, 0.02, z, HALF, 0.02, z);
+  add(cross, 0x245BFF, 0.5);
+}
+// ciudad que pasa
+const towers = [];
+{
+  let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const mE = lm(0xFF9D32, 0.22, false), mW = lm(0xFF9D32, 0.07, false);
+  for (let n = 0; n < 90; n++) {
+    const side = r() < 0.5 ? -1 : 1, x = side * (45 + r() * 500), z = 200 - r() * 2400;
+    const w = 14 + r()*40, h = 30 + r()*200, d = 14 + r()*40;
+    const g = new THREE.BoxGeometry(w, h, d); g.translate(0, h/2, 0);
+    const grp = new THREE.Group(); grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), mE));
+    const win = []; for (let y = 8; y < h - 4; y += 9) win.push(-w/2,y,d/2, w/2,y,d/2, -w/2,y,-d/2, w/2,y,-d/2);
+    grp.add(new THREE.LineSegments(seg(win), mW)); grp.position.set(x, -6, z); scene.add(grp); towers.push(grp);
+  }
+}
+
+// nave: silueta maciza aproximada de VECTOR (z −4,0 → 3,31, semiancho 2,63)
+const ship = new THREE.Group(); scene.add(ship);
+{
+  const sh = new THREE.Shape();
+  [[0,-4.0],[0.42,-2.6],[0.75,-0.6],[2.63,1.9],[2.5,2.45],[1.05,2.3],[0.95,3.31],[-0.95,3.31],[-1.05,2.3],[-2.5,2.45],[-2.63,1.9],[-0.75,-0.6],[-0.42,-2.6]]
+    .forEach(([x, z], i) => i ? sh.lineTo(x, z) : sh.moveTo(x, z));
+  const g = new THREE.ExtrudeGeometry(sh, { depth:0.34, bevelEnabled:true, bevelThickness:0.08, bevelSize:0.06, bevelSegments:1 });
+  g.rotateX(Math.PI/2); g.translate(0, 0.42, 0);
+  const hullMat = new THREE.MeshLambertMaterial({ color:0x2A3140 });
+  ship.add(new THREE.Mesh(g, hullMat));
+  ship.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({ color:0x36E7FF, transparent:true, opacity:0.55 })));
+  // lomo y cúpula
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 5.6, 8, 1), hullMat); body.rotation.x = Math.PI/2; body.scale.set(1, 1, 0.55); body.position.set(0, 0.5, 0.2); ship.add(body);
+  const can = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshLambertMaterial({ color:0x0C1830, emissive:0x0A2040 }));
+  can.scale.set(0.8, 0.55, 2.2); can.position.set(0, 0.68, -1.0); ship.add(can);
+  // góndolas y toberas
+  [-1, 1].forEach(k => {
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 2.4, 8), hullMat); pod.rotation.x = Math.PI/2; pod.scale.set(1, 1, 0.6); pod.position.set(k*0.95, 0.42, 1.9); ship.add(pod);
+    const noz = new THREE.Mesh(new THREE.CircleGeometry(0.26, 12), new THREE.MeshBasicMaterial({ color:0x36E7FF })); noz.position.set(k*0.95, 0.42, 3.12); ship.add(noz);
+    const fl = new THREE.LineSegments(seg([k*0.95,0.42,3.12, k*0.95,0.42,5.4]), new THREE.LineBasicMaterial({ color:0x36E7FF, ...ADD, opacity:0.8 })); ship.add(fl);
+  });
+  const sun = new THREE.DirectionalLight(0xFFF1E0, 2.2); sun.position.set(4, 10, -5); scene.add(sun);
+  const back = new THREE.DirectionalLight(0xFF9D50, 1.1); back.position.set(-6, 2.5, 9); scene.add(back);
+  scene.add(new THREE.HemisphereLight(0xB0B8C8, 0x101010, 0.5));
+}
+// focos de humo (en la nave): el vacío Smoke y, en el grave, dos más
+const FOCI = [new THREE.Vector3(0.95, 0.62, 2.55), new THREE.Vector3(-0.95, 0.62, 2.55), new THREE.Vector3(1.85, 0.52, 1.55)];
+
+// ================= TEXTURAS =================
+function radTex(stops) {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32,32,0,32,32,32); stops.forEach(([o, col]) => g.addColorStop(o, col));
+  x.fillStyle = g; x.fillRect(0,0,64,64); return new THREE.CanvasTexture(c);
+}
+const texDot = radTex([[0,'rgba(255,255,255,0.9)'],[0.5,'rgba(255,255,255,0.45)'],[1,'rgba(255,255,255,0)']]);
+const texGlow = radTex([[0,'rgba(255,255,255,1)'],[0.3,'rgba(255,255,255,0.5)'],[1,'rgba(255,255,255,0)']]);
+// nube con ruido y luz por arriba (4 variantes)
+function cloudTex(seed) {
+  const N = 128, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d'), im = x.createImageData(N, N);
+  let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const G = 8, grid = Array.from({ length:(G+1)*(G+1) }, r), G2 = 16, grid2 = Array.from({ length:(G2+1)*(G2+1) }, r);
+  const val = (gr, n, u, v) => { const fx = u*n, fy = v*n, i = Math.floor(fx), j = Math.floor(fy), a = fx - i, b = fy - j, sa = a*a*(3-2*a), sb = b*b*(3-2*b), q = (ii, jj) => gr[Math.min(n, jj)*(n+1) + Math.min(n, ii)];
+    return lerp(lerp(q(i,j), q(i+1,j), sa), lerp(q(i,j+1), q(i+1,j+1), sa), sb); };
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const u = i/(N-1), v = j/(N-1), d = Math.hypot(u - 0.5, v - 0.5) * 2;
+    const n = 0.65 * val(grid, G, u, v) + 0.35 * val(grid2, G2, u, v);
+    const a = Math.max(0, Math.min(1, (1 - d*d) * (0.35 + 0.9*n) - 0.08));
+    const light = 0.62 + 0.38 * (1 - v) + 0.15 * (n - 0.5);     // más claro arriba
+    const o = (j*N + i)*4; im.data[o] = im.data[o+1] = im.data[o+2] = Math.min(255, 255 * light); im.data[o+3] = 255 * a;
+  }
+  x.putImageData(im, 0, 0); return new THREE.CanvasTexture(c);
+}
+const CLOUD = [cloudTex(3), cloudTex(17), cloudTex(41), cloudTex(77)];
+const texFlame = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 96, 2, 32, 80, 60); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.beginPath(); x.moveTo(32, 4); x.quadraticCurveTo(62, 70, 32, 124); x.quadraticCurveTo(2, 70, 32, 4); x.fill(); return new THREE.CanvasTexture(c);
+})();
+
+// ================= HUMO =================
+// valores propuestos (HIGH)
+const SMK = {
+  2:{ rate:6.5, life:[0.9,1.3], r:[0.35,1.5], up:[0.6,1.0], col:[0.42,0.44,0.5], op:0.42 },
+  3:{ rate:10, life:[1.0,1.5], r:[0.45,2.2], up:[0.8,1.4], col:[0.17,0.175,0.2], op:0.62 },
+};
+const TODAY = { 2:{ rate:7, col:[0.29,0.29,0.29] }, 3:{ rate:20, col:[0.15,0.15,0.15] } };
+const MAXS = 420;
+const pool = Array.from({ length:MAXS }, () => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:CLOUD[0], transparent:true, depthWrite:false })); s.visible = false; scene.add(s); return s; });
+const puffs = [];
+let acc = [0, 0, 0], accT = 0;
+const _v = new THREE.Vector3();
+function emit(dt, lvl, v) {
+  if (opt.style === 'today') {
+    accT += TODAY[lvl].rate * dt;
+    while (accT >= 1) { accT -= 1; if (puffs.length >= MAXS) break;
+      ship.updateMatrixWorld(); const p = FOCI[0].clone().applyMatrix4(ship.matrixWorld);
+      puffs.push({ today:true, lvl, x:p.x, y:p.y, z:p.z, vx:rnd(-0.2,0.2), vy:rnd(0.7,1.1), vz:v, age:0, life:1.6, r0:0.35, r1:1.6 + v*3.6*0.01*0.3, rot:0, spin:0, tex:-1 }); }
+    return;
+  }
+  const c = SMK[lvl], n = lvl === 3 && opt.foci === '3' ? 3 : 1, q = QK[opt.q];
+  ship.updateMatrixWorld();
+  for (let f = 0; f < n; f++) {
+    acc[f] += c.rate * q * (f === 0 ? 1 : 0.7) * dt;
+    while (acc[f] >= 1) {
+      acc[f] -= 1; if (puffs.length >= MAXS) break;
+      const wrap = opt.style === 'wrap';
+      const L = FOCI[f];
+      // A · penacho: hereda casi toda la velocidad de la nave (se queda atrás despacio, entre 1,5 y 7 m/s)
+      const back = Math.min(7, Math.max(1.5, 0.06 * v));
+      const p = { lvl, f, wrap, age:0, life:rnd(c.life[0], c.life[1]) * (wrap ? 0.85 : 1), r0:c.r[0] * rnd(0.8, 1.1), r1:c.r[1] * rnd(0.8, 1.2) * (wrap ? 0.85 : 1),
+        rot:rnd(0, Math.PI*2), spin:rnd(-0.7, 0.7), tex:Math.floor(rnd(0, 4)), shade:rnd(0.85, 1.15), ph:rnd(0, 10) };
+      if (wrap) {   // B · envuelto: en coordenadas de la nave, se abre hacia atrás y por los lados del casco
+        p.lx = L.x + rnd(-0.1, 0.1); p.ly = L.y; p.lz = L.z + rnd(-0.1, 0.1);
+        p.lvx = rnd(-0.6, 0.6) + Math.sign(L.x) * 0.4; p.lvy = rnd(c.up[0], c.up[1]) * 0.8; p.lvz = rnd(1.5, 3.2);
+      } else {
+        const w = L.clone().applyMatrix4(ship.matrixWorld);
+        p.x = w.x + rnd(-0.08, 0.08); p.y = w.y; p.z = w.z;
+        p.vx = rnd(-0.4, 0.4); p.vy = rnd(c.up[0], c.up[1]); p.vz = back * rnd(0.8, 1.2);
+      }
+      puffs.push(p);
+    }
+  }
+}
+function updatePuffs(dt, v) {
+  for (let i = puffs.length - 1; i >= 0; i--) {
+    const p = puffs[i]; p.age += dt;
+    if (p.age >= p.life) { puffs.splice(i, 1); continue; }
+    if (p.today) { p.x += p.vx*dt; p.y += p.vy*dt; p.z += v*dt; continue; }
+    const t = p.age, tw = 0.6 * Math.sin(t * 3.1 + p.ph), tw2 = 0.4 * Math.cos(t * 2.3 + p.ph * 1.7);   // remolino
+    if (p.wrap) { p.lx += (p.lvx + tw) * dt; p.ly += p.lvy * dt; p.lz += p.lvz * dt; p.lvy *= (1 - 0.5*dt); }
+    else { p.x += (p.vx + tw) * dt; p.y += (p.vy + tw2 * 0.3) * dt; p.z += p.vz * dt; p.vy *= (1 - 0.5*dt); p.vx *= (1 - 0.8*dt); }
+  }
+}
+function drawPuffs() {
+  ship.updateMatrixWorld();
+  let j = 0;
+  for (const p of puffs) {
+    if (j >= MAXS) break;
+    const s = pool[j++], u = p.age / p.life;
+    let x = p.x, y = p.y, z = p.z;
+    if (p.wrap) { _v.set(p.lx, p.ly, p.lz).applyMatrix4(ship.matrixWorld); x = _v.x; y = _v.y; z = _v.z; }
+    s.visible = true; s.position.set(x, y, z);
+    const r = p.r0 + (p.r1 - p.r0) * Math.sqrt(u);
+    s.scale.set(2*r, 2*r, 1);
+    const m = s.material;
+    if (p.today) {
+      m.map = texDot; m.rotation = 0; const c = TODAY[p.lvl].col; m.color.setRGB(c[0], c[1], c[2]); m.opacity = 0.55 * (1 - u);
+    } else {
+      m.map = CLOUD[p.tex]; m.rotation = p.rot + p.spin * p.age;
+      const c = SMK[p.lvl].col; let cr = c[0]*p.shade, cg = c[1]*p.shade, cb = c[2]*p.shade;
+      // en el grave con fuego, el humo recién nacido sale iluminado de naranja
+      if (p.lvl === 3 && opt.fire === 'on' && u < 0.3) { const k = 1 - u / 0.3; cr = lerp(cr, 0.75, k*0.8); cg = lerp(cg, 0.3, k*0.8); cb = lerp(cb, 0.1, k*0.8); }
+      m.color.setRGB(cr, cg, cb);
+      m.opacity = SMK[p.lvl].op * Math.pow(1 - u, 1.4) * Math.min(1, p.age / 0.08);
+    }
+    if (m.map !== s.userData.map) { s.userData.map = m.map; m.needsUpdate = true; }
+  }
+  for (; j < MAXS; j++) pool[j].visible = false;
+}
+
+// ================= FUEGO (nivel 3) =================
+const flames = [];
+for (let f = 0; f < 3; f++) {
+  const arr = [];
+  for (let k = 0; k < 4; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:texFlame, color:k % 2 ? 0xFF6A1E : 0xFFB050, ...ADD, opacity:0 })); scene.add(s); arr.push(s); }
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map:texGlow, color:0xFF6A1E, ...ADD, opacity:0 })); scene.add(halo);
+  flames.push({ arr, halo });
+}
+let simT = 0;
+function drawFire(lvl) {
+  ship.updateMatrixWorld();
+  const on = lvl === 3 && opt.fire === 'on' && opt.style !== 'today', n = opt.foci === '3' ? 3 : 1;
+  flames.forEach((fl, f) => {
+    const vis = on && f < n, base = FOCI[f].clone().applyMatrix4(ship.matrixWorld), sz = f === 0 ? 1 : 0.75;
+    fl.arr.forEach((s, k) => {
+      if (!vis) { s.material.opacity = 0; return; }
+      const fk = 0.6 + 0.4 * Math.sin(simT * (23 + k*7) + f*3 + k) * Math.sin(simT * (13 + k*5) + k*2);
+      s.position.set(base.x + rnd(-0.06, 0.06), base.y + 0.18 + 0.15*k*fk, base.z + 0.1*k);
+      s.scale.set(0.32 * sz * (0.7 + 0.5*fk), 0.62 * sz * (0.6 + 0.7*fk), 1);
+      s.material.opacity = 0.85 * (0.5 + 0.5*fk);
+    });
+    if (vis) { const fk = 0.75 + 0.25 * Math.sin(simT * 31 + f) * Math.sin(simT * 17); fl.halo.position.copy(base).y += 0.15; fl.halo.scale.set(1.7*sz, 1.7*sz, 1); fl.halo.material.opacity = 0.28 * fk; }
+    else fl.halo.material.opacity = 0;
+  });
+}
+
+// ================= BRASAS (nivel 3) =================
+const MAXE = 400;
+const E = { x:new Float32Array(MAXE), y:new Float32Array(MAXE), z:new Float32Array(MAXE), vx:new Float32Array(MAXE), vy:new Float32Array(MAXE), vz:new Float32Array(MAXE), age:new Float32Array(MAXE), life:new Float32Array(MAXE), n:0 };
+const ePos = new Float32Array(MAXE*6), eCol = new Float32Array(MAXE*6);
+const eGeo = new THREE.BufferGeometry();
+eGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3).setUsage(THREE.DynamicDrawUsage));
+eGeo.setAttribute('color', new THREE.BufferAttribute(eCol, 3).setUsage(THREE.DynamicDrawUsage));
+const emb = new THREE.LineSegments(eGeo, new THREE.LineBasicMaterial({ vertexColors:true, ...ADD })); emb.frustumCulled = false; scene.add(emb);
+let eAcc = 0;
+function emitEmbers(dt, lvl, v) {
+  if (opt.emb === 'off' || opt.style === 'today') return;
+  const n = lvl === 3 && opt.foci === '3' ? 3 : 1;
+  eAcc += (lvl === 3 ? 5 : 3) * n * QK[opt.q] * dt;   // 3 por s en el medio, 5 por foco en el grave
+  ship.updateMatrixWorld();
+  while (eAcc >= 1) {
+    eAcc -= 1; if (E.n >= MAXE) continue;
+    const f = Math.floor(rnd(0, n)), w = FOCI[f].clone().applyMatrix4(ship.matrixWorld), i = E.n++;
+    E.x[i] = w.x; E.y[i] = w.y + 0.1; E.z[i] = w.z;
+    E.vx[i] = rnd(-1.5, 1.5); E.vy[i] = rnd(1, 3); E.vz[i] = Math.min(9, 0.1 * v) * rnd(0.6, 1.4);   // hereda el 90 %
+    E.age[i] = 0; E.life[i] = rnd(0.5, 1.0);
+  }
+}
+function updateEmbers(dt) {
+  for (let i = 0; i < E.n; i++) {
+    E.age[i] += dt;
+    if (E.age[i] >= E.life[i]) { const j = --E.n; for (const a of ['x','y','z','vx','vy','vz','age','life']) E[a][i] = E[a][j]; i--; continue; }
+    E.vy[i] -= 2*dt; E.vx[i] += Math.sin(simT*5 + i) * 2 * dt;
+    E.x[i] += E.vx[i]*dt; E.y[i] += E.vy[i]*dt; E.z[i] += E.vz[i]*dt;
+  }
+  for (let i = 0; i < E.n; i++) {
+    const u = E.age[i] / E.life[i], k = (1-u) * (0.7 + 0.3*Math.sin(simT*40 + i)), o = i*6;
+    ePos[o]=E.x[i]; ePos[o+1]=E.y[i]; ePos[o+2]=E.z[i]; ePos[o+3]=E.x[i]-E.vx[i]*0.04; ePos[o+4]=E.y[i]-E.vy[i]*0.04; ePos[o+5]=E.z[i]-E.vz[i]*0.04;
+    eCol[o]=k; eCol[o+1]=0.55*k; eCol[o+2]=0.14*k; eCol[o+3]=0; eCol[o+4]=0; eCol[o+5]=0;
+  }
+  eGeo.setDrawRange(0, E.n*2); eGeo.attributes.position.needsUpdate = eGeo.attributes.color.needsUpdate = true;
+}
+
+// ================= ESTADO =================
+let dist = 0, lvl = 2, autoT = 0, vCur = 300/3.6;
+function curLvl() { return opt.dmg === 'auto' ? lvl : +opt.dmg; }
+function update(dt) {
+  simT += dt;
+  if (opt.dmg === 'auto') { autoT += dt; if (autoT > 7) { autoT = 0; lvl = lvl === 2 ? 3 : 2; } }
+  vCur += (opt.speed/3.6 - vCur) * (1 - Math.exp(-dt * 1.5));
+  const v = vCur;
+  dist += v * dt;
+  track.position.z = dist % PER;
+  towers.forEach(t => { t.position.z += v * dt; if (t.position.z > 260) t.position.z -= 2500; });
+  const lat = 2.2 * Math.sin(simT * 0.35), latV = 2.2 * 0.35 * Math.cos(simT * 0.35);
+  ship.position.set(lat, 0.6, 0); ship.rotation.set(0, -Math.atan2(latV, v) * 3, -latV * 0.05);
+  const L = curLvl();
+  emit(dt, L, v); updatePuffs(dt, v);
+  emitEmbers(dt, L, v); updateEmbers(dt);
+  camA.position.set(lat * 0.85, 3.4, 10.5); camA.lookAt(lat, 1.2, -14);
+  camB.position.set(-13, 2.6, 1.2); camB.lookAt(lat * 0.5, 0.9, 1.4);
+}
+
+// ================= HUD =================
+function txt(t, x, y, size, color, align = 'left', op = 1, glow = 6) {
+  hx.font = `${size}px 'Share Tech Mono', monospace`; hx.textAlign = align; hx.globalAlpha = op;
+  hx.fillStyle = color; hx.shadowColor = color; hx.shadowBlur = glow; hx.fillText(t, x, y); hx.shadowBlur = 0; hx.globalAlpha = 1;
+}
+const INSET = { x:1280 - 16 - 440, y:16, w:440, h:248 };
+function drawHud() {
+  const w = hud.width, h = hud.height, u = h / 720;
+  hx.setTransform(1,0,0,1,0,0); hx.clearRect(0,0,w,h); hx.setTransform(u,0,0,u,(w - 1280*u)/2,0);
+  const L = curLvl(), STY = { today:'HOY', plume:'A · PENACHO', wrap:'B · ENVUELTO' };
+  txt(`HUMO DE DAÑOS · NIVEL ${L} · ${L === 2 ? 'MEDIO' : 'GRAVE'}`, 40, 52, 22, L === 3 ? '#FF4D5E' : '#FFE04A');
+  txt(`${STY[opt.style]}${opt.dmg === 'auto' ? ' · AUTO (cambia cada 7 s)' : ''}${opt.slow ? ' · ×0,25' : ''}${opt.paused ? ' · PAUSA' : ''}`, 40, 76, 14, '#A6B8D8', 'left', 0.9, 0);
+  // indicador de daño del HUD (referencia)
+  for (let i = 0; i < 3; i++) {
+    const on = i < L, col = L === 3 ? '#FF4D5E' : '#FF4D5E', blink = L === 3 ? (Math.floor(simT * 4) % 2 ? 0.25 : 1) : 1;
+    hx.globalAlpha = on ? blink : 0.6; hx.strokeStyle = col; hx.lineWidth = 1; hx.strokeRect(1060 + i*26, 600, 22, 8);
+    if (on) { hx.fillStyle = col; hx.shadowColor = col; hx.shadowBlur = 8; hx.fillRect(1060 + i*26, 600, 22, 8); hx.shadowBlur = 0; }
+    hx.globalAlpha = 1;
+  }
+  txt(`HUMO ${puffs.length} / ${MAXS} · BRASAS ${E.n} · ${opt.q}`, 40, 690, 14, '#A6B8D8', 'left', 0.8, 0);
+  txt(String(Math.round(vCur * 3.6)), 1172, 690, 44, '#36E7FF', 'right');
+  txt('KM/H', 1180, 690, 15, '#A6B8D8', 'left', 1, 0);
+  if (opt.view === 'both') {
+    hx.strokeStyle = '#36E7FF'; hx.globalAlpha = 0.7; hx.lineWidth = 1.5; hx.strokeRect(INSET.x, INSET.y, INSET.w, INSET.h); hx.globalAlpha = 1;
+    txt('LATERAL', INSET.x + 10, INSET.y + 20, 12, '#A6B8D8', 'left', 0.85, 0);
+  }
+  if (opt.view === 'side') txt('VISTA LATERAL', 40, 100, 14, '#A6B8D8', 'left', 0.7, 0);
+}
+
+// ================= RENDER =================
+let VW = 1280, VH = 720;
+function renderView(cam, x, y, w, h) {
+  renderer.setViewport(x, y, w, h); renderer.setScissor(x, y, w, h); renderer.setScissorTest(true);
+  renderer.clear(); cam.aspect = w / h; cam.updateProjectionMatrix();
+  sky.position.copy(cam.position); renderer.render(scene, cam);
+}
+function render() {
+  drawPuffs(); drawFire(curLvl());
+  renderView(opt.view === 'side' ? camB : camA, 0, 0, VW, VH);
+  if (opt.view === 'both') { const k = VH / 720; renderView(camB, INSET.x*k, VH - (INSET.y + INSET.h)*k, INSET.w*k, INSET.h*k); }
+}
+
+// ================= CONTROLES =================
+const DESC = {
+  'style:today':'HOY · el humo de los cascos 3D: un foco, se queda quieto en el mundo y a velocidad deja un chorro de más de 100 m',
+  'style:plume':'A · PENACHO · nubes con ruido que heredan casi toda la velocidad de la nave: se quedan atrás despacio (1,5–7 m/s) y el humo va pegado a la nave',
+  'style:wrap':'B · ENVUELTO · el humo va con la nave y se abre por los lados del casco hacia atrás, igual a cualquier velocidad',
+  'foci:1':'NIVEL 3 CON 1 FOCO · solo el vacío Smoke', 'foci:3':'NIVEL 3 CON 3 FOCOS · Smoke y dos más (la otra góndola y el ala)',
+  'fire:on':'FUEGO EN 3 · llamas pequeñas en cada foco y el humo recién salido iluminado de naranja', 'fire:off':'SIN FUEGO',
+  'emb:on':'BRASAS · unas pocas pavesas que suben: 3 por s en el medio y 5 por foco en el grave', 'emb:off':'SIN BRASAS',
+};
+function toast(t) { const m = document.getElementById('mode'); m.textContent = t; m.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => m.style.opacity = 0, 3200); }
+document.querySelectorAll('button[data-g]').forEach(b => b.addEventListener('click', () => {
+  const g = b.dataset.g, val = b.dataset.v;
+  opt[g] = g === 'speed' ? +val : val;
+  document.querySelectorAll(`button[data-g="${g}"]`).forEach(x => x.classList.toggle('on', x === b));
+  if (DESC[g + ':' + val]) toast(DESC[g + ':' + val]);
+  if (g === 'style') { puffs.length = 0; E.n = 0; }
+  if (g === 'dmg' && val === 'auto') { lvl = 2; autoT = 0; }
+  if (g === 'q') toast(`PARTICLES ${val} · humo y brasas al ${QK[val]*100} % · el fuego no cambia`);
+}));
+const bP = document.getElementById('bPause'), bS = document.getElementById('bSlow');
+const togglePause = () => { opt.paused = !opt.paused; bP.classList.toggle('on', opt.paused); };
+const toggleSlow = () => { opt.slow = !opt.slow; bS.classList.toggle('on', opt.slow); };
+bP.addEventListener('click', togglePause); bS.addEventListener('click', toggleSlow);
+addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); togglePause(); } else if (e.key === 'l' || e.key === 'L') toggleSlow(); });
+
+function resize() {
+  const st = document.getElementById('stage'), W = st.clientWidth, H = st.clientHeight;
+  let w = W, h = W * 9/16; if (h > H) { h = H; w = H * 16/9; }
+  const view = document.getElementById('view');
+  view.style.width = w + 'px'; view.style.height = h + 'px'; view.style.setProperty('--u', (h / 720) + 'px');
+  renderer.setSize(w, h, false); VW = w; VH = h;
+  hud.width = Math.round(w * DPR); hud.height = Math.round(h * DPR);
+}
+addEventListener('resize', resize); resize();
+update(0.016);
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!opt.paused) update(dt * (opt.slow ? 0.25 : 1));
+  render(); drawHud();
+  requestAnimationFrame(frame);
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { toast('Compara HOY con A y B. En AUTO, el daño pasa de 2 a 3 cada 7 s.'); requestAnimationFrame(t0 => { last = t0; frame(t0); }); });
+</script>
+</body>
+</html>
