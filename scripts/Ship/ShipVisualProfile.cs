@@ -59,8 +59,10 @@ public readonly record struct DriftContactShape(float TipZ, float EdgeStartZ, fl
 	float EdgeEndFraction, float EdgeY, float FocusZ, float FocusFraction);
 
 // Focos del humo de daños (spec docs/efectos-4-humo-danos.md, 3), en los ejes de la nave: Smoke es el vacío del
-// manifiesto de su casco (una prueba lo compara); Smoke2 y Smoke3, dos puntos más sobre la piel, solo para el nivel 3
-public readonly record struct DamageSmokeFoci(Vector3 Smoke, Vector3 Smoke2, Vector3 Smoke3);
+// manifiesto de su casco (una prueba lo compara); Smoke2 y Smoke3, dos puntos más sobre la piel, solo para el nivel 3.
+// SkinGaps: lo que hay de cada foco (X, Y, Z = Smoke, Smoke2, Smoke3) a la piel que tiene debajo, medido en el .glb; el
+// fuego nace ahí, pegado al casco, y el humo en el foco
+public readonly record struct DamageSmokeFoci(Vector3 Smoke, Vector3 Smoke2, Vector3 Smoke3, Vector3 SkinGaps = default);
 
 // Un casco 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
 // del que sale su contrato de piezas

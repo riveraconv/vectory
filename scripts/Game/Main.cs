@@ -457,7 +457,8 @@ public partial class Main : Node3D
 			_collisionFx.Landing(_player.LandingSpeed, landing, _player.HullTransform, _player.PlanVelocity, _player.ExteriorProfile);
 		System.Numerics.Vector2 pv = _player.PlanVelocity;
 		_collisionFx.DamageShip(_player.Id, _damage?.Level ?? 0, _playerRespawns, _player.HullTransform,
-			new System.Numerics.Vector3(pv.X, _player.VerticalSpeed, pv.Y), _player.ExteriorProfile, delta);
+			new System.Numerics.Vector3(pv.X, _player.VerticalSpeed, pv.Y), _player.ExteriorProfile,
+			_player.View != CameraView.Cockpit, delta);
 		if (_rivals != null)
 		{
 			for (int ri = 0; ri < _rivals.Ships.Count; ri++)
@@ -474,7 +475,7 @@ public partial class Main : Node3D
 						car.Ship.Visual);
 				System.Numerics.Vector2 rv = car.Dynamics.Velocity;
 				_collisionFx.DamageShip(car.Id, car.Damage.Level, car.Respawns, ship.HullTransform,
-					new System.Numerics.Vector3(rv.X, car.Physics.Vertical.VerticalSpeed, rv.Y), car.Ship.Visual, delta);
+					new System.Numerics.Vector3(rv.X, car.Physics.Vertical.VerticalSpeed, rv.Y), car.Ship.Visual, true, delta);
 			}
 			for (int ci = 0; ci < _rivals.Contacts.Events.Count; ci++)
 			{

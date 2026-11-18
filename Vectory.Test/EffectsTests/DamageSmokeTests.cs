@@ -15,8 +15,68 @@ public class DamageSmokeTests
     private static readonly DamageSmokeFoci Foci = ShipDefinitions.Find(ShipCatalog.Ship01).Visual.SmokeFoci;
     private static readonly ShipPose Pose = ShipPose.Flat(new Vector3(0f, 2f, 0f));
 
+    // A · PENACHO (casi todas las pruebas son suyas); la B · ENVUELTO, con Wrap
+    private static DamageSmokeSettings Plume()
+    {
+        var s = DamageSmokeSettings.Default;
+        s.Wrap = false;
+        return s;
+    }
+
     private static DamageSmoke Smoke(int seed = 1, DamageSmokeSettings? settings = null) =>
-        new(settings ?? DamageSmokeSettings.Default, new Random(seed));
+        new(settings ?? Plume(), new Random(seed));
+
+    private static DamageSmoke Wrapped(int seed = 1) => new(DamageSmokeSettings.Default, new Random(seed));
+
+    [Fact]
+    public void Wrap_is_the_default_and_goes_with_the_ship()
+    {
+        Assert.True(DamageSmokeSettings.Default.Wrap);
+        var smoke = Wrapped();
+        for (int i = 0; i < 60; i++)
+            smoke.Emit(0, 3, Foci, Pose, Forward(300f), 1f, 1f / 60f);
+        Assert.True(smoke.Count > 10);
+        var s = DamageSmokeSettings.Default;
+        for (int i = 0; i < smoke.Count; i++)
+        {
+            DamagePuff p = smoke[i];
+            Assert.True(p.Wrap);
+            // Nace junto a su foco, en los ejes de la nave, y va hacia la popa y hacia fuera por su lado
+            Assert.InRange(p.LocalVelocity.Z, s.WrapBackMin, s.WrapBackMax);
+            Assert.InRange(p.Life, s.Strong.LifeMin * 0.85f - 1e-4f, s.Strong.LifeMax * 0.85f + 1e-4f);
+            Assert.True(p.EndRadius <= s.Strong.EndRadius * 1.2f * 0.85f + 1e-4f);
+        }
+        // Va con la nave: si la nave avanza 10 m, la bocanada también, aunque no pase el tiempo
+        DamagePuff first = smoke[0];
+        var moved = new ShipPose(Pose.Origin - Vector3.UnitZ * 10f, Pose.Right, Pose.Up, Pose.Back);
+        Assert.Equal(DamageSmoke.WorldPosition(first, Pose) - Vector3.UnitZ * 10f, DamageSmoke.WorldPosition(first, moved));
+
+        // Con el tiempo se aleja de la nave hacia atrás, por los lados
+        Vector3 before = first.Local;
+        smoke.Update(0.3f);
+        DamagePuff later = smoke[0];
+        Assert.True(later.Local.Z > before.Z + 0.3f * s.WrapBackMin - 1e-3f);
+        Assert.True(later.Local.Y > before.Y);
+    }
+
+    [Fact]
+    public void Wrap_opens_outward_by_the_side_of_its_focus()
+    {
+        var smoke = Wrapped(3);
+        for (int i = 0; i < 120; i++)
+            smoke.Emit(0, 3, Foci, Pose, Forward(300f), 1f, 1f / 60f);
+        float left = 0f, right = 0f;
+        int nl = 0, nr = 0;
+        for (int i = 0; i < smoke.Count; i++)
+        {
+            DamagePuff p = smoke[i];
+            if (p.Local.X < -0.3f) { left += p.LocalVelocity.X; nl++; }
+            if (p.Local.X > 0.3f) { right += p.LocalVelocity.X; nr++; }
+        }
+        Assert.True(nl > 0 && nr > 0);
+        Assert.True(left / nl < 0f);
+        Assert.True(right / nr > 0f);
+    }
 
     // Velocidad hacia −Z (el morro con rumbo 0)
     private static Vector3 Forward(float kmh) => new(0f, 0f, -kmh * Kmh);
@@ -37,10 +97,14 @@ public class DamageSmokeTests
         Assert.Empty(DamageSmokeFocusRules.Active(0, Foci, s));
         Assert.Empty(DamageSmokeFocusRules.Active(1, Foci, s));
         var two = DamageSmokeFocusRules.Active(2, Foci, s);
-        Assert.Equal(new[] { new SmokeFocus(0, Foci.Smoke, 1f) }, two);
+        Assert.Equal(new[] { new SmokeFocus(0, Foci.Smoke, 1f, Foci.SkinGaps.X) }, two);
         var three = DamageSmokeFocusRules.Active(3, Foci, s);
         Assert.Equal(new[] { Foci.Smoke, Foci.Smoke2, Foci.Smoke3 }, three.Select(f => f.Local));
-        Assert.Equal(new[] { 1f, 0.75f, 0.75f }, three.Select(f => f.Size));
+        Assert.Equal(new[] { 1f, 0.7f, 0.5f }, three.Select(f => f.Size));
+
+        // El fuego nace en la piel, debajo de cada foco: VECTOR, 22 cm bajo Smoke (el vacío flota sobre la góndola)
+        Assert.Equal(Foci.Smoke - new Vector3(0f, 0.22f, 0f), three[0].FireBase);
+        Assert.Equal(Foci.Smoke3 - new Vector3(0f, 0.05f, 0f), three[2].FireBase);
         Assert.Equal(0, Smoke().Emit(0, 1, Foci, Pose, Forward(300f), 1f, 1f));
     }
 

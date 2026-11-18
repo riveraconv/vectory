@@ -1,6 +1,6 @@
 # VECTORY — Spec: Efectos 4 · Humo de daños
 
-Versión 1.1 · 2026-11-18 · Estado: **etapa 1 implementada**
+Versión 1.6 · 2026-11-19 · Estado: **implementada** (etapas 1 y 2, versión 0.24.0)
 
 Cuarta y última spec de efectos de nave. **Sustituye el humo de daño** de los cascos 3D por uno nuevo, más elaborado y **pegado a la nave**:
 
@@ -41,6 +41,11 @@ Todo lo demás del documento maestro sigue aplicando: principios, flujo por etap
 - **El humo se ordena de lejos a cerca** de la cámara cada frame: es oscuro y con mezcla normal, y el orden se nota.
 - Con tres focos, cada uno tiene su acumulador: en LOW, en el primer segundo salen 2 + 1 + 1 bocanadas; de media, 6 por segundo (prueba 2).
 - Quitar el humo viejo arregla también la bola gris que salía en el cielo al recolocar una nave.
+- **Fuego (v1.3, decisión del usuario, sustituye a la sección 5)**: las 4 gotas por foco de la maqueta se veían largas y poco realistas. Ahora hay **una llama por foco**, dibujada por un shader con ruido fbm que sube: base ancha pegada al casco (3 cm por debajo del foco), punta que se deshace, núcleo amarillo claro (1; 0,86; 0,55), cuerpo naranja (1; 0,45; 0,10) y bordes rojo oscuro (0,55; 0,08; 0,02), en suma. Alto **0,40 m** y ancho 0,22 m a tamaño 1 (0,75 en los focos 2 y 3), con el alto oscilando entre 0,85 y 1,15. Va de pie (arriba es el del mundo) y girada de lado hacia la cámara. El halo, más pequeño y tenue: 0,8 m y 0,12. El tiempo del ruido es el de la carrera, así que la pausa lo congela.
+- **Fuego barrido por el viento y llamaradas (v1.4, decisión del usuario)**: la llama de la v1.3 subía recta, como en una hoguera. Ahora su eje va de la vertical del mundo (parada) a casi hacia atrás contra la velocidad de la nave (inclinada del todo desde 55 m/s, ~200 km/h, con una curva suave; sigue subiendo un 25 %), se alarga hasta ×2 y se estrecha un 20 %; el ruido corre más deprisa (de 2,2 a 5 largos por segundo). La llama ondula de lado, más hacia la cola, y la cola se rompe en lenguas sueltas. Llamaradas: en cada tramo de 3 s, con un 55 % de probabilidad, una llamarada de 0,4 s en un momento al azar del tramo (sube en el 20 % y se apaga en el resto): largo × 1,8, ancho × 1,35 y brillo × 1,3, también el halo. Deterministas (un hash del tramo y del foco), así que no necesitan generador y la pausa las congela.
+- **Fuego pegado al casco, tamaños distintos y llamaradas alternas (v1.5, decisión del usuario)**: el fuego nace en la piel, debajo de cada foco (`DamageSmokeFoci.SkinGaps`, medido en los `.glb`: VECTOR 0,22 / 0,22 / 0,05 m —su vacío `Smoke` flota sobre la góndola—, BLADE 0,13 / 0,13 / 0,05, HAMMER 0 —la boca del escape— / 0,05 / 0,05); el humo sigue saliendo del foco. Parada, la base se mete 6 cm en la piel; inclinada, nada (tumbada a lo largo de una góndola redonda se quedaba dentro), y a fondo sigue subiendo un 40 %. El fondo de la llama se desvanece en el 4 % de su largo (antes, el 12 %). Tamaños: 1 en `Smoke` (el de antes, el mayor), 0,7 en `Smoke2` y 0,5 en `Smoke3`. Llamaradas: cortas (0,25 s) y largas (0,6 s), ± 20 %, alternas de un tramo al siguiente y entre focos vecinos.
+- **B · ENVUELTO en lugar de A · PENACHO (v1.6, decisión del usuario, para probarla: el penacho le parecía una nube demasiado grande)**: el humo va en los ejes de la nave y se mueve con ella, como la variante B de la maqueta: nace junto al foco (± 0,1 m), sale hacia la popa a 1,5–3,2 m/s y hacia fuera por el lado de su foco (0,4 m/s ± 0,6), sube con el 80 % de la subida de su nivel, con el remolino lateral; vida y radio final × 0,85. Igual a cualquier velocidad y pegado al casco. Se cambia con `DamageSmokeWrap` en el Inspector de `CollisionEffects` (en false, A · PENACHO, tal cual estaba). Fuego, brasas, tinte y focos, sin cambios.
+- **Fuego y brasas (etapa 2)**: llama y halo en dos `MultiMeshInstance3D` aditivos (como el humo, sin basura por frame), **dibujados después del humo**: sin eso el humo oscuro quedaba encima y el fuego se veía apagado. Las brasas son trazos en un `ImmediateMesh`, con la cola según su velocidad relativa a tu nave; el vaivén usa la edad de cada brasa más su fase. El temblor lateral de las llamas se queda en el centro con la pausa. Tu nave en cabina no dibuja su fuego; su humo y sus brasas sí.
 - El humo se dibuja con un **`MultiMeshInstance3D`** (un cuadrado por bocanada con un shader que lo pone de cara a la cámara, lo gira y elige la nube) y un búfer de floats fijo: rehacer una malla con arrays de Godot cada frame dejaba basura toda la carrera y adelantaba las pausas del recolector de .NET. Las mallas de los demás efectos reutilizan sus arrays.
 
 ---
@@ -151,7 +156,7 @@ Va **con la nave** (en coordenadas de la nave), no en el mundo. En cada uno de l
 - **4 llamas**: sprites con una textura de **gota** (punta arriba, redonda abajo, como `texFlame` de la maqueta), mezcla **aditiva**, colores alternos **#FFB050** y **#FF6A1E**.
   - Parpadeo de cada llama `k` (0–3) en el foco `f`: `fk` = 0,6 + 0,4 × sen((23 + 7k)·`t` + 3f + k) × sen((13 + 5k)·`t` + 2k), con `t` el tiempo de la carrera.
   - Posición: el foco, con ±0,06 m de temblor a los lados, subida de 0,18 + 0,15·k·`fk` m y 0,1·k m hacia atrás.
-  - Tamaño: ancho 0,32 × `s` × (0,7 + 0,5·`fk`) y alto 0,62 × `s` × (0,6 + 0,7·`fk`) m, con `s` = 1 en `Smoke` y 0,75 en los otros dos.
+  - Tamaño: ancho 0,32 × `s` × (0,7 + 0,5·`fk`) y alto 0,62 × `s` × (0,6 + 0,7·`fk`) m (sustituido en la v1.3: ver los cambios al principio), con `s` = 1 en `Smoke` y 0,75 en los otros dos.
   - Opacidad: 0,85 × (0,5 + 0,5·`fk`).
 - **Halo**: un sprite redondo y suave de 1,7 × `s` m, **#FF6A1E**, aditivo, 0,15 m por encima del foco, con opacidad 0,28 × (0,75 + 0,25 × sen(31·`t` + f) × sen(17·`t`)).
 - Con un **desfase** de tiempo por nave, para que dos naves con fuego no parpadeen igual.
@@ -206,8 +211,8 @@ Van al **objeto de ajustes de efectos**, en un bloque propio de humo de daños.
 | Entrada | 0,08 s |
 | Tinte del fuego | (0,75; 0,30; 0,10) · 30 % de la vida · peso 0,8 |
 | Máximo de bocanadas | 420 (v1.1) |
-| Llamas por foco / tamaño / opacidad | 4 / 0,32 × 0,62 m / 0,85 |
-| Halo del fuego | 1,7 m · 0,28 |
+| Llamas por foco / tamaño / opacidad | v1.3: 1 / 0,22 × 0,40 m / 0,9 (la maqueta: 4 / 0,32 × 0,62 m / 0,85) |
+| Halo del fuego | v1.3: 0,8 m · 0,12 (la maqueta: 1,7 m · 0,28) |
 | Tamaño en los focos 2 y 3 | 0,75 |
 | Brasas por segundo | 2: 3 · 3: 5 por foco |
 | Brasas: retraso / lados / arriba | mín(9; 10 % v) / ±1,5 / 1–3 m/s |
@@ -249,7 +254,7 @@ Focos y humo (etapa 1):
 9. Con la misma semilla, las mismas bocanadas.
 
 Fuego y brasas (etapa 2):
-10. Sin fuego por debajo del nivel 3. Con nivel 3: 4 llamas y un halo por foco.
+10. Sin fuego por debajo del nivel 3. Con nivel 3: una llama (v1.3; eran 4) y un halo por foco.
 11. Tinte: en `u` = 0, color mezclado con naranja al 80 %; en `u` = 0,3 y después, sin tinte.
 12. Brasas: nivel 2 → 3 por segundo; nivel 3 → 15. LOW en nivel 3 → 3,75 (±1 en 1 s).
 13. Recolocación: se borran las bocanadas y las brasas de esa nave, no las de las demás.

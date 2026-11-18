@@ -40,7 +40,10 @@ public sealed class DamageSmokeSettings
 	public DamageSmokeLevel Medium = new(6.5f, 0f, 0.9f, 1.3f, 0.35f, 1.5f, 0.6f, 1.0f, new Vector3(0.42f, 0.44f, 0.5f), 0.42f);
 	public DamageSmokeLevel Strong = new(10f, 7f, 1.0f, 1.5f, 0.45f, 2.2f, 0.8f, 1.4f, new Vector3(0.17f, 0.175f, 0.2f), 0.62f);
 
-	public float SecondarySize = 0.75f;          // tamaño del fuego en Smoke2 y Smoke3
+	// Tamaño del fuego en Smoke2 y Smoke3 (Smoke, 1: el mayor). Distintos, para que las llamas no parezcan copias
+	// (decisión del usuario)
+	public float Smoke2Size = 0.7f;
+	public float Smoke3Size = 0.5f;
 
 	// --- Penacho (4.2): hereda la velocidad de la nave menos un retraso hacia atrás
 	public float LagFraction = 0.06f;            // de la velocidad de la nave
@@ -67,6 +70,22 @@ public sealed class DamageSmokeSettings
 	// en nivel 3 llenan casi 300)
 	public int MaxPuffs = 420;
 
+	// --- B · ENVUELTO (la otra variante de la maqueta; decisión del usuario, para probarla: el penacho le parecía demasiado
+	// grande). Va en los ejes de la nave y se mueve con ella: se abre por los lados del casco hacia atrás, igual a
+	// cualquier velocidad, y es más corto y más pequeño. Con Wrap en false, A · PENACHO.
+	public bool Wrap = true;
+	public float WrapJitter = 0.1f;                // ± m al nacer, de lado y a lo largo
+	public float WrapSideSpeed = 0.6f;             // ± m/s de lado
+	public float WrapOutward = 0.4f;               // m/s hacia fuera, por el lado del foco
+	public float WrapRiseScale = 0.8f;             // de la subida del nivel
+	public float WrapBackMin = 1.5f, WrapBackMax = 3.2f;   // m/s hacia la popa
+	public float WrapLifeScale = 0.85f;
+	public float WrapEndRadiusScale = 0.85f;
+
+	// --- Fuego y brasas (5 y 6)
+	public DamageFireSettings Fire = new();
+	public DamageEmberSettings Embers = new();
+
 	public DamageSmokeLevel LevelOf(int level) => level switch
 	{
 		2 => Medium,
@@ -77,8 +96,13 @@ public sealed class DamageSmokeSettings
 	public static DamageSmokeSettings Default => new();
 }
 
-// Un foco activo: su punto en los ejes de la nave, su tamaño (el del fuego: 1 en Smoke, 0,75 en los otros) y su índice
-public readonly record struct SmokeFocus(int Index, Vector3 Local, float Size);
+// Un foco activo: su punto en los ejes de la nave, su tamaño (el del fuego: 1 en Smoke, 0,7 y 0,5 en los otros), su
+// índice y lo que hay de él a la piel de debajo (el fuego nace ahí)
+public readonly record struct SmokeFocus(int Index, Vector3 Local, float Size, float SkinGap = 0f)
+{
+	// Base del fuego: en la piel, debajo del foco
+	public Vector3 FireBase => Local - Vector3.UnitY * SkinGap;
+}
 
 // Focos del humo de daños (3): nivel 0 y 1, ninguno; 2, Smoke; 3, los tres. Lógica pura.
 public static class DamageSmokeFocusRules
@@ -88,23 +112,19 @@ public static class DamageSmokeFocusRules
 
 	public static SmokeFocus At(int index, in DamageSmokeFoci foci, DamageSmokeSettings s) => index switch
 	{
-		0 => new SmokeFocus(0, foci.Smoke, 1f),
-		1 => new SmokeFocus(1, foci.Smoke2, s.SecondarySize),
-		_ => new SmokeFocus(2, foci.Smoke3, s.SecondarySize)
+		0 => new SmokeFocus(0, foci.Smoke, 1f, foci.SkinGaps.X),
+		1 => new SmokeFocus(1, foci.Smoke2, s.Smoke2Size, foci.SkinGaps.Y),
+		_ => new SmokeFocus(2, foci.Smoke3, s.Smoke3Size, foci.SkinGaps.Z)
 	};
 
 	public static IReadOnlyList<SmokeFocus> Active(int level, in DamageSmokeFoci foci, DamageSmokeSettings s)
 	{
 		if (level < 2)
 			return Array.Empty<SmokeFocus>();
-		if (level == 2)
-			return new[] { new SmokeFocus(0, foci.Smoke, 1f) };
-		return new[]
-		{
-			new SmokeFocus(0, foci.Smoke, 1f),
-			new SmokeFocus(1, foci.Smoke2, s.SecondarySize),
-			new SmokeFocus(2, foci.Smoke3, s.SecondarySize)
-		};
+		var active = new SmokeFocus[Count(level)];
+		for (int i = 0; i < active.Length; i++)
+			active[i] = At(i, foci, s);
+		return active;
 	}
 }
 
@@ -128,6 +148,10 @@ public struct DamagePuff
 	public int Texture;
 	public float Shade;
 	public float Phase;
+	// B · ENVUELTO: en los ejes de su nave (Local), con su velocidad en esos ejes; Position no se usa
+	public bool Wrap;
+	public Vector3 Local;
+	public Vector3 LocalVelocity;
 }
 
 // Humo de daños de todas las naves (spec docs/efectos-4-humo-danos.md, 4): emisor con un acumulador por nave y foco y
@@ -180,6 +204,12 @@ public sealed class DamageSmoke
 				acc -= 1f;
 				if (_puffs.Count >= _s.MaxPuffs)
 					continue;
+				if (_s.Wrap)
+				{
+					_puffs.Add(WrapPuff(shipId, level, l, focus));
+					added++;
+					continue;
+				}
 				float lag = Lag(speed) * Range(_s.LagScaleMin, _s.LagScaleMax);
 				_puffs.Add(new DamagePuff
 				{
@@ -225,6 +255,14 @@ public sealed class DamageSmoke
 			}
 			float t = p.Age;
 			float swirlSide = _s.SwirlSide * MathF.Sin(t * _s.SwirlSideFrequency + p.Phase);
+			if (p.Wrap)
+			{
+				// Como la maqueta: el remolino solo de lado y la subida se frena
+				p.Local += new Vector3(p.LocalVelocity.X + swirlSide, p.LocalVelocity.Y, p.LocalVelocity.Z) * dt;
+				p.LocalVelocity.Y *= riseDamp;
+				_puffs[i] = p;
+				continue;
+			}
 			float swirlUp = _s.SwirlUp * MathF.Cos(t * _s.SwirlUpFrequency + p.Phase * _s.SwirlUpPhase);
 			p.Position += (p.Carry + p.SideAxis * (p.Side + swirlSide) + Vector3.UnitY * (p.Rise + swirlUp)) * dt;
 			p.Rise *= riseDamp;
@@ -238,6 +276,29 @@ public sealed class DamageSmoke
 		_puffs.Clear();
 		_accumulators.Clear();
 	}
+
+	// Dónde está una bocanada en el mundo: las de B · ENVUELTO, con la nave que se ve ahora (pose)
+	public static Vector3 WorldPosition(in DamagePuff p, in ShipPose pose) => p.Wrap ? pose.Point(p.Local) : p.Position;
+
+	// Una bocanada de B · ENVUELTO: nace en el foco y se abre hacia atrás y por su lado
+	private DamagePuff WrapPuff(int shipId, int level, DamageSmokeLevel l, SmokeFocus focus) => new()
+	{
+		ShipId = shipId,
+		Level = level,
+		Wrap = true,
+		Local = focus.Local + new Vector3(Range(-_s.WrapJitter, _s.WrapJitter), 0f, Range(-_s.WrapJitter, _s.WrapJitter)),
+		LocalVelocity = new Vector3(Range(-_s.WrapSideSpeed, _s.WrapSideSpeed) + MathF.Sign(focus.Local.X) * _s.WrapOutward,
+			Range(l.RiseMin, l.RiseMax) * _s.WrapRiseScale, Range(_s.WrapBackMin, _s.WrapBackMax)),
+		Age = 0f,
+		Life = Range(l.LifeMin, l.LifeMax) * _s.WrapLifeScale,
+		StartRadius = l.StartRadius * Range(_s.StartRadiusScaleMin, _s.StartRadiusScaleMax),
+		EndRadius = l.EndRadius * Range(_s.EndRadiusScaleMin, _s.EndRadiusScaleMax) * _s.WrapEndRadiusScale,
+		Rotation = Range(0f, MathF.Tau),
+		Spin = Range(-_s.Spin, _s.Spin),
+		Texture = Math.Min(_s.TextureVariants - 1, (int)(_random.NextSingle() * _s.TextureVariants)),
+		Shade = Range(_s.ShadeMin, _s.ShadeMax),
+		Phase = Range(0f, _s.PhaseMax)
+	};
 
 	// Recolocación (7): fuera las bocanadas de esa nave
 	public void Clear(int shipId)
@@ -262,10 +323,16 @@ public sealed class DamageSmoke
 		return l.Opacity * MathF.Pow(1f - u, _s.FadePower) * fadeIn;
 	}
 
+	// Color de la bocanada con su tono; con fuego (nivel 3), naranja al salir (4.3)
 	public Vector3 Color(in DamagePuff p)
 	{
 		DamageSmokeLevel l = _s.LevelOf(p.Level);
-		return l == null ? Vector3.Zero : l.Color * p.Shade;
+		if (l == null)
+			return Vector3.Zero;
+		Vector3 color = l.Color * p.Shade;
+		if (!DamageFire.Burns(p.Level) || p.Life <= 0f)
+			return color;
+		return DamageFire.Tint(color, Math.Clamp(p.Age / p.Life, 0f, 1f), _s.Fire);
 	}
 
 	public static float RotationOf(in DamagePuff p) => p.Rotation + p.Spin * p.Age;

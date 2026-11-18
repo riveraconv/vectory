@@ -43,7 +43,8 @@ public static class VectorShip
 			BellyY = -0.31f,
 			// Smoke en la góndola derecha; Smoke2 en la izquierda; Smoke3 sobre el ala derecha, al 70 % del semiancho, en su
 			// mitad trasera, 5 cm sobre la piel
-			SmokeFoci = new DamageSmokeFoci(new(0.75f, 0.5f, 2.2f), new(-0.75f, 0.5f, 2.2f), new(1.84f, 0.18f, 1.6f)),
+			SmokeFoci = new DamageSmokeFoci(new(0.75f, 0.5f, 2.2f), new(-0.75f, 0.5f, 2.2f), new(1.84f, 0.18f, 1.6f),
+				new(0.22f, 0.22f, 0.05f)),
 			NoseDistance = 4f,
 			PhysicsBoxSize = new Vector3(6.8f, 1.2f, 7.2f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.4f)

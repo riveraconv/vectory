@@ -20,6 +20,13 @@ namespace Vectory.Effects;
 // Sin reglas propias.
 public partial class CollisionEffects : Node3D
 {
+	// Nombres de parámetros de shader creados una vez (con un texto, cada llamada crea un StringName nuevo)
+	private static readonly StringName SnAtlas = "atlas";
+	private static readonly StringName SnSprite = "sprite";
+	private static readonly StringName SnCoreColor = "core_color";
+	private static readonly StringName SnMidColor = "mid_color";
+	private static readonly StringName SnEdgeColor = "edge_color";
+
 	private static readonly CollisionFxSettings D = CollisionFxSettings.Default;
 
 	[ExportGroup("Punto de contacto")]
@@ -111,6 +118,7 @@ public partial class CollisionEffects : Node3D
 	[Export] public float DamageSmokeSwirlSide { get; set; } = D.DamageSmoke.SwirlSide;            // m/s
 	[Export] public float DamageSmokeSwirlUp { get; set; } = D.DamageSmoke.SwirlUp;                // m/s
 	[Export] public int DamageSmokeMaxPuffs { get; set; } = D.DamageSmoke.MaxPuffs;
+	[Export] public bool DamageSmokeWrap { get; set; } = D.DamageSmoke.Wrap;   // B · ENVUELTO (va con la nave); false: A · PENACHO
 
 	private const int Bucket = 256;       // las mallas de líneas usan arrays de tamaño múltiplo de esto, para no crearlos cada frame
 	private const int QuadBucket = 32;    // ídem en cuadrados
@@ -119,10 +127,24 @@ public partial class CollisionEffects : Node3D
 	private DriftMarks _drift;
 	private DriftSparkEmitter _driftSparks;
 	private DamageSmoke _damageSmoke;
+	private DamageEmbers _damageEmbers;
+	// Naves con fuego (nivel 3) en su último paso: la nave que se ve y sus focos. Sin las que no se ven (tu nave en cabina).
+	private readonly Dictionary<int, (Transform3D Hull, DamageSmokeFoci Foci, NVector3 Velocity)> _fires = new();
+	private float _fireTime;
+	private MultiMeshInstance3D _flameView, _haloView;
+	private MultiMesh _flameMulti, _haloMulti;
+	private float[] _flameBuffer, _haloBuffer;
+	private MeshInstance3D _emberView;
+	private ImmediateMesh _emberMesh;
+	private const int FireStride = 20;    // como el humo: transformación 12, color 4, datos propios 4 (medio ancho y medio alto)
+	private const int MaxFireShips = 16;
 	// Recolocaciones de cada nave vistas la última vez: al cambiar, se borra su humo de daños
 	private readonly Dictionary<int, int> _respawns = new();
 	private int[] _smokeOrder;
 	private float[] _smokeDepth;
+	private NVector3[] _smokeWorld;
+	// La nave que se ve de cada una en su último paso: el humo de B · ENVUELTO va en sus ejes
+	private readonly Dictionary<int, ShipPose> _smokePoses = new();
 	// Foco del derrape de cada nave en su último paso: intensidades del núcleo y del halo, y dónde está
 	private readonly Dictionary<int, (float Core, float Halo, NVector3 Point)> _driftFoci = new();
 	private CollisionFxSettings _settings;
@@ -163,6 +185,7 @@ public partial class CollisionEffects : Node3D
 		_drift = new DriftMarks(_settings.Drift);
 		_driftSparks = new DriftSparkEmitter(_settings.Drift, new Random());
 		_damageSmoke = new DamageSmoke(_settings.DamageSmoke, new Random());
+		_damageEmbers = new DamageEmbers(_settings.DamageSmoke, new Random());
 		ApplyQuality();
 		BuildViews();
 	}
@@ -236,21 +259,31 @@ public partial class CollisionEffects : Node3D
 	}
 
 	// El humo de daños de una nave en este paso de física (spec docs/efectos-4-humo-danos.md): level, su nivel de daño
-	// (0 fuera de RACE); respawns, cuántas veces se ha recolocado (al cambiar, su humo se borra); hull: la nave que se ve;
-	// velocity: su velocidad en el mundo.
+	// (0 fuera de RACE); respawns, cuántas veces se ha recolocado (al cambiar, su humo y sus brasas se borran; el fuego
+	// sigue, porque va con la nave); hull: la nave que se ve; velocity: su velocidad en el mundo; showFire: false para tu
+	// nave en cabina (el casco no se dibuja y el fuego va pegado a él).
 	public void DamageShip(int shipId, int level, int respawns, Transform3D hull, NVector3 velocity, ShipVisualProfile visual,
-		float dt)
+		bool showFire, float dt)
 	{
 		if (_damageSmoke == null)
 			return;
 		if (_respawns.TryGetValue(shipId, out int seen) && seen != respawns)
+		{
 			_damageSmoke.Clear(shipId);
+			_damageEmbers.Clear(shipId);
+		}
 		_respawns[shipId] = respawns;
-		if (level < 2)
-			return;
+		if (DamageFire.Burns(level) && showFire)
+			_fires[shipId] = (hull, visual.SmokeFoci, velocity);
+		else
+			_fires.Remove(shipId);
 		Basis b = hull.Basis;
 		var pose = new ShipPose(N(hull.Origin), N(b.X.Normalized()), N(b.Y.Normalized()), N(b.Z.Normalized()));
+		_smokePoses[shipId] = pose;
+		if (level < 2)
+			return;
 		_damageSmoke.Emit(shipId, level, visual.SmokeFoci, pose, velocity, _fx.Quality, dt);
+		_damageEmbers.Emit(shipId, level, visual.SmokeFoci, pose, velocity, _fx.Quality, dt);
 	}
 
 	// Recolocación: el trazo de esa nave se corta y las marcas se quedan
@@ -264,6 +297,9 @@ public partial class CollisionEffects : Node3D
 		_fx.Update((float)delta, _ground);
 		_drift.Advance((float)delta);
 		_damageSmoke.Update((float)delta);
+		_damageEmbers.Update((float)delta);
+		if (delta > 0)
+			_fireTime += (float)delta;
 		DrawDriftMarks();
 		Camera3D camera = GetViewport().GetCamera3D();
 		if (camera == null)
@@ -276,6 +312,8 @@ public partial class CollisionEffects : Node3D
 		DrawGlows(right, up);
 		DrawSmoke(right, up);
 		DrawDamageSmoke(camera.GlobalPosition);
+		DrawFire();
+		DrawEmbers();
 		DrawDriftFoci(right, up);
 	}
 
@@ -367,6 +405,7 @@ public partial class CollisionEffects : Node3D
 		s.DamageSmoke.SwirlSide = DamageSmokeSwirlSide;
 		s.DamageSmoke.SwirlUp = DamageSmokeSwirlUp;
 		s.DamageSmoke.MaxPuffs = DamageSmokeMaxPuffs;
+		s.DamageSmoke.Wrap = DamageSmokeWrap;
 		return s;
 	}
 
@@ -416,6 +455,152 @@ public partial class CollisionEffects : Node3D
 		};
 		_driftGlowView = View("DriftGlows", driftGlow, out _driftGlowMesh);
 		BuildDamageSmokeView();
+		BuildFireViews();
+	}
+
+	// Halos: cuadrados de cara a la cámara, en suma, con medio ancho y medio alto propios
+	private const string FireShader = @"
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+uniform sampler2D sprite : source_color, filter_linear_mipmap, repeat_disable;
+varying vec4 tint;
+void vertex() {
+	vec2 p = VERTEX.xy * 2.0 * INSTANCE_CUSTOM.xy;
+	vec3 center = MODEL_MATRIX[3].xyz;
+	vec3 world = center + INV_VIEW_MATRIX[0].xyz * p.x + INV_VIEW_MATRIX[1].xyz * p.y;
+	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(world, 1.0);
+	tint = COLOR;
+}
+void fragment() {
+	vec4 t = texture(sprite, UV);
+	ALBEDO = tint.rgb * t.rgb;
+	ALPHA = tint.a * t.a;
+}
+";
+
+	// Llamas: un cuadrado a lo largo del eje de cada una (el Y de su transformación: de la vertical a casi hacia atrás con
+	// el viento), girado de lado hacia la cámara alrededor de él, con la base en el foco. Forma y color salen de un ruido
+	// que corre por el eje: base ancha, cola que se rompe en lenguas, núcleo amarillo claro, naranja y bordes rojos.
+	// Datos propios: medio ancho, medio largo, tiempo del ruido (el de la carrera: la pausa lo congela) y semilla.
+	private const string FlameShader = @"
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+uniform vec3 core_color;
+uniform vec3 mid_color;
+uniform vec3 edge_color;
+varying vec4 tint;
+varying vec2 noise_data;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float value_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+	float v = 0.0;
+	float a = 0.5;
+	for (int i = 0; i < 4; i++) {
+		v += a * value_noise(p);
+		p = p * 2.03 + vec2(1.7, 9.2);
+		a *= 0.5;
+	}
+	return v;
+}
+void vertex() {
+	vec3 center = MODEL_MATRIX[3].xyz;
+	vec3 up = normalize(MODEL_MATRIX[1].xyz);
+	vec3 to_camera = INV_VIEW_MATRIX[3].xyz - center;
+	vec3 right = cross(up, to_camera);
+	right = length(right) > 1e-4 ? normalize(right) : INV_VIEW_MATRIX[0].xyz;
+	vec2 p = VERTEX.xy * 2.0 * INSTANCE_CUSTOM.xy;
+	vec3 world = center + right * p.x + up * p.y;
+	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(world, 1.0);
+	tint = COLOR;
+	noise_data = INSTANCE_CUSTOM.zw;
+}
+void fragment() {
+	vec2 uv = vec2(UV.x, 1.0 - UV.y);
+	// La llama ondula de lado, más hacia la cola, con un ruido que corre por el eje
+	float wave = fbm(vec2(uv.y * 3.0 - noise_data.x * 1.3, noise_data.y));
+	uv.x += (wave - 0.5) * 0.45 * uv.y;
+	float n = fbm(vec2(uv.x * 3.0 + noise_data.y, uv.y * 2.5 - noise_data.x));
+	float dx = abs(uv.x - 0.5) * 2.0;
+	// Base ancha y redonda, se afila hacia la cola; bordes suaves
+	float profile = pow(max(1.0 - uv.y, 0.0), 0.55) * (0.65 + 0.7 * n);
+	float body = 1.0 - smoothstep(profile * 0.35, profile, dx);
+	// La cola se rompe en lenguas sueltas que se apagan
+	float tongues = fbm(vec2(uv.x * 6.0 - noise_data.y, uv.y * 5.0 - noise_data.x * 1.6));
+	float breakup = smoothstep(0.2, 0.62, tongues + (1.0 - uv.y) * 0.55);
+	float top = 1.0 - smoothstep(0.35, 1.0, uv.y + (n - 0.5) * 0.5);
+	float bottom = smoothstep(0.0, 0.04, uv.y);
+	float heat = clamp(body * top * bottom * breakup, 0.0, 1.0);
+	vec3 color = mix(edge_color, mid_color, smoothstep(0.1, 0.5, heat));
+	color = mix(color, core_color, smoothstep(0.55, 0.95, heat));
+	ALBEDO = color;
+	ALPHA = clamp(heat * 1.3, 0.0, 1.0) * tint.a;
+}
+";
+
+	private void BuildFireViews()
+	{
+		DamageFireSettings fire = _settings.DamageSmoke.Fire;
+		int foci = MaxFireShips * 3;
+		var flame = new ShaderMaterial { Shader = new Shader { Code = FlameShader }, RenderPriority = 1 };
+		flame.SetShaderParameter(SnCoreColor, G(fire.CoreColor));
+		flame.SetShaderParameter(SnMidColor, G(fire.MidColor));
+		flame.SetShaderParameter(SnEdgeColor, G(fire.EdgeColor));
+		(_flameView, _flameMulti, _flameBuffer) = FireView("DamageFlames", flame, foci);
+		// Después del humo: las mallas no tienen un centro con sentido para ordenarlas por distancia, y con el humo oscuro
+		// encima el fuego se apagaba
+		var halo = new ShaderMaterial { Shader = new Shader { Code = FireShader }, RenderPriority = 1 };
+		halo.SetShaderParameter(SnSprite, Radial(new[] { 0f, 0.3f, 1f }, new[] { 1f, 0.5f, 0f }));
+		(_haloView, _haloMulti, _haloBuffer) = FireView("DamageHalos", halo, foci);
+
+		// Brasas: líneas en suma; un ImmediateMesh se rellena vértice a vértice, sin arrays nuevos cada frame
+		_emberMesh = new ImmediateMesh();
+		_emberView = new MeshInstance3D
+		{
+			Name = "DamageEmbers",
+			Mesh = _emberMesh,
+			MaterialOverride = new StandardMaterial3D
+			{
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+				BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+				VertexColorUseAsAlbedo = true,
+				DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled,
+				CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+				RenderPriority = 1
+			},
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			CustomAabb = new Aabb(new Vector3(-1e5f, -1e5f, -1e5f), new Vector3(2e5f, 2e5f, 2e5f)),
+			Visible = false
+		};
+		AddChild(_emberView);
+	}
+
+	private (MultiMeshInstance3D, MultiMesh, float[]) FireView(string name, ShaderMaterial material, int max)
+	{
+		var multi = new MultiMesh
+		{
+			TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+			UseColors = true,
+			UseCustomData = true,
+			Mesh = new QuadMesh { Size = Vector2.One },
+			InstanceCount = max,
+			VisibleInstanceCount = 0
+		};
+		var view = new MultiMeshInstance3D
+		{
+			Name = name,
+			Multimesh = multi,
+			MaterialOverride = material,
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			CustomAabb = new Aabb(new Vector3(-1e5f, -1e5f, -1e5f), new Vector3(2e5f, 2e5f, 2e5f)),
+			Visible = false
+		};
+		AddChild(view);
+		return (view, multi, new float[max * FireStride]);
 	}
 
 	// Cuadrado de cara a la cámara, girado y con su nube del atlas de 2 × 2, desde los datos de cada instancia
@@ -447,7 +632,7 @@ void fragment() {
 	{
 		int max = Math.Max(1, _settings.DamageSmoke.MaxPuffs);
 		var material = new ShaderMaterial { Shader = new Shader { Code = DamageSmokeShader } };
-		material.SetShaderParameter("atlas", CloudAtlas());
+		material.SetShaderParameter(SnAtlas, CloudAtlas());
 		_damageSmokeMulti = new MultiMesh
 		{
 			TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
@@ -460,6 +645,7 @@ void fragment() {
 		_damageSmokeBuffer = new float[max * SmokeStride];
 		_smokeOrder = new int[max];
 		_smokeDepth = new float[max];
+		_smokeWorld = new NVector3[max];
 		_damageSmokeView = new MultiMeshInstance3D
 		{
 			Name = "DamageSmoke",
@@ -726,25 +912,119 @@ void fragment() {
 		NVector3 eye = N(cameraPosition);
 		for (int i = 0; i < count; i++)
 		{
+			DamagePuff puff = smoke[i];
+			// Las de B · ENVUELTO, con su nave de ahora; si ya no está, en el sitio de siempre y sin verse
+			_smokeWorld[i] = puff.Wrap && _smokePoses.TryGetValue(puff.ShipId, out ShipPose pose)
+				? DamageSmoke.WorldPosition(puff, pose)
+				: puff.Position;
 			_smokeOrder[i] = i;
-			_smokeDepth[i] = -NVector3.DistanceSquared(smoke[i].Position, eye);
+			_smokeDepth[i] = -NVector3.DistanceSquared(_smokeWorld[i], eye);
 		}
 		Array.Sort(_smokeDepth, _smokeOrder, 0, count);
 		float[] buffer = _damageSmokeBuffer;
 		for (int q = 0; q < count; q++)
 		{
-			DamagePuff p = smoke[_smokeOrder[q]];
+			int index = _smokeOrder[q];
+			DamagePuff p = smoke[index];
+			NVector3 at = _smokeWorld[index];
 			NVector3 col = smoke.Color(p);
+			float opacity = p.Wrap && !_smokePoses.ContainsKey(p.ShipId) ? 0f : smoke.Opacity(p);
 			int o = q * SmokeStride;
 			// Transformación (base identidad y el centro), color y datos propios: giro, nube y radio
-			buffer[o] = 1f; buffer[o + 1] = 0f; buffer[o + 2] = 0f; buffer[o + 3] = p.Position.X;
-			buffer[o + 4] = 0f; buffer[o + 5] = 1f; buffer[o + 6] = 0f; buffer[o + 7] = p.Position.Y;
-			buffer[o + 8] = 0f; buffer[o + 9] = 0f; buffer[o + 10] = 1f; buffer[o + 11] = p.Position.Z;
-			buffer[o + 12] = col.X; buffer[o + 13] = col.Y; buffer[o + 14] = col.Z; buffer[o + 15] = smoke.Opacity(p);
+			buffer[o] = 1f; buffer[o + 1] = 0f; buffer[o + 2] = 0f; buffer[o + 3] = at.X;
+			buffer[o + 4] = 0f; buffer[o + 5] = 1f; buffer[o + 6] = 0f; buffer[o + 7] = at.Y;
+			buffer[o + 8] = 0f; buffer[o + 9] = 0f; buffer[o + 10] = 1f; buffer[o + 11] = at.Z;
+			buffer[o + 12] = col.X; buffer[o + 13] = col.Y; buffer[o + 14] = col.Z; buffer[o + 15] = opacity;
 			buffer[o + 16] = DamageSmoke.RotationOf(p); buffer[o + 17] = p.Texture; buffer[o + 18] = smoke.Radius(p); buffer[o + 19] = 0f;
 		}
 		RenderingServer.MultimeshSetBuffer(_damageSmokeMulti.GetRid(), new ReadOnlySpan<float>(buffer));
 		_damageSmokeMulti.VisibleInstanceCount = count;
+	}
+
+	// Fuego del nivel 3: en cada foco, su llama y su halo, con la nave que se ve en su último paso (va con la nave)
+	private void DrawFire()
+	{
+		DamageFireSettings s = _settings.DamageSmoke.Fire;
+		int flames = 0, halos = 0;
+		foreach (KeyValuePair<int, (Transform3D Hull, DamageSmokeFoci Foci, NVector3 Velocity)> pair in _fires)
+		{
+			if (halos + 3 > _haloMulti.InstanceCount)
+				break;
+			Transform3D hull = pair.Value.Hull;
+			float time = _fireTime + DamageFire.Phase(pair.Key, s);
+			// Hacia atrás: contra su velocidad en planta, o contra el morro si va parada
+			NVector3 v = pair.Value.Velocity;
+			var plan = new NVector3(v.X, 0f, v.Z);
+			NVector3 back = plan.LengthSquared() > 0.25f
+				? -NVector3.Normalize(plan)
+				: NVector3.Normalize(new NVector3(hull.Basis.Z.X, 0f, hull.Basis.Z.Z) + new NVector3(0f, 0f, 1e-6f));
+			float speed = v.Length();
+			for (int f = 0; f < 3; f++)
+			{
+				SmokeFocus focus = DamageSmokeFocusRules.At(f, pair.Value.Foci, _settings.DamageSmoke);
+				Vector3 at = hull * G(focus.FireBase);
+				FireSprite flame = DamageFire.Flame(f, focus.Size, time, speed, s);
+				Vector3 axis = G(DamageFire.Axis(back, flame.Lean, s));
+				WriteFire(_flameBuffer, flames++, at + axis * (0.5f * flame.Length - DamageFire.Sink(flame.Lean, focus.Size, s)), axis,
+					NVector3.One, flame);
+				FireSprite halo = DamageFire.Halo(f, focus.Size, time, s);
+				WriteFire(_haloBuffer, halos++, at + Vector3.Up * halo.Rise, Vector3.Up, s.HaloColor, halo);
+			}
+		}
+		Show(_flameView, _flameMulti, _flameBuffer, flames);
+		Show(_haloView, _haloMulti, _haloBuffer, halos);
+	}
+
+	// La transformación lleva el eje de la llama como su Y (el resto, de la identidad): el shader lo lee de ahí
+	private static void WriteFire(float[] buffer, int index, Vector3 position, Vector3 axis, NVector3 color, in FireSprite sprite)
+	{
+		int o = index * FireStride;
+		buffer[o] = 1f; buffer[o + 1] = axis.X; buffer[o + 2] = 0f; buffer[o + 3] = position.X;
+		buffer[o + 4] = 0f; buffer[o + 5] = axis.Y; buffer[o + 6] = 0f; buffer[o + 7] = position.Y;
+		buffer[o + 8] = 0f; buffer[o + 9] = axis.Z; buffer[o + 10] = 1f; buffer[o + 11] = position.Z;
+		buffer[o + 12] = color.X; buffer[o + 13] = color.Y; buffer[o + 14] = color.Z; buffer[o + 15] = sprite.Opacity;
+		buffer[o + 16] = sprite.Width * 0.5f; buffer[o + 17] = sprite.Length * 0.5f;
+		buffer[o + 18] = sprite.NoiseTime; buffer[o + 19] = sprite.Seed;
+	}
+
+	private static void Show(MultiMeshInstance3D view, MultiMesh multi, float[] buffer, int count)
+	{
+		if (count == 0)
+		{
+			if (view.Visible)
+			{
+				multi.VisibleInstanceCount = 0;
+				view.Visible = false;
+			}
+			return;
+		}
+		view.Visible = true;
+		RenderingServer.MultimeshSetBuffer(multi.GetRid(), new ReadOnlySpan<float>(buffer));
+		multi.VisibleInstanceCount = count;
+	}
+
+	// Brasas: un trazo corto cada una, de su color a negro, con la cola según su velocidad relativa a tu nave
+	private void DrawEmbers()
+	{
+		DamageEmbers embers = _damageEmbers;
+		_emberMesh.ClearSurfaces();
+		if (embers.Count == 0)
+		{
+			_emberView.Visible = false;
+			return;
+		}
+		_emberView.Visible = true;
+		_emberMesh.SurfaceBegin(Mesh.PrimitiveType.Lines);
+		for (int i = 0; i < embers.Count; i++)
+		{
+			DamageEmber e = embers[i];
+			NVector3 color = embers.ColorOf(e);
+			_emberMesh.SurfaceSetColor(new Color(color.X, color.Y, color.Z));
+			_emberMesh.SurfaceAddVertex(G(e.Position));
+			_emberMesh.SurfaceSetColor(Colors.Black);
+			_emberMesh.SurfaceAddVertex(G(e.Position + embers.Tail(e, _reference)));
+		}
+		_emberMesh.SurfaceEnd();
 	}
 
 	// Sin nada que dibujar, la malla se vacía una vez y se oculta
