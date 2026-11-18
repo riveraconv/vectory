@@ -485,7 +485,6 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name):
         "transparentMaterials": [{"material": k, "opacity": v} for k, v in TRANSPARENT.items()],
         "decalMaterials": DECAL_MATERIALS,
         "scorchMaterials": SCORCH_MATERIALS,
-        "scorchMasks": [f"hull_scorch_{i}.png" for i in (1, 2, 3)],
         "uv2Scale": UV2_SCALE,
         "triangles": tris,
         "trianglesWithLivery": tris_l,
@@ -610,11 +609,6 @@ def main():
     checks, low, high = check_axes(root, zones)
     manifest = write_manifest(manifest_path, root, zones, materials, no_shadow, env_name)
     io.export_glb(glb_path, root)
-
-    # Máscaras de quemaduras por nivel de daño (las usa Godot con la UV2)
-    noise = tx.scorch_noise(41)
-    for i, damage in enumerate(tx.SCORCH_DAMAGE, start=1):
-        tx.write_gray_png(os.path.join(ASSETS, f"hull_scorch_{i}.png"), tx.scorch_mask(noise, damage))
 
     preview_collection = bpy.data.collections.new("Preview")
     scene.collection.children.link(preview_collection)

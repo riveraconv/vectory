@@ -252,6 +252,8 @@ Reglas de las UV (las texturas usan UV en **metros × repetición**, sin `KHR_te
 
 ### 3.6 Máscaras de quemaduras
 
+> **Ya no se generan** (spec `efectos-5-danos-casco`): el script no escribe estas máscaras ni el manifiesto las lista.
+
 - `scorchTex(41)`: ruido fbm de celda 96 y 5 octavas, 512 × 512, un canal.
 - El script guarda **tres máscaras**, una por nivel de daño: `k = smoothstep(th, th + 0,16, ruido)` con `th = 1 − [0,24; 0,36; 0,48]` para los niveles 1, 2 y 3 → `hull_scorch_1.png`, `_2.png`, `_3.png` (gris, sin color). Las usa Godot (sección 6.5).
 
@@ -511,6 +513,8 @@ Valores de emisión del prototipo (se ajustan a ojo con el glow del juego y se a
 Las luces de perfil van **suaves**. Las del morro y las traseras le gustan al usuario como están en el prototipo: **no se bajan**.
 
 ### 6.5 Daño visible
+> **Sustituido** (spec `efectos-5-danos-casco`): las **quemaduras** de esta sección y sus máscaras (`hull_scorch_1/2/3.png`) ya no existen; las sustituyen rozaduras donde se choca, hollín alrededor de los focos del humo y grietas incandescentes con daño 3. El **humo** es el de `efectos-4-humo-danos`. El **parpadeo de las luces** sigue como aquí.
+
 
 Solo en RACE, con el nivel de daño de la spec `danos`. En TIME TRIAL, nada.
 

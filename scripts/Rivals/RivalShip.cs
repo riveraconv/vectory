@@ -51,6 +51,34 @@ public partial class RivalShip : Node3D
 
 	public RivalCar Car => _car;
 
+	// Rozaduras del casco (spec docs/efectos-5-danos-casco.md): las pone Main con los golpes de la carrera
+	private readonly HullWear _hullWear = new(HullWearSettings.Default);
+	private int _hullWearVersion;
+
+	public void WearBarrier(in BarrierTouch touch, float dt)
+	{
+		if (!touch.Contact)
+			return;
+		_hullWear.Barrier(touch.Side, touch.Level, touch.IsNewImpact, dt);
+		PushHullWear();
+	}
+
+	public void WearShip(System.Numerics.Vector2 point, ImpactLevel level, bool isNewImpact, float dt)
+	{
+		ShipVisualProfile visual = _car.Ship.Visual;
+		_hullWear.ContactAt(point, new System.Numerics.Vector2(_car.Position.X, _car.Position.Z), _car.Dynamics.Yaw,
+			visual.CollisionFront, visual.CollisionBack, level, isNewImpact, dt);
+		PushHullWear();
+	}
+
+	private void PushHullWear()
+	{
+		if (_hullWear.Version == _hullWearVersion || _ship == null)
+			return;
+		_hullWearVersion = _hullWear.Version;
+		_ship.SetHullWear(_hullWear.Zones);
+	}
+
 	// Antes de añadirlo al árbol
 	public void Setup(RivalCar car, RaceSession race, RaceShipList raceShips, RivalLook look, float flickerOpacity, RespawnBlink blink)
 	{

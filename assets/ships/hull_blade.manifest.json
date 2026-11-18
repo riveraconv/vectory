@@ -397,11 +397,6 @@
     "M_Gunmetal",
     "M_Titanium"
   ],
-  "scorchMasks": [
-    "hull_scorch_1.png",
-    "hull_scorch_2.png",
-    "hull_scorch_3.png"
-  ],
   "uv2Scale": 1.1,
   "triangles": 32148,
   "trianglesWithLivery": 32692,

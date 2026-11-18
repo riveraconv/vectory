@@ -529,7 +529,6 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name):
         "transparentMaterials": [{"material": k, "opacity": v} for k, v in TRANSPARENT.items()],
         "decalMaterials": DECAL_MATERIALS,
         "scorchMaterials": SCORCH_MATERIALS,
-        "scorchMasks": [f"hull_scorch_{i}.png" for i in (1, 2, 3)],
         "uv2Scale": UV2_SCALE,
         "triangles": tris,
         "trianglesWithLivery": tris_m,

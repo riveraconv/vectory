@@ -503,11 +503,6 @@
     "M_Tread",
     "M_Hazard"
   ],
-  "scorchMasks": [
-    "hull_scorch_1.png",
-    "hull_scorch_2.png",
-    "hull_scorch_3.png"
-  ],
   "uv2Scale": 1.1,
   "triangles": 66538,
   "trianglesWithLivery": 66648,

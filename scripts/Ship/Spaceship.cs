@@ -31,6 +31,7 @@ public partial class Spaceship : Node3D
 	// si F10 lo rehace
 	private readonly System.Collections.Generic.Dictionary<HullStyle, int> _hullPaints = new();
 	private int _hullDamage;
+	private System.Numerics.Vector4 _hullWear;
 	private bool _hullTimeTrial;
 	private int _wireEdgeCount;
 
@@ -66,7 +67,14 @@ public partial class Spaceship : Node3D
 	public int HullPaint(HullStyle style) =>
 		_hullPaints.TryGetValue(style, out int index) && index >= 0 ? HullPaints.Step(style, index, 0) : HullPaints.DefaultIndex(style);
 
-	// Daño visible del casco 3D: quemaduras (en TIME TRIAL, nada)
+	// Rozaduras acumuladas del casco 3D (izquierda, derecha, morro, popa; spec docs/efectos-5-danos-casco.md)
+	public void SetHullWear(System.Numerics.Vector4 wear)
+	{
+		_hullWear = wear;
+		_hull3D?.SetWear(wear);
+	}
+
+	// Daño visible del casco 3D: hollín y grietas según el nivel (en TIME TRIAL, nada)
 	public void SetHullDamage(int level, bool timeTrial)
 	{
 		_hullDamage = level;
@@ -115,7 +123,9 @@ public partial class Spaceship : Node3D
 			_hull3D.SetPaint(_hullPaints.TryGetValue(profile.Style, out int paint) ? paint : -1);
 			AddChild(_hull3D);
 			_hull3D.SetDamage(_hullDamage, _hullTimeTrial);
+			_hull3D.SetWear(_hullWear);
 		}
+		_hull3D?.SetDamageShape(Visual.SmokeFoci, Visual.CollisionHalfWidth, Visual.CollisionFront, Visual.CollisionBack);
 		ApplyVisibility();
 	}
 

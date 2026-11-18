@@ -74,24 +74,6 @@ def brushed_set(seed, rgb, heat):
     return from_arrays(color, rough, height, 1.2)
 
 
-# Ruido de las quemaduras (scorchTex): un canal de 0 a 255
-def scorch_noise(seed):
-    r = Rng(seed)
-    n = fbm(96, 5, r).astype(np.float64)
-    return _clamped(np.maximum(0.0, np.minimum(255.0, n * 255.0)))
-
-
-# Máscara de un nivel de daño: smoothstep(th, th + 0,16, ruido) con th = 1 − daño, como el shader del prototipo
-def scorch_mask(noise, damage):
-    th = 1.0 - damage
-    v = noise.astype(np.float64) / 255.0
-    t = np.clip((v - th) / 0.16, 0.0, 1.0)
-    return _clamped(t * t * (3 - 2 * t) * 255.0)
-
-
-SCORCH_DAMAGE = (0.24, 0.36, 0.48)  # niveles 1, 2 y 3
-
-
 def _chunk(tag, data):
     return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & _MASK)
 

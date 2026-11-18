@@ -394,6 +394,34 @@ public partial class Player : CharacterBody3D, IContactShip
 	// Hacia dónde apunta el morro, en planta (X, Z del mundo): el frente del radar y el minimapa
 	public System.Numerics.Vector2 PlanForward => Dynamics.Forward;
 
+	// Rozaduras del casco (spec docs/efectos-5-danos-casco.md): las pone Main con los golpes de la carrera (solo RACE)
+	private readonly HullWear _hullWear = new(HullWearSettings.Default);
+	private int _hullWearVersion;
+
+	public void WearBarrier(in BarrierTouch touch, float dt)
+	{
+		if (!touch.Contact)
+			return;
+		_hullWear.Barrier(touch.Side, touch.Level, touch.IsNewImpact, dt);
+		PushHullWear();
+	}
+
+	public void WearShip(NVec2 point, ImpactLevel level, bool isNewImpact, float dt)
+	{
+		ShipVisualProfile visual = ExteriorVisual;
+		_hullWear.ContactAt(point, new NVec2(GlobalPosition.X, GlobalPosition.Z), Dynamics.Yaw, visual.CollisionFront,
+			visual.CollisionBack, level, isNewImpact, dt);
+		PushHullWear();
+	}
+
+	private void PushHullWear()
+	{
+		if (_hullWear.Version == _hullWearVersion)
+			return;
+		_hullWearVersion = _hullWear.Version;
+		_ship.SetHullWear(_hullWear.Zones);
+	}
+
 	// Velocidad real en planta (X, Z del mundo): la que heredan las chispas de los choques
 	public System.Numerics.Vector2 PlanVelocity => Dynamics.Velocity;
 

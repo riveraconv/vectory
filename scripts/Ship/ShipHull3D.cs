@@ -29,8 +29,17 @@ public partial class ShipHull3D : Node3D
 {
 	// Nombres de acciones y de parámetros de shader creados una vez: con un texto, cada llamada crea un StringName
 	// nuevo (con finalizador), y en cada frame eso alargaba las pausas del recolector de .NET
-	private static readonly StringName SnScorch = "scorch";
 	private static readonly StringName SnStrength = "strength";
+	private static readonly StringName SnWorldToHull = "world_to_hull";
+	private static readonly StringName SnWear = "wear";
+	private static readonly StringName SnExtent = "extent";
+	private static readonly StringName SnSoot0 = "soot0";
+	private static readonly StringName SnSoot1 = "soot1";
+	private static readonly StringName SnSoot2 = "soot2";
+	private static readonly StringName SnSootStrength = "soot_strength";
+	private static readonly StringName SnCracks = "cracks";
+	private static readonly StringName SnCrackReach = "crack_reach";
+	private static readonly StringName SnCrackTime = "crack_time";
 
 	// Capa visual propia del casco: sus luces solo afectan a ella y solo ella proyecta su sombra
 	public const uint HullLayer = 1u << 10;
@@ -38,32 +47,127 @@ public partial class ShipHull3D : Node3D
 	public const uint RivalLayer = 1u << 11;
 
 
-	private static readonly string[] ScorchPaths =
-	{
-		"res://assets/ships/hull_scorch_1.png", "res://assets/ships/hull_scorch_2.png", "res://assets/ships/hull_scorch_3.png"
-	};
-	private static readonly Texture2D[] ScorchTextures = new Texture2D[3];
-	// Sin quemaduras: un píxel transparente. El detalle va siempre encendido y al subir el daño solo cambia la textura;
-	// encenderlo entonces cambiaba de shader y Godot compilaba sus pipelines en pleno golpe (~7 ms por nave)
-	private static Texture2D _noScorch;
 
 	private static readonly Color HemisphereSky = Color.FromHtml("#B0B8C8");
 	private static readonly Color HemisphereGround = Color.FromHtml("#101010");
 
-	// Cambio de color con el ángulo de vista (capa fina): una pasada que suma sobre el material, atenuada en lo quemado
+	// Daño visible (spec docs/efectos-5-danos-casco.md): una pasada encima de la pintura, en los ejes del casco
+	// (world_to_hull, la inversa de la raíz del modelo: las piezas traen cada una su transformación). Rozaduras de metal
+	// en la zona que ha chocado (izquierda, derecha, morro, popa), hollín alrededor de los focos del humo y grietas
+	// incandescentes con daño 3. Sin nada que pintar, descarta el píxel.
+	private const string WearShader = @"
+shader_type spatial;
+render_mode blend_mix, depth_draw_never, cull_disabled;
+uniform mat4 world_to_hull;
+uniform vec4 wear = vec4(0.0);
+uniform vec3 extent = vec3(2.6, 4.0, 3.3);
+uniform vec4 soot0 = vec4(0.0);
+uniform vec4 soot1 = vec4(0.0);
+uniform vec4 soot2 = vec4(0.0);
+uniform vec3 soot_strength = vec3(0.0);
+uniform float crack_reach = 0.6;
+uniform float cracks = 0.0;
+uniform float crack_time = 0.0;
+uniform vec3 metal_color : source_color = vec3(0.80, 0.81, 0.82);
+uniform vec3 scuff_color : source_color = vec3(0.22, 0.21, 0.20);
+uniform vec3 soot_color : source_color = vec3(0.022, 0.018, 0.016);
+uniform vec3 crack_color : source_color = vec3(1.0, 0.36, 0.07);
+varying vec3 hp;
+varying vec3 hn;
+float hash(vec3 p) {
+	p = fract(p * 0.3183099 + 0.1);
+	p *= 17.0;
+	return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+float vnoise(vec3 x) {
+	vec3 i = floor(x);
+	vec3 f = fract(x);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(mix(hash(i), hash(i + vec3(1.0, 0.0, 0.0)), f.x),
+			mix(hash(i + vec3(0.0, 1.0, 0.0)), hash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+		mix(mix(hash(i + vec3(0.0, 0.0, 1.0)), hash(i + vec3(1.0, 0.0, 1.0)), f.x),
+			mix(hash(i + vec3(0.0, 1.0, 1.0)), hash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+}
+float fbm(vec3 p) {
+	float v = 0.0;
+	float a = 0.5;
+	for (int i = 0; i < 4; i++) {
+		v += a * vnoise(p);
+		p = p * 2.02 + vec3(3.1, 1.7, 5.3);
+		a *= 0.5;
+	}
+	return v;
+}
+float soot_of(vec4 s, float strength, float n) {
+	if (s.w <= 0.0) return 0.0;
+	float d = length(hp - s.xyz) + (n - 0.5) * s.w * 0.7;
+	return strength * (1.0 - smoothstep(s.w * 0.3, s.w, d));
+}
+float crack_of(vec4 s) {
+	if (s.w <= 0.0) return 0.0;
+	float d = length(hp - s.xyz);
+	return 1.0 - smoothstep(s.w * crack_reach * 0.5, s.w * crack_reach, d);
+}
+vec4 over(vec4 dst, vec3 col, float k) {
+	float a = k + dst.a * (1.0 - k);
+	if (a <= 0.0) return vec4(0.0);
+	return vec4((col * k + dst.rgb * dst.a * (1.0 - k)) / a, a);
+}
+void vertex() {
+	vec3 w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	hp = (world_to_hull * vec4(w, 1.0)).xyz;
+	hn = normalize(mat3(world_to_hull) * normalize(mat3(MODEL_MATRIX) * NORMAL));
+}
+void fragment() {
+	// Zonas: costados por el lado y lo de lado que mira la superficie (sin el signo de la normal: algunas piezas la
+	// traen hacia dentro, y por eso la pasada va por las dos caras); morro y popa por el largo
+	float facing = smoothstep(0.05, 0.45, abs(hn.x));
+	float left = wear.x * facing * smoothstep(0.05, 0.3, -hp.x);
+	float right = wear.y * facing * smoothstep(0.05, 0.3, hp.x);
+	float front = wear.z * smoothstep(0.5, 0.85, -hp.z / extent.y);
+	float rear = wear.w * smoothstep(0.5, 0.85, hp.z / extent.z);
+	float zone = max(max(left, right), max(front, rear));
+	// Rozaduras: manchas que crecen con el desgaste y, dentro, arañazos largos a lo largo de la nave
+	float patch = fbm(hp * vec3(2.0, 3.0, 0.5));
+	float covered = smoothstep(1.0 - zone * 0.75, 1.08 - zone * 0.75, patch);
+	// Arañazos largos a lo largo de la nave (de unos centímetros de ancho, para que se vean de lejos)
+	float streak = vnoise(vec3(hp.z * 0.6, (hp.y + hp.x) * 18.0, 0.0)) * 0.6 + vnoise(vec3(hp.z * 1.8, (hp.y - hp.x) * 40.0, 1.0)) * 0.4;
+	float lines = smoothstep(0.6, 0.66, streak) * covered;
+	vec4 c = vec4(0.0);
+	c = over(c, scuff_color, covered * 0.2);
+	c = over(c, metal_color, lines);
+	float metal = lines;
+	// Hollín alrededor de los focos
+	float n = fbm(hp * 3.2);
+	float soot = max(soot_of(soot0, soot_strength.x, n), max(soot_of(soot1, soot_strength.y, n), soot_of(soot2, soot_strength.z, n)));
+	c = over(c, soot_color, soot);
+	metal *= 1.0 - soot;
+	// Grietas incandescentes (nivel 3), dentro del hollín
+	float reach = max(crack_of(soot0), max(crack_of(soot1), crack_of(soot2))) * cracks;
+	float v = abs(fbm(hp * 7.5) - 0.5);
+	float line = (1.0 - smoothstep(0.006, 0.018, v)) * reach;
+	float pulse = 0.6 + 0.4 * sin(crack_time * 5.0 + fbm(hp * 1.7) * 12.0);
+	c = over(c, vec3(0.04, 0.03, 0.025), line);
+	if (c.a < 0.004) discard;
+	ALBEDO = c.rgb;
+	ALPHA = c.a;
+	// Metal claro y poco metálico: muy metálico solo reflejaría el entorno oscuro y saldría negro
+	METALLIC = metal * 0.35;
+	ROUGHNESS = mix(0.85, 0.45, metal);
+	EMISSION = crack_color * line * pulse * 2.2;
+}";
+
+	// Cambio de color con el ángulo de vista (capa fina): una pasada que suma sobre el material
 	private const string IridescenceShader = @"
 shader_type spatial;
 render_mode blend_add, unshaded, cull_disabled, depth_draw_never;
 uniform float strength = 0.0;
-uniform sampler2D scorch : hint_default_transparent, filter_linear_mipmap, repeat_enable;
-varying vec2 uv_scorch;
-void vertex() { uv_scorch = UV2; }
 void fragment() {
 	float c = clamp(abs(dot(normalize(NORMAL), normalize(VIEW))), 0.0, 1.0);
 	float t = 1.0 - c;
 	vec3 film = 0.5 + 0.5 * cos(6.28318 * (vec3(0.0, 0.33, 0.67) + t * 1.6 + 0.12));
 	float edge = 0.08 + 0.92 * pow(t, 2.0);
-	ALBEDO = film * edge * strength * (1.0 - texture(scorch, uv_scorch).a);
+	ALBEDO = film * edge * strength;
 }";
 
 	private readonly Dictionary<string, MeshInstance3D> _pieces = new();
@@ -91,6 +195,14 @@ void fragment() {
 	private readonly Dictionary<string, (StandardMaterial3D Hazard, StandardMaterial3D Plate)> _leadingEdges = new();
 	private int _paintVersion;
 	private int _scorchLevel;
+	// Daño visible: la pasada (una por casco, en todos los materiales pintados), la raíz del modelo, focos y medidas
+	private ShaderMaterial _wearPass;
+	private Node3D _modelRoot;
+	private DamageSmokeFoci _foci;
+	private HullWearSettings _wearSettings = HullWearSettings.Default;
+	private Vector4 _wear;
+	private float _wearTime;
+	private bool _wearActive;
 
 	public ShipHull3DProfile Profile { get; set; }
 
@@ -122,10 +234,9 @@ void fragment() {
 		ApplySettings(_settings);
 		if (IsLoaded)
 			SetPaint(_paintIndex);
-		// Las máscaras se preparan ya y el detalle se enciende sin quemaduras: así el primer golpe de la carrera no da un
-		// tirón
-		for (int level = 1; level <= DamageModel.MaxLevel; level++)
-			ScorchTexture(level);
+		// La pasada del daño va puesta desde el principio (sin nada que pintar): así su shader se compila al cargar y el
+		// primer golpe no da un tirón
+		AttachWear();
 		ApplyScorch();
 		// Al final del árbol: la WorldEnvironment de la escena se crea en el _Ready de Main, después de este nodo
 		CallDeferred(MethodName.SetUpWorldReflections);
@@ -569,16 +680,16 @@ void fragment() {
 			return;
 		if (amount <= 0f)
 		{
-			material.NextPass = null;
+			material.NextPass = _wearPass;
 			return;
 		}
-		if (material.NextPass is not ShaderMaterial pass)
+		if (material.NextPass is not ShaderMaterial pass || pass == _wearPass)
 		{
 			pass = NewIridescencePass();
 			material.NextPass = pass;
 		}
+		pass.NextPass = _wearPass;
 		pass.SetShaderParameter(SnStrength, amount * IridescenceOfPaint);
-		pass.SetShaderParameter(SnScorch, ScorchTexture(_scorchLevel));
 	}
 
 	private ShaderMaterial NewIridescencePass()
@@ -592,25 +703,87 @@ void fragment() {
 	// Daño visible (spec 6.5)
 	// ---------------------------------------------------------------
 
-	// Nivel de daño (0–3; en TIME TRIAL, 0): quemaduras
+	// Nivel de daño (0–3; en TIME TRIAL, 0): hollín y grietas
 	public void SetDamage(int level, bool timeTrial)
 	{
 		_scorchLevel = HullDamage.ScorchMask(level, timeTrial);
 		ApplyScorch();
 	}
 
-	// Quemaduras del nivel de ahora en el detalle de los materiales (siempre encendido) y en las pasadas de iridiscencia
+	// Focos del humo de la nave (el hollín sale de ellos) y medidas de su caja (para morro, popa y costados)
+	public void SetDamageShape(in DamageSmokeFoci foci, float halfWidth, float front, float back)
+	{
+		_foci = foci;
+		_wearPass ??= NewWearPass();
+		_wearPass.SetShaderParameter(SnExtent, new Vector3(halfWidth, front, back));
+		ApplyScorch();
+	}
+
+	// Rozaduras acumuladas: izquierda, derecha, morro y popa (0–1)
+	public void SetWear(System.Numerics.Vector4 wear)
+	{
+		_wear = new Vector4(wear.X, wear.Y, wear.Z, wear.W);
+		_wearPass ??= NewWearPass();
+		_wearPass.SetShaderParameter(SnWear, _wear);
+		UpdateWearActive();
+	}
+
+	// Hollín y grietas del nivel de ahora
 	private void ApplyScorch()
 	{
-		Texture2D scorch = ScorchTexture(_scorchLevel);
-		Texture2D detail = scorch ?? NoScorch();
+		_wearPass ??= NewWearPass();
+		Vector3 strength = Vector3.Zero;
+		for (int f = 0; f < 3; f++)
+		{
+			SootSpot spot = HullWear.Soot(_scorchLevel, f, _foci, _wearSettings);
+			_wearPass.SetShaderParameter(f == 0 ? SnSoot0 : f == 1 ? SnSoot1 : SnSoot2,
+				new Vector4(spot.Center.X, spot.Center.Y, spot.Center.Z, spot.Radius));
+			strength[f] = spot.Strength;
+		}
+		_wearPass.SetShaderParameter(SnSootStrength, strength);
+		_wearPass.SetShaderParameter(SnCracks, HullWear.Cracks(_scorchLevel) ? 1f : 0f);
+		_wearPass.SetShaderParameter(SnCrackReach, _wearSettings.CrackReach);
+		UpdateWearActive();
+	}
+
+	private void UpdateWearActive()
+	{
+		_wearActive = _scorchLevel >= 2 || _wear.X > 0f || _wear.Y > 0f || _wear.Z > 0f || _wear.W > 0f;
+		if (_wearActive)
+			UpdateWearTransform();
+	}
+
+	// La pasada sigue los ejes del casco: la inversa de la raíz del modelo, cada frame mientras haya algo que pintar
+	public override void _Process(double delta)
+	{
+		if (!_wearActive || _wearPass == null)
+			return;
+		_wearTime += (float)delta;
+		UpdateWearTransform();
+		if (_scorchLevel >= 3)
+			_wearPass.SetShaderParameter(SnCrackTime, _wearTime);
+	}
+
+	private void UpdateWearTransform()
+	{
+		if (_modelRoot == null || !_modelRoot.IsInsideTree())
+			return;
+		_wearPass.SetShaderParameter(SnWorldToHull, new Projection(_modelRoot.GlobalTransform.AffineInverse()));
+	}
+
+	private ShaderMaterial NewWearPass() => new() { Shader = new Shader { Code = WearShader } };
+
+	// La pasada del daño detrás de cada material pintado (y detrás de su iridiscencia, si la tiene)
+	private void AttachWear()
+	{
+		_wearPass ??= NewWearPass();
 		foreach (StandardMaterial3D material in _scorchMaterials)
 		{
-			material.DetailEnabled = true;
-			material.DetailAlbedo = detail;
+			if (material.NextPass is ShaderMaterial iris && iris != _wearPass)
+				iris.NextPass = _wearPass;
+			else
+				material.NextPass = _wearPass;
 		}
-		foreach (ShaderMaterial pass in _irisPasses)
-			pass.SetShaderParameter(SnScorch, scorch);
 	}
 
 	// Parpadeo de las luces de su contrato: el mismo EdgeFlicker de los daños, con una "arista" por luz
@@ -647,46 +820,6 @@ void fragment() {
 		}
 	}
 
-	private static Texture2D NoScorch()
-	{
-		if (_noScorch == null)
-			_noScorch = ImageTexture.CreateFromImage(Image.CreateFromData(1, 1, false, Image.Format.Rgba8, new byte[4]));
-		return _noScorch;
-	}
-
-	private static Texture2D ScorchTexture(int level)
-	{
-		if (level <= 0)
-			return null;
-		int i = level - 1;
-		if (ScorchTextures[i] != null)
-			return ScorchTextures[i];
-		// Color casi negro con la máscara en el alfa: el detalle de Godot mezcla con el alfa de su textura por la UV2
-		var source = GD.Load<Texture2D>(ScorchPaths[i]);
-		if (source == null)
-			return null;
-		Image mask = source.GetImage();
-		if (mask.IsCompressed())
-			mask.Decompress();
-		if (mask.HasMipmaps())
-			mask.ClearMipmaps();
-		mask.Convert(Image.Format.L8);
-		byte[] gray = mask.GetData();
-		var rgba = new byte[gray.Length * 4];
-		uint dark = HullDamage.ScorchColor;
-		for (int p = 0; p < gray.Length; p++)
-		{
-			rgba[p * 4] = (byte)((dark >> 16) & 0xFF);
-			rgba[p * 4 + 1] = (byte)((dark >> 8) & 0xFF);
-			rgba[p * 4 + 2] = (byte)(dark & 0xFF);
-			rgba[p * 4 + 3] = gray[p];
-		}
-		Image image = Image.CreateFromData(mask.GetWidth(), mask.GetHeight(), false, Image.Format.Rgba8, rgba);
-		image.GenerateMipmaps();
-		ScorchTextures[i] = ImageTexture.CreateFromImage(image);
-		return ScorchTextures[i];
-	}
-
 	// ---------------------------------------------------------------
 	// Carga
 	// ---------------------------------------------------------------
@@ -707,6 +840,7 @@ void fragment() {
 
 		Node model = scene.Instantiate();
 		AddChild(model);
+		_modelRoot = model as Node3D;
 		Collect(model);
 
 		List<string> missing = HullManifest.Missing(_pieces.Keys, Profile.Contract)
@@ -750,11 +884,7 @@ void fragment() {
 				material.ResourceName = source.ResourceName;
 				Prepare(material, manifest);
 				if (scorch.Contains(material.ResourceName))
-				{
-					material.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mix;
-					material.DetailUVLayer = BaseMaterial3D.DetailUV.UV2;
 					_scorchMaterials.Add(material);
-				}
 				if (decals.Contains(material.ResourceName))
 					MakeDecal(material);
 				float iris = manifest.IridescenceFactor(material.ResourceName);

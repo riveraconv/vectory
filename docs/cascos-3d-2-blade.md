@@ -524,6 +524,8 @@ Valores del prototipo (se ajustan a ojo con el glow del juego y se apuntan):
 - en el Inspector: periodo, duración e intensidad.
 
 ### 6.5 Daño visible
+> **Sustituido** (spec `efectos-5-danos-casco`): las **quemaduras** de esta sección y sus máscaras (`hull_scorch_1/2/3.png`) ya no existen; las sustituyen rozaduras donde se choca, hollín alrededor de los focos del humo y grietas incandescentes con daño 3. El **humo** es el de `efectos-4-humo-danos`. El **parpadeo de las luces** sigue como aquí.
+
 
 Las mismas reglas que VECTOR (spec `cascos-3d-1-vector`, sección 6.5). Solo en RACE; en TIME TRIAL, nada.
 

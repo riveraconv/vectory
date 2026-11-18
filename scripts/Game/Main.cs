@@ -446,6 +446,10 @@ public partial class Main : Node3D
 		if (_collisionFx == null)
 			return;
 		_player.FeelBarrier(_player.LastBarrierTouch);
+		// Rozaduras del casco: solo RACE, como el daño (spec docs/efectos-5-danos-casco.md)
+		bool wear = _damage != null;
+		if (wear)
+			_player.WearBarrier(_player.LastBarrierTouch, delta);
 		_collisionFx.SetReference(_player.PlanVelocity);
 		_collisionFx.BarrierContact(_player.Id, _player.LastBarrierTouch, _player.PlanForward, _player.PlanVelocity, delta);
 		Vector3 p = _player.GlobalPosition;
@@ -466,6 +470,8 @@ public partial class Main : Node3D
 				RivalShip ship = _rivals.Ships[ri];
 				RivalCar car = ship.Car;
 				_collisionFx.BarrierContact(car.Id, car.LastTouch, car.Dynamics.Forward, car.Dynamics.Velocity, delta);
+				if (wear)
+					ship.WearBarrier(car.LastTouch, delta);
 				// Los rivales no derrapan nunca (su piloto no pulsa la tecla); si un día lo hacen, ya dejan marcas
 				_collisionFx.DriftShip(car.Id, car.Dynamics.Drifting, car.Physics.Vertical.Airborne, car.Dynamics.SlipAngle,
 					car.Position, car.Dynamics.Forward, car.Dynamics.Velocity, ship.HullTransform,
@@ -483,9 +489,27 @@ public partial class Main : Node3D
 				_collisionFx.ShipContact(e, ContactVelocity(e), delta);
 				if (e.A == _player.Id || e.B == _player.Id)
 					_player.FeelShip(e.Point, e.Level, e.IsNewImpact, e.Graze, e.Facing);
+				if (wear)
+				{
+					WearShip(e.A, e);
+					WearShip(e.B, e);
+				}
 			}
 		}
 		_player.StepCrashFeel(delta);
+	}
+
+	// Las rozaduras de un contacto entre naves, en la nave id
+	private void WearShip(int id, in ShipContactEvent e)
+	{
+		if (id == _player.Id)
+		{
+			_player.WearShip(e.Point, e.Level, e.IsNewImpact, (float)GetPhysicsProcessDeltaTime());
+			return;
+		}
+		for (int ri = 0; ri < _rivals.Ships.Count; ri++)
+			if (_rivals.Ships[ri].Car.Id == id)
+				_rivals.Ships[ri].WearShip(e.Point, e.Level, e.IsNewImpact, (float)GetPhysicsProcessDeltaTime());
 	}
 
 	// La velocidad que heredan los efectos de un contacto entre naves: la del que embiste, o la media
