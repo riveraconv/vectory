@@ -202,5 +202,8 @@ public sealed class CollisionFxSettings
 	// --- Derrape (spec docs/efectos-2-derrape.md)
 	public DriftFxSettings Drift = new();
 
+	// --- Aterrizaje (spec docs/efectos-3-aterrizaje.md)
+	public LandingFxSettings Landing = new();
+
 	public static CollisionFxSettings Default => new();
 }

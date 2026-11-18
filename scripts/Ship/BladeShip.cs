@@ -60,6 +60,8 @@ public static class BladeShip
 			// Caja total del manifiesto del casco 3D sin la sonda, al centímetro
 			CollisionFront = 5.2f,
 			CollisionBack = 3.61f,
+			// Lo más bajo de la caja del manifiesto del casco 3D
+			BellyY = -0.234f,
 			NoseDistance = 5.2f,
 			PhysicsBoxSize = new Vector3(3.2f, 0.62f, 8.8f),
 			PhysicsBoxCenter = new Vector3(0f, 0.17f, -0.8f)

@@ -59,6 +59,8 @@ public static class HammerShip
 			// Caja total del manifiesto del casco 3D, al centímetro
 			CollisionFront = 3.83f,
 			CollisionBack = 3f,
+			// Lo más bajo de la caja del manifiesto del casco 3D
+			BellyY = -0.52f,
 			NoseDistance = 3.6f,
 			PhysicsBoxSize = new Vector3(5f, 1.4f, 6.6f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.3f)

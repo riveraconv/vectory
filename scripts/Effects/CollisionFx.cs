@@ -1,4 +1,6 @@
 using System;
+using Vectory.Circuit;
+using Vectory.Ship;
 
 namespace Vectory.Effects;
 
@@ -16,6 +18,7 @@ public sealed class CollisionFx
 		Emitter = new SparkEmitter(settings, random);
 		Flashes = new CrashFlashes(settings, random);
 		Smoke = new CrashSmoke(settings, random);
+		Landing = new LandingEmitter(settings.Landing, random);
 	}
 
 	public CollisionFxSettings Settings { get; }
@@ -23,6 +26,7 @@ public sealed class CollisionFx
 	public SparkEmitter Emitter { get; }
 	public CrashFlashes Flashes { get; }
 	public CrashSmoke Smoke { get; }
+	public LandingEmitter Landing { get; }
 	public float Quality { get; private set; } = 1f;
 
 	public void SetQuality(float quality)
@@ -40,11 +44,16 @@ public sealed class CollisionFx
 		Smoke.Emit(e, Quality);
 	}
 
+	// Un aterrizaje (spec docs/efectos-3-aterrizaje.md): chispas desde la panza y polvo a ras de suelo
+	public LandingBurst Land(LandingLevel level, TrackFrame frame, in ShipPose pose, System.Numerics.Vector2 velocity,
+		float halfWidth, float back, float bellyY) =>
+		Landing.Emit(level, frame, pose, velocity, halfWidth, back, bellyY, Quality, Sparks, Smoke);
+
 	public void Update(float dt, ICrashGround ground)
 	{
 		Sparks.Update(dt, ground);
 		Flashes.Update(dt);
-		Smoke.Update(dt);
+		Smoke.Update(dt, ground);
 	}
 
 	public void Clear()

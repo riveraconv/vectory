@@ -15,7 +15,8 @@ namespace Vectory.Effects;
 // destellos en cuadrados de cara a la cámara en suma, y sus rayos y ondas en otra malla de líneas; humo en cuadrados de
 // cara a la cámara con mezcla normal. También los efectos del derrape (spec docs/efectos-2-derrape.md): sus marcas en
 // otra malla de líneas en suma, sus chispas con las de los choques y su foco (núcleo y halo de cara a la cámara) en
-// cuadrados en suma. Las mallas se rehacen cada frame en _Process, así la pausa lo congela todo.
+// cuadrados en suma. Y los del aterrizaje (spec docs/efectos-3-aterrizaje.md): sus chispas con las de los choques y su
+// polvo con el humo, más ancho que alto. Las mallas se rehacen cada frame en _Process, así la pausa lo congela todo.
 // Sin reglas propias.
 public partial class CollisionEffects : Node3D
 {
@@ -85,6 +86,18 @@ public partial class CollisionEffects : Node3D
 	[Export] public float DriftCoreIntensity { get; set; } = D.Drift.CoreIntensity;
 	[Export] public float DriftFocusHaloSize { get; set; } = D.Drift.FocusHaloSize;  // m: halo del foco
 	[Export] public float DriftFocusHaloIntensity { get; set; } = D.Drift.FocusHaloIntensity;
+
+	[ExportGroup("Aterrizaje")]
+	[Export] public int LandingMediumSparks { get; set; } = D.Landing.Medium.Sparks;
+	[Export] public int LandingStrongSparks { get; set; } = D.Landing.Strong.Sparks;
+	[Export] public int LandingStrongEmbers { get; set; } = D.Landing.Strong.Embers;
+	[Export] public float LandingSparkBellyDrop { get; set; } = D.Landing.SparkBellyDrop;   // m por debajo de la panza
+	[Export] public float LandingSparkInherit { get; set; } = D.Landing.SparkInherit;
+	[Export] public int LandingMediumPuffs { get; set; } = D.Landing.Medium.Puffs;
+	[Export] public int LandingStrongPuffs { get; set; } = D.Landing.Strong.Puffs;
+	[Export] public float LandingDustLift { get; set; } = D.Landing.DustLift;               // m sobre la superficie
+	[Export] public float LandingDustInherit { get; set; } = D.Landing.DustInherit;
+	[Export] public float LandingDustOpacity { get; set; } = D.Landing.Dust.Opacity;
 
 	private const int Bucket = 256;       // las mallas de líneas usan arrays de tamaño múltiplo de esto, para no crearlos cada frame
 	private const int QuadBucket = 32;    // ídem en cuadrados
@@ -183,6 +196,22 @@ public partial class CollisionEffects : Node3D
 			pose.Point(DriftContact.FocusPoint(edge, state.Side)));
 	}
 
+	// El aterrizaje de una nave en este paso de física (spec docs/efectos-3-aterrizaje.md). fallSpeed: su velocidad de
+	// caída contra la superficie; thresholds: los umbrales de pista-3d; hull: la nave que se ve, con su inclinación;
+	// velocity: su velocidad en planta.
+	public void Landing(float fallSpeed, in LandingSettings thresholds, Transform3D hull, NVector2 velocity,
+		ShipVisualProfile visual)
+	{
+		if (_fx == null)
+			return;
+		LandingLevel level = LandingImpact.Level(fallSpeed, thresholds);
+		if (level == LandingLevel.None)
+			return;
+		Basis b = hull.Basis;
+		var pose = new ShipPose(N(hull.Origin), N(b.X.Normalized()), N(b.Y.Normalized()), N(b.Z.Normalized()));
+		_fx.Land(level, _frame, pose, velocity, visual.CollisionHalfWidth, visual.CollisionBack, visual.BellyY);
+	}
+
 	// Recolocación: el trazo de esa nave se corta y las marcas se quedan
 	public void CutDrift(int shipId) => _drift?.Cut(shipId);
 
@@ -274,6 +303,16 @@ public partial class CollisionEffects : Node3D
 		s.Drift.CoreIntensity = DriftCoreIntensity;
 		s.Drift.FocusHaloSize = DriftFocusHaloSize;
 		s.Drift.FocusHaloIntensity = DriftFocusHaloIntensity;
+		s.Landing.Medium.Sparks = LandingMediumSparks;
+		s.Landing.Strong.Sparks = LandingStrongSparks;
+		s.Landing.Strong.Embers = LandingStrongEmbers;
+		s.Landing.SparkBellyDrop = LandingSparkBellyDrop;
+		s.Landing.SparkInherit = LandingSparkInherit;
+		s.Landing.Medium.Puffs = LandingMediumPuffs;
+		s.Landing.Strong.Puffs = LandingStrongPuffs;
+		s.Landing.DustLift = LandingDustLift;
+		s.Landing.DustInherit = LandingDustInherit;
+		s.Landing.Dust.Opacity = LandingDustOpacity;
 		return s;
 	}
 
@@ -524,7 +563,8 @@ public partial class CollisionEffects : Node3D
 			SmokePuff p = smoke[i];
 			if (!CrashSmoke.IsVisible(p))
 				continue;
-			Quad(v, c, u, q++, G(p.Position), right, up, CrashSmoke.Radius(p), new Color(col.X, col.Y, col.Z, smoke.Opacity(p)));
+			float r = CrashSmoke.Radius(p);
+			Quad(v, c, u, q++, G(p.Position), right, up, r, r * CrashSmoke.HeightScale(p), new Color(col.X, col.Y, col.Z, smoke.Opacity(p)));
 		}
 		FillQuads(v, c, u, q);
 		Commit(_smokeMesh, Mesh.PrimitiveType.Triangles, v, c, u);
@@ -587,10 +627,15 @@ public partial class CollisionEffects : Node3D
 		}
 	}
 
-	private static void Quad(Vector3[] v, Color[] c, Vector2[] u, int q, Vector3 center, Vector3 right, Vector3 up, float half, Color color)
+	private static void Quad(Vector3[] v, Color[] c, Vector2[] u, int q, Vector3 center, Vector3 right, Vector3 up, float half, Color color) =>
+		Quad(v, c, u, q, center, right, up, half, half, color);
+
+	// Con alto y ancho distintos (el polvo del aterrizaje, más ancho que alto)
+	private static void Quad(Vector3[] v, Color[] c, Vector2[] u, int q, Vector3 center, Vector3 right, Vector3 up, float halfWidth,
+		float halfHeight, Color color)
 	{
-		Vector3 r = right * half;
-		Vector3 t = up * half;
+		Vector3 r = right * halfWidth;
+		Vector3 t = up * halfHeight;
 		int o = q * 6;
 		Vector3 a = center - r - t, b = center + r - t, cc = center + r + t, d = center - r + t;
 		v[o] = a; u[o] = new Vector2(0f, 1f);

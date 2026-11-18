@@ -431,7 +431,7 @@ public partial class Main : Node3D
 	}
 
 	// Efectos de los choques de este paso (solo visual): contra la barrera, el jugador y los rivales; entre naves, los
-	// contactos del paso (solo RACE). Luz y temblor de la cabina con los tuyos.
+	// contactos del paso (solo RACE); y los aterrizajes de todas. Luz y temblor de la cabina con los tuyos.
 	private void UpdateCollisionEffects(float delta)
 	{
 		if (_collisionFx == null)
@@ -443,6 +443,9 @@ public partial class Main : Node3D
 		_collisionFx.DriftShip(_player.Id, _player.Drifting, _player.IsAirborne, _player.SlipAngle,
 			new System.Numerics.Vector3(p.X, p.Y, p.Z), _player.PlanForward, _player.PlanVelocity, _player.HullTransform,
 			_player.CollisionHalfWidth, _player.DriftContact, delta);
+		LandingSettings landing = _player.LandingThresholds;
+		if (_player.JustLanded)
+			_collisionFx.Landing(_player.LandingSpeed, landing, _player.HullTransform, _player.PlanVelocity, _player.ExteriorProfile);
 		if (_rivals != null)
 		{
 			foreach (RivalShip ship in _rivals.Ships)
@@ -453,6 +456,9 @@ public partial class Main : Node3D
 				_collisionFx.DriftShip(car.Id, car.Dynamics.Drifting, car.Physics.Vertical.Airborne, car.Dynamics.SlipAngle,
 					car.Position, car.Dynamics.Forward, car.Dynamics.Velocity, ship.HullTransform,
 					car.Ship.Visual.CollisionHalfWidth, car.Ship.Visual.DriftContact, delta);
+				if (car.Physics.Vertical.Landed)
+					_collisionFx.Landing(car.Physics.Vertical.LandingSpeed, landing, ship.HullTransform, car.Dynamics.Velocity,
+						car.Ship.Visual);
 			}
 			foreach (ShipContactEvent e in _rivals.Contacts.Events)
 			{

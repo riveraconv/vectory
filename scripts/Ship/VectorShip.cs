@@ -39,6 +39,8 @@ public static class VectorShip
 			// Caja total del manifiesto del casco 3D, al centímetro
 			CollisionFront = 4f,
 			CollisionBack = 3.31f,
+			// Lo más bajo de la caja del manifiesto del casco 3D
+			BellyY = -0.31f,
 			NoseDistance = 4f,
 			PhysicsBoxSize = new Vector3(6.8f, 1.2f, 7.2f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.4f)

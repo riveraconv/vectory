@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>VECTORY · Efectos de aterrizaje · Maqueta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { --cyan:#36E7FF; --blue:#245BFF; --mag:#FF43D0; --orange:#FF9D32; --bg:#05070D; --grey:#A6B8D8; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--grey); font-family:'Share Tech Mono', monospace; overflow:hidden; user-select:none; -webkit-user-select:none; }
+  body { display:flex; flex-direction:column; }
+  #stage { flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:0; }
+  #view { position:relative; }
+  #view canvas { position:absolute; inset:0; display:block; width:100%; height:100%; }
+  #mode { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(var(--u) * 70); font-size:calc(var(--u) * 15); letter-spacing:.08em; color:var(--grey); opacity:0; transition:opacity .3s; pointer-events:none; background:rgba(5,7,13,.85); padding:6px 12px; border:1px solid rgba(54,231,255,.3); max-width:90%; text-align:center; }
+  #bar { flex:none; display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; align-items:center; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid rgba(36,91,255,.35); background:#070B16; }
+  .grp { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+  .grp b { font-weight:normal; font-size:11px; letter-spacing:.12em; opacity:.6; margin-right:2px; }
+  #bar button { font-family:inherit; font-size:12px; letter-spacing:.08em; color:var(--cyan); background:#0C1324; border:1px solid rgba(54,231,255,.35); padding:7px 9px; cursor:pointer; }
+  #bar button.on { background:rgba(54,231,255,.18); border-color:rgba(54,231,255,.9); }
+  #help { flex-basis:100%; text-align:center; font-size:11px; letter-spacing:.05em; opacity:.55; }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+</head>
+<body>
+<div id="stage">
+  <div id="view">
+    <canvas id="gl"></canvas>
+    <canvas id="hud"></canvas>
+    <div id="mode"></div>
+  </div>
+</div>
+<div id="bar">
+  <div class="grp"><b>SALTO</b>
+    <button data-g="jump" data-v="auto" class="on">AUTO</button>
+    <button data-g="jump" data-v="soft">SUAVE</button>
+    <button data-g="jump" data-v="mid">MEDIO</button>
+    <button data-g="jump" data-v="hard">FUERTE</button>
+  </div>
+  <div class="grp"><b>ONDA</b>
+    <button data-g="wave" data-v="ring" class="on">A·ANILLO</button>
+    <button data-g="wave" data-v="diamond">B·ROMBO</button>
+    <button data-g="wave" data-v="off">NO</button>
+  </div>
+  <div class="grp"><b>COLOR ONDA</b>
+    <button data-g="wcol" data-v="cyan" class="on">CIAN</button>
+    <button data-g="wcol" data-v="blue">AZUL LEVITACIÓN</button>
+  </div>
+  <div class="grp"><b>CHISPAS</b>
+    <button data-g="spark" data-v="on" class="on">SÍ</button>
+    <button data-g="spark" data-v="off">NO</button>
+  </div>
+  <div class="grp"><b>LEVITACIÓN</b>
+    <button data-g="lev" data-v="on" class="on">DESTELLO</button>
+    <button data-g="lev" data-v="off">NORMAL</button>
+  </div>
+  <div class="grp"><b>POLVO</b>
+    <button data-g="dust" data-v="on" class="on">SÍ</button>
+    <button data-g="dust" data-v="off">NO</button>
+  </div>
+  <div class="grp"><b>VISTA</b>
+    <button data-g="view" data-v="chase">PERSECUCIÓN</button>
+    <button data-g="view" data-v="side">LATERAL</button>
+    <button data-g="view" data-v="both" class="on">LAS DOS</button>
+  </div>
+  <div class="grp"><b>PARTICLES</b>
+    <button data-g="q" data-v="LOW">LOW</button>
+    <button data-g="q" data-v="MEDIUM">MEDIUM</button>
+    <button data-g="q" data-v="HIGH" class="on">HIGH</button>
+  </div>
+  <div class="grp"><button id="bSlow">LENTO ×0,25</button><button id="bPause">PAUSA</button></div>
+  <div id="help">A 270 km/h · gravedad 6 m/s² como en pista-3d · la sacudida y la compresión de 0,3 m ya existen y salen siempre · Espacio pausa · L lento</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+const opt = { jump:'auto', wave:'ring', wcol:'cyan', spark:'on', lev:'on', dust:'on', view:'both', q:'HIGH', slow:false, paused:false };
+const QK = { LOW:0.25, MEDIUM:0.5, HIGH:1 };
+const WCOL = { cyan:[0.21,0.9,1], blue:[0.14,0.36,1] };
+const HALF = 11, BAR = 11.5, WING = 1.87, TAIL = 1.6, NOSE = 3.6, G = 6, V = 75;
+const JUMPS = { soft:{ H:0.7, name:'SUAVE' }, mid:{ H:2.4, name:'MEDIO' }, hard:{ H:6, name:'FUERTE' } };
+const ORDER = ['soft','mid','hard'];
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+// perfil de la cresta: subida suave de 100 m y bajada de 40 m
+const S0 = 150, LR = 100, LD = 40;
+let H = 2.4;
+function hAt(s) {
+  if (s < S0) return 0; let u = s - S0;
+  if (u < LR) return H * (1 - Math.cos(Math.PI * u / LR)) / 2; u -= LR;
+  if (u < LD) return H * (1 + Math.cos(Math.PI * u / LD)) / 2; return 0;
+}
+const dh = s => (hAt(s + 0.05) - hAt(s - 0.05)) / 0.1;
+const d2 = s => (hAt(s + 0.5) - 2*hAt(s) + hAt(s - 0.5)) / 0.25;
+
+// ================= ESCENA =================
+const glc = document.getElementById('gl'), hud = document.getElementById('hud'), hx = hud.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas:glc, antialias:true });
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+renderer.setPixelRatio(DPR); renderer.setClearColor(0x05070D, 1); renderer.autoClear = false;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x05070D, 80, 1100);
+const camA = new THREE.PerspectiveCamera(62, 16/9, 0.1, 4000);
+const camB = new THREE.PerspectiveCamera(42, 16/9, 0.1, 4000);
+const lm = (c, o, fog = true) => new THREE.LineBasicMaterial({ color:c, transparent:o < 1, opacity:o, fog });
+const seg = arr => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); return g; };
+const ADD = { blending:THREE.AdditiveBlending, transparent:true, depthWrite:false };
+
+let sky;
+{
+  const g = new THREE.SphereGeometry(2500, 48, 32), col = [], p = g.attributes.position, c = new THREE.Color();
+  const dark = new THREE.Color(0x05070D), warm = new THREE.Color(0x2A1A0E), mid = new THREE.Color(0x140D0A);
+  for (let i = 0; i < p.count; i++) {
+    const h = p.getY(i) / 2500;
+    if (h < -0.01) c.copy(dark); else if (h < 0.03) c.copy(warm); else if (h < 0.12) c.copy(warm).lerp(mid, (h-0.03)/0.09); else if (h < 0.3) c.copy(mid).lerp(dark, (h-0.12)/0.18); else c.copy(dark);
+    col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  sky = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors:true, side:THREE.BackSide, fog:false, depthWrite:false }));
+  scene.add(sky);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshBasicMaterial({ color:0x03050A }));
+  ground.rotation.x = -Math.PI/2; ground.position.y = -0.05; scene.add(ground);
+}
+// ciudad
+{
+  let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const mE = lm(0xFF9D32, 0.22, false), mW = lm(0xFF9D32, 0.07, false);
+  for (let n = 0; n < 90; n++) {
+    const side = r() < 0.5 ? -1 : 1, x = side * (45 + r() * 500), z = 200 - r() * 1700;
+    const w = 14 + r()*40, h = 30 + r()*200, d = 14 + r()*40;
+    const g = new THREE.BoxGeometry(w, h, d); g.translate(0, h/2, 0);
+    const grp = new THREE.Group(); grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), mE));
+    const win = []; for (let y = 8; y < h - 4; y += 9) win.push(-w/2,y,d/2, w/2,y,d/2, -w/2,y,-d/2, w/2,y,-d/2);
+    grp.add(new THREE.LineSegments(seg(win), mW)); grp.position.set(x, -6, z); scene.add(grp);
+  }
+}
+// pista con la cresta (se rehace al cambiar la altura)
+let trackGrp = null;
+function buildTrack() {
+  if (trackGrp) { scene.remove(trackGrp); trackGrp.traverse(o => o.geometry && o.geometry.dispose()); }
+  trackGrp = new THREE.Group(); scene.add(trackGrp);
+  const SA = -120, SB = 1200, ST = 2;
+  const add = (arr, c, o) => trackGrp.add(new THREE.LineSegments(seg(arr), lm(c, o)));
+  const pline = (x, y, c, o) => { const a = []; for (let s = SA; s < SB; s += ST) a.push(x, hAt(s) + y, -s, x, hAt(s + ST) + y, -(s + ST)); add(a, c, o); };
+  // asfalto
+  { const pos = [], ix = []; let n = 0;
+    for (let s = SA; s <= SB; s += ST) { const h = hAt(s); pos.push(-HALF, h, -s, HALF, h, -s); if (n) ix.push(2*n-2, 2*n, 2*n-1, 2*n-1, 2*n, 2*n+1); n++; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(ix);
+    trackGrp.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color:0x060A16, side:THREE.DoubleSide }))); }
+  [-1, 1].forEach(k => {
+    pline(k*HALF, 0.02, 0x5A82FF, 1); pline(k*HALF*0.474, 0.02, 0x245BFF, 0.8);
+    [[0,0x36E7FF,1],[0.04,0x36E7FF,1],[0.4,0x36E7FF,0.85],[1.4,0x245BFF,0.5],[2.4,0x36E7FF,0.85],[2.96,0x36E7FF,1],[3,0x36E7FF,1]].forEach(([y, c, o]) => pline(k*BAR, y, c, o));
+    const a = [], b = [];
+    for (let s = SA; s < SB; s += 4) { const h = hAt(s), x = k*BAR; a.push(x,h,-s, x,h+0.4,-s, x,h+2.4,-s, x,h+3,-s); b.push(x,h+0.4,-s, x,h+2.4,-s); }
+    add(a, 0x36E7FF, 0.6); add(b, 0x245BFF, 0.4);
+  });
+  pline(0, 0.02, 0x245BFF, 0.8);
+  const cross = []; for (let s = SA; s < SB; s += 10) { const h = hAt(s) + 0.02; cross.push(-HALF, h, -s, HALF, h, -s); }
+  add(cross, 0x245BFF, 0.5);
+  // chevrons de cresta (referencia)
+  const ch = []; const sc = S0 + LR - 10, hc = hAt(sc) + 0.03;
+  for (let k = -2; k <= 2; k++) { const x = k * 3.6; ch.push(x - 1.4, hc, -sc + 1.2, x, hc, -sc - 0.4, x, hc, -sc - 0.4, x + 1.4, hc, -sc + 1.2); }
+  add(ch, 0xFF9D32, 0.9);
+}
+
+// nave
+function shipGeom() {
+  const v = [[0,0.35,-NOSE],[-WING,0.25,TAIL],[WING,0.25,TAIL],[0,0.95,1.2],[0,0.05,1.2]];
+  const f = [[0,1,3],[0,3,2],[0,4,1],[0,2,4],[1,4,3],[3,4,2]];
+  const a = []; f.forEach(t => t.forEach(i => a.push(...v[i])));
+  return new THREE.EdgesGeometry(seg(a));
+}
+const ship = new THREE.LineSegments(shipGeom(), new THREE.LineBasicMaterial({ color:0x36E7FF }));
+ship.rotation.order = 'YXZ'; scene.add(ship);
+ship.add(new THREE.LineSegments(seg([-0.55,0.4,TAIL, -0.55,0.4,TAIL+2.6, 0.55,0.4,TAIL, 0.55,0.4,TAIL+2.6]), new THREE.LineBasicMaterial({ color:0x36E7FF, ...ADD, opacity:0.8 })));
+
+function radTex(stops) {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32,32,0,32,32,32); stops.forEach(([o, col]) => g.addColorStop(o, col));
+  x.fillStyle = g; x.fillRect(0,0,64,64); return new THREE.CanvasTexture(c);
+}
+const texGlow = radTex([[0,'rgba(255,255,255,1)'],[0.3,'rgba(255,255,255,0.5)'],[1,'rgba(255,255,255,0)']]);
+const texSmoke = radTex([[0,'rgba(255,255,255,0.9)'],[0.5,'rgba(255,255,255,0.45)'],[1,'rgba(255,255,255,0)']]);
+// brillo de levitación (casco 3D): 3,2 × 7,5 m, 0,32 ± 0,06, se apaga en el aire del todo a 3 m
+const lev = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 7.5), new THREE.MeshBasicMaterial({ map:texGlow, color:new THREE.Color(0.14,0.36,1), ...ADD, opacity:0.32 }));
+lev.rotation.order = 'YXZ'; scene.add(lev);
+
+// ================= ONDA =================
+const waves = [];
+const WAVE = { mid:{ R:7, dur:0.45, I:0.8 }, hard:{ R:12, dur:0.6, I:1, second:true } };
+const wPos = new Float32Array(4000*3), wCol = new Float32Array(4000*3);
+const wGeo = new THREE.BufferGeometry();
+wGeo.setAttribute('position', new THREE.BufferAttribute(wPos, 3).setUsage(THREE.DynamicDrawUsage));
+wGeo.setAttribute('color', new THREE.BufferAttribute(wCol, 3).setUsage(THREE.DynamicDrawUsage));
+const wLines = new THREE.LineSegments(wGeo, new THREE.LineBasicMaterial({ vertexColors:true, ...ADD })); wLines.frustumCulled = false; scene.add(wLines);
+function addWave(x, s, lv) {
+  const c = WAVE[lv]; if (!c) return;
+  waves.push({ x, s, R:c.R, dur:c.dur, I:c.I, age:0 });
+  if (c.second) waves.push({ x, s, R:c.R * 0.65, dur:c.dur * 0.9, I:c.I * 0.7, age:-0.09 });
+}
+function drawWaves(dt) {
+  let n = 0; const col = WCOL[opt.wcol];
+  const put = (x, s, w) => { const o = n*3; wPos[o]=x; wPos[o+1]=hAt(s) + 0.05; wPos[o+2]=-s; wCol[o]=col[0]*w; wCol[o+1]=col[1]*w; wCol[o+2]=col[2]*w; n++; };
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const w = waves[i]; w.age += dt; if (w.age >= w.dur) { waves.splice(i, 1); continue; }
+    if (w.age < 0 || opt.wave === 'off') continue;
+    const u = w.age / w.dur, r = 0.5 + (w.R - 0.5) * (1 - (1-u)*(1-u)), I = w.I * Math.pow(1 - u, 1.5);
+    if (opt.wave === 'ring') {
+      for (let k = 0; k < 48; k++) {
+        const a0 = k/48*Math.PI*2, a1 = (k+1)/48*Math.PI*2;
+        const x0 = w.x + Math.cos(a0)*r, x1 = w.x + Math.cos(a1)*r;
+        if (Math.abs(x0) > BAR || Math.abs(x1) > BAR) continue;   // la barrera la corta
+        put(x0, w.s + Math.sin(a0)*r, I); put(x1, w.s + Math.sin(a1)*r, I);
+      }
+    } else {   // rombo alargado en el sentido de la pista
+      const pts = [[r,0],[0,r*1.6],[-r,0],[0,-r*1.6],[r,0]];
+      for (let k = 0; k < 4; k++) for (let j = 0; j < 8; j++) {
+        const t0 = j/8, t1 = (j+1)/8, [ax, az] = pts[k], [bx, bz] = pts[k+1];
+        const x0 = w.x + ax + (bx-ax)*t0, z0 = az + (bz-az)*t0, x1 = w.x + ax + (bx-ax)*t1, z1 = az + (bz-az)*t1;
+        if (Math.abs(x0) > BAR || Math.abs(x1) > BAR) continue;
+        put(x0, w.s + z0, I); put(x1, w.s + z1, I);
+      }
+    }
+  }
+  wGeo.setDrawRange(0, n); wGeo.attributes.position.needsUpdate = wGeo.attributes.color.needsUpdate = true;
+}
+
+// ================= CHISPAS =================
+const MAXP = 3000;
+const P = { x:new Float32Array(MAXP), y:new Float32Array(MAXP), z:new Float32Array(MAXP), vx:new Float32Array(MAXP), vy:new Float32Array(MAXP), vz:new Float32Array(MAXP), age:new Float32Array(MAXP), life:new Float32Array(MAXP), kind:new Uint8Array(MAXP), n:0 };
+const stPos = new Float32Array(MAXP*6), stCol = new Float32Array(MAXP*6);
+const stGeo = new THREE.BufferGeometry();
+stGeo.setAttribute('position', new THREE.BufferAttribute(stPos, 3).setUsage(THREE.DynamicDrawUsage));
+stGeo.setAttribute('color', new THREE.BufferAttribute(stCol, 3).setUsage(THREE.DynamicDrawUsage));
+const streaks = new THREE.LineSegments(stGeo, new THREE.LineBasicMaterial({ vertexColors:true, ...ADD })); streaks.frustumCulled = false; scene.add(streaks);
+const cap = () => Math.round(MAXP * QK[opt.q]);
+const W3 = [1,0.95,0.82], O3 = [1,0.6,0.18], E0 = [0.85,0.22,0.04];
+const lerp3 = (a, b, u) => [a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u, a[2]+(b[2]-a[2])*u];
+function sparkCol(u, kind) {
+  if (kind === 3) { const k = (1-u)*0.85; return [k, 0.55*k, 0.14*k]; }
+  const c = u < 0.3 ? lerp3(W3, O3, u/0.3) : lerp3(O3, E0, (u-0.3)/0.7), k = Math.pow(1-u, 1.1); return [c[0]*k, c[1]*k, c[2]*k];
+}
+const SPK = { mid:{ n:20, emb:0 }, hard:{ n:70, emb:12 } };
+function sparkBurst(x, s, y, lv) {
+  const c = SPK[lv]; if (!c || opt.spark === 'off') return;
+  const q = QK[opt.q], n = Math.max(1, Math.round(c.n * q)), e = Math.round(c.emb * q);
+  for (let i = 0; i < n + e; i++) {
+    if (P.n >= cap()) break;
+    const em = i >= n, j = P.n++;
+    const lx = rnd(-1.5, 1.5), lz = rnd(-2, TAIL);
+    P.x[j] = x + lx; P.y[j] = y + 0.06; P.z[j] = -(s - lz);
+    const sideV = Math.sign(lx || 1) * (em ? rnd(1, 3) : rnd(3, 9));
+    P.vx[j] = sideV + rnd(-1, 1); P.vy[j] = em ? rnd(0.5, 2) : rnd(1, 5); P.vz[j] = -V * 0.7 + rnd(-2, 4);
+    P.age[j] = 0; P.life[j] = em ? rnd(0.9, 1.4) : rnd(0.2, 0.6); P.kind[j] = em ? 3 : 0;
+  }
+}
+function updateSparks(dt) {
+  for (let i = 0; i < P.n; i++) {
+    P.age[i] += dt;
+    if (P.age[i] >= P.life[i]) { const j = --P.n; for (const a of ['x','y','z','vx','vy','vz','age','life','kind']) P[a][i] = P[a][j]; i--; continue; }
+    P.vy[i] -= 14*dt; const d = 1 - 0.8*dt; P.vx[i] *= d; P.vy[i] *= d; P.vz[i] *= d;
+    P.x[i] += P.vx[i]*dt; P.y[i] += P.vy[i]*dt; P.z[i] += P.vz[i]*dt;
+    const gy = hAt(-P.z[i]) + 0.02;
+    if (P.y[i] < gy && P.vy[i] < 0) { P.y[i] = gy; P.vy[i] *= -0.3; P.vx[i] *= 0.6; P.vz[i] *= 0.6; }
+    if (Math.abs(P.x[i]) > BAR) { P.x[i] = Math.sign(P.x[i]) * BAR; P.vx[i] *= -0.3; }
+  }
+}
+function drawSparks() {
+  for (let i = 0; i < P.n; i++) {
+    const [r, g, b] = sparkCol(P.age[i] / P.life[i], P.kind[i]);
+    let rx = P.vx[i], ry = P.vy[i] - shipVy, rz = P.vz[i] + V;
+    const l = Math.hypot(rx, ry, rz) * 0.03, k = l > 2.2 ? 2.2 / l : 1; rx *= 0.03*k; ry *= 0.03*k; rz *= 0.03*k;
+    const o = i*6;
+    stPos[o]=P.x[i]; stPos[o+1]=P.y[i]; stPos[o+2]=P.z[i]; stPos[o+3]=P.x[i]-rx; stPos[o+4]=P.y[i]-ry; stPos[o+5]=P.z[i]-rz;
+    stCol[o]=r; stCol[o+1]=g; stCol[o+2]=b; stCol[o+3]=0; stCol[o+4]=0; stCol[o+5]=0;
+  }
+  stGeo.setDrawRange(0, P.n*2); stGeo.attributes.position.needsUpdate = stGeo.attributes.color.needsUpdate = true;
+}
+
+// ================= POLVO (humo de los choques, a ras de suelo) =================
+const puffs = [];
+const DUST = { mid:{ n:4, life:[0.9,1.3], r:[0.5,1.6] }, hard:{ n:12, life:[1.1,1.6], r:[0.6,2.4] } };
+const cloudPool = Array.from({ length:80 }, () => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:texSmoke, color:0x4A5670, transparent:true, depthWrite:false })); s.visible = false; scene.add(s); return s; });
+function dust(x, s, lv) {
+  const c = DUST[lv]; if (!c || opt.dust === 'off') return;
+  const n = Math.max(lv === 'hard' ? 2 : 1, Math.round(c.n * QK[opt.q]));
+  for (let i = 0; i < n; i++) {
+    const side = i % 2 ? 1 : -1, lz = rnd(-2.5, 2);
+    puffs.push({ x:x + side * rnd(0.5, 1.8), y:hAt(s - lz) + 0.3, z:-(s - lz), vx:side * rnd(2, 6), vy:rnd(0.2, 0.6), vz:-V * 0.5 + rnd(-1, 1),
+      age:-rnd(0, 0.06), life:rnd(c.life[0], c.life[1]), r0:c.r[0], r1:c.r[1] * rnd(0.8, 1.2) });
+  }
+}
+function updateDust(dt) {
+  for (let i = puffs.length - 1; i >= 0; i--) {
+    const p = puffs[i]; p.age += dt; if (p.age < 0) continue;
+    const d = 1 - 2.2*dt; p.vx *= d; p.vz *= d; p.vy *= (1 - 0.6*dt);
+    p.x += p.vx*dt; p.y += p.vy*dt; p.z += p.vz*dt;
+    if (Math.abs(p.x) > BAR - 0.5) { p.x = Math.sign(p.x) * (BAR - 0.5); p.vx = 0; }
+    if (p.age >= p.life) puffs.splice(i, 1);
+  }
+  let j = 0;
+  for (const p of puffs) {
+    if (p.age < 0 || j >= cloudPool.length) continue;
+    const u = p.age / p.life, r = p.r0 + (p.r1 - p.r0) * Math.sqrt(u), sp = cloudPool[j++];
+    sp.visible = true; sp.position.set(p.x, p.y, p.z); sp.scale.set(2*r, 1.4*r, 1);
+    sp.material.opacity = 0.38 * Math.pow(1-u, 1.3) * Math.min(1, p.age / 0.08);
+  }
+  for (; j < cloudPool.length; j++) cloudPool[j].visible = false;
+}
+
+// ================= ESTADO =================
+const SHK = { mid:{ a:0.06, r:0.8, d:0.25, lv:1 }, hard:{ a:0.15, r:2, d:0.4, lv:2 } };
+let shake = null, comp = null, levFlash = null, label = null;
+let s = 0, y = 0, vy = 0, air = false, airT = 0, maxH = 0, pitch = 0, shipVy = 0, simT = 0, autoIdx = 0, cur = 'mid', camInit = false;
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+const LEVF = { mid:{ peak:0.6, dur:0.3 }, hard:{ peak:1.1, dur:0.4 } };
+
+function startRun(id) {
+  cur = id; H = JUMPS[id].H; buildTrack();
+  s = 0; y = 0; vy = 0; air = false; airT = 0; maxH = 0; pitch = 0; camInit = false;
+  P.n = 0; puffs.length = 0; waves.length = 0; shake = comp = levFlash = label = null;
+}
+function land(fall, sl) {
+  const lv = fall >= 8 ? 'hard' : fall >= 3 ? 'mid' : null;
+  label = { txt: lv ? `ATERRIZAJE ${lv === 'hard' ? 'FUERTE' : 'MEDIO'} · caída ${fall.toFixed(1)} m/s` : `ATERRIZAJE SUAVE · caída ${fall.toFixed(1)} m/s · nada`, age:0, lv };
+  if (!lv) return;
+  // lo que ya existe (pista-3d): sacudida y compresión
+  const c = SHK[lv]; if (!shake || shake.age >= shake.d || shake.lv < c.lv) shake = { ...c, age:0 };
+  comp = { A:0.3 * Math.min(1, fall / 10), age:0 };
+  // nuevos
+  addWave(0, s, lv);
+  sparkBurst(0, s, hAt(s), lv);
+  dust(0, s, lv);
+  if (opt.lev === 'on') levFlash = { ...LEVF[lv], age:0 };
+}
+function update(dt) {
+  simT += dt;
+  s += V * dt;
+  if (s > (cur === 'hard' ? 760 : 600)) { if (opt.jump === 'auto') autoIdx = (autoIdx + 1) % 3; startRun(opt.jump === 'auto' ? ORDER[autoIdx] : opt.jump); return; }
+  const gS = hAt(s), sl = dh(s);
+  if (!air) {
+    if (V * V * d2(s) < -G) { air = true; vy = V * sl; y = gS; airT = 0; maxH = 0; }
+    else y = gS;
+  } else {
+    vy -= G * dt; y += vy * dt; airT += dt; maxH = Math.max(maxH, y - gS);
+    if (y <= gS) { const fall = (V * sl - vy) / Math.sqrt(1 + sl*sl); air = false; y = gS; if (airT > 0.15) land(fall, sl); }
+  }
+  shipVy = air ? vy : V * sl;
+  // cabeceo: en el aire hacia la dirección del movimiento (máx 20°, 0,3 s); en el suelo con la pista (0,15 s)
+  const tgt = air ? Math.max(-0.35, Math.min(0.35, Math.atan2(vy, V))) : Math.atan(sl);
+  pitch += (tgt - pitch) * (1 - Math.exp(-dt / (air ? 0.3 : 0.15)));
+  let off = 0;
+  if (comp) { comp.age += dt; const u = comp.age / 0.2; if (u >= 1) comp = null; else off = -comp.A * (1 - u) * (1 - u); }
+  ship.position.set(0, y + 0.6 + off, -s); ship.rotation.x = pitch;
+  // brillo de levitación
+  const hAir = Math.max(0, y - gS);
+  let lo = (0.32 + 0.06 * Math.sin(simT * 3)) * Math.max(0, 1 - hAir / 3), ls = 1;
+  if (levFlash) { levFlash.age += dt; const u = levFlash.age / levFlash.dur; if (u >= 1) levFlash = null; else { const k = (1-u)*(1-u); lo += levFlash.peak * k; ls = 1 + 0.35 * levFlash.peak * k; } }
+  lev.position.set(0, gS + 0.03, -s); lev.rotation.set(-Math.PI/2 + Math.atan(sl), 0, 0); lev.scale.set(ls, ls, 1); lev.material.opacity = lo;
+  updateSparks(dt); updateDust(dt);
+  if (label) label.age += dt;
+  // cámaras
+  const want = new THREE.Vector3(0, y + 3.4, -s + 10.5), look = new THREE.Vector3(0, y + 1.2, -s - 14);
+  if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
+  const k = 1 - Math.exp(-dt * 6); camPos.lerp(want, k); camLook.lerp(look, k);
+  camA.position.copy(camPos); camA.lookAt(camLook);
+  if (shake) {
+    shake.age += dt;
+    if (shake.age < shake.d) {
+      const d = Math.pow(1 - shake.age / shake.d, 2), w = 2*Math.PI*25*shake.age;
+      camA.position.x += shake.a * d * Math.sin(w); camA.position.y += shake.a * d * Math.sin(w*1.31 + 1.7);
+      camA.rotateZ(shake.r * Math.PI/180 * d * Math.sin(w*0.87 + 0.6));
+    }
+  }
+  camB.position.set(-24, y + 3, -s + 2); camB.lookAt(0, y + 0.3, -s - 2);
+  dtLast = dt;
+}
+let dtLast = 0;
+
+// ================= HUD =================
+function txt(t, x, yy, size, color, align = 'left', op = 1, glow = 6) {
+  hx.font = `${size}px 'Share Tech Mono', monospace`; hx.textAlign = align; hx.globalAlpha = op;
+  hx.fillStyle = color; hx.shadowColor = color; hx.shadowBlur = glow; hx.fillText(t, x, yy); hx.shadowBlur = 0; hx.globalAlpha = 1;
+}
+const INSET = { x:1280 - 16 - 440, y:16, w:440, h:248 };
+function drawHud() {
+  const w = hud.width, h = hud.height, u = h / 720;
+  hx.setTransform(1,0,0,1,0,0); hx.clearRect(0,0,w,h); hx.setTransform(u,0,0,u,(w - 1280*u)/2,0);
+  txt(`ATERRIZAJE · SALTO ${JUMPS[cur].name}`, 40, 52, 22, '#36E7FF');
+  txt(`${opt.jump === 'auto' ? 'AUTO ' + (autoIdx + 1) + '/3' : 'EN BUCLE'} · cresta de ${H.toLocaleString('es-ES')} m${opt.slow ? ' · ×0,25' : ''}${opt.paused ? ' · PAUSA' : ''}`, 40, 76, 14, '#A6B8D8', 'left', 0.9, 0);
+  if (air) txt(`EN EL AIRE · ${airT.toFixed(1)} s · ${maxH.toFixed(1)} m`, 40, 100, 15, '#36E7FF', 'left', 1, 4);
+  if (label && label.age < 1.8) txt(label.txt, 640, 150, label.lv ? 28 : 22, label.lv ? '#FF9D32' : '#A6B8D8', 'center', 1 - Math.max(0, label.age - 1.2) / 0.6, label.lv ? 10 : 0);
+  txt(`CHISPAS ${P.n} / ${cap()} · POLVO ${puffs.length} · ${opt.q}`, 40, 690, 14, '#A6B8D8', 'left', 0.8, 0);
+  txt(String(Math.round(V * 3.6)), 1172, 690, 44, '#36E7FF', 'right');
+  txt('KM/H', 1180, 690, 15, '#A6B8D8', 'left', 1, 0);
+  if (opt.view === 'both') {
+    hx.strokeStyle = '#36E7FF'; hx.globalAlpha = 0.7; hx.lineWidth = 1.5; hx.strokeRect(INSET.x, INSET.y, INSET.w, INSET.h); hx.globalAlpha = 1;
+    txt('LATERAL', INSET.x + 10, INSET.y + 20, 12, '#A6B8D8', 'left', 0.85, 0);
+  }
+}
+
+// ================= RENDER =================
+let VW = 1280, VH = 720;
+function renderView(cam, x, yy, w, h) {
+  renderer.setViewport(x, yy, w, h); renderer.setScissor(x, yy, w, h); renderer.setScissorTest(true);
+  renderer.clear(); cam.aspect = w / h; cam.updateProjectionMatrix();
+  sky.position.copy(cam.position); renderer.render(scene, cam);
+}
+function render(dt) {
+  drawWaves(dt); drawSparks();
+  renderView(opt.view === 'side' ? camB : camA, 0, 0, VW, VH);
+  if (opt.view === 'both') { const k = VH / 720; renderView(camB, INSET.x*k, VH - (INSET.y + INSET.h)*k, INSET.w*k, INSET.h*k); }
+}
+
+// ================= CONTROLES =================
+const DESC = {
+  'wave:ring':'ONDA A · ANILLO · un círculo que se abre en la pista desde donde toca la nave (doble en el fuerte)',
+  'wave:diamond':'ONDA B · ROMBO · un rombo alargado en el sentido de la marcha, más de circuito',
+  'wave:off':'SIN ONDA',
+  'wcol:cyan':'ONDA EN CIAN', 'wcol:blue':'ONDA EN AZUL · el color del brillo de levitación',
+  'spark:on':'CHISPAS · un chorro corto desde la panza (pocas en el medio, más y con brasas en el fuerte)', 'spark:off':'SIN CHISPAS',
+  'lev:on':'LEVITACIÓN · el brillo azul de debajo se enciende y se abre un instante al tocar', 'lev:off':'LEVITACIÓN NORMAL · solo el brillo de siempre (se apaga en el aire)',
+  'dust:on':'POLVO · nubes grises bajas que salen hacia los lados', 'dust:off':'SIN POLVO',
+};
+function toast(t) { const m = document.getElementById('mode'); m.textContent = t; m.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => m.style.opacity = 0, 2800); }
+document.querySelectorAll('button[data-g]').forEach(b => b.addEventListener('click', () => {
+  const g = b.dataset.g, val = b.dataset.v;
+  opt[g] = val;
+  document.querySelectorAll(`button[data-g="${g}"]`).forEach(x => x.classList.toggle('on', x === b));
+  if (DESC[g + ':' + val]) toast(DESC[g + ':' + val]);
+  if (g === 'jump') { if (val === 'auto') { autoIdx = 0; startRun('soft'); } else startRun(val); }
+  if (g === 'q') { P.n = Math.min(P.n, cap()); toast(`PARTICLES ${val} · chispas y polvo al ${QK[val]*100} % · la onda y la levitación no cambian`); }
+}));
+const bP = document.getElementById('bPause'), bS = document.getElementById('bSlow');
+const togglePause = () => { opt.paused = !opt.paused; bP.classList.toggle('on', opt.paused); };
+const toggleSlow = () => { opt.slow = !opt.slow; bS.classList.toggle('on', opt.slow); };
+bP.addEventListener('click', togglePause); bS.addEventListener('click', toggleSlow);
+addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); togglePause(); } else if (e.key === 'l' || e.key === 'L') toggleSlow(); });
+
+function resize() {
+  const st = document.getElementById('stage'), W = st.clientWidth, Hh = st.clientHeight;
+  let w = W, h = W * 9/16; if (h > Hh) { h = Hh; w = Hh * 16/9; }
+  const view = document.getElementById('view');
+  view.style.width = w + 'px'; view.style.height = h + 'px'; view.style.setProperty('--u', (h / 720) + 'px');
+  renderer.setSize(w, h, false); VW = w; VH = h;
+  hud.width = Math.round(w * DPR); hud.height = Math.round(h * DPR);
+}
+addEventListener('resize', resize); resize();
+startRun('soft'); update(0.016);
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const sdt = opt.paused ? 0 : dt * (opt.slow ? 0.25 : 1);
+  if (sdt > 0) update(sdt);
+  render(sdt); drawHud();
+  requestAnimationFrame(frame);
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { toast('La nave salta una cresta en bucle: suave, medio y fuerte. Activa o quita cada efecto.'); requestAnimationFrame(t0 => { last = t0; frame(t0); }); });
+</script>
+</body>
+</html>

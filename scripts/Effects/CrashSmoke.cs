@@ -14,6 +14,22 @@ public struct SmokePuff
 	public float Life;
 	public float StartRadius;
 	public float EndRadius;
+	// Otros valores para esta bocanada (el polvo del aterrizaje); null: los del humo de los choques
+	public SmokeStyle Style;
+	// Distancia sobre el eje de su última consulta al suelo (solo con BarrierGap)
+	public float Hint;
+}
+
+// Cómo va una bocanada que no es del humo de los choques (spec docs/efectos-3-aterrizaje.md, 4): su frenado, su
+// opacidad, su entrada, su alto respecto al ancho y, con BarrierGap ≥ 0, a cuánto de la barrera se queda quieta de lado
+public sealed class SmokeStyle
+{
+	public float DampHorizontal;
+	public float DampVertical;
+	public float Opacity;
+	public float FadeIn;
+	public float HeightScale = 1f;    // alto / ancho
+	public float BarrierGap = -1f;    // m; negativo: sin tope
 }
 
 // Humo de los golpes medios y fuertes (spec docs/efectos-1-choques.md, 6): bocanadas con retraso aleatorio, radio que
@@ -93,15 +109,24 @@ public sealed class CrashSmoke
 		return added;
 	}
 
+	// Una bocanada hecha fuera (el polvo del aterrizaje): no entra con el máximo lleno
+	public bool Add(in SmokePuff puff)
+	{
+		if (_puffs.Count >= Capacity)
+			return false;
+		_puffs.Add(puff);
+		return true;
+	}
+
 	public void Clear() => _puffs.Clear();
 
-	// Con dt 0 (pausa) no cambia nada
-	public void Update(float dt)
+	// Con dt 0 (pausa) no cambia nada. ground: para el tope en la barrera de las que lo llevan (null: sin tope)
+	public void Update(float dt, ICrashGround ground = null)
 	{
 		if (dt <= 0f)
 			return;
-		float dampH = MathF.Max(0f, 1f - _s.SmokeDampHorizontal * dt);
-		float dampV = MathF.Max(0f, 1f - _s.SmokeDampVertical * dt);
+		float crashDampH = MathF.Max(0f, 1f - _s.SmokeDampHorizontal * dt);
+		float crashDampV = MathF.Max(0f, 1f - _s.SmokeDampVertical * dt);
 		for (int i = _puffs.Count - 1; i >= 0; i--)
 		{
 			SmokePuff p = _puffs[i];
@@ -111,8 +136,12 @@ public sealed class CrashSmoke
 				_puffs[i] = p;
 				continue;
 			}
+			float dampH = p.Style == null ? crashDampH : MathF.Max(0f, 1f - p.Style.DampHorizontal * dt);
+			float dampV = p.Style == null ? crashDampV : MathF.Max(0f, 1f - p.Style.DampVertical * dt);
 			p.Velocity = new Vector3(p.Velocity.X * dampH, p.Velocity.Y * dampV, p.Velocity.Z * dampH);
 			p.Position += p.Velocity * dt;
+			if (ground != null && p.Style != null && p.Style.BarrierGap >= 0f)
+				StopAtBarrier(ref p, ground, p.Style.BarrierGap);
 			if (p.Age >= p.Life)
 			{
 				_puffs.RemoveAt(i);
@@ -121,6 +150,22 @@ public sealed class CrashSmoke
 			_puffs[i] = p;
 		}
 	}
+
+	// Llega a gap de la barrera: se queda ahí, sin velocidad de lado
+	private static void StopAtBarrier(ref SmokePuff p, ICrashGround ground, float gap)
+	{
+		GroundPoint g = ground.Locate(p.Position, p.Hint);
+		p.Hint = g.Distance;
+		float limit = ground.BarrierOffset - gap;
+		if (MathF.Abs(g.Lateral) <= limit)
+			return;
+		float sign = MathF.Sign(g.Lateral);
+		p.Position -= g.Right * (g.Lateral - sign * limit);
+		p.Velocity -= g.Right * Vector3.Dot(p.Velocity, g.Right);
+	}
+
+	// Alto respecto al ancho (1: redonda)
+	public static float HeightScale(in SmokePuff p) => p.Style?.HeightScale ?? 1f;
 
 	public static bool IsVisible(in SmokePuff p) => p.Age >= 0f && p.Age < p.Life;
 
@@ -135,8 +180,9 @@ public sealed class CrashSmoke
 		if (!IsVisible(p))
 			return 0f;
 		float u = Math.Clamp(p.Age / p.Life, 0f, 1f);
-		float fadeIn = _s.SmokeFadeIn > 0f ? MathF.Min(1f, p.Age / _s.SmokeFadeIn) : 1f;
-		return _s.SmokeOpacity * MathF.Pow(1f - u, _s.SmokeFadePower) * fadeIn;
+		float fadeTime = p.Style?.FadeIn ?? _s.SmokeFadeIn;
+		float fadeIn = fadeTime > 0f ? MathF.Min(1f, p.Age / fadeTime) : 1f;
+		return (p.Style?.Opacity ?? _s.SmokeOpacity) * MathF.Pow(1f - u, _s.SmokeFadePower) * fadeIn;
 	}
 
 	private float Range(float min, float max) => min + (max - min) * _random.NextSingle();

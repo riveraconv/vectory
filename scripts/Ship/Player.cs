@@ -360,6 +360,11 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	// La nave va por el aire (tras despegar en una cresta): el atasco no cuenta
 	public bool IsAirborne => Vertical.Airborne;
+	// En el último paso de física: si aterrizó y con qué velocidad de caída contra la superficie (m/s)
+	public bool JustLanded => Vertical.Landed;
+	public float LandingSpeed => Vertical.LandingSpeed;
+	// Umbrales del aterrizaje (spec docs/pista-3d.md, 3.4), también para los efectos de los rivales
+	public LandingSettings LandingThresholds => BuildLandingSettings();
 
 	// El cuadro de mando enseña el daño (RACE). En TIME TRIAL no hay daños: se queda apagado.
 	public bool CockpitDamageEnabled { get; set; }
@@ -386,6 +391,8 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	// La nave que se ve (con F10, la del panel): su semiancho y dónde roza al derrapar
 	public float CollisionHalfWidth => ExteriorVisual.CollisionHalfWidth;
+	// Perfil visual de la nave que se ve (F10 lo cambia)
+	public ShipVisualProfile ExteriorProfile => ExteriorVisual;
 	public DriftContactShape DriftContact => ExteriorVisual.DriftContact;
 
 	// La nave que se ve en el mundo, con su inclinación y su cabeceo (de ahí nacen las chispas del derrape)

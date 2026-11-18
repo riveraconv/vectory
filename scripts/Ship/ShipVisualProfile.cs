@@ -94,6 +94,10 @@ public sealed record ShipVisualProfile
 	public required float CollisionFront { get; init; }
 	public required float CollisionBack { get; init; }
 
+	// Altura de lo más bajo del casco 3D en los ejes de la nave (la y mínima de su manifiesto): de ahí salen las chispas
+	// del aterrizaje (spec docs/efectos-3-aterrizaje.md, 3). Una prueba lo compara con el manifiesto.
+	public required float BellyY { get; init; }
+
 	// Distancia del origen de la nave a la punta del morro (colocación en la parrilla)
 	public required float NoseDistance { get; init; }
 
