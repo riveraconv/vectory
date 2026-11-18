@@ -1,4 +1,5 @@
 using Godot;
+using Vectory.Settings;
 using Vectory.Ship;
 using NVector3 = System.Numerics.Vector3;
 
@@ -20,11 +21,13 @@ public partial class ThrusterFlames : Node3D
 	private static readonly StringName SnMid = "col_mid";
 	private static readonly StringName SnOut = "col_out";
 	private static readonly StringName SnRing = "ring";
+	private static readonly StringName SnHeat = "heat";
 
 	private static ArrayMesh _cone;
 	private static QuadMesh _quad;
 	private static Shader _flameShader;
 	private static Shader _ringShader;
+	private static Shader _heatShader;
 
 	private sealed class Nozzle
 	{
@@ -33,6 +36,9 @@ public partial class ThrusterFlames : Node3D
 		public ShaderMaterial Core;
 		public MeshInstance3D Ring;
 		public ShaderMaterial RingMaterial;
+		public MeshInstance3D Heat;
+		public ShaderMaterial HeatMaterial;
+		public OmniLight3D Light;
 	}
 
 	private readonly Nozzle[] _nozzles = new Nozzle[ThrusterState.Nozzles];
@@ -41,6 +47,8 @@ public partial class ThrusterFlames : Node3D
 	private ThrusterState _state;
 	private ThrusterInput _input;
 	private float _phase;
+	private bool _full = true;
+	private uint _lightLayer = ShipHull3D.HullLayer;
 
 	// Casco 3D de la nave, para la emisión de sus bocas (null con el wireframe)
 	public ShipHull3D Hull { get; set; }
@@ -48,12 +56,15 @@ public partial class ThrusterFlames : Node3D
 	// La intensidad de todo × esto (el fantasma: su transparencia)
 	public float Opacity { get; set; } = 1f;
 
-	// Antes de _Ready: ajustes, forma de la nave y desfase del tiempo (para que dos naves no parpadeen igual)
-	public void Setup(ThrusterFxSettings settings, ThrusterShape shape, float phase)
+	// Antes de _Ready: ajustes, forma de la nave, desfase del tiempo (para que dos naves no parpadeen igual), si lleva todo
+	// (carrera) o solo la llama (fantasma y menú: sin diamantes, calor ni luz; spec 9) y la capa del casco que ilumina
+	public void Setup(ThrusterFxSettings settings, ThrusterShape shape, float phase, bool full, uint lightLayer)
 	{
 		_settings = settings ?? ThrusterFxSettings.Default;
 		_shape = shape;
 		_phase = phase;
+		_full = full;
+		_lightLayer = lightLayer;
 	}
 
 	// Otra nave (F10): las bocas en su sitio, con su tamaño y sus colores
@@ -79,6 +90,7 @@ public partial class ThrusterFlames : Node3D
 		_quad ??= new QuadMesh { Size = Vector2.One };
 		_flameShader ??= new Shader { Code = FlameShader };
 		_ringShader ??= new Shader { Code = RingShader };
+		_heatShader ??= new Shader { Code = HeatShader };
 
 		for (int k = 0; k < ThrusterState.Nozzles; k++)
 		{
@@ -96,6 +108,33 @@ public partial class ThrusterFlames : Node3D
 				Visible = false
 			};
 			nozzle.Pivot.AddChild(nozzle.Ring);
+			if (_full)
+			{
+				// Calor: antes que las llamas (prioridad −1), porque copia la pantalla sin lo transparente
+				nozzle.HeatMaterial = new ShaderMaterial { Shader = _heatShader, RenderPriority = -1 };
+				nozzle.Heat = new MeshInstance3D
+				{
+					Name = "Heat",
+					Mesh = _quad,
+					MaterialOverride = nozzle.HeatMaterial,
+					CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+					ExtraCullMargin = 4f,
+					Visible = false
+				};
+				nozzle.Pivot.AddChild(nozzle.Heat);
+				nozzle.Light = new OmniLight3D
+				{
+					Name = "Light",
+					Position = new Vector3(0f, 0f, _settings.LightBehind),
+					OmniRange = _settings.LightRange,
+					OmniAttenuation = _settings.LightAttenuation,
+					ShadowEnabled = false,
+					LightCullMask = _lightLayer,
+					LightEnergy = 0f,
+					Visible = false
+				};
+				nozzle.Pivot.AddChild(nozzle.Light);
+			}
 			_nozzles[k] = nozzle;
 		}
 		PlaceNozzles();
@@ -134,16 +173,19 @@ public partial class ThrusterFlames : Node3D
 
 		ThrusterFxSettings s = _settings;
 		float scale = _shape.Scale;
+		bool heatOn = _full && ActiveSettings.Particles > ActiveSettings.ParticlesFraction(0);
+		Camera3D camera = heatOn ? GetViewport().GetCamera3D() : null;
 		for (int k = 0; k < ThrusterState.Nozzles; k++)
 		{
-			ThrusterFlame f = _state.Flame(k, _shape, s);
+			ThrusterFlame f = _state.Flame(k, _shape, s, heatOn);
 			Nozzle n = _nozzles[k];
 			float time = _state.Time + k * 3.7f;
 			float scroll = _state.Scroll + k * 7.3f;
 			float intensity = f.Brightness * Opacity;
 
 			n.Plume.SetShaderParameter(SnShape, new Vector4(f.Length, f.Width, f.Bend, _shape.Squash));
-			n.Plume.SetShaderParameter(SnForm, new Vector4(s.PlumeMouthRadius * scale, s.PlumeTipRadius * scale, 0f, 0f));
+			float diamonds = _full ? f.Diamonds * s.DiamondGlow * Opacity : 0f;
+			n.Plume.SetShaderParameter(SnForm, new Vector4(s.PlumeMouthRadius * scale, s.PlumeTipRadius * scale, 0f, diamonds));
 			n.Plume.SetShaderParameter(SnGlow, new Vector4(intensity, f.Flicker, scroll, time));
 			n.Plume.SetShaderParameter(SnCore, ToVector(f.Core));
 			n.Plume.SetShaderParameter(SnMid, ToVector(f.Mid));
@@ -163,6 +205,32 @@ public partial class ThrusterFlames : Node3D
 				float size = f.RingSize * scale;
 				n.Ring.Transform = new Transform3D(Basis.FromScale(new Vector3(size, size * s.RingAspect, 1f)), new Vector3(0f, 0f, s.RingBehind));
 				n.RingMaterial.SetShaderParameter(SnRing, new Vector4(s.RingColor.X, s.RingColor.Y, s.RingColor.Z, f.RingIntensity * Opacity));
+			}
+
+			if (_full)
+			{
+				// Calor: de cara a la cámara (lo hace el shader), detrás de la boca según el largo
+				// y menos cuanto más lejos de la cámara (si no, una nave lejana se ve doble)
+				n.Heat.Position = new Vector3(0f, 0f, s.HeatBehind + s.HeatBehindLength * f.Length);
+				float strength = f.Heat;
+				if (strength > 0f && camera != null)
+					strength *= ThrusterState.HeatDistanceFactor(camera.GlobalPosition.DistanceTo(n.Heat.GlobalPosition), s);
+				bool heat = strength > 0.01f;
+				n.Heat.Visible = heat;
+				if (heat)
+				{
+					n.HeatMaterial.SetShaderParameter(SnHeat, new Vector4(s.HeatWidth + s.HeatWidthLength * f.Length,
+						s.HeatHeight + s.HeatHeightLength * f.Length, strength * s.HeatDisplacement, time));
+				}
+
+				// Luz en el casco: solo con casco 3D (el wireframe no se ilumina), del color medio (HAMMER, naranja)
+				bool light = Hull != null && f.LightEnergy > 0f;
+				n.Light.Visible = light;
+				if (light)
+				{
+					n.Light.LightColor = new Color(f.Mid.X, f.Mid.Y, f.Mid.Z);
+					n.Light.LightEnergy = f.LightEnergy;
+				}
 			}
 
 			// La boca toma el color medio (el de la maqueta, tal cual, como color de la emisión)
@@ -217,7 +285,7 @@ public partial class ThrusterFlames : Node3D
 
 	// Llama (4.2 y 4.3), traducida de la maqueta: sin luz, en suma, por las dos caras, sin escribir profundidad.
 	// shape = (largo, ancho, doblado, achatado); form = (radio en la boca, en la punta, capa: 0 penacho / 1 núcleo, —);
-	// glow = (intensidad, parpadeo, lo que ha corrido el ruido, tiempo).
+	// glow = (intensidad, parpadeo, lo que ha corrido el ruido, tiempo). form.w: los diamantes (0 en el núcleo).
 	private const string FlameShader = @"
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
@@ -265,6 +333,8 @@ void fragment() {
 	vec3 col = mix(col_core, col_mid, smoothstep(0.02, 0.32, v));
 	col = mix(col, col_out, smoothstep(0.3, 0.95, v));
 	float i = glow.x * glow.y * s * edge * (0.45 + 0.75 * n) * tear;
+	// Diamantes de choque (5.1): bandas quietas respecto a la boca, solo en el penacho (form.w = D × 2,2)
+	i += pow(max(0.0, cos(v * shape.x * 2.4 - 0.6)), 10.0) * exp(-v * 2.2) * form.w * edge;
 	if (core) i *= 1.6;
 	ALBEDO = col * i;
 }
@@ -279,6 +349,42 @@ void fragment() {
 	float d = length(UV - 0.5) * 2.0;
 	float a = d < 0.47 ? 0.0 : d < 0.7 ? (d - 0.47) / 0.23 : d < 1.0 ? (1.0 - d) / 0.3 : 0.0;
 	ALBEDO = ring.rgb * ring.a * a;
+}
+";
+
+	// Calor (5.2): un plano de cara a la cámara que desplaza lo que hay detrás con dos ruidos que suben, dentro de una
+	// elipse. heat = (ancho, alto, desplazamiento en coordenadas de pantalla, tiempo). Sin escribir profundidad.
+	private const string HeatShader = @"
+shader_type spatial;
+render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+uniform vec4 heat;
+float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), u.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+	float a = 0.5;
+	float s = 0.0;
+	for (int i = 0; i < 4; i++) { s += a * vn(p); p *= 2.03; a *= 0.5; }
+	return s;
+}
+void vertex() {
+	vec3 center = MODEL_MATRIX[3].xyz;
+	vec3 world = center + INV_VIEW_MATRIX[0].xyz * VERTEX.x * heat.x + INV_VIEW_MATRIX[1].xyz * VERTEX.y * heat.y;
+	POSITION = PROJECTION_MATRIX * VIEW_MATRIX * vec4(world, 1.0);
+}
+void fragment() {
+	vec2 c = UV - 0.5;
+	float m = smoothstep(0.5, 0.1, length(c * vec2(1.6, 1.0)));
+	float a = fbm(UV * vec2(5.0, 3.0) + vec2(0.0, heat.w * 2.6));
+	float b = fbm(UV * vec2(4.0, 3.5) + vec2(4.7, heat.w * 3.1));
+	vec2 o = vec2(a - 0.5, b - 0.5) * m * heat.z;
+	ALBEDO = texture(screen_tex, SCREEN_UV + o).rgb;
+	ALPHA = m;
 }
 ";
 }

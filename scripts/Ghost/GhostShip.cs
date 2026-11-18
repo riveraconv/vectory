@@ -32,7 +32,7 @@ public partial class GhostShip : Node3D
 		Visible = false;
 
 		_ship = new Spaceship { Name = "Spaceship" };
-		_ship.EnableThrusters(ThrusterFxSettings.Default, 0.5f);
+		_ship.EnableThrusters(ThrusterFxSettings.Default, 0.5f, full: false);
 		AddChild(_ship);
 
 		// Sin colores de vértice ni emisión: un solo color translúcido, por debajo del umbral del glow

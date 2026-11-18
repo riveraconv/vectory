@@ -230,6 +230,56 @@ public class ThrusterFxTests
     }
 
     [Fact]
+    public void Diamonds_start_at_60_percent_power_and_grow_with_boost()
+    {
+        Assert.Equal(0f, ThrusterState.Diamonds(0.5f, 0f, S), 4);
+        Assert.Equal(0.55f, ThrusterState.Diamonds(1f, 0f, S), 4);
+        Assert.Equal(1.55f, ThrusterState.Diamonds(1f, 1f, S), 4);
+    }
+
+    [Fact]
+    public void Heat_follows_power_and_is_off_on_low_particles()
+    {
+        Assert.Equal(2f, ThrusterState.HeatStrength(1f, 1f, S), 4);
+        var state = new ThrusterState();
+        Run(state, Drive(accelerate: true), 2f);
+        Assert.True(state.Flame(0, Shape(), S).Heat > 0.9f);
+        Assert.Equal(0f, state.Flame(0, Shape(), S, heat: false).Heat);
+    }
+
+    [Fact]
+    public void Heat_shrinks_with_distance_and_fades_out_far()
+    {
+        Assert.Equal(1f, ThrusterState.HeatDistanceFactor(5f, S), 4);
+        Assert.Equal(1f, ThrusterState.HeatDistanceFactor(8f, S), 4);
+        Assert.Equal(0.5f, ThrusterState.HeatDistanceFactor(16f, S), 4);
+        Assert.Equal(8f / 30f, ThrusterState.HeatDistanceFactor(30f, S), 4);
+        Assert.Equal(8f / 45f * 0.5f, ThrusterState.HeatDistanceFactor(45f, S), 4);
+        Assert.Equal(0f, ThrusterState.HeatDistanceFactor(60f, S), 4);
+        Assert.Equal(0f, ThrusterState.HeatDistanceFactor(200f, S), 4);
+    }
+
+    [Fact]
+    public void Light_energy_follows_power_and_boost()
+    {
+        var unit = new ThrusterFxSettings { LightEnergy = 1f };
+        Assert.Equal(0.57f, ThrusterState.LightEnergyOf(0.3f, 0f, unit), 4);
+        Assert.Equal(2.2f, ThrusterState.LightEnergyOf(1f, 1f, unit), 4);
+        Assert.Equal(0.57f * S.LightEnergy, ThrusterState.LightEnergyOf(0.3f, 0f, S), 4);
+    }
+
+    [Fact]
+    public void Hammer_light_and_mouth_are_orange_like_its_flame()
+    {
+        // La luz y la boca toman el color medio de la llama: en HAMMER, su naranja (sin boost)
+        var state = new ThrusterState();
+        Run(state, Drive(accelerate: true), 2f);
+        ThrusterFlame flame = state.Flame(0, HammerShip.Definition.Visual.Thrusters, S);
+        Assert.Equal(ThrusterColors.Industrial.Mid, flame.Mid);
+        Assert.True(flame.Mid.X > flame.Mid.Z * 5f);
+    }
+
+    [Fact]
     public void Every_ship_has_its_thrusters()
     {
         Assert.Equal(new Vector3(0.75f, 0.10f, 3.20f), VectorShip.Definition.Visual.Thrusters.Nozzle);

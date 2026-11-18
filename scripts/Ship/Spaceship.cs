@@ -41,6 +41,7 @@ public partial class Spaceship : Node3D
 	private ThrusterFlames _thrusters;
 	private ThrusterFxSettings _thrusterSettings;
 	private float _thrusterPhase;
+	private bool _thrusterFull;
 
 	// Número de aristas que pueden parpadear por su cuenta con los daños: las líneas del wireframe o, con casco 3D,
 	// sus luces (14 en VECTOR, 9 en BLADE)
@@ -57,11 +58,13 @@ public partial class Spaceship : Node3D
 		RebuildHull3D();
 	}
 
-	// Enciende las llamas de las toberas, con sus ajustes y un desfase de tiempo propio. Antes o después de _Ready.
-	public void EnableThrusters(ThrusterFxSettings settings, float phase)
+	// Enciende las llamas de las toberas, con sus ajustes y un desfase de tiempo propio; full: con diamantes, calor y luz
+	// (carrera), si no solo la llama (fantasma y menú). Antes o después de _Ready.
+	public void EnableThrusters(ThrusterFxSettings settings, float phase, bool full = true)
 	{
 		_thrusterSettings = settings ?? ThrusterFxSettings.Default;
 		_thrusterPhase = phase;
+		_thrusterFull = full;
 		if (_meshInstance != null && _thrusters == null)
 		{
 			CreateThrusters();
@@ -73,7 +76,7 @@ public partial class Spaceship : Node3D
 	private void CreateThrusters()
 	{
 		_thrusters = new ThrusterFlames { Name = "Thrusters" };
-		_thrusters.Setup(_thrusterSettings, Visual.Thrusters, _thrusterPhase);
+		_thrusters.Setup(_thrusterSettings, Visual.Thrusters, _thrusterPhase, _thrusterFull, Hull3DLayer);
 		AddChild(_thrusters);
 	}
 

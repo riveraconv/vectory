@@ -56,7 +56,7 @@ public partial class MenuBackground : Node3D
 
 		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual };
 		// Al ralentí: nadie le pasa nada (spec docs/efectos-6-toberas.md, 9)
-		_ship.EnableThrusters(Effects.ThrusterFxSettings.Default, 0f);
+		_ship.EnableThrusters(Effects.ThrusterFxSettings.Default, 0f, full: false);
 		AddChild(_ship);
 
 		var grid = new HorizonGridSettings

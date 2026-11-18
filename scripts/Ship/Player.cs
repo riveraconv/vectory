@@ -289,6 +289,12 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export] public float ThrusterMaxSlip = ThrusterDefaults.MaxSlipDegrees;      // grados: doblada del todo desde aquí
 	[Export] public float ThrusterRingSize = ThrusterDefaults.RingEnd;            // m, tamaño final del anillo del boost
 	[Export] public float ThrusterRingDuration = ThrusterDefaults.RingDuration;   // s
+	[Export] public float ThrusterDiamonds = ThrusterDefaults.DiamondGlow;        // brillo de los diamantes de choque
+	[Export] public float ThrusterHeat = ThrusterDefaults.HeatDisplacement;       // desplazamiento del calor (pantalla)
+	[Export] public float ThrusterHeatReference = ThrusterDefaults.HeatReferenceDistance; // m: más lejos, el calor baja con la distancia
+	[Export] public float ThrusterHeatFadeStart = ThrusterDefaults.HeatFadeStart;  // m: desde aquí se apaga
+	[Export] public float ThrusterHeatFadeEnd = ThrusterDefaults.HeatFadeEnd;      // m: aquí ya no hay calor
+	[Export] public float ThrusterLightEnergy = ThrusterDefaults.LightEnergy;     // E0 de la luz de las toberas en el casco
 
 	private static readonly ThrusterFxSettings ThrusterDefaults = new();
 
@@ -312,7 +318,13 @@ public partial class Player : CharacterBody3D, IContactShip
 			BendDrift = ThrusterBendDrift,
 			MaxSlipDegrees = ThrusterMaxSlip,
 			RingEnd = ThrusterRingSize,
-			RingDuration = ThrusterRingDuration
+			RingDuration = ThrusterRingDuration,
+			DiamondGlow = ThrusterDiamonds,
+			HeatDisplacement = ThrusterHeat,
+			HeatReferenceDistance = ThrusterHeatReference,
+			HeatFadeStart = ThrusterHeatFadeStart,
+			HeatFadeEnd = ThrusterHeatFadeEnd,
+			LightEnergy = ThrusterLightEnergy
 		};
 	}
 

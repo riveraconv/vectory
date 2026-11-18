@@ -218,6 +218,14 @@ Espacial, **sin luz** (`unshaded`), mezcla **aditiva**, las **dos caras**, **sin
 - Solo en la **capa del casco** (`light_cull_mask`): no ilumina la pista ni el entorno.
 - **Límite conocido**: tus luces van en `HullLayer` (11) y solo tocan tu casco; las de los siete rivales van en `RivalLayer` (12), que comparten todos, así que la luz de un rival **también ilumina a los rivales que tenga a menos de 7 m** (sobre todo el morro del que va detrás). Separarlos pediría una capa por rival; se acepta así. Si en la prueba se nota feo, se prueba a bajar el rango de los rivales.
 - Sin sombras. 16 luces como mucho (8 naves × 2): con Forward+ no hay tope práctico, pero se miden los fps (prueba manual 13).
+- **Etapa 2**: `E0` = **4** (con 1 la popa apenas se teñía; con 4 se ve el fuselaje trasero y los bordes de las toberas del color de su llama, sin quemar). La luz y la boca toman el color medio de la llama de cada nave: **en HAMMER, naranja**. Solo con casco 3D (el wireframe del fantasma y del menú no se ilumina).
+
+### 5.4 Resultado de la etapa 2
+
+- El calor se dibuja **antes que las llamas** (prioridad −1): la textura de pantalla no lleva lo transparente, y dibujado después borraba la llama que tenía detrás. Su `ALPHA` es la máscara elíptica, así fuera de ella no toca nada. Lo transparente que se dibuje antes que él dentro de la elipse (otro calor) se pierde ahí; no se nota.
+- **Calor con la distancia** (pedido por el usuario tras probarlo): el desplazamiento de la maqueta va en coordenadas de pantalla, así que una nave lejana (con su plano pequeño) tomaba píxeles de muy lejos y se veía doble, como espectros difuminados, a 2–3 m de la nave. Ahora, hasta **8 m** de la cámara (la cámara exterior), el de la maqueta; más lejos, × 8 / distancia; y de **30 a 60 m** se apaga del todo (y deja de dibujarse). En el grupo **Toberas** del `Player`: `ThrusterHeatReference`, `ThrusterHeatFadeStart` y `ThrusterHeatFadeEnd`. Prueba `Heat_shrinks_with_distance_and_fades_out_far`.
+- Diamantes, calor y luz solo en la carrera (tú y los rivales); fantasma y menú, solo la llama.
+- Medido en RACE con VECTOR y las 8 naves, 8 s a fondo desde el GO a 144 Hz: 144 FPS y frame medio igual (6,95 ms); sin vsync, **2,52 ms con las toberas y 1,85 sin ellas** (unos 0,67 ms). Los frames lentos que salen (en el GO y hacia los 7 s, de 18–27 ms) salen **igual con las toberas apagadas**: ya estaban. No se ha probado en un PC flojo.
 
 ## 6. Retroempuje (etapa 3)
 

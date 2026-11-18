@@ -64,6 +64,28 @@ public sealed class ThrusterFxSettings
 	// --- Boca (4.6): emisión × (base + P × … + bt × …) × q / norma; con P = 0,3 y sin boost, la de siempre
 	public float MouthBase = 0.6f, MouthPower = 1.6f, MouthBoost = 1.5f, MouthNorm = 1.08f;
 
+	// --- Diamantes de choque (5.1): fuerza D = máx(0, (P − desde) / rango) × ganancia + bt; en el penacho, × DiamondGlow
+	public float DiamondFrom = 0.6f, DiamondRange = 0.4f, DiamondGain = 0.55f, DiamondBoost = 1f;
+	public float DiamondGlow = 2.2f;
+
+	// --- Calor (5.2): plano detrás de la boca a base + largo × … m, de ancho y alto base + largo × …; fuerza k = base +
+	// P × … + bt × …; desplazamiento en coordenadas de pantalla × HeatDisplacement
+	public float HeatBehind = 0.8f, HeatBehindLength = 0.55f;
+	public float HeatWidth = 1.3f, HeatWidthLength = 0.25f;
+	public float HeatHeight = 1.1f, HeatHeightLength = 0.5f;
+	public float HeatBase = 0.25f, HeatPower = 0.75f, HeatBoost = 1f;
+	public float HeatDisplacement = 0.045f;
+	// El desplazamiento es en coordenadas de pantalla: sin esto, una nave lejana (plano pequeño) tomaría píxeles de muy
+	// lejos y se vería doble. Hasta HeatReferenceDistance m de la cámara, el de la maqueta (su cámara exterior); más
+	// lejos, × referencia / distancia; y de HeatFadeStart a HeatFadeEnd m se apaga del todo
+	public float HeatReferenceDistance = 8f;
+	public float HeatFadeStart = 30f, HeatFadeEnd = 60f;
+
+	// --- Luz en el casco (5.3): OmniLight3D LightBehind m detrás de la boca; energía E0 × (base + P × … + bt × …) × q
+	public float LightBehind = 0.7f, LightRange = 7f, LightAttenuation = 1.6f;
+	public float LightEnergy = 4f;                               // E0, ajustado a ojo (con 1 la popa apenas se ilumina)
+	public float LightBase = 0.3f, LightPower = 0.9f, LightBoost = 1f;
+
 	public static ThrusterFxSettings Default => new();
 }
 
@@ -100,6 +122,9 @@ public struct ThrusterFlame
 	public float Mouth;
 	public float RingSize;
 	public float RingIntensity;
+	public float Diamonds;     // D (5.1)
+	public float Heat;         // k (5.2); 0 = no se dibuja
+	public float LightEnergy;  // energía de su luz (5.3)
 }
 
 // Estado de las dos toberas de una nave (spec docs/efectos-6-toberas.md, 3): potencia, boost de la llama, encendido,
@@ -183,7 +208,8 @@ public sealed class ThrusterState
 	}
 
 	// Cómo se ve la tobera k con la forma y los colores de su nave
-	public ThrusterFlame Flame(int k, in ThrusterShape shape, ThrusterFxSettings s)
+	// heat: false con PARTICLES en LOW (5.2), y el calor no se dibuja
+	public ThrusterFlame Flame(int k, in ThrusterShape shape, ThrusterFxSettings s, bool heat = true)
 	{
 		float side = k == 0 ? -1f : 1f;
 		float turn = TurnFactor(Steer, side, Throttle, s);
@@ -205,7 +231,10 @@ public sealed class ThrusterState
 			Out = Mix(shape.Colors.Out, s.BoostOut, Boost),
 			Mouth = (s.MouthBase + s.MouthPower * Power + s.MouthBoost * Boost) * flicker / s.MouthNorm,
 			RingSize = ring ? s.RingStart + (s.RingEnd - s.RingStart) * ringT : 0f,
-			RingIntensity = ring ? s.RingIntensity * (1f - ringT) : 0f
+			RingIntensity = ring ? s.RingIntensity * (1f - ringT) : 0f,
+			Diamonds = Diamonds(Power, Boost, s),
+			Heat = heat ? HeatStrength(Power, Boost, s) : 0f,
+			LightEnergy = LightEnergyOf(Power, Boost, s) * flicker
 		};
 	}
 
@@ -243,6 +272,25 @@ public sealed class ThrusterState
 
 	public static float Brightness(float power, float boost, float turn, ThrusterFxSettings s) =>
 		(s.BrightBase + s.BrightPower * power + s.BrightBoost * boost) * (s.BrightTurnBase + s.BrightTurn * turn) * s.Brightness;
+
+	public static float Diamonds(float power, float boost, ThrusterFxSettings s) =>
+		MathF.Max(0f, (power - s.DiamondFrom) / s.DiamondRange) * s.DiamondGain + s.DiamondBoost * boost;
+
+	public static float HeatStrength(float power, float boost, ThrusterFxSettings s) =>
+		s.HeatBase + s.HeatPower * power + s.HeatBoost * boost;
+
+	// Lo que queda del calor a esa distancia de la cámara (m): 1 cerca, referencia / distancia más lejos y 0 desde el final
+	public static float HeatDistanceFactor(float distance, ThrusterFxSettings s)
+	{
+		float near = distance > s.HeatReferenceDistance && distance > 0f ? s.HeatReferenceDistance / distance : 1f;
+		float span = s.HeatFadeEnd - s.HeatFadeStart;
+		float t = span > 0f ? Math.Clamp((distance - s.HeatFadeStart) / span, 0f, 1f) : (distance >= s.HeatFadeEnd ? 1f : 0f);
+		return near * (1f - t * t * (3f - 2f * t));
+	}
+
+	// Sin el parpadeo
+	public static float LightEnergyOf(float power, float boost, ThrusterFxSettings s) =>
+		s.LightEnergy * (s.LightBase + s.LightPower * power + s.LightBoost * boost);
 
 	public static float Approach(float x, float target, float tau, float dt) =>
 		tau <= 0f ? target : x + (target - x) * (1f - MathF.Exp(-dt / tau));
