@@ -23,6 +23,7 @@ from lib import blender_io as io  # noqa: E402
 from lib import geometry as g  # noqa: E402
 from lib import hull_blade_geometry as bg  # noqa: E402
 from lib import hull_geometry as hg  # noqa: E402
+from lib import nose_copy as nc  # noqa: E402
 from lib import textures_hull as tx  # noqa: E402
 from lib import textures_hull_blade as tb  # noqa: E402
 from lib.builder import Builder  # noqa: E402
@@ -265,7 +266,8 @@ def build_canopy(b, m):
     h = bg.canopy_half_x(z)
     pts = [(-h + 2 * h * i / 16, bg.canopy_y((-h + 2 * h * i / 16) * 0.999, z) + 0.006, z) for i in range(17)]
     b.add(g.tube(pts, 0.013, 32, 8), m.gun, name="Canopy_Bow")
-    # barras de la cúpula blindada
+    # barras de la cúpula blindada, solo por detrás del arco: delante, donde convergen, tapaban la vista desde la cabina
+    # (decisión del usuario, spec docs/cabinas-3d-4-morros.md; la cabina copia estas mismas)
     for i, x in enumerate((-0.13, 0.0, 0.13)):
         hz = bg.canopy_half_z(x)
         pts = []
@@ -273,7 +275,7 @@ def build_canopy(b, m):
             d = -1 + 2 * j / 18
             zz = bg.CAN["zc"] + d * hz * (bg.CAN["Bf"] if d < 0 else bg.CAN["Br"]) * 0.97
             pts.append((x, bg.canopy_y(x, zz) + 0.008, zz))
-        b.add(g.tube(pts, 0.012, 40, 8), m.gun, name=f"Canopy_Bar_{i}")
+        b.add(nc.clip_back(g.tube(pts, 0.012, 40, 8), z), m.gun, name=f"Canopy_Bar_{i}")
     # carenado detrás de la cúpula
     b.add(bg.fairing(), m.paint, name="Fairing")
     # suelo de la cabina, del color base de la pintura (sin camuflaje)

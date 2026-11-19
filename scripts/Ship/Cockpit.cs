@@ -25,6 +25,9 @@ public partial class Cockpit : Node3D
 
 	public Camera3D Camera { get; private set; }
 
+	// Copia del morro del casco de la cabina actual (spec docs/cabinas-3d-4-morros.md): la pinta el casco 3D
+	public HullNoseCopy NoseCopy => _view3D?.NoseCopy;
+
 	// Perfil visual de la nave. Se asigna al crear el nodo.
 	public ShipVisualProfile Visual { get; set; } = ShipDefinitions.Default.Visual;
 

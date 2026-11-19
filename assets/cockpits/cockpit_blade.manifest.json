@@ -182,7 +182,7 @@
       "opacity": 0.05
     }
   ],
-  "triangles": 79371,
+  "triangles": 79059,
   "bounds": {
     "min": [
       -1.0837,
@@ -354,19 +354,19 @@
     "frame": [
       {
         "name": "Canopy_Bar_0",
-        "hull": "Canopy_Bar_0",
+        "hull": "Canopy_M_Gunmetal",
         "material": "M_Gunmetal",
         "live": false
       },
       {
         "name": "Canopy_Bar_1",
-        "hull": "Canopy_Bar_1",
+        "hull": "Canopy_M_Gunmetal",
         "material": "M_Gunmetal",
         "live": false
       },
       {
         "name": "Canopy_Bar_2",
-        "hull": "Canopy_Bar_2",
+        "hull": "Canopy_M_Gunmetal",
         "material": "M_Gunmetal",
         "live": false
       }

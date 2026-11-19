@@ -106,7 +106,8 @@ public sealed record Cockpit3DScene(
 	float KeyFactor = 1f,
 	float LampFactor = 1f,
 	float HemisphereStrength = Cockpit3DScene.VectorHemisphereStrength,
-	float AmbientStrength = Cockpit3DScene.VectorAmbientStrength)
+	float AmbientStrength = Cockpit3DScene.VectorAmbientStrength,
+	float NoseReflections = 1f)   // reflejos de la copia del morro del casco (spec docs/cabinas-3d-4-morros.md, 4.3)
 {
 	public const float VectorHemisphereStrength = 0.6f;
 	public const float VectorAmbientStrength = 0.45f;

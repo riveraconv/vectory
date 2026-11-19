@@ -126,11 +126,11 @@ public class Cockpit3DHammerProfileTests
     }
 
     [Fact]
-    public void Hammer_EyeAt287m_Fov70_LookingDown49Degrees()
+    public void Hammer_EyeAt2805m_Fov70_LookingDown49Degrees()
     {
         CockpitFraming framing = ShipDefinitions.Find(ShipCatalog.Ship03)!.Visual.Cockpit;
-        Assert.Equal(2.87f, framing.Eye.Y + ShipHover, 4);
-        Assert.Equal(-1.2f, framing.Eye.Z);
+        Assert.Equal(2.805f, framing.Eye.Y + ShipHover, 4);
+        Assert.Equal(-1.03f, framing.Eye.Z);
         Assert.Equal(70f, framing.Fov);
         Assert.Equal(-4.9f, framing.PitchDegrees, 1);
         Assert.Equal(-0.085f, framing.PitchRadians, 5);
@@ -146,7 +146,7 @@ public class Cockpit3DHammerProfileTests
         Assert.Equal(Cockpit3DStyle.Racing, vector.Cockpit3D!.Style);
         Assert.Equal(0f, vector.Cockpit.PitchDegrees);
         Assert.Equal(Cockpit3DStyle.Military, blade.Cockpit3D!.Style);
-        Assert.Equal(2.42f, blade.Cockpit.Eye.Y + ShipHover, 4);
+        Assert.Equal(2.37f, blade.Cockpit.Eye.Y + ShipHover, 4);
         Assert.Equal(-5.7f, blade.Cockpit.PitchDegrees, 1);
         Assert.Equal(Cockpit3DStyle.Industrial, hammer.Cockpit3D!.Style);
         Assert.All(new[] { vector, blade, hammer }, v => Assert.NotNull(v.Cockpit3D));

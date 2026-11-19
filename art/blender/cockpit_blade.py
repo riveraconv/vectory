@@ -785,7 +785,7 @@ def main():
     nose_entries = nc.create_objects(nose, hull.contract_names(), bpy.data.objects["Nose"], collection, hull.uv_args,
                                      originals, live)
     frame_entries = nc.create_objects(bars, BARS, bpy.data.objects["Frame"], collection, hull.uv_args, originals, live,
-                                      prefix="")
+                                      prefix="", hull_contract=hull.contract_names())
     no_shadow += [e["name"] for e in nose_entries + frame_entries if e["noShadow"]]
     bpy.context.view_layer.update()
 

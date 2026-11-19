@@ -60,11 +60,20 @@ def moved(soup, eye):
 # Se queda con lo que hay en z ≤ cut_z. Los triángulos que cruzan el plano se cortan (Sutherland-Hodgman sobre el
 # triángulo), interpolando posición, normal y UV, y se vuelven a triangular en abanico con el mismo sentido.
 def clip_front(soup, cut_z):
+    return _clip(soup, cut_z, True)
+
+
+# Lo contrario: se queda con lo que hay en z ≥ cut_z (los barrotes de la cúpula de BLADE, por detrás de su arco)
+def clip_back(soup, cut_z):
+    return _clip(soup, cut_z, False)
+
+
+def _clip(soup, cut_z, keep_front):
     pos, nrm, uvs = soup.positions, soup.normals, soup.uvs
     out = g.Soup([], [], [])
     for i in range(0, len(pos), 3):
         tri = [(pos[j], nrm[j], uvs[j]) for j in (i, i + 1, i + 2)]
-        inside = [v[0][2] <= cut_z for v in tri]
+        inside = [(v[0][2] <= cut_z) == keep_front for v in tri]
         if all(inside):
             for p, n, uv in tri:
                 out.positions.append(p)
@@ -128,15 +137,21 @@ class _Named:
 # live: nombres de pieza del casco que son vivas (luces, acentos, toberas).
 # Devuelve una entrada por objeto: nombre, nombre en el casco, zona del casco, material original, si es viva y si no
 # da sombra.
-def create_objects(pieces, contract, parent, collection, uv_args, originals, live, prefix=PREFIX):
+# hull_contract: el contrato del casco, si las piezas solas de la cabina no lo están en el casco (los barrotes de BLADE):
+# entonces su nombre en el casco es el del objeto donde el casco las junta.
+def create_objects(pieces, contract, parent, collection, uv_args, originals, live, prefix=PREFIX, hull_contract=None):
     contract = set(contract)
+    in_hull = None if hull_contract is None else set(hull_contract)
     entries = []
     merged = {}
     for piece in pieces:
         original = originals.get(piece.material.name, piece.material.name)
         if piece.name in contract:
-            entries.append(_object(prefix, piece.name, piece.zone, piece.soup, piece.material, original, parent,
-                                   collection, uv_args, piece.name in live, piece.no_shadow))
+            entry = _object(prefix, piece.name, piece.zone, piece.soup, piece.material, original, parent,
+                            collection, uv_args, piece.name in live, piece.no_shadow)
+            if in_hull is not None and piece.name not in in_hull:
+                entry["hull"] = f"{piece.zone}_{original}" + ("_NoShadow" if piece.no_shadow else "")
+            entries.append(entry)
             continue
         key = (piece.zone, piece.material.name, piece.no_shadow)
         if key not in merged:

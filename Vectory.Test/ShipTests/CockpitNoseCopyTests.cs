@@ -113,6 +113,60 @@ public class CockpitNoseCopyTests
             || p.Hull.StartsWith("Work_") || p.Hull.StartsWith("Light_Work_"));
     }
 
+    // ---------- Perfil visual (prueba 1) ----------
+
+    [Theory]
+    [InlineData("ship_01", "vector", 0f)]
+    [InlineData("ship_02", "blade", -0.10f)]
+    [InlineData("ship_03", "hammer", -0.085f)]
+    public void Profile_EyeIsTheOneOfItsNoseCopy_AndPitchDoesNotChange(string id, string ship, float pitch)
+    {
+        CockpitFraming framing = ShipDefinitions.Find(id)!.Visual.Cockpit;
+        float[] eye = Cockpit(ship).Nose.Eye;
+        Assert.InRange(MathF.Abs(framing.Eye.X - eye[0]), 0f, 0.001f);
+        Assert.InRange(MathF.Abs(framing.Eye.Y - eye[1]), 0f, 0.001f);
+        Assert.InRange(MathF.Abs(framing.Eye.Z - eye[2]), 0f, 0.001f);
+        Assert.Equal(pitch, framing.PitchRadians, 4);
+    }
+
+    // ---------- Pintura y piezas vivas (pruebas 4 y 5) ----------
+
+    // El casco pinta sus piezas por nombre: las pintadas que quedan delante del corte están en la copia con ese nombre,
+    // y llevan una copia de su material (con la pasada del daño de la copia), que el casco rehace al cambiar de pintura
+    [Theory]
+    [InlineData("vector", "Fuselage_Upper")]
+    [InlineData("blade", "Fuselage_Upper")]
+    [InlineData("hammer", "Fuselage_Upper")]
+    [InlineData("hammer", "Canard_L_Top")]
+    [InlineData("hammer", "Canard_R_Top")]
+    public void Paint_ReachesTheCopy_ByTheNameOfItsHullPiece(string ship, string painted)
+    {
+        CockpitManifestHullPiece piece = Assert.Single(Cockpit(ship).Nose.Pieces, p => p.Hull == painted);
+        Assert.Equal(HullNoseCopyRules.CopyName(painted), piece.Name);
+        Assert.False(piece.Live);
+        Assert.False(HullNoseCopyRules.SharesMaterial(emissive: false, transparent: false, hasPass: true));
+    }
+
+    // Las luces de la copia comparten el material de las del casco: se encienden y titilan con su mismo estado
+    [Theory]
+    [InlineData("vector")]
+    [InlineData("blade")]
+    [InlineData("hammer")]
+    public void LiveLights_ShareTheStateOfTheHull(string ship)
+    {
+        string[] flicker = (ship switch
+        {
+            "vector" => HullPieces.FlickerLights,
+            "blade" => MilitaryHullPieces.FlickerLights,
+            _ => IndustrialHullPieces.FlickerLights
+        }).ToArray();
+        foreach (CockpitManifestHullPiece piece in Cockpit(ship).Nose.Pieces.Where(p => p.Live))
+            Assert.Contains(piece.Hull, flicker);
+        Assert.True(HullNoseCopyRules.SharesMaterial(emissive: true, transparent: false, hasPass: false));
+        Assert.True(HullNoseCopyRules.SharesMaterial(emissive: false, transparent: true, hasPass: false));   // calcomanías
+        Assert.False(HullNoseCopyRules.SharesMaterial(emissive: true, transparent: false, hasPass: true));
+    }
+
     // ---------- Cambios del cristal ----------
 
     [Fact]
@@ -127,7 +181,8 @@ public class CockpitNoseCopyTests
     {
         Assert.Equal(-0.026f, Blade.CombinerCenterY!.Value, 4);
         Assert.Equal(new[] { "Canopy_Bar_0", "Canopy_Bar_1", "Canopy_Bar_2" }, Blade.Nose.Frame.Select(p => p.Name));
-        Assert.All(Blade.Nose.Frame, p => Assert.Equal(p.Name, p.Hull));
+        // En el .glb del casco los barrotes van juntos con el resto del metal de la cúpula
+        Assert.All(Blade.Nose.Frame, p => Assert.Equal("Canopy_M_Gunmetal", p.Hull));
         Assert.DoesNotContain(Blade.Nose.Pieces, p => p.Hull.StartsWith("Canopy_Bar_"));
     }
 

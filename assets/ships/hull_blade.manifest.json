@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-15",
+  "exported": "2026-11-19",
   "root": "HullBlade",
   "environment": "cockpit_blade_env.png",
   "pieces": [
@@ -398,8 +398,8 @@
     "M_Titanium"
   ],
   "uv2Scale": 1.1,
-  "triangles": 32148,
-  "trianglesWithLivery": 32692,
+  "triangles": 31836,
+  "trianglesWithLivery": 32380,
   "bounds": {
     "min": [
       -1.612,

@@ -561,6 +561,7 @@ public partial class Player : CharacterBody3D, IContactShip
 
 		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual, Settings3D = BuildCockpit3DSettings() };
 		AddChild(_cockpit);
+		_ship.SetNoseCopy(_cockpit.NoseCopy);
 
 		_chaseCam = new ChaseCamera { Name = "ChaseCamera" };
 		AddChild(_chaseCam);
@@ -639,6 +640,7 @@ public partial class Player : CharacterBody3D, IContactShip
 			return;
 		_ship.SetVisual(visual);
 		_cockpit.SetVisual(visual);
+		_ship.SetNoseCopy(_cockpit.NoseCopy);
 		RebuildFlicker();
 		ApplyView();
 		ViewChanged?.Invoke(View);

@@ -39,6 +39,8 @@ public readonly record struct Cockpit3DSettings(
 public partial class Cockpit3DView : CanvasLayer
 {
 	private const int LayerIndex = 0;   // el HUD está en la capa 1
+	// Capa visual de la copia del morro del casco (spec docs/cabinas-3d-4-morros.md): solo la ve la cámara de su pasada
+	private const uint NoseLayer = 1u << 19;
 
 	// Del prototipo
 	private const float NearPlane = 0.02f;
@@ -102,6 +104,10 @@ public partial class Cockpit3DView : CanvasLayer
 	private float _pitch;   // rad, la misma que la cámara del mundo
 	private SubViewport _viewport;
 	private Camera3D _camera;
+	// Pasada de la copia del morro, en el mismo mundo y con la misma cámara, que se pinta debajo de la cabina: así la
+	// cabina tapa lo que el casco tiene dentro de ella (suelo de la cúpula, lomo), como la maqueta
+	private SubViewport _noseViewport;
+	private Camera3D _noseCamera;
 	private DirectionalLight3D _key;
 	private OmniLight3D _lamp;
 	private OmniLight3D _boostFront;
@@ -163,6 +169,9 @@ public partial class Cockpit3DView : CanvasLayer
 
 	// Una luz por arista del parpadeo: cada una titila por su cuenta con los daños
 	public int FlickerCount => _flickerMaterials.Length;
+
+	// Copia del morro del casco que lleva el modelo; la pinta el casco 3D (ShipHull3D.SetNoseCopy). Null sin copia.
+	public HullNoseCopy NoseCopy { get; private set; }
 
 	// 0xRRGGBB a color de Godot
 	public static Color ToColor(uint rgb, float alpha = 1f)
@@ -226,6 +235,7 @@ public partial class Cockpit3DView : CanvasLayer
 			return;
 		Visible = shown;
 		_viewport.RenderTargetUpdateMode = shown ? SubViewport.UpdateMode.Always : SubViewport.UpdateMode.Disabled;
+		_noseViewport.RenderTargetUpdateMode = shown && NoseCopy != null ? SubViewport.UpdateMode.Always : SubViewport.UpdateMode.Disabled;
 		if (!_built)
 			return;
 
@@ -254,6 +264,7 @@ public partial class Cockpit3DView : CanvasLayer
 		CockpitCameraPose pitched = CockpitCameraMotion.Pitched(pose, _pitch);
 		_camera.Position = new Vector3(pitched.Position.X, pitched.Position.Y, pitched.Position.Z);
 		_camera.Rotation = new Vector3(pitched.Rotation.X, pitched.Rotation.Y, pitched.Rotation.Z);
+		_noseCamera.Transform = _camera.Transform;
 	}
 
 	public void Apply(in Cockpit3DSettings s)
@@ -263,6 +274,7 @@ public partial class Cockpit3DView : CanvasLayer
 		_applied = true;
 		_settings = s;
 		_camera.Fov = s.Fov;
+		_noseCamera.Fov = s.Fov;
 		foreach ((StandardMaterial3D material, float coat) in _coated)
 			material.Clearcoat = coat * s.Clearcoat;
 		foreach (StandardMaterial3D material in _carbon)
@@ -574,9 +586,37 @@ public partial class Cockpit3DView : CanvasLayer
 			Far = FarPlane,
 			Environment = _environment,
 			Current = true,
-			Rotation = new Vector3(_pitch, 0f, 0f)
+			Rotation = new Vector3(_pitch, 0f, 0f),
+			CullMask = 0xFFFFF & ~NoseLayer
 		};
 		_viewport.AddChild(_camera);
+
+		// La pasada de la copia: comparte el mundo de la cabina (sus luces y su cielo) y solo ve la capa de la copia
+		_noseViewport = new SubViewport
+		{
+			Name = "NoseViewport",
+			World3D = _viewport.FindWorld3D(),
+			TransparentBg = true,
+			HandleInputLocally = false,
+			GuiDisableInput = true,
+			Msaa3D = _viewport.Msaa3D,
+			ScreenSpaceAA = _viewport.ScreenSpaceAA,
+			PositionalShadowAtlasSize = 0,
+			RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled
+		};
+		AddChild(_noseViewport);
+		_noseCamera = new Camera3D
+		{
+			Name = "NoseCamera",
+			Near = NearPlane,
+			Far = FarPlane,
+			Environment = _environment,
+			Current = true,
+			Rotation = _camera.Rotation,
+			CullMask = NoseLayer
+		};
+		_noseViewport.AddChild(_noseCamera);
+		FitToWindow();
 	}
 
 	// Hemisferio y ambiente del prototipo en un solo color: la mitad del hemisferio llega de arriba y la mitad de abajo
@@ -591,6 +631,19 @@ public partial class Cockpit3DView : CanvasLayer
 
 	private void BuildImage()
 	{
+		// Primero la copia del morro y encima la cabina, con la misma mezcla
+		var nose = new TextureRect
+		{
+			Name = "NoseImage",
+			Texture = _noseViewport.GetTexture(),
+			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+			StretchMode = TextureRect.StretchModeEnum.Scale,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.PremultAlpha }
+		};
+		nose.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		AddChild(nose);
+
 		var image = new TextureRect
 		{
 			Name = "Image",
@@ -639,6 +692,8 @@ public partial class Cockpit3DView : CanvasLayer
 		}
 		float scale = Mathf.Min((float)size.X / content.X, (float)size.Y / content.Y);
 		_viewport.Size = new Vector2I(Mathf.Max(Mathf.RoundToInt(content.X * scale), 1), Mathf.Max(Mathf.RoundToInt(content.Y * scale), 1));
+		if (_noseViewport != null)
+			_noseViewport.Size = _viewport.Size;
 	}
 
 	private void BuildLights()
@@ -655,6 +710,8 @@ public partial class Cockpit3DView : CanvasLayer
 		};
 		_viewport.AddChild(_key);
 		_key.LookAtFromPosition(KeySource, KeyTarget, Vector3.Up);
+		// La copia del morro la ilumina el juego de luces de su casco (HullNoseCopy), no la luz principal de la cabina
+		_key.LightCullMask = 0xFFFFF & ~NoseLayer;
 
 		_lamp = NewOmni("Lamp", LampPosition, scene.Lamp, LampRange, LampDecay);
 		_boostFront = NewOmni("BoostFront", BoostFrontPosition, scene.BoostLight, BoostFrontRange, BoostLightDecay);
@@ -722,19 +779,40 @@ public partial class Cockpit3DView : CanvasLayer
 			GD.PushError("[Cockpit3D] Missing cockpit pieces: " + string.Join(", ", missing));
 
 		ApplyManifest(manifest);
-		HideHullCopy(manifest);
+		SetUpNoseCopy(manifest, model as Node3D);
 		return missing.Count == 0;
 	}
 
-	// Etapa 1 de docs/cabinas-3d-4-morros.md: el modelo ya trae la copia del morro del casco (y los barrotes de BLADE),
-	// pero hasta la etapa 2, que le pone la pintura, el daño y las luces del casco, no se enseña
-	private void HideHullCopy(CockpitManifest manifest)
+	// Copia del morro del casco y barrotes de BLADE (spec docs/cabinas-3d-4-morros.md): en su capa, la de la pasada que va
+	// debajo de la cabina, y sin sombra (en la maqueta el casco no la echa sobre la cabina). La pinta el casco 3D.
+	private void SetUpNoseCopy(CockpitManifest manifest, Node3D model)
 	{
-		foreach (CockpitManifestHullPiece piece in manifest.Nose.Pieces.Concat(manifest.Nose.Frame))
+		CockpitManifestNose nose = manifest.Nose;
+		if (nose.Pieces.Count == 0 || nose.Eye.Length != 3 || model == null)
+			return;
+		var pieces = new List<(MeshInstance3D, string)>();
+		foreach (CockpitManifestHullPiece piece in nose.Pieces.Concat(nose.Frame))
 		{
-			if (_pieces.TryGetValue(piece.Name, out MeshInstance3D mesh))
-				mesh.Visible = false;
+			if (!_pieces.TryGetValue(piece.Name, out MeshInstance3D mesh))
+			{
+				GD.PushError("[Cockpit3D] Missing nose piece: " + piece.Name);
+				continue;
+			}
+			mesh.Layers = NoseLayer;
+			mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+			pieces.Add((mesh, piece.Hull));
 		}
+		var eye = new Vector3(nose.Eye[0], nose.Eye[1], nose.Eye[2]);
+		NoseCopy = new HullNoseCopy
+		{
+			Hull = nose.Hull,
+			Pieces = pieces,
+			WorldToHull = new Transform3D(Basis.Identity, eye) * model.GlobalTransform.AffineInverse(),
+			Reflections = _layout.Scene.NoseReflections,
+			Layer = NoseLayer,
+			LightRoot = model,
+			Camera = _noseCamera
+		};
 	}
 
 	private void CollectPieces(Node node)
@@ -837,8 +915,7 @@ public partial class Cockpit3DView : CanvasLayer
 	{
 		(float coat, float roughness) = material.ResourceName switch
 		{
-			"M_Carbon" or "M_CarbonNoseSide" => (1f, 0.06f),
-			"M_CarbonNose" => (0.6f, 0.06f),
+			"M_Carbon" => (1f, 0.06f),
 			"M_Paint" => (1f, 0.05f),
 			_ => (0f, 0f)
 		};

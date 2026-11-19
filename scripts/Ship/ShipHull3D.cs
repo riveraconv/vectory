@@ -208,6 +208,10 @@ void fragment() {
 	private Vector4 _wear;
 	private float _wearTime;
 	private bool _wearActive;
+	// Copia del morro en la cabina (spec docs/cabinas-3d-4-morros.md, 4.2) y su pasada del daño, con sus propios ejes
+	private HullNoseCopy _noseCopy;
+	private ShaderMaterial _copyWearPass;
+	private HullLightRig _copyLights;
 
 	public ShipHull3DProfile Profile { get; set; }
 
@@ -244,6 +248,7 @@ void fragment() {
 		AttachWear();
 		AttachGlass();
 		ApplyScorch();
+		SyncNoseCopy();
 		// Al final del árbol: la WorldEnvironment de la escena se crea en el _Ready de Main, después de este nodo
 		CallDeferred(MethodName.SetUpWorldReflections);
 	}
@@ -254,6 +259,7 @@ void fragment() {
 		if (!_built)
 			return;
 		_lights?.Apply(settings);
+		_copyLights?.Apply(settings);
 		ApplyAmbient();
 		ApplyIridescence();
 	}
@@ -395,6 +401,7 @@ void fragment() {
 		}
 		if (look.MarkingsVisible)
 			PaintDecals(MilitaryDecalDrawing.For(look));
+		SyncNoseCopy();
 	}
 
 	private static void ApplyCamo(StandardMaterial3D material, Texture2D camo, MilitaryFinish finish, float metal)
@@ -503,6 +510,7 @@ void fragment() {
 		}
 		if (look.MarkingsVisible)
 			PaintDecals(IndustrialDecalDrawing.For(look));
+		SyncNoseCopy();
 	}
 
 	// Copia de la chapa oscura para cada borde del canard, con las UV pasadas de la repetición de las franjas a la suya
@@ -687,14 +695,16 @@ void fragment() {
 			return;
 		foreach ((ShaderMaterial pass, float factor) in _materialIris)
 			pass.SetShaderParameter(SnStrength, IridescenceOfCanopy * factor * _settings.IridescenceStrength);
-		if (Profile.Style != HullStyle.Racing)
-			return;
-		float paint = _paint.Paint.Finish.Iridescence * _settings.IridescenceStrength;
-		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
-			SetIridescence(MaterialOf(name), paint);
-		bool endplatesPainted = !_paint.WithLivery;
-		foreach (string name in new[] { "Endplate_L", "Endplate_R" })
-			SetIridescence(MaterialOf(name), endplatesPainted ? paint : 0f);
+		if (Profile.Style == HullStyle.Racing)
+		{
+			float paint = _paint.Paint.Finish.Iridescence * _settings.IridescenceStrength;
+			foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
+				SetIridescence(MaterialOf(name), paint);
+			bool endplatesPainted = !_paint.WithLivery;
+			foreach (string name in new[] { "Endplate_L", "Endplate_R" })
+				SetIridescence(MaterialOf(name), endplatesPainted ? paint : 0f);
+		}
+		SyncNoseCopy();
 	}
 
 	// Fuerza de la pasada sobre la pintura y sobre la cúpula, a ojo con el prototipo
@@ -743,7 +753,7 @@ void fragment() {
 	{
 		_foci = foci;
 		_wearPass ??= NewWearPass();
-		_wearPass.SetShaderParameter(SnExtent, new Vector3(halfWidth, front, back));
+		SetWearParameter(SnExtent, new Vector3(halfWidth, front, back));
 		ApplyScorch();
 	}
 
@@ -752,7 +762,7 @@ void fragment() {
 	{
 		_wear = new Vector4(wear.X, wear.Y, wear.Z, wear.W);
 		_wearPass ??= NewWearPass();
-		_wearPass.SetShaderParameter(SnWear, _wear);
+		SetWearParameter(SnWear, _wear);
 		UpdateWearActive();
 	}
 
@@ -768,9 +778,9 @@ void fragment() {
 				new Vector4(spot.Center.X, spot.Center.Y, spot.Center.Z, spot.Radius));
 			strength[f] = spot.Strength;
 		}
-		_wearPass.SetShaderParameter(SnSootStrength, strength);
-		_wearPass.SetShaderParameter(SnCracks, HullWear.Cracks(_scorchLevel) ? 1f : 0f);
-		_wearPass.SetShaderParameter(SnCrackReach, _wearSettings.CrackReach);
+		SetWearParameter(SnSootStrength, strength);
+		SetWearParameter(SnCracks, HullWear.Cracks(_scorchLevel) ? 1f : 0f);
+		SetWearParameter(SnCrackReach, _wearSettings.CrackReach);
 		UpdateWearActive();
 	}
 
@@ -789,7 +799,7 @@ void fragment() {
 		_wearTime += (float)delta;
 		UpdateWearTransform();
 		if (_scorchLevel >= 3)
-			_wearPass.SetShaderParameter(SnCrackTime, _wearTime);
+			SetWearParameter(SnCrackTime, _wearTime);
 	}
 
 	private void UpdateWearTransform()
@@ -800,6 +810,110 @@ void fragment() {
 	}
 
 	private ShaderMaterial NewWearPass() => new() { Shader = new Shader { Code = WearShader } };
+
+	private void SetWearParameter(StringName name, Variant value)
+	{
+		_wearPass.SetShaderParameter(name, value);
+		_copyWearPass?.SetShaderParameter(name, value);
+	}
+
+	// ---------------------------------------------------------------
+	// Copia del morro en la cabina (spec docs/cabinas-3d-4-morros.md, 4.2)
+	// ---------------------------------------------------------------
+
+	// La cabina que lleva la copia de este casco; null, o una copia de otro casco, la quita
+	public void SetNoseCopy(HullNoseCopy copy)
+	{
+		HullNoseCopy next = copy != null && copy.Matches(Profile) ? copy : null;
+		if (next == _noseCopy)
+			return;
+		_noseCopy = next;
+		_copyWearPass = null;
+		_copyLights?.QueueFree();
+		_copyLights = null;
+		SyncNoseCopy();
+		ApplyNoseEnvironment();
+	}
+
+	// Sus luces se quedan en el mundo de la cabina: se van con el casco (F10 crea otro)
+	public override void _ExitTree()
+	{
+		_copyLights?.QueueFree();
+		_copyLights = null;
+	}
+
+	// La cámara de la pasada de la copia, con el entorno de la carrera: sin tonemap, con su glow, sus reflejos y la luz
+	// ambiente del casco
+	private void ApplyNoseEnvironment()
+	{
+		if (_noseCopy?.Camera == null)
+			return;
+		Godot.Environment env = FindEnvironment();
+		if (env != null)
+			_noseCopy.Camera.Environment = (Godot.Environment)env.Duplicate();
+	}
+
+	// Pone en la copia lo que lleva ahora cada pieza del casco: si se ve y sus materiales. Las luces y las calcomanías
+	// comparten el material del casco (así titilan, se encienden y se dibujan a la vez); el resto lleva una copia, con
+	// la pasada del daño de la copia y sus reflejos. Solo al cargar y al cambiar de pintura: no cada frame.
+	private void SyncNoseCopy()
+	{
+		if (_noseCopy == null || !IsLoaded || _wearPass == null)
+			return;
+		if (_copyWearPass == null)
+		{
+			_copyWearPass = (ShaderMaterial)_wearPass.Duplicate();
+			_copyWearPass.SetShaderParameter(SnWorldToHull, new Projection(_noseCopy.WorldToHull));
+		}
+		if (_copyLights == null && _noseCopy.LightRoot != null)
+		{
+			_copyLights = new HullLightRig { Name = "HullLights", Layer = _noseCopy.Layer, FollowParent = true };
+			_copyLights.Apply(_settings);
+			_noseCopy.LightRoot.AddChild(_copyLights);
+		}
+		foreach ((MeshInstance3D mesh, string hullPiece) in _noseCopy.Pieces)
+		{
+			if (!_pieces.TryGetValue(hullPiece, out MeshInstance3D source))
+				continue;
+			mesh.Visible = source.Visible;
+			int surfaces = Mathf.Min(mesh.GetSurfaceOverrideMaterialCount(), source.GetSurfaceOverrideMaterialCount());
+			for (int i = 0; i < surfaces; i++)
+				mesh.SetSurfaceOverrideMaterial(i, CopyMaterial(source.GetSurfaceOverrideMaterial(i)));
+		}
+	}
+
+	private Material CopyMaterial(Material material)
+	{
+		if (material is not StandardMaterial3D source)
+			return material;
+		if (HullNoseCopyRules.SharesMaterial(source.EmissionEnabled,
+				source.Transparency != BaseMaterial3D.TransparencyEnum.Disabled, source.NextPass != null))
+			return source;
+		var copy = (StandardMaterial3D)source.Duplicate();
+		copy.ResourceName = source.ResourceName;
+		copy.NextPass = CopyPass(source.NextPass);
+		float reflections = _noseCopy.Reflections;
+		if (reflections != 1f)
+		{
+			copy.MetallicSpecular = Mathf.Min(1f, copy.MetallicSpecular * reflections);
+			copy.Metallic = Mathf.Min(1f, copy.Metallic * reflections);
+		}
+		return copy;
+	}
+
+	// La cadena de pasadas de un material de la copia: la del daño es la de la copia; las demás (iridiscencia), copias
+	private Material CopyPass(Material pass)
+	{
+		if (pass == null)
+			return null;
+		if (pass == _wearPass)
+			return _copyWearPass;
+		if (pass is not ShaderMaterial shader)
+			return pass;
+		var copy = (ShaderMaterial)shader.Duplicate();
+		copy.NextPass = CopyPass(shader.NextPass);
+		return copy;
+	}
 
 	// Las piezas de cristal de la cabina: la cúpula de VECTOR y BLADE, las ventanas de HAMMER
 	private void AttachGlass()
@@ -1034,6 +1148,7 @@ void fragment() {
 		env.ReflectedLightSource = Godot.Environment.ReflectionSource.Sky;
 		env.AmbientLightSource = Godot.Environment.AmbientSource.Color;
 		ApplyAmbient();
+		ApplyNoseEnvironment();
 	}
 
 	// Hemisferio del prototipo en un solo color: la mitad de la luz llega de arriba y la mitad de abajo

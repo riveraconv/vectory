@@ -33,6 +33,7 @@ public partial class Spaceship : Node3D
 	private readonly System.Collections.Generic.Dictionary<HullStyle, int> _hullPaints = new();
 	private int _hullDamage;
 	private System.Numerics.Vector4 _hullWear;
+	private HullNoseCopy _noseCopy;   // copia del morro de la cabina del jugador; null en rivales, fantasma y menú
 	private bool _hullTimeTrial;
 	private int _wireEdgeCount;
 
@@ -166,6 +167,13 @@ public partial class Spaceship : Node3D
 		_hull3D?.UpdateEffects(time);
 	}
 
+	// Copia del morro de la cabina (spec docs/cabinas-3d-4-morros.md, 4.2): la pinta el casco 3D, si es de este casco
+	public void SetNoseCopy(HullNoseCopy copy)
+	{
+		_noseCopy = copy;
+		_hull3D?.SetNoseCopy(copy);
+	}
+
 	// Balizas del techo del casco 3D (HAMMER): intensidad de la ámbar y de la roja; sin balizas no hace nada
 	public void SetHullBeacons(float boost, float damage)
 	{
@@ -193,6 +201,7 @@ public partial class Spaceship : Node3D
 			};
 			_hull3D.ApplySettings(_hullSettings);
 			_hull3D.SetPaint(_hullPaints.TryGetValue(profile.Style, out int paint) ? paint : -1);
+			_hull3D.SetNoseCopy(_noseCopy);
 			AddChild(_hull3D);
 			_hull3D.SetDamage(_hullDamage, _hullTimeTrial);
 			_hull3D.SetWear(_hullWear);

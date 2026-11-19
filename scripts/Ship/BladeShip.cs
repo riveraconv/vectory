@@ -13,10 +13,10 @@ public static class BladeShip
 	private const float ChaseFactor = 1.22f;   // 8,8 m de largo frente a los 7,2 de Vector
 
 	// Cabina 3D (spec docs/cabinas-3d-2-blade.md, 4.5): FOV 70 y la vista 0,10 rad (5,7°) hacia abajo, como en el
-	// prototipo, con el ojo dentro de la cúpula del casco 3D (y 0,20–0,50), a 2,42 m de la pista: así los rivales se ven a
-	// la altura a la que van (spec docs/rivales-1-parrilla.md). Antes iba a 0,90 m, por debajo del propio casco.
-	private const float EyeY = 0.42f;
-	private const float EyeZ = -1.2f;
+	// prototipo. Ojo en coordenadas del casco, dentro de su cúpula, donde la punta del morro de la copia del casco cae donde
+	// caía el morro de la cabina (spec docs/cabinas-3d-4-morros.md, 3.3): a 2,37 m de la pista. Antes, (0; 0,42; −1,2).
+	private const float EyeY = 0.37f;
+	private const float EyeZ = -0.45f;
 	private const float CockpitFov = 70f;
 	private const float EyePitchRadians = -0.10f;
 
