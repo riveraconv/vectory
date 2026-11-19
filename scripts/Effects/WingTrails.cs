@@ -35,6 +35,8 @@ public partial class WingTrails : Node3D
 
 	private static readonly StringName SnAlong = "along";
 	private static readonly StringName SnAcross = "across";
+	private static readonly StringName SnPulse = "pulse";
+	private static readonly StringName SnPhase = "phase";
 
 	// Llamas de las toberas de la misma nave: de ellas salen th y bt
 	public ThrusterFlames Thrusters { get; set; }
@@ -103,6 +105,8 @@ public partial class WingTrails : Node3D
 		_material = new ShaderMaterial { Shader = _shader };
 		_material.SetShaderParameter(SnAlong, new Vector4(s.AlongPower, s.AlongFadeIn, s.Brightness, 0f));
 		_material.SetShaderParameter(SnAcross, new Vector4(s.HaloGain, s.HaloFalloff, s.CoreGain, s.CoreFalloff));
+		_material.SetShaderParameter(SnPulse, new Vector4(s.PulseSpacing, s.PulseSharpness, s.PulseGain, s.PulseFalloff));
+		_material.SetShaderParameter(SnPhase, 0f);
 		AddChild(new MeshInstance3D
 		{
 			Name = "Ribbons",
@@ -135,6 +139,8 @@ public partial class WingTrails : Node3D
 		if (!IsVisibleInTree())
 			return;
 
+		// Pulsos: con el tiempo de la estela, que la pausa para
+		_material.SetShaderParameter(SnPhase, WingTrailRibbon.PulsePhase(_state.Time, _settings));
 		Camera3D camera = GetViewport().GetCamera3D();
 		NVector3 eye = camera != null ? ToNumerics(camera.GlobalPosition) : NVector3.Zero;
 		for (int k = 0; k < WingTrailState.Tips; k++)
@@ -193,18 +199,23 @@ public partial class WingTrails : Node3D
 
 	private static NVector3 ToNumerics(Vector3 v) => new(v.X, v.Y, v.Z);
 
-	// Cinta (4.3), traducida de la maqueta: sin luz, en suma, por las dos caras, sin escribir profundidad (sí la lee).
-	// UV = (u, v); UV2 = (D, boost: para los pulsos de la etapa 2); CUSTOM0 = (color, intensidad).
-	// along = (potencia del apagado, entrada en la punta, brillo, —); across = (halo, su caída, núcleo, su caída).
+	// Cinta (4.3) y pulsos (5.2), traducidos de la maqueta: sin luz, en suma, por las dos caras, sin escribir profundidad
+	// (sí la lee). UV = (u, v); UV2 = (D, boost de la muestra); CUSTOM0 = (color, intensidad).
+	// along = (potencia del apagado, entrada en la punta, brillo, —); across = (halo, su caída, núcleo, su caída);
+	// pulse = (separación, dureza, fuerza, caída de lado); phase = velocidad × t, envuelta a una vuelta.
 	private const string TrailShader = @"
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
 uniform vec4 along;
 uniform vec4 across;
+uniform vec4 pulse;
+uniform float phase;
 varying vec4 tint;
+varying vec2 dist;
 
 void vertex() {
 	tint = CUSTOM0;
+	dist = UV2;
 }
 
 void fragment() {
@@ -212,7 +223,8 @@ void fragment() {
 	float v = UV.y;
 	float a = pow(max(0.0, 1.0 - u), along.x) * smoothstep(0.0, along.y, u);
 	float c = across.x * exp(-across.y * v * v) + across.z * exp(-across.w * v * v);
-	ALBEDO = tint.rgb * (c * a) * tint.a * along.z;
+	float p = dist.y * pow(max(0.0, sin(pulse.x * dist.x - phase)), pulse.y) * pulse.z * exp(-pulse.w * v * v);
+	ALBEDO = tint.rgb * (c * a + p * a) * tint.a * along.z;
 }
 ";
 }

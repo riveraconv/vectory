@@ -63,7 +63,7 @@ Carpetas de `scripts/` (detalle en `docs/arquitectura.md`): `Circuit/` (pista, b
 
 ## Estado
 
-- Versión **0.25.0**. Última spec cerrada: `docs/efectos-5-danos-casco.md` (daño visible del casco y del cristal). El detalle de todo lo hecho, en `docs/historial.md`.
+- Versión **0.27.0**. Última spec cerrada: `docs/efectos-7-estelas.md` (estelas de luz de las alas, con pulsos al dar boost). El detalle de todo lo hecho, en `docs/historial.md`.
 - `docs/efectos-velocidad.md` y `docs/escenografia.md` siguen **sin implementar**: no hay tobera, líneas de velocidad ni visión túnel (TUNNEL VISION sigue en COMING SOON). No se tocan hasta que el usuario lo diga.
 - Pendiente: CHAMPIONSHIP y HANGAR del menú, `docs/naves-disenos.md` sin las cabinas elegidas, ajustar el contorno interior de la cabina, reajustar la dificultad de los rivales cuando haya circuitos nuevos.
 

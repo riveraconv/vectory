@@ -37,6 +37,13 @@ public sealed class WingTrailSettings
 	public float HaloGain = 0.6f, HaloFalloff = 3.5f, CoreGain = 1.2f, CoreFalloff = 45f;
 	public float Brightness = 0.7f;              // ajuste a ojo con el glow (decisión del usuario: más discreta)
 
+	// Pulsos (5.2): B × máx(0; sen(0,9·D − 25·t))^16 × 2,5 × e^(−8·v²)
+	public float PulseSpacing = 0.9f;            // rad/m
+	public float PulseSpeed = 25f;               // rad/s
+	public float PulseSharpness = 16f;
+	public float PulseGain = 2.5f;
+	public float PulseFalloff = 8f;
+
 	public static WingTrailSettings Default => new();
 }
 
@@ -273,6 +280,14 @@ public static class WingTrailRibbon
 			n++;
 		return n;
 	}
+
+	// Fase de los pulsos (5.2) en el tiempo t, envuelta a una vuelta (el seno no cambia y el shader no pierde precisión)
+	public static float PulsePhase(float time, WingTrailSettings s) => (s.PulseSpeed * time) % (2f * MathF.PI);
+
+	// Pulso en un punto de la cinta (5.2), lo mismo que hace el shader
+	public static float Pulse(float boost, float distance, float phase, float v, WingTrailSettings s) =>
+		boost * MathF.Pow(MathF.Max(0f, MathF.Sin(s.PulseSpacing * distance - phase)), s.PulseSharpness) * s.PulseGain
+		* MathF.Exp(-s.PulseFalloff * v * v);
 
 	// Escribe los vértices en output (2 por muestra viva) y devuelve cuántos. Con menos de dos muestras vivas, 0.
 	public static int Build(WingTrailTip tip, float now, Vector3 camera, in WingTrailColors colors, WingTrailSettings s,

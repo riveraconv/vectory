@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Vectory.Test.EffectsTests;
 
-// Estelas de las alas (spec docs/efectos-7-estelas.md, pruebas 1–9)
+// Estelas de las alas (spec docs/efectos-7-estelas.md, pruebas 1–9 y 11; el vórtice, prueba 10, lo quitó el usuario)
 public class WingTrailFxTests
 {
     private static readonly WingTrailSettings S = WingTrailSettings.Default;
@@ -248,5 +248,39 @@ public class WingTrailFxTests
             Assert.Equal(left.Position[1], tip.Y, 2);
             Assert.Equal(left.Position[2], tip.Z, 2);
         }
+    }
+
+    // 11
+    [Fact]
+    public void No_pulse_without_boost_and_pulses_with_it()
+    {
+        var state = new WingTrailState(S);
+        Run(state, 1f, 100f);
+        var output = new WingTrailVertex[800];
+        int n = WingTrailRibbon.Build(state.Tip(0), state.Time, new Vector3(0f, 30f, 0f), WingTrailColors.CyanOrange, S, output);
+        Assert.True(n > 0);
+        float phase = WingTrailRibbon.PulsePhase(state.Time, S);
+        for (int i = 0; i < n; i++)
+            Assert.Equal(0f, output[i].Boost);
+        for (float d = 0f; d < 60f; d += 0.25f)
+            Assert.Equal(0f, WingTrailRibbon.Pulse(0f, d, phase, 0f, S));
+        // Con boost, un destello cada 2π/0,9 ≈ 7 m que corre hacia atrás a 25/0,9 ≈ 28 m/s
+        float peak = (MathF.PI / 2f) / S.PulseSpacing;
+        Assert.Equal(2.5f, WingTrailRibbon.Pulse(1f, peak, 0f, 0f, S), 4);
+        Assert.Equal(2.5f, WingTrailRibbon.Pulse(1f, peak + 2f * MathF.PI / S.PulseSpacing, 0f, 0f, S), 3);
+        float later = 0.1f;
+        float moved = peak + S.PulseSpeed * later / S.PulseSpacing;
+        Assert.Equal(2.5f, WingTrailRibbon.Pulse(1f, moved, WingTrailRibbon.PulsePhase(later, S), 0f, S), 3);
+        Assert.True(WingTrailRibbon.Pulse(1f, peak, 0f, 1f, S) < 0.001f);
+    }
+
+    [Fact]
+    public void Pulse_phase_wraps_without_changing_the_pulse()
+    {
+        float t = 1234.567f;
+        float wrapped = WingTrailRibbon.PulsePhase(t, S);
+        Assert.InRange(wrapped, 0f, 2f * MathF.PI);
+        double expected = Math.Pow(Math.Max(0.0, Math.Sin(S.PulseSpacing * 3.0 - S.PulseSpeed * (double)t)), 16) * 2.5;
+        Assert.Equal((float)expected, WingTrailRibbon.Pulse(1f, 3f, wrapped, 0f, S), 2);
     }
 }
