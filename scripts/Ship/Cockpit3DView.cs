@@ -722,7 +722,19 @@ public partial class Cockpit3DView : CanvasLayer
 			GD.PushError("[Cockpit3D] Missing cockpit pieces: " + string.Join(", ", missing));
 
 		ApplyManifest(manifest);
+		HideHullCopy(manifest);
 		return missing.Count == 0;
+	}
+
+	// Etapa 1 de docs/cabinas-3d-4-morros.md: el modelo ya trae la copia del morro del casco (y los barrotes de BLADE),
+	// pero hasta la etapa 2, que le pone la pintura, el daño y las luces del casco, no se enseña
+	private void HideHullCopy(CockpitManifest manifest)
+	{
+		foreach (CockpitManifestHullPiece piece in manifest.Nose.Pieces.Concat(manifest.Nose.Frame))
+		{
+			if (_pieces.TryGetValue(piece.Name, out MeshInstance3D mesh))
+				mesh.Visible = false;
+		}
 	}
 
 	private void CollectPieces(Node node)

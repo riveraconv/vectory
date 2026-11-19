@@ -1,5 +1,7 @@
 # Cabina 3D de BLADE, estilo MILITAR (spec docs/cabinas-3d-2-blade.md). Traducción de buildCockpit(4) de
 # designs/cabina-3d-blade.html (disposición 4 · DEFINITIVA): mismos números y mismo orden.
+# El morro es una copia del casco 3D (hull_blade.py), el cristal HUD va 6 cm más alto y los barrotes de la cúpula ASALTO
+# del casco pasan por fuera del arco (spec docs/cabinas-3d-4-morros.md).
 #
 # Uso: blender -b --factory-startup --python art/blender/cockpit_blade.py -- --out art/blender/out
 # El .blend se regenera cada vez: todo vive en este script.
@@ -16,8 +18,10 @@ sys.path.insert(0, HERE)
 
 import bpy  # noqa: E402
 
+import hull_blade as hull  # noqa: E402
 from lib import blender_io as io  # noqa: E402
 from lib import geometry as g  # noqa: E402
+from lib import nose_copy as nc  # noqa: E402
 from lib import textures_military as tx  # noqa: E402
 from lib.blade_builder import BladeBuilder, transformed  # noqa: E402
 from lib.textures import strip_png_text  # noqa: E402
@@ -56,6 +60,13 @@ LOOK = (0.0, 0.02, 0.12)
 
 EYE_PITCH = -0.10  # la vista mira 5,7° hacia abajo; no va en el modelo, solo en las capturas
 
+# Ojo de la cabina en coordenadas del casco y corte de la copia del morro (spec docs/cabinas-3d-4-morros.md, 3.3)
+EYE = (0.0, 0.37, -0.45)
+CUT = 0.30
+BARS = [f"Canopy_Bar_{i}" for i in range(3)]   # van enteros al grupo Frame, no en la copia del morro
+HULL_DROP = ["Canopy_Glass"] + BARS
+COMBINER_Y = -0.026   # centro del cristal HUD (antes −0,086)
+
 
 def contract_names():
     names = ["Screen_HUD"]
@@ -64,7 +75,7 @@ def contract_names():
     names += [f"Accent_{s[7:]}" for s in SCREENS]
     names += ["Accent_Glare"]
     names += [f"Led_Visor_{s[7:]}" for s in SCREENS]
-    names += ["Led_Nose_L", "Led_Nose_R", "Led_Sensor", "Lamp_Caution", "Lamp_Warning", "Plate",
+    names += ["Led_Sensor", "Lamp_Caution", "Lamp_Warning", "Plate",
               "Combiner_Plate", "Glass_Canopy", "Glass_Smudge"]
     return names
 
@@ -169,52 +180,6 @@ def accent(b, m, parent, name, w, pos, base):
     return b.mesh(b.rbox(w, 0.003, 0.003, 0.001), m.glow("Accent", name, ACCENT, base), parent, name, True, pos)
 
 
-def build_nose(b, m, root):
-    nose = b.group(root, "Nose")
-    st = [  # z, semiancho, alto de la cubierta
-        (-0.80, 0.62, -0.225), (-1.30, 0.55, -0.245), (-2.00, 0.44, -0.270), (-2.80, 0.32, -0.295),
-        (-3.60, 0.20, -0.320), (-4.30, 0.09, -0.340), (-4.75, 0.03, -0.350)]
-
-    def sec(s):
-        z, w, y = s
-        return [(-w, y - 0.10, z), (-w * 0.92, y - 0.016, z), (-w * 0.55, y, z),
-                (w * 0.55, y, z), (w * 0.92, y - 0.016, z), (w, y - 0.10, z)]
-
-    sections = [sec(s) for s in st]
-    # Cinco caras a lo largo: costado, chaflán, cubierta, chaflán, costado
-    for k in range(5):
-        a = [s[k] for s in sections]
-        c = [s[k + 1] for s in sections]
-        b.mesh(b.strip(a, c), m.paint_nose, nose, f"Nose_Skin_{k}")
-    b.mesh(b.poly(sections[-1]), m.paint_nose, nose, "Nose_Tip")
-    # Panel antirreflejos (mate) en la cubierta, delante del cristal
-    ag = [(w * 0.22, y + 0.002, z) for z, w, y in st[:4]]
-    b.mesh(b.strip(mirror_x(ag), ag), m.anti_slip, nose, "Nose_AntiGlare")
-    # Juntas transversales y longitudinales
-    for i, z in enumerate((-1.6, -2.4, -3.2, -4.0)):
-        w, y, _ = _at(st, z)
-        b.mesh(b.poly([(-w * 0.55, y + 0.0015, z - 0.004), (w * 0.55, y + 0.0015, z - 0.004),
-                       (w * 0.55, y + 0.0015, z + 0.004), (-w * 0.55, y + 0.0015, z + 0.004)]),
-               m.dark, nose, f"Nose_Seam_{i}", True)
-    for sx in (-1, 1):
-        b.tube([(sx * w * 0.55, y + 0.002, z) for z, w, y in st[:6]], 0.002, 24, m.dark, nose, "Nose_SeamL", True)
-    # Remaches a lo largo de la junta del chaflán
-    for i in range(14):
-        z = -0.9 - i * 0.22
-        w, y, j = _at(st, z)
-        if j < 1:
-            continue
-        for sx in (-1, 1):
-            b.sphere(0.0045, m.gunmetal, nose, "Rivet", True, (sx * w * 0.70, y - 0.004, z), (1.0, 0.4, 1.0))
-    # Luces de posición: roja a la izquierda, verde a la derecha
-    b.sphere(0.012, m.glow("NavL", "Led_Nose_L", NAV_L, LED_NOSE), nose, "Led_Nose_L", True, (-0.44 * 0.96, -0.27 - 0.05, -2.0))
-    b.sphere(0.012, m.glow("NavR", "Led_Nose_R", NAV_R, LED_NOSE), nose, "Led_Nose_R", True, (0.44 * 0.96, -0.27 - 0.05, -2.0))
-    # Sonda (pitot) en la punta y antena de cuchilla en la cubierta
-    b.tube([(0, -0.352, -4.74), (0, -0.352, -5.05), (0, -0.352, -5.45)], 0.008, 4, m.gunmetal, nose, "Nose_Pitot")
-    b.cyl(0, 0.008, 0.06, 10, m.gunmetal, nose, "Nose_PitotTip", False, (0, -0.352, -5.48), (-math.pi / 2, 0, 0))
-    b.beam((0, -0.262, -1.70), (0, -0.215, -1.86), 0.004, 0.05, (0, 1, -1.78), m.paint_dark, nose, "Nose_Antenna")
-
-
 def build_dash(b, m, root):
     dash = b.group(root, "Dash")
     # Frontal del salpicadero, inclinado hacia el piloto
@@ -294,8 +259,8 @@ def build_combiner(b, m, con):
     for i in range(6):
         b.mesh(b.rbox(0.018, 0.009, 0.006, 0.002), m.rubber, cb, "UFC_Key", pos=(-0.075 + i * 0.03, -0.163, -0.5385))
     for sx in (-1, 1):
-        b.beam((sx * 0.112, -0.150, -0.585), (sx * 0.112, -0.018, -0.565), 0.008, 0.008, (0, -0.08, 1), m.gunmetal, cb, "Combiner_Post")
-    gl = b.group(cb, "Combiner_Glass", (0, -0.086, -0.575), (0.15, 0, 0))
+        b.beam((sx * 0.112, -0.150, -0.585), (sx * 0.112, 0.042, -0.565), 0.008, 0.008, (0, -0.08, 1), m.gunmetal, cb, "Combiner_Post")
+    gl = b.group(cb, "Combiner_Glass", (0, COMBINER_Y, -0.575), (0.15, 0, 0))
     b.mesh(g.plane(0.22, 0.13), m.combiner_glass, gl, "Combiner_Plate", True)
     b.mesh(g.plane(0.22, 0.13), m.screen_hud(), gl, "Screen_HUD", True, (0, 0, 0.0015))
     b.tube([(-0.112, -0.065, 0), (-0.112, 0.065, 0), (0.112, 0.065, 0), (0.112, -0.065, 0)], 0.003, 12, m.gunmetal, gl, "Combiner_Frame")
@@ -553,21 +518,25 @@ def measure(root):
     return low, high, triangles
 
 
-# Comprobación de ejes de la spec (3.3), con las piezas antes de juntarlas (coordenadas del prototipo = de Godot)
-def check_axes(builder):
+# Comprobaciones de la spec (docs/cabinas-3d-4-morros.md, 3.3), en coordenadas de la cabina: punta del morro de la
+# copia en (0; −0,35; −4,75), sonda hasta z ≈ −5,30, arco en y ≈ 0,456 y centro del cristal HUD en y −0,026
+def check_axes(builder, nose):
     def points(name):
         return [g.transform_point(p.matrix, v) for p in builder.pieces if p.name == name for v in p.soup.positions]
 
-    tip = min(p[2] for p in points("Nose_Tip"))
-    pitot = [p[2] for p in points("Nose_PitotTip")]
-    pitot_mid = (min(pitot) + max(pitot)) / 2
+    tip = min((v for piece in nose if piece.name != hull.PROBE for v in piece.soup.positions), key=lambda v: v[2])
+    probe = min(v[2] for piece in nose if piece.name == hull.PROBE for v in piece.soup.positions)
     bow = max(p[1] for p in points("Canopy_Bow"))
-    if abs(tip + 4.75) > 0.01 or abs(pitot_mid + 5.48) > 0.01 or abs(bow - 0.456) > 0.005:
-        raise RuntimeError(f"Ejes mal: punta del morro z = {tip:.3f}, sonda z = {pitot_mid:.3f}, arco y = {bow:.3f}")
-    return tip, pitot_mid, bow
+    plate = points("Combiner_Plate")
+    combiner_y = (min(p[1] for p in plate) + max(p[1] for p in plate)) / 2
+    if (max(abs(tip[0]), abs(tip[1] + 0.35), abs(tip[2] + 4.75)) > 0.005 or abs(probe + 5.30) > 0.01
+            or abs(bow - 0.456) > 0.005 or abs(combiner_y - COMBINER_Y) > 0.001):
+        raise RuntimeError(f"Ejes mal: punta del morro {tuple(round(float(c), 4) for c in tip)}, sonda z = {probe:.3f}, "
+                           f"arco y = {bow:.3f}, cristal HUD y = {combiner_y:.4f}")
+    return tip, probe, bow, combiner_y
 
 
-def write_manifest(path, root, materials, no_shadow):
+def write_manifest(path, root, materials, no_shadow, nose_entries, nose_low, nose_high, frame_entries, combiner_y):
     low, high, triangles = measure(root)
     pieces = []
     for name in contract_names():
@@ -597,6 +566,10 @@ def write_manifest(path, root, materials, no_shadow):
         "transparentMaterials": [{"material": k, "opacity": v} for k, v in TRANSPARENT_MATERIALS.items()],
         "triangles": triangles,
         "bounds": {"min": [round(c, 4) for c in low], "max": [round(c, 4) for c in high]},
+        # Centro del cristal HUD, copia del morro del casco y barrotes de su cúpula en Frame (spec
+        # docs/cabinas-3d-4-morros.md, 3.2 y 5)
+        "combinerCenterY": round(float(combiner_y), 4),
+        "nose": nc.manifest("hull_blade", EYE, CUT, nose_entries, nose_low, nose_high, frame_entries),
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -726,7 +699,7 @@ def render_environment(path):
 
 # ---------- Capturas ----------
 
-def render_previews(scene, collection, root, env_path, panels, out):
+def render_previews(scene, collection, root, env_path, panels, out, hull_materials):
     scene.render.engine = "BLENDER_EEVEE"
     # El prototipo usa ACES: se aproxima con la vista que haya, solo para mirar
     views = {v.identifier for v in scene.view_settings.bl_rna.properties["view_transform"].enum_items}
@@ -754,6 +727,15 @@ def render_previews(scene, collection, root, env_path, panels, out):
     io.render_preview(scene, collection, root, os.path.join(folder, "blade_eye.png"), (0, 0, 0), forward, 70)
     io.render_preview(scene, collection, root, os.path.join(folder, "blade_three_quarter.png"), (2.2, 1.5, 1.6), (0, -0.3, -1.7), 45)
     io.render_preview(scene, collection, root, os.path.join(folder, "blade_screens.png"), (0, -0.06, -0.12), (0, -0.23, -0.5), 55)
+    # Desde el ojo con el morro nuevo (spec docs/cabinas-3d-4-morros.md, 3.3), con BOSQUE ya coloreado en lugar de la
+    # máscara del camuflaje, como las capturas del casco
+    nc.hide_livery_in_previews(root, ("Markings",))
+    nc.swap_preview_materials(root, hull.preview_paint_materials(hull_materials))
+    # Dos capturas: con la copia pintada antes que la cabina, como la maqueta (la cabina tapa lo que tiene detrás), y
+    # con las dos en el mismo espacio (lo que esté más cerca del ojo, delante)
+    nc.render_layered(scene, collection, root, os.path.join(folder, "blade_eye_new.png"), (0, 0, 0), forward, 70,
+                      nc.copied_names(root))
+    io.render_preview(scene, collection, root, os.path.join(folder, "blade_eye_new_depth.png"), (0, 0, 0), forward, 70)
     return aces or "Filmic"
 
 
@@ -775,11 +757,18 @@ def main():
 
     render_environment(env_path)
 
+    # Primero el casco, en memoria: sus materiales e imágenes pasan a llevar el prefijo Hull_ antes de crear los de la
+    # cabina, que a veces se llaman igual
+    hull_materials, hull_builder = hull.build_hull(out)
+    nose = nc.front_pieces(hull_builder.pieces, EYE, CUT, HULL_DROP)
+    nc.check_cut(nose, CUT)
+    bars = nc.whole_pieces(hull_builder.pieces, EYE, BARS)
+    originals = nc.prefix_hull_data()
+
     # Texturas sueltas aparte de las de VECTOR: algunas se llaman igual
     materials = Materials(os.path.join(out, "textures", "blade"))
     builder = BladeBuilder()
     root_group = builder.root
-    build_nose(builder, materials, root_group)
     dash, face = build_dash(builder, materials, root_group)
     build_sides(builder, materials, root_group)
     build_frame(builder, materials, root_group)
@@ -787,15 +776,23 @@ def main():
     # Añadido sobre el prototipo, al final para no cambiar el orden de lo que viene de él
     build_dash_details(builder, materials, face)
 
-    tip, pitot, bow = check_axes(builder)
+    tip, pitot, bow, combiner_y = check_axes(builder, nose)
 
     # Raíz girada +90° en X: un punto del prototipo (x, y, z) queda en Blender en (x, −z, y) y vuelve a ser (x, y, z) en glTF
     root = io.empty("CockpitBlade", None, collection, rotation=(math.pi / 2, 0.0, 0.0))
     no_shadow = create_objects(builder, root, collection)
+    live = set(hull_materials.emissive)
+    nose_entries = nc.create_objects(nose, hull.contract_names(), bpy.data.objects["Nose"], collection, hull.uv_args,
+                                     originals, live)
+    frame_entries = nc.create_objects(bars, BARS, bpy.data.objects["Frame"], collection, hull.uv_args, originals, live,
+                                      prefix="")
+    no_shadow += [e["name"] for e in nose_entries + frame_entries if e["noShadow"]]
     bpy.context.view_layer.update()
 
     check_contract(root)
-    write_manifest(manifest_path, root, materials, no_shadow)
+    nose_low, nose_high = nc.bounds(nose)
+    write_manifest(manifest_path, root, materials, no_shadow, nose_entries, nose_low, nose_high, frame_entries,
+                   combiner_y)
     io.export_glb(glb_path, root)
 
     # Solo en las capturas: el cristal HUD es negro y opaco hasta que Godot lo pone en modo suma
@@ -803,12 +800,14 @@ def main():
 
     preview_collection = bpy.data.collections.new("Preview")
     scene.collection.children.link(preview_collection)
-    view = render_previews(scene, preview_collection, root, env_path, panels, out)
+    view = render_previews(scene, preview_collection, root, env_path, panels, out, hull_materials)
 
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "cockpit_blade.blend"))
 
     print(f"[Cockpit] Blender {bpy.app.version_string} · capturas con {scene.render.engine} y vista {view}")
-    print(f"[Cockpit] Punta del morro z = {tip:.3f} · sonda z = {pitot:.3f} · arco y = {bow:.3f}")
+    print(f"[Cockpit] Punta del morro {tuple(round(float(c), 4) for c in tip)} · sonda z = {pitot:.3f} · arco y = {bow:.3f}"
+          f" · cristal HUD y = {combiner_y:.4f}")
+    nc.report(nose_entries, nose, nose_high)
     print(f"[Cockpit] GLB {os.path.getsize(glb_path)} bytes · sha256 {sha256(glb_path)}")
 
 

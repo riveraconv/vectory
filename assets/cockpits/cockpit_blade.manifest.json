@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-12",
+  "exported": "2026-11-19",
   "root": "CockpitBlade",
   "pieces": [
     {
@@ -68,16 +68,6 @@
       "intensity": 0.35
     },
     {
-      "name": "Led_Nose_L",
-      "emission": "#FF2A1E",
-      "intensity": 3.0
-    },
-    {
-      "name": "Led_Nose_R",
-      "emission": "#3DFF6A",
-      "intensity": 3.0
-    },
-    {
       "name": "Led_Sensor",
       "emission": "#7CFF5A",
       "intensity": 2.5
@@ -108,8 +98,6 @@
     }
   ],
   "noShadow": [
-    "Led_Nose_L",
-    "Led_Nose_R",
     "Accent_Glare",
     "Led_Sensor",
     "Glass_Canopy",
@@ -131,15 +119,22 @@
     "Screen_Map_Shade",
     "Accent_Map",
     "Plate",
-    "Nose_M_Dark_NoShadow",
-    "Nose_M_Gunmetal_NoShadow",
     "Dash_M_Dark_NoShadow",
     "Side_L_M_Gunmetal_NoShadow",
     "Side_R_M_Gunmetal_NoShadow",
     "Frame_M_Mirror_NoShadow",
     "Console_M_Gunmetal_NoShadow",
     "Dash_M_Gunmetal_NoShadow",
-    "Dash_M_Paint_NoShadow"
+    "Dash_M_Paint_NoShadow",
+    "Nose_Light_Nav_L",
+    "Nose_Light_Nav_R",
+    "Nose_Accent_FormNose_L",
+    "Nose_Accent_FormNose_R",
+    "Nose_Canopy_Floor",
+    "Nose_Decal_Number_L",
+    "Nose_Decal_Number_R",
+    "Nose_Fuselage_M_Dark_NoShadow",
+    "Nose_Armor_M_Gunmetal_NoShadow"
   ],
   "lowReflectionMaterials": [
     "M_PaintNose"
@@ -187,17 +182,194 @@
       "opacity": 0.05
     }
   ],
-  "triangles": 66614,
+  "triangles": 79371,
   "bounds": {
     "min": [
-      -0.8832,
-      -0.505,
-      -5.51
+      -1.0837,
+      -0.6043,
+      -5.3
     ],
     "max": [
-      0.8832,
+      1.0837,
       0.6633,
-      0.345
+      1.5525
+    ]
+  },
+  "combinerCenterY": -0.026,
+  "nose": {
+    "hull": "hull_blade",
+    "eye": [
+      0.0,
+      0.37,
+      -0.45
+    ],
+    "cut": 0.3,
+    "materialPrefix": "Hull_",
+    "pieces": [
+      {
+        "name": "Nose_Fuselage_Upper",
+        "hull": "Fuselage_Upper",
+        "material": "M_Paint",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_Lower",
+        "hull": "Fuselage_Lower",
+        "material": "M_PaintBottom",
+        "live": false
+      },
+      {
+        "name": "Nose_Nose_Pitot",
+        "hull": "Nose_Pitot",
+        "material": "M_Gunmetal",
+        "live": false
+      },
+      {
+        "name": "Nose_Light_Nav_L",
+        "hull": "Light_Nav_L",
+        "material": "M_Emissive_Light_Nav_L",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Nav_R",
+        "hull": "Light_Nav_R",
+        "material": "M_Emissive_Light_Nav_R",
+        "live": true
+      },
+      {
+        "name": "Nose_Accent_FormNose_L",
+        "hull": "Accent_FormNose_L",
+        "material": "M_Emissive_Accent_FormNose_L",
+        "live": true
+      },
+      {
+        "name": "Nose_Accent_FormNose_R",
+        "hull": "Accent_FormNose_R",
+        "material": "M_Emissive_Accent_FormNose_R",
+        "live": true
+      },
+      {
+        "name": "Nose_Sensor_Ball",
+        "hull": "Sensor_Ball",
+        "material": "M_SensorGlass",
+        "live": false
+      },
+      {
+        "name": "Nose_Canopy_Floor",
+        "hull": "Canopy_Floor",
+        "material": "M_CanopyFloor",
+        "live": false
+      },
+      {
+        "name": "Nose_Armor_0_L_Plate",
+        "hull": "Armor_0_L_Plate",
+        "material": "M_PaintArmor",
+        "live": false
+      },
+      {
+        "name": "Nose_Armor_0_R_Plate",
+        "hull": "Armor_0_R_Plate",
+        "material": "M_PaintArmor",
+        "live": false
+      },
+      {
+        "name": "Nose_Armor_1_L_Plate",
+        "hull": "Armor_1_L_Plate",
+        "material": "M_PaintArmor",
+        "live": false
+      },
+      {
+        "name": "Nose_Armor_1_R_Plate",
+        "hull": "Armor_1_R_Plate",
+        "material": "M_PaintArmor",
+        "live": false
+      },
+      {
+        "name": "Nose_Armor_2_L_Plate",
+        "hull": "Armor_2_L_Plate",
+        "material": "M_PaintArmor",
+        "live": false
+      },
+      {
+        "name": "Nose_Armor_2_R_Plate",
+        "hull": "Armor_2_R_Plate",
+        "material": "M_PaintArmor",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_Number_L",
+        "hull": "Decal_Number_L",
+        "material": "M_Decal_Number",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_Number_R",
+        "hull": "Decal_Number_R",
+        "material": "M_Decal_Number",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_AntiSlip",
+        "hull": "Fuselage_M_AntiSlip",
+        "material": "M_AntiSlip",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_Dark_NoShadow",
+        "hull": "Fuselage_M_Dark_NoShadow",
+        "material": "M_Dark",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_Gunmetal",
+        "hull": "Fuselage_M_Gunmetal",
+        "material": "M_Gunmetal",
+        "live": false
+      },
+      {
+        "name": "Nose_Canopy_M_Gunmetal",
+        "hull": "Canopy_M_Gunmetal",
+        "material": "M_Gunmetal",
+        "live": false
+      },
+      {
+        "name": "Nose_Armor_M_Gunmetal_NoShadow",
+        "hull": "Armor_M_Gunmetal_NoShadow",
+        "material": "M_Gunmetal",
+        "live": false
+      }
+    ],
+    "bounds": {
+      "min": [
+        -1.0837,
+        -0.6043,
+        -5.3
+      ],
+      "max": [
+        1.0837,
+        0.0928,
+        0.3
+      ]
+    },
+    "frame": [
+      {
+        "name": "Canopy_Bar_0",
+        "hull": "Canopy_Bar_0",
+        "material": "M_Gunmetal",
+        "live": false
+      },
+      {
+        "name": "Canopy_Bar_1",
+        "hull": "Canopy_Bar_1",
+        "material": "M_Gunmetal",
+        "live": false
+      },
+      {
+        "name": "Canopy_Bar_2",
+        "hull": "Canopy_Bar_2",
+        "material": "M_Gunmetal",
+        "live": false
+      }
     ]
   }
 }

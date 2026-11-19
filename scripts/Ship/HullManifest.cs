@@ -77,6 +77,8 @@ public sealed class HullManifest
 	[JsonPropertyName("glass")] public List<string> Glass { get; set; } = new();
 	[JsonPropertyName("paintMasks")] public List<HullManifestPaintMask> PaintMasks { get; set; } = new();
 	[JsonPropertyName("boundsWithoutRoofExtras")] public CockpitManifestBounds BoundsWithoutRoofExtras { get; set; } = new();
+	// Todas las piezas con nombre del prototipo, también las que van juntas (spec docs/cabinas-3d-4-morros.md, 6)
+	[JsonPropertyName("builtPieces")] public List<string> BuiltPieces { get; set; } = new();
 
 	// Null si el texto no se puede leer
 	public static HullManifest Parse(string json)

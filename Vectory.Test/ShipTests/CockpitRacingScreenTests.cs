@@ -290,7 +290,8 @@ public class Cockpit3DFlickerTests
     [Fact]
     public void Flicker_OnlyChoosesBetweenAccentsAndLeds()
     {
-        Assert.Equal(11, Cockpit3DPieces.FlickerLights.Count);
+        // 5 acentos y 4 LEDs de la consola: los del morro pasan a la copia del casco (spec docs/cabinas-3d-4-morros.md)
+        Assert.Equal(9, Cockpit3DPieces.FlickerLights.Count);
         Assert.All(Cockpit3DPieces.FlickerLights, n => Assert.True(n.StartsWith("Accent_") || n.StartsWith("Led_"), n));
 
         var flicker = new EdgeFlicker(Cockpit3DPieces.FlickerLights.Count, EdgeFlickerSettings.Default, new Random(3));

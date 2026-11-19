@@ -1,5 +1,7 @@
 # Cabina 3D de HAMMER, estilo INDUSTRIAL (spec docs/cabinas-3d-3-hammer.md). Traducción de buildCockpit() con
 # VARIANT = 2 (disposición COLGANTE) de designs/cabina-3d-hammer.html: mismos números y mismo orden.
+# El morro y el canard son una copia del casco 3D (hull_hammer.py), sin su cabina de grúa (spec
+# docs/cabinas-3d-4-morros.md).
 #
 # Uso: blender -b --factory-startup --python art/blender/cockpit_hammer.py -- --out art/blender/out
 # El .blend se regenera cada vez: todo vive en este script.
@@ -16,8 +18,10 @@ sys.path.insert(0, HERE)
 
 import bpy  # noqa: E402
 
+import hull_hammer as hull  # noqa: E402
 from lib import blender_io as io  # noqa: E402
 from lib import geometry as g  # noqa: E402
+from lib import nose_copy as nc  # noqa: E402
 from lib import textures_industrial as tx  # noqa: E402
 from lib.blade_builder import BladeBuilder, transformed  # noqa: E402
 
@@ -51,12 +55,18 @@ REFLECTIONS = {"M_PaintNose": 0.6, "M_CrtGlass": 1.4, "M_Glass": 1.3}
 ADDITIVE_MATERIALS = {"M_GlassSmudge": 0.06}
 TRANSPARENT_MATERIALS = {"M_ScreenShade": 0.7, "M_CrtGlass": 0.14, "M_Glass": 0.06, "M_GlassSmudge": 0.06}
 
-ZONES = ["Nose", "Canard", "Dash", "Side_L", "Side_R", "Frame", "Console"]
+ZONES = ["Nose", "Dash", "Side_L", "Side_R", "Frame", "Console"]
 
 SCREENS = ["Screen_Radar", "Screen_Damage", "Screen_Map", "Screen_Speed"]
 LOOK = (0.0, 0.02, 0.12)
 
 EYE_PITCH = -0.085  # la vista mira 4,9° hacia abajo; no va en el modelo, solo en las capturas
+
+# Ojo de la cabina en coordenadas del casco y corte de la copia del morro (spec docs/cabinas-3d-4-morros.md, 3.3). De
+# la copia se quita toda la cabina de grúa del casco (Cab, con sus balizas y focos)
+EYE = (0.0, 0.805, -1.03)
+CUT = 0.30
+HULL_DROP_ZONES = ["Cab"] + [zone for zone, parent in hull.SUBZONES.items() if parent == "Cab"]
 
 LABEL_BOOST = [f"Label_Boost_{i}" for i in (1, 2, 3)]
 
@@ -65,7 +75,6 @@ def contract_names():
     names = list(SCREENS)
     names += [f"{s}_Shade" for s in SCREENS]
     names += ["Accent_Radar", "Accent_Damage", "Accent_Map"]
-    names += ["Led_Nose_L", "Led_Nose_R", "Led_Canard_L", "Led_Canard_R"]
     names += [f"Lamp_Boost_{i}" for i in (1, 2, 3)]
     names += ["Beacon_Boost_Lens", "Beacon_Damage_Lens", "Plate"]
     names += LABEL_BOOST + ["Label_Aux"]
@@ -217,69 +226,6 @@ def beacon(b, m, parent, name, pos, color):
 
 
 # ---------- buildCockpit() → CockpitHammer ----------
-
-def build_nose(b, m, root):
-    nose = b.group(root, "Nose")
-    st = [(-0.86, 0.92, -0.435), (-1.30, 0.86, -0.490), (-1.80, 0.74, -0.560), (-2.25, 0.56, -0.620), (-2.55, 0.40, -0.665)]
-
-    def sec(s):
-        z, w, y = s
-        return [(-w, y - 0.22, z), (-w * 0.94, y - 0.04, z), (-w * 0.6, y, z),
-                (w * 0.6, y, z), (w * 0.94, y - 0.04, z), (w, y - 0.22, z)]
-
-    sections = [sec(s) for s in st]
-    for k in range(5):
-        b.mesh(b.strip([s[k] for s in sections], [s[k + 1] for s in sections]), m.paint_nose, nose, f"Nose_Skin_{k}")
-    b.mesh(b.poly(sections[-1]), m.paint_nose, nose, "Nose_Tip")
-    # Banda central de chapa lagrimada (antirreflejos)
-    ag = [(w * 0.24, y + 0.002, z) for z, w, y in st]
-    b.mesh(b.strip(mirror_x(ag), ag), m.tread, nose, "Nose_Tread")
-    # Juntas y remaches
-    for i, z in enumerate((-1.5, -2.0)):
-        j = next(n for n, s in enumerate(st) if s[0] < z)
-        sa, sb = st[j - 1], st[j]
-        t = (z - sa[0]) / (sb[0] - sa[0])
-        w = sa[1] + (sb[1] - sa[1]) * t
-        y = sa[2] + (sb[2] - sa[2]) * t
-        b.mesh(b.poly([(-w * 0.6, y + 0.0015, z - 0.005), (w * 0.6, y + 0.0015, z - 0.005),
-                       (w * 0.6, y + 0.0015, z + 0.005), (-w * 0.6, y + 0.0015, z + 0.005)]),
-               m.dark, nose, f"Nose_Seam_{i}", True)
-        for q in range(-3, 4):
-            b.sphere(0.006, m.steel, nose, "Rivet", True, (q / 3 * w * 0.56, y + 0.002, z + 0.016), (1.0, 0.4, 1.0))
-    # Parachoques de acero en la punta
-    b.beam((-0.44, -0.75, -2.57), (0.44, -0.75, -2.57), 0.07, 0.05, (0, -0.8, 0), m.steel, nose, "Nose_Bumper")
-    # Balizas ámbar en los hombros del morro
-    for sx in (-1, 1):
-        name = "Led_Nose_L" if sx < 0 else "Led_Nose_R"
-        b.sphere(0.014, m.glow("Emissive_Nav", name, BEACON, LED_NAV), nose, name, True, (sx * 0.74 * 0.95, -0.60, -1.80))
-
-
-def build_canard(b, m, root):
-    can = b.group(root, "Canard")
-    for k in (-1, 1):
-        r_le, r_te = (k * 0.38, -0.70, -2.85), (k * 0.38, -0.68, -2.30)
-        t_le, t_te = (k * 2.35, -0.66, -2.95), (k * 2.35, -0.65, -2.62)
-
-        def dn(p):
-            return (p[0], p[1] - 0.07, p[2])
-
-        b.mesh(b.poly([r_le, t_le, t_te, r_te]), m.paint_nose, can, "Canard_Top")
-        b.mesh(b.poly([dn(r_le), dn(t_le), dn(t_te), dn(r_te)]), m.plate_dark, can, "Canard_Bottom")
-        b.mesh(b.strip([r_le, t_le], [dn(r_le), dn(t_le)]), m.hazard, can, "Canard_LeadingEdge")
-        b.mesh(b.strip([r_te, t_te], [dn(r_te), dn(t_te)]), m.plate_dark, can, "Canard_TrailingEdge")
-        # Punta caída
-        d_te, d_le = (k * 2.50, -1.12, -2.70), (k * 2.50, -1.12, -2.97)
-        b.mesh(b.poly([t_le, t_te, d_te, d_le]), m.paint_nose, can, "Canard_Tip")
-        b.mesh(b.poly([dn(t_le), dn(t_te), (d_te[0] - k * 0.05, d_te[1], d_te[2]), (d_le[0] - k * 0.05, d_le[1], d_le[2])]),
-               m.plate_dark, can, "Canard_TipInner")
-        name = "Led_Canard_L" if k < 0 else "Led_Canard_R"
-        b.sphere(0.022, m.glow("Emissive_Nav", name, BEACON, LED_NAV), can, name, True, (k * 2.49, -1.11, -2.84))
-        # Costillas atornilladas en la raíz
-        for q in range(4):
-            z = -2.38 - q * 0.13
-            b.sphere(0.009, m.steel, can, "Rivet", True, (k * 0.46, -0.685, z), (1.0, 0.4, 1.0))
-        b.beam((k * 0.40, -0.69, -2.40), (k * 1.6, -0.67, -2.62), 0.012, 0.012, (0, 1, -2.5), m.dark, can, "Canard_Seam")
-
 
 def build_dash(b, m, root):
     dash = b.group(root, "Dash")
@@ -503,26 +449,27 @@ def measure(root):
 
 
 # Comprobación de ejes de la spec (3.3), con las piezas antes de juntarlas (coordenadas del prototipo = de Godot)
-def check_axes(builder, overhead):
+# Comprobaciones de la spec (docs/cabinas-3d-4-morros.md, 3.3), en coordenadas de la cabina: cara del morro de la copia
+# en z −2,57 y defensa en z ≈ −2,77 (eje de sus postes); bloque colgante y larguero, los de siempre
+def check_axes(builder, overhead, nose):
     def points(name):
         return [g.transform_point(p.matrix, v) for p in builder.pieces if p.name == name for v in p.soup.positions]
 
-    tip = min(p[2] for p in points("Nose_Tip"))
-    canard = points("Canard_Tip")
-    canard_x = max(abs(p[0]) for p in canard)
-    canard_y = min(p[1] for p in canard)
+    face = min(v[2] for piece in nose if piece.zone == "Fuselage" for v in piece.soup.positions)
+    post = [v[2] for piece in nose if piece.name == "BullBar_Post_1" for v in piece.soup.positions]
+    bumper = (min(post) + max(post)) / 2
     oh = tuple(float(c) for c in overhead.world[:3, 3])
     header = [p[1] for p in points("Header")]
     header_y = (min(header) + max(header)) / 2
-    ok = (abs(tip + 2.55) < 0.01 and abs(canard_x - 2.50) < 0.01 and abs(canard_y + 1.12) < 0.01
+    ok = (abs(face + 2.57) < 0.005 and abs(bumper + 2.77) < 0.005
           and max(abs(oh[0]), abs(oh[1] - 0.205), abs(oh[2] + 0.535)) < 0.001 and abs(header_y - 0.37) < 0.005)
     if not ok:
-        raise RuntimeError(f"Ejes mal: punta del morro z = {tip:.3f}, canard x = ±{canard_x:.3f} y = {canard_y:.3f}, "
+        raise RuntimeError(f"Ejes mal: cara del morro z = {face:.3f}, defensa z = {bumper:.3f}, "
                            f"bloque colgante {oh[0]:.3f}, {oh[1]:.3f}, {oh[2]:.3f}, larguero y = {header_y:.3f}")
-    return tip, canard_x, canard_y, oh, header_y
+    return face, bumper, oh, header_y
 
 
-def write_manifest(path, root, materials, no_shadow, env_name):
+def write_manifest(path, root, materials, no_shadow, env_name, nose_entries, nose_low, nose_high):
     low, high, triangles = measure(root)
     pieces = []
     for name in contract_names():
@@ -553,6 +500,8 @@ def write_manifest(path, root, materials, no_shadow, env_name):
         "transparentMaterials": [{"material": k, "opacity": v} for k, v in TRANSPARENT_MATERIALS.items()],
         "triangles": triangles,
         "bounds": {"min": [round(c, 4) for c in low], "max": [round(c, 4) for c in high]},
+        # Copia del morro del casco (spec docs/cabinas-3d-4-morros.md, 5)
+        "nose": nc.manifest("hull_hammer", EYE, CUT, nose_entries, nose_low, nose_high),
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -562,7 +511,7 @@ def write_manifest(path, root, materials, no_shadow, env_name):
 
 # ---------- Capturas ----------
 
-def render_previews(scene, collection, root, env_path, panels, out):
+def render_previews(scene, collection, root, env_path, panels, out, hull_materials):
     scene.render.engine = "BLENDER_EEVEE"
     # El prototipo usa ACES: se aproxima con la vista que haya, solo para mirar
     views = {v.identifier for v in scene.view_settings.bl_rna.properties["view_transform"].enum_items}
@@ -590,6 +539,15 @@ def render_previews(scene, collection, root, env_path, panels, out):
     io.render_preview(scene, collection, root, os.path.join(folder, "hammer_eye.png"), (0, 0, 0), forward, 70)
     io.render_preview(scene, collection, root, os.path.join(folder, "hammer_three_quarter.png"), (2.3, 0.15, 1.1), (0, -0.4, -1.3), 45)
     io.render_preview(scene, collection, root, os.path.join(folder, "hammer_overhead.png"), (0.10, 0.02, -0.12), (0, 0.205, -0.535), 50)
+    # Desde el ojo con el morro nuevo (spec docs/cabinas-3d-4-morros.md, 3.3), con AMARILLO OBRA ya coloreado en lugar
+    # de las máscaras, como las capturas del casco
+    nc.hide_livery_in_previews(root, ("Markings",))
+    nc.swap_preview_materials(root, hull.preview_paint_materials(hull_materials))
+    # Dos capturas: con la copia pintada antes que la cabina, como la maqueta (la cabina tapa lo que tiene detrás), y
+    # con las dos en el mismo espacio (lo que esté más cerca del ojo, delante)
+    nc.render_layered(scene, collection, root, os.path.join(folder, "hammer_eye_new.png"), (0, 0, 0), forward, 70,
+                      nc.copied_names(root))
+    io.render_preview(scene, collection, root, os.path.join(folder, "hammer_eye_new_depth.png"), (0, 0, 0), forward, 70)
     return aces or "Filmic"
 
 
@@ -613,37 +571,47 @@ def main():
     scene = bpy.context.scene
     collection = scene.collection
 
+    # Primero el casco, en memoria: sus materiales e imágenes pasan a llevar el prefijo Hull_ antes de crear los de la
+    # cabina, que a veces se llaman igual
+    hull_materials, hull_builder = hull.build_hull(out)
+    nose = nc.front_pieces(hull_builder.pieces, EYE, CUT, drop_zones=HULL_DROP_ZONES)
+    nc.check_cut(nose, CUT)
+    originals = nc.prefix_hull_data()
+
     # Texturas sueltas aparte de las de VECTOR y BLADE: algunas se llaman igual
     materials = Materials(os.path.join(out, "textures", "hammer"))
     builder = BladeBuilder()
     root_group = builder.root
-    build_nose(builder, materials, root_group)
-    build_canard(builder, materials, root_group)
     build_dash(builder, materials, root_group)
     build_sides(builder, materials, root_group)
     build_frame(builder, materials, root_group)
     panels, overhead = build_colgante(builder, materials, root_group)
 
-    tip, canard_x, canard_y, oh, header_y = check_axes(builder, overhead)
+    face, bumper, oh, header_y = check_axes(builder, overhead, nose)
 
     # Raíz girada +90° en X: un punto del prototipo (x, y, z) queda en Blender en (x, −z, y) y vuelve a ser (x, y, z) en glTF
     root = io.empty("CockpitHammer", None, collection, rotation=(math.pi / 2, 0.0, 0.0))
     no_shadow = create_objects(builder, root, collection)
+    nose_entries = nc.create_objects(nose, hull.contract_names(), bpy.data.objects["Nose"], collection, hull.uv_args,
+                                     originals, set(hull_materials.emissive))
+    no_shadow += [e["name"] for e in nose_entries if e["noShadow"]]
     bpy.context.view_layer.update()
 
     check_contract(root)
-    write_manifest(manifest_path, root, materials, no_shadow, env_name)
+    nose_low, nose_high = nc.bounds(nose)
+    write_manifest(manifest_path, root, materials, no_shadow, env_name, nose_entries, nose_low, nose_high)
     io.export_glb(glb_path, root)
 
     preview_collection = bpy.data.collections.new("Preview")
     scene.collection.children.link(preview_collection)
-    view = render_previews(scene, preview_collection, root, env_path, panels, out)
+    view = render_previews(scene, preview_collection, root, env_path, panels, out, hull_materials)
 
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "cockpit_hammer.blend"))
 
     print(f"[Cockpit] Blender {bpy.app.version_string} · capturas con {scene.render.engine} y vista {view} · panorama {env_name}")
-    print(f"[Cockpit] Punta del morro z = {tip:.3f} · canard x = ±{canard_x:.3f} y = {canard_y:.3f} · "
+    print(f"[Cockpit] Cara del morro z = {face:.3f} · defensa z = {bumper:.3f} · "
           f"bloque colgante ({oh[0]:.3f}, {oh[1]:.3f}, {oh[2]:.3f}) · larguero y = {header_y:.3f}")
+    nc.report(nose_entries, nose, nose_high)
     print(f"[Cockpit] GLB {os.path.getsize(glb_path)} bytes · sha256 {sha256(glb_path)}")
 
 

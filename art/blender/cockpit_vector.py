@@ -1,5 +1,6 @@
 # Cabina 3D de VECTOR, estilo CARRERAS (spec docs/cabinas-3d-1-vector.md). Traducción de buildCockpit() de
 # designs/cabina-3d-vector-radar.html, colocación 1 sin intercambiar: mismos números y mismo orden.
+# El morro es una copia del casco 3D (hull_vector.py), sin la viga central del cristal (spec docs/cabinas-3d-4-morros.md).
 #
 # Uso: blender -b --factory-startup --python art/blender/cockpit_vector.py -- --out art/blender/out
 # El .blend se regenera cada vez: todo vive en este script.
@@ -17,12 +18,19 @@ sys.path.insert(0, HERE)
 import bpy  # noqa: E402
 
 from lib import blender_io as io  # noqa: E402
+import hull_vector as hull  # noqa: E402
 from lib import geometry as g  # noqa: E402
+from lib import nose_copy as nc  # noqa: E402
 from lib import textures as tx  # noqa: E402
 from lib.builder import Builder  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(HERE))
 ASSETS = os.path.join(REPO, "assets", "cockpits")
+
+# Ojo de la cabina en coordenadas del casco y corte de la copia del morro (spec docs/cabinas-3d-4-morros.md, 3.3)
+EYE = (0.0, 0.80, -0.95)
+CUT = 0.30
+HULL_DROP = ["Canopy_Glass"]
 
 HOUSING_T = 0.013
 PILLAR_W = 0.034
@@ -42,18 +50,17 @@ REPEAT = {
     "M_GlassSmudge": 2.2,
 }
 
-LOW_REFLECTION_MATERIALS = ["M_CarbonNose", "M_CarbonNoseSide"]
+LOW_REFLECTION_MATERIALS = []   # el morro de carbono ya no existe: lo sustituye la copia del casco
 LOW_REFLECTION_FACTOR = 0.35
 ADDITIVE_MATERIALS = {"M_GlassSmudge": 0.012}
 
-ZONES = ["Nose", "Dash", "Console", "Frame", "Halo", "Side_L", "Side_R"]
+ZONES = ["Nose", "Dash", "Console", "Frame", "Side_L", "Side_R"]
 
 
 def contract_names():
     names = ["Screen_L", "Screen_R", "Screen_L_Shade", "Screen_R_Shade",
              "Screen_Radar", "Screen_Map", "Screen_Radar_Shade", "Screen_Map_Shade",
-             "Accent_Visor", "Accent_Screen_L", "Accent_Screen_R", "Accent_Radar", "Accent_Map",
-             "Led_Nose_L", "Led_Nose_R", "Glass_Smudge"]
+             "Accent_Visor", "Accent_Screen_L", "Accent_Screen_R", "Accent_Radar", "Accent_Map", "Glass_Smudge"]
     names += [f"ShiftLight_{i:02d}" for i in range(15)]
     names += [f"ShiftLight_Base_{i:02d}" for i in range(15)]
     names += [f"Led_Console_{i}" for i in range(4)]
@@ -79,8 +86,6 @@ class Materials:
         smudge = io.save_texture_set(texture_folder, "Smudge", {"color": tx.smudge_texture()})
 
         self.carbon = io.material("M_Carbon", metallic=0.25, coat=1.0, coat_roughness=0.06, textures=carbon)
-        self.nose = io.material("M_CarbonNose", metallic=0.25, coat=0.6, coat_roughness=0.06, textures=carbon)
-        self.nose_side = io.material("M_CarbonNoseSide", metallic=0.25, coat=1.0, coat_roughness=0.06, textures=carbon)
         self.alu = io.material("M_Alu", metallic=1.0, textures=alu)
         self.alu_dark = io.material("M_AluDark", metallic=1.0, textures=alu_dark)
         self.fabric = io.material("M_Fabric", metallic=0.0, textures=fabric)
@@ -102,43 +107,6 @@ class Materials:
 
 
 # ---------- Cabina: buildCockpit() del prototipo ----------
-
-def build_nose(b, m):
-    b.zone = "Nose"
-    levels = [(-0.85, 0.80, -0.50), (-1.55, 0.62, -0.60), (-2.25, 0.46, -0.70), (-3.05, 0.28, -0.80)]  # z, semiancho, y
-    R, STEP, SK = 0.06, 0.035, 0.16
-    start = levels[0]
-    for i in range(len(levels) - 1):
-        za, ha, ya = start
-        zb, hb, yb = levels[i + 1]
-        last = i == len(levels) - 2
-        inner = hb if last else hb + 0.04
-        for k in (-1, 1):
-            b.poly([(k * ha, ya, za), (k * inner, yb, zb), (0, yb + R, zb), (0, ya + R, za)], m.nose)
-            b.poly([(k * ha, ya, za), (k * inner, yb, zb), (k * inner, yb - SK, zb), (k * ha, ya - SK, za)], m.nose_side)
-            if not last:
-                b.poly([(k * inner, yb, zb), (k * hb, yb - STEP, zb - 0.02), (0, yb - STEP + R, zb - 0.02), (0, yb + R, zb)], m.dark)
-        if not last:
-            start = (zb - 0.02, hb, yb - STEP)
-    zt, ht, yt = levels[-1]
-    b.poly([(-ht, yt, zt), (0, yt + R, zt), (ht, yt, zt), (ht + 0.04, yt - 0.07, zt - 0.06), (-ht - 0.04, yt - 0.07, zt - 0.06)], m.nose_side)
-    # Franja roja central pintada sobre el carbono
-    for k in (-1, 1):
-        s0 = levels[0]
-        for i in range(len(levels) - 1):
-            za, ha, ya = s0
-            zb, hb0, yb = levels[i + 1]
-            last = i == len(levels) - 2
-            hb = hb0 if last else hb0 + 0.04
-            off = 0.0025
-            wa = 0.07 - i * 0.012
-            wb = 0.07 - (i + 1) * 0.012
-            b.poly([(0, ya + R + off, za), (k * wa, ya + R - R * wa / ha + off, za),
-                    (k * wb, yb + R - R * wb / hb + off, zb), (0, yb + R + off, zb)], m.paint)
-            s0 = (zb - 0.02, hb0, yb - 0.035)
-    b.led((-ht + 0.05, yt + 0.02, zt - 0.01), m.glow("Accent", "Led_Nose_L", ACCENT, 4.0), "Led_Nose_L", 0.007)
-    b.led((ht - 0.05, yt + 0.02, zt - 0.01), m.glow("Accent", "Led_Nose_R", ACCENT, 4.0), "Led_Nose_R", 0.007)
-
 
 def build_dash(b, m):
     b.zone = "Dash"
@@ -219,10 +187,6 @@ def build_frame(b, m):
         kind, color = ("ShiftGreen", SHIFT_GREEN) if i < 5 else (("ShiftRed", SHIFT_RED) if i < 10 else ("ShiftBlue", SHIFT_BLUE))
         name = f"ShiftLight_{i:02d}"
         b.led((x, -0.2535, -0.655), m.glow(kind, name, color, 3.5), name, 0.0035)
-    # Halo: barra central y travesaño inferior
-    b.zone = "Halo"
-    b.beam((0, top_y - 0.02, top_z + 0.02), (0, -0.27, -0.74), 0.03, 0.04, m.alu_dark, (0, 0, 0.3))
-    b.beam((-0.06, -0.275, -0.74), (0.06, -0.275, -0.74), 0.03, 0.03, m.alu_dark, (0, 0.3, 0.3))
     # Techo: no proyecta sombra
     b.zone = "Frame"
     b.poly([(-1.3, 0.43, -0.60), (1.3, 0.43, -0.60), (1.3, 0.47, 0.6), (-1.3, 0.47, 0.6)], m.carbon, name="Frame_Roof", no_shadow=True)
@@ -312,18 +276,25 @@ def measure(root):
     return low, high, triangles
 
 
-# Comprobación de ejes de la spec: punta del morro en z ≈ −3,1 y techo en y ≈ +0,45
-def check_axes(root):
-    nose = min(godot_point(o, v.co)[2] for o in root.children_recursive if o.name.startswith("Nose_") for v in o.data.vertices)
+# Comprobaciones de la spec (docs/cabinas-3d-4-morros.md, 3.3), en coordenadas de la cabina: punta del morro de la
+# copia en (0; −0,80; −3,05), techo en y ≈ +0,45 y ninguna pieza del marco en x = 0 entre el larguero y el salpicadero
+# (la viga central ya no está)
+def check_axes(builder, nose):
+    tip = min((p for piece in nose for p in piece.soup.positions), key=lambda p: p[2])
     roof = bpy.data.objects["Frame_Roof"]
     roof_y = [godot_point(roof, v.co)[1] for v in roof.data.vertices]
     roof_mid = (min(roof_y) + max(roof_y)) / 2
-    if abs(nose + 3.1) > 0.05 or abs(roof_mid - 0.45) > 0.01:
-        raise RuntimeError(f"Ejes mal: punta del morro en z = {nose:.3f}, techo en y = {roof_mid:.3f}")
-    return nose, roof_mid
+    if max(abs(tip[0]), abs(tip[1] + 0.80), abs(tip[2] + 3.05)) > 0.005 or abs(roof_mid - 0.45) > 0.01:
+        raise RuntimeError(f"Ejes mal: punta del morro en {tuple(round(c, 4) for c in tip)}, techo en y = {roof_mid:.3f}")
+    halo = [piece for piece in builder.pieces if piece.zone in ("Frame", "Side_L", "Side_R")
+            and piece.name != "Glass_Smudge"
+            and any(abs(p[0]) < 0.03 and -0.26 < p[1] < 0.35 for p in g.transformed(piece.soup, piece.matrix).positions)]
+    if halo:
+        raise RuntimeError("Queda una pieza del marco en x = 0 entre el larguero y el salpicadero")
+    return tip, roof_mid
 
 
-def write_manifest(path, root, materials, panels, no_shadow):
+def write_manifest(path, root, materials, panels, no_shadow, nose_entries, nose_low, nose_high):
     low, high, triangles = measure(root)
     pieces = []
     for name in contract_names():
@@ -350,6 +321,10 @@ def write_manifest(path, root, materials, panels, no_shadow):
         "additiveMaterials": [{"material": k, "opacity": v} for k, v in ADDITIVE_MATERIALS.items()],
         "triangles": triangles,
         "bounds": {"min": [round(c, 4) for c in low], "max": [round(c, 4) for c in high]},
+        # Grupos de la cabina (sin Halo: la viga central ya no está) y copia del morro del casco (spec
+        # docs/cabinas-3d-4-morros.md, 3.2 y 5)
+        "zones": ZONES,
+        "nose": nc.manifest("hull_vector", EYE, CUT, nose_entries, nose_low, nose_high),
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -379,6 +354,13 @@ def render_previews(scene, collection, root, env_path, panels, out):
 
     folder = os.path.join(out, "previews")
     io.render_preview(scene, collection, root, os.path.join(folder, "eye.png"), (0, 0, 0), (0, 0, -1), 70)
+    # Desde el ojo con el morro nuevo (spec docs/cabinas-3d-4-morros.md, 3.3)
+    nc.hide_livery_in_previews(root, ("Livery",))
+    # Dos capturas: con la copia pintada antes que la cabina, como la maqueta (la cabina tapa lo que tiene detrás), y
+    # con las dos en el mismo espacio (lo que esté más cerca del ojo, delante)
+    nc.render_layered(scene, collection, root, os.path.join(folder, "vector_eye_new.png"), (0, 0, 0), (0, 0, -1), 70,
+                      nc.copied_names(root))
+    io.render_preview(scene, collection, root, os.path.join(folder, "vector_eye_new_depth.png"), (0, 0, 0), (0, 0, -1), 70)
     io.render_preview(scene, collection, root, os.path.join(folder, "three_quarter.png"), (2.4, 1.6, 2.6), (0, -0.25, -0.9), 45)
     io.render_preview(scene, collection, root, os.path.join(folder, "screens.png"), (0, -0.08, -0.05), (0, -0.3, -0.58), 60)
     return aces or "Filmic"
@@ -402,9 +384,15 @@ def main():
 
     io.render_environment(env_path)
 
+    # Primero el casco, en memoria: sus materiales e imágenes pasan a llevar el prefijo Hull_ antes de crear los de la
+    # cabina, que a veces se llaman igual
+    hull_materials, hull_builder = hull.build_hull(out)
+    nose = nc.front_pieces(hull_builder.pieces, EYE, CUT, HULL_DROP)
+    nc.check_cut(nose, CUT)
+    originals = nc.prefix_hull_data()
+
     materials = Materials(os.path.join(out, "textures"))
     builder = Builder()
-    build_nose(builder, materials)
     build_dash(builder, materials)
     panels = build_screens(builder, materials)
     build_console(builder, materials)
@@ -415,12 +403,15 @@ def main():
     # Raíz girada +90° en X: un punto del prototipo (x, y, z) queda en Blender en (x, −z, y) y vuelve a ser (x, y, z) en glTF
     root = io.empty("CockpitVector", None, collection, rotation=(math.pi / 2, 0.0, 0.0))
     create_objects(builder, root, collection)
+    nose_entries = nc.create_objects(nose, hull.contract_names(), bpy.data.objects["Nose"], collection, hull.uv_args,
+                                     originals, set(hull_materials.emissive))
     bpy.context.view_layer.update()
 
     check_contract(root)
-    nose, roof = check_axes(root)
-    no_shadow = [p.name for p in builder.pieces if p.no_shadow]
-    write_manifest(manifest_path, root, materials, panels, no_shadow)
+    tip, roof = check_axes(builder, nose)
+    no_shadow = [p.name for p in builder.pieces if p.no_shadow] + [e["name"] for e in nose_entries if e["noShadow"]]
+    nose_low, nose_high = nc.bounds(nose)
+    write_manifest(manifest_path, root, materials, panels, no_shadow, nose_entries, nose_low, nose_high)
     io.export_glb(glb_path, root)
 
     preview_collection = bpy.data.collections.new("Preview")
@@ -430,7 +421,8 @@ def main():
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "cockpit_vector.blend"))
 
     print(f"[Cockpit] Blender {bpy.app.version_string} · capturas con {scene.render.engine} y vista {view}")
-    print(f"[Cockpit] Punta del morro z = {nose:.3f} · techo y = {roof:.3f}")
+    print(f"[Cockpit] Punta del morro {tuple(round(float(c), 4) for c in tip)} · techo y = {roof:.3f}")
+    nc.report(nose_entries, nose, nose_high)
     print(f"[Cockpit] GLB {os.path.getsize(glb_path)} bytes · sha256 {sha256(glb_path)}")
 
 

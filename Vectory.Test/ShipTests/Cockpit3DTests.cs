@@ -33,7 +33,8 @@ public class Cockpit3DManifestTests
         Assert.Equal(15, Manifest.Pieces.Count(p => p.Name.StartsWith("ShiftLight_") && !p.Name.Contains("Base")));
         Assert.Equal(15, Manifest.Pieces.Count(p => p.Name.StartsWith("ShiftLight_Base_")));
         Assert.Equal(4, Manifest.Pieces.Count(p => p.Name.StartsWith("Led_Console_")));
-        Assert.Equal(2, Manifest.Pieces.Count(p => p.Name.StartsWith("Led_Nose_")));
+        // Las luces del morro son ahora las de la copia del casco (spec docs/cabinas-3d-4-morros.md)
+        Assert.DoesNotContain(Manifest.Pieces, p => p.Name.StartsWith("Led_Nose_"));
         Assert.Equal(5, Manifest.Pieces.Count(p => p.Name.StartsWith("Accent_")));
     }
 
@@ -57,7 +58,6 @@ public class Cockpit3DManifestTests
         Assert.Equal("#FF2D2D", Manifest.Piece("ShiftLight_05").Emission);
         Assert.Equal("#3D7BFF", Manifest.Piece("ShiftLight_14").Emission);
         Assert.Equal("#FF8A00", Manifest.Piece("Led_Console_0").Emission);
-        Assert.True(Manifest.Piece("Led_Nose_L").Intensity > 0f);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class Cockpit3DManifestTests
         Assert.Contains("Screen_L", Manifest.NoShadow);
         Assert.Contains("Frame_Roof", Manifest.NoShadow);
         Assert.DoesNotContain("ShiftLight_Base_00", Manifest.NoShadow);
-        Assert.Equal(new[] { "M_CarbonNose", "M_CarbonNoseSide" }, Manifest.LowReflectionMaterials);
+        Assert.Empty(Manifest.LowReflectionMaterials);   // el morro de carbono ya no está: lo sustituye la copia del casco
         Assert.Equal(0.35f, Manifest.LowReflectionFactor);
         Assert.Equal("M_GlassSmudge", Assert.Single(Manifest.AdditiveMaterials).Material);
     }
@@ -75,7 +75,7 @@ public class Cockpit3DManifestTests
     [Fact]
     public void Manifest_BoundsMatchTheAxesOfThePrototype()
     {
-        Assert.Equal(-3.11f, Manifest.Bounds.Min[2], 2);
+        Assert.Equal(-3.05f, Manifest.Bounds.Min[2], 2);   // punta del morro de la copia del casco
         Assert.Equal(0.47f, Manifest.Bounds.Max[1], 2);
         Assert.True(Manifest.Triangles > 0);
     }

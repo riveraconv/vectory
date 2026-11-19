@@ -650,6 +650,21 @@ def sha256(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
+# Construye el casco en memoria, sin exportar: lo usan este script y las cabinas, para la copia del morro
+# (spec docs/cabinas-3d-4-morros.md, 3.1)
+def build_hull(out):
+    # Texturas sueltas aparte de las de las cabinas y de VECTOR: algunas se llaman igual
+    materials = Materials(os.path.join(out, "textures", "hull_blade"))
+    builder = Builder()
+    build_fuselage(builder, materials)
+    build_canopy(builder, materials)
+    for side, k in SIDES:
+        build_side(builder, materials, side, k)
+    build_armor(builder, materials)
+    build_markings(builder, materials)
+    return materials, builder
+
+
 def main():
     out = parse_out()
     os.makedirs(out, exist_ok=True)
@@ -664,15 +679,7 @@ def main():
     scene = bpy.context.scene
     collection = scene.collection
 
-    # Texturas sueltas aparte de las de las cabinas y de VECTOR: algunas se llaman igual
-    materials = Materials(os.path.join(out, "textures", "hull_blade"))
-    builder = Builder()
-    build_fuselage(builder, materials)
-    build_canopy(builder, materials)
-    for side, k in SIDES:
-        build_side(builder, materials, side, k)
-    build_armor(builder, materials)
-    build_markings(builder, materials)
+    materials, builder = build_hull(out)
 
     # Raíz girada +90° en X: un punto del prototipo (x, y, z) queda en Blender en (x, −z, y) y vuelve a ser (x, y, z) en glTF
     root = io.empty("HullBlade", None, collection, rotation=(math.pi / 2, 0.0, 0.0))
@@ -708,4 +715,6 @@ def main():
     print(f"[Hull] GLB {os.path.getsize(glb_path)} bytes · sha256 {sha256(glb_path)}")
 
 
-main()
+# Solo al ejecutarlo: las cabinas lo importan para construir el casco
+if __name__ == "__main__":
+    main()

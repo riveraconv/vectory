@@ -142,12 +142,12 @@ def _standard_view(scene):
     scene.view_settings.gamma = 1.0
 
 
-def _render_png(scene, path, width, height):
+def _render_png(scene, path, width, height, alpha=False):
     scene.render.resolution_x = width
     scene.render.resolution_y = height
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
-    scene.render.image_settings.color_mode = "RGB"
+    scene.render.image_settings.color_mode = "RGBA" if alpha else "RGB"
     scene.render.image_settings.color_depth = "8"
     scene.render.dither_intensity = 0.0
     # Sin fecha ni tiempo de render dentro del PNG: dos ejecuciones tienen que dar el mismo archivo
@@ -307,7 +307,7 @@ def preview_light_point(name, collection, parent, position, color, candela, radi
     return obj
 
 
-def render_preview(scene, collection, parent, path, eye, target, fov_degrees, width=1280, height=720):
+def render_preview(scene, collection, parent, path, eye, target, fov_degrees, width=1280, height=720, alpha=False):
     cam = bpy.data.cameras.new("PreviewCamera")
     cam.sensor_fit = "VERTICAL"
     cam.angle_y = math.radians(fov_degrees)
@@ -320,7 +320,7 @@ def render_preview(scene, collection, parent, path, eye, target, fov_degrees, wi
     m = g.look_at(tuple(eye), tuple(2 * e - t for e, t in zip(eye, target)))
     obj.matrix_basis = Matrix([list(r) for r in m])
     scene.camera = obj
-    _render_png(scene, path, width, height)
+    _render_png(scene, path, width, height, alpha)
     bpy.data.objects.remove(obj)
     bpy.data.cameras.remove(cam)
 

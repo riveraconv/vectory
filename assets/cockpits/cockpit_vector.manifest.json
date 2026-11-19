@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-06",
+  "exported": "2026-11-19",
   "root": "CockpitVector",
   "pieces": [
     {
@@ -59,16 +59,6 @@
       "name": "Accent_Map",
       "emission": "#FF2D2D",
       "intensity": 2.0
-    },
-    {
-      "name": "Led_Nose_L",
-      "emission": "#FF2D2D",
-      "intensity": 4.0
-    },
-    {
-      "name": "Led_Nose_R",
-      "emission": "#FF2D2D",
-      "intensity": 4.0
     },
     {
       "name": "Glass_Smudge"
@@ -215,8 +205,6 @@
     }
   ],
   "noShadow": [
-    "Led_Nose_L",
-    "Led_Nose_R",
     "Accent_Visor",
     "Screen_L_Shade",
     "Accent_Screen_L",
@@ -250,12 +238,16 @@
     "ShiftLight_13",
     "ShiftLight_14",
     "Frame_Roof",
-    "Glass_Smudge"
+    "Glass_Smudge",
+    "Nose_Accent_Chine_R",
+    "Nose_Accent_Chine_L",
+    "Nose_Light_Nose_R",
+    "Nose_Light_Nose_L",
+    "Nose_Decal_Number_Nose",
+    "Nose_Decal_Sponsor_R",
+    "Nose_Decal_Sponsor_L"
   ],
-  "lowReflectionMaterials": [
-    "M_CarbonNose",
-    "M_CarbonNoseSide"
-  ],
+  "lowReflectionMaterials": [],
   "lowReflectionFactor": 0.35,
   "additiveMaterials": [
     {
@@ -263,17 +255,139 @@
       "opacity": 0.012
     }
   ],
-  "triangles": 38515,
+  "triangles": 46720,
   "bounds": {
     "min": [
       -1.3,
-      -0.96,
-      -3.11
+      -1.0951,
+      -3.05
     ],
     "max": [
       1.3,
       0.4713,
       0.8015
     ]
+  },
+  "zones": [
+    "Nose",
+    "Dash",
+    "Console",
+    "Frame",
+    "Side_L",
+    "Side_R"
+  ],
+  "nose": {
+    "hull": "hull_vector",
+    "eye": [
+      0.0,
+      0.8,
+      -0.95
+    ],
+    "cut": 0.3,
+    "materialPrefix": "Hull_",
+    "pieces": [
+      {
+        "name": "Nose_Fuselage_Upper",
+        "hull": "Fuselage_Upper",
+        "material": "M_Paint",
+        "live": false
+      },
+      {
+        "name": "Nose_Accent_Chine_R",
+        "hull": "Accent_Chine_R",
+        "material": "M_Emissive_Accent_Chine_R",
+        "live": true
+      },
+      {
+        "name": "Nose_Accent_Chine_L",
+        "hull": "Accent_Chine_L",
+        "material": "M_Emissive_Accent_Chine_L",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Nose_R",
+        "hull": "Light_Nose_R",
+        "material": "M_Emissive_Light_Nose_R",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Nose_L",
+        "hull": "Light_Nose_L",
+        "material": "M_Emissive_Light_Nose_L",
+        "live": true
+      },
+      {
+        "name": "Nose_Livery_TwinStripe_R_Front",
+        "hull": "Livery_TwinStripe_R_Front",
+        "material": "M_LiveryStripe",
+        "live": false
+      },
+      {
+        "name": "Nose_Livery_TwinStripe_L_Front",
+        "hull": "Livery_TwinStripe_L_Front",
+        "material": "M_LiveryStripe",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_Number_Nose",
+        "hull": "Decal_Number_Nose",
+        "material": "M_Decal_Number",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_Sponsor_R",
+        "hull": "Decal_Sponsor_R",
+        "material": "M_Decal_Sponsor",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_Sponsor_L",
+        "hull": "Decal_Sponsor_L",
+        "material": "M_Decal_Sponsor",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_CarbonSatin",
+        "hull": "Fuselage_M_CarbonSatin",
+        "material": "M_CarbonSatin",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_Carbon",
+        "hull": "Fuselage_M_Carbon",
+        "material": "M_Carbon",
+        "live": false
+      },
+      {
+        "name": "Nose_Canopy_M_Dark",
+        "hull": "Canopy_M_Dark",
+        "material": "M_Dark",
+        "live": false
+      },
+      {
+        "name": "Nose_Wing_L_M_Carbon",
+        "hull": "Wing_L_M_Carbon",
+        "material": "M_Carbon",
+        "live": false
+      },
+      {
+        "name": "Nose_Wing_R_M_Carbon",
+        "hull": "Wing_R_M_Carbon",
+        "material": "M_Carbon",
+        "live": false
+      }
+    ],
+    "bounds": {
+      "min": [
+        -0.8842,
+        -1.0951,
+        -3.05
+      ],
+      "max": [
+        0.8842,
+        -0.2108,
+        0.3
+      ]
+    }
   }
 }

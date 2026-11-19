@@ -34,6 +34,29 @@ public sealed class CockpitManifestBounds
 	[JsonPropertyName("max")] public float[] Max { get; set; } = System.Array.Empty<float>();
 }
 
+// Una pieza de la cabina sacada del casco 3D (spec docs/cabinas-3d-4-morros.md, 5): su nombre en la cabina, el que
+// tiene en el .glb del casco, su material del casco (en la cabina, con el prefijo de MaterialPrefix) y si es viva
+public sealed class CockpitManifestHullPiece
+{
+	[JsonPropertyName("name")] public string Name { get; set; } = "";
+	[JsonPropertyName("hull")] public string Hull { get; set; } = "";
+	[JsonPropertyName("material")] public string Material { get; set; } = "";
+	[JsonPropertyName("live")] public bool Live { get; set; }
+}
+
+// Copia del morro del casco dentro de la cabina (spec docs/cabinas-3d-4-morros.md, 3.1): ojo en coordenadas del casco,
+// corte (z por detrás del ojo), piezas del grupo Nose y, en BLADE, las del casco que van enteras en Frame (barrotes)
+public sealed class CockpitManifestNose
+{
+	[JsonPropertyName("hull")] public string Hull { get; set; } = "";
+	[JsonPropertyName("eye")] public float[] Eye { get; set; } = System.Array.Empty<float>();
+	[JsonPropertyName("cut")] public float Cut { get; set; }
+	[JsonPropertyName("materialPrefix")] public string MaterialPrefix { get; set; } = "";
+	[JsonPropertyName("pieces")] public List<CockpitManifestHullPiece> Pieces { get; set; } = new();
+	[JsonPropertyName("frame")] public List<CockpitManifestHullPiece> Frame { get; set; } = new();
+	[JsonPropertyName("bounds")] public CockpitManifestBounds Bounds { get; set; } = new();
+}
+
 // Lo que el script de Blender apunta y glTF no lleva (spec docs/cabinas-3d-1-vector.md, 3.7). Lógica pura.
 public sealed class CockpitManifest
 {
@@ -49,6 +72,10 @@ public sealed class CockpitManifest
 	[JsonPropertyName("transparentMaterials")] public List<CockpitManifestAdditive> TransparentMaterials { get; set; } = new();
 	[JsonPropertyName("triangles")] public int Triangles { get; set; }
 	[JsonPropertyName("bounds")] public CockpitManifestBounds Bounds { get; set; } = new();
+	// Copia del morro del casco (spec docs/cabinas-3d-4-morros.md); grupos de VECTOR y centro del cristal HUD de BLADE
+	[JsonPropertyName("nose")] public CockpitManifestNose Nose { get; set; } = new();
+	[JsonPropertyName("zones")] public List<string> Zones { get; set; } = new();
+	[JsonPropertyName("combinerCenterY")] public float? CombinerCenterY { get; set; }
 
 	// Null si el texto no se puede leer
 	public static CockpitManifest Parse(string json)
@@ -100,7 +127,6 @@ public static class Cockpit3DPieces
 	public static readonly string[] SmallScreens = { ScreenRadar, ScreenMap };
 
 	public static readonly string[] Accents = { "Accent_Visor", "Accent_Screen_L", "Accent_Screen_R", "Accent_Radar", "Accent_Map" };
-	public static readonly string[] NoseLeds = { "Led_Nose_L", "Led_Nose_R" };
 
 	// Las luces que titilan con daño (spec, 6.5): ni las shift lights ni las pantallas
 	public static readonly IReadOnlyList<string> FlickerLights = BuildFlickerLights();
@@ -114,8 +140,8 @@ public static class Cockpit3DPieces
 
 	private static IReadOnlyList<string> BuildFlickerLights()
 	{
+		// Las luces del morro ya no son de la cabina: son las de la copia del casco (spec docs/cabinas-3d-4-morros.md)
 		var names = new List<string>(Accents);
-		names.AddRange(NoseLeds);
 		for (int i = 0; i < ConsoleLedCount; i++)
 			names.Add(ConsoleLed(i));
 		return names;
@@ -130,7 +156,6 @@ public static class Cockpit3DPieces
 			names.Add(Shade(screen));
 		}
 		names.AddRange(Accents);
-		names.AddRange(NoseLeds);
 		names.Add(GlassSmudge);
 		for (int i = 0; i < ShiftLightCount; i++)
 		{

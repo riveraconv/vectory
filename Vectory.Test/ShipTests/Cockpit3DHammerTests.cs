@@ -38,13 +38,14 @@ public class Cockpit3DHammerManifestTests
         Assert.Equal(4, c.Count(n => n.EndsWith("_Shade")));
         Assert.Equal(4, c.Count(n => n.StartsWith("Screen_") && n.EndsWith("_Glass")));
         Assert.Equal(3, c.Count(n => n.StartsWith("Accent_")));
-        Assert.Equal(4, c.Count(n => n.StartsWith("Led_Nose_") || n.StartsWith("Led_Canard_")));
+        // Las balizas del morro y del canard pasan a la copia del casco (spec docs/cabinas-3d-4-morros.md, 3.2)
+        Assert.Equal(0, c.Count(n => n.StartsWith("Led_Nose_") || n.StartsWith("Led_Canard_")));
         Assert.Equal(3, c.Count(n => n.StartsWith("Lamp_Boost_")));
         Assert.Equal(2, c.Count(n => n.StartsWith("Beacon_")));
         Assert.Equal(4, c.Count(n => n.StartsWith("Label_")));
         Assert.Equal(6, c.Count(n => n.StartsWith("Led_Panel_")));
         Assert.Equal(2, c.Count(n => n.StartsWith("Gauge_")));
-        Assert.Equal(39, c.Count);   // tabla 3.7: 4 + 4 + 3 + 2 + 2 + 3 + 2 + 1 + 3 + 1 + 6 + 2 + 2 + 4
+        Assert.Equal(35, c.Count);   // tabla 3.7: 4 + 4 + 3 + 3 + 2 + 1 + 3 + 1 + 6 + 2 + 2 + 4
     }
 
     [Theory]
@@ -75,7 +76,6 @@ public class Cockpit3DHammerManifestTests
             Assert.True(piece.Intensity > 0f, name);
         }
         Assert.Equal(1.4f, Manifest.Piece("Accent_Radar")!.Intensity);
-        Assert.Equal(3f, Manifest.Piece("Led_Canard_R")!.Intensity);
         Assert.Equal(1.5f, Manifest.Piece("Led_Panel_1")!.Intensity);
         Assert.Equal("#7CFF3A", Manifest.Piece("Led_Panel_1")!.Emission);
         Assert.Equal("#FFA020", Manifest.Piece("Led_Panel_2")!.Emission);
@@ -102,9 +102,11 @@ public class Cockpit3DHammerManifestTests
     [Fact]
     public void Bounds_MatchTheAxesOfThePrototype()
     {
-        Assert.InRange(Manifest.Bounds.Min[2], -2.98f, -2.96f);   // borde de ataque de la punta del canard
-        Assert.InRange(Manifest.Bounds.Max[0], 2.50f, 2.52f);     // puntas del canard
-        Assert.InRange(Manifest.Bounds.Min[1], -1.14f, -1.12f);   // puntas caídas
+        // Con la copia del casco (spec docs/cabinas-3d-4-morros.md): delante, la defensa; a los lados, las puntas del
+        // canard; abajo, los patines, todo restando el ojo (0; 0,805; −1,03)
+        Assert.InRange(Manifest.Bounds.Min[2], -2.81f, -2.79f);
+        Assert.InRange(Manifest.Bounds.Max[0], 2.50f, 2.51f);
+        Assert.InRange(Manifest.Bounds.Min[1], -1.33f, -1.32f);
     }
 }
 
@@ -253,7 +255,9 @@ public class Cockpit3DIndustrialLayoutTests
     {
         IReadOnlyList<string> flicker = Industrial.FlickerLights;
 
-        Assert.Equal(13, flicker.Count);   // 3 acentos, 4 balizas del morro y del canard, 6 LEDs del panel
+        // 3 acentos y 6 LEDs del panel: las balizas del morro y del canard pasan a la copia del casco
+        // (spec docs/cabinas-3d-4-morros.md)
+        Assert.Equal(9, flicker.Count);
         Assert.All(flicker, n => Assert.True(n.StartsWith("Accent_") || n.StartsWith("Led_"), n));
         Assert.All(flicker, n => Assert.Contains(n, IndustrialPieces.Contract));
         Assert.Equal(0, Industrial.ShiftLightCount);

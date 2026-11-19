@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-13",
+  "exported": "2026-11-19",
   "root": "CockpitHammer",
   "environment": "cockpit_blade_env.png",
   "pieces": [
@@ -50,26 +50,6 @@
       "name": "Accent_Map",
       "emission": "#FFA436",
       "intensity": 1.4
-    },
-    {
-      "name": "Led_Nose_L",
-      "emission": "#FF9A1A",
-      "intensity": 3.0
-    },
-    {
-      "name": "Led_Nose_R",
-      "emission": "#FF9A1A",
-      "intensity": 3.0
-    },
-    {
-      "name": "Led_Canard_L",
-      "emission": "#FF9A1A",
-      "intensity": 3.0
-    },
-    {
-      "name": "Led_Canard_R",
-      "emission": "#FF9A1A",
-      "intensity": 3.0
     },
     {
       "name": "Lamp_Boost_1",
@@ -181,10 +161,6 @@
     }
   ],
   "noShadow": [
-    "Led_Nose_L",
-    "Led_Nose_R",
-    "Led_Canard_L",
-    "Led_Canard_R",
     "Plate",
     "Beacon_Boost_Lens",
     "Beacon_Damage_Lens",
@@ -220,9 +196,6 @@
     "Led_Panel_6",
     "Gauge_Hyd_Face",
     "Gauge_Temp_Face",
-    "Nose_M_Dark_NoShadow",
-    "Nose_M_Steel_NoShadow",
-    "Canard_M_Steel_NoShadow",
     "Dash_M_Dark_NoShadow",
     "Dash_M_Steel_NoShadow",
     "Side_L_M_Steel_NoShadow",
@@ -234,7 +207,16 @@
     "Frame_M_PlateDark_NoShadow",
     "Console_M_Steel_NoShadow",
     "Console_M_Hazard_NoShadow",
-    "Console_M_CrtGlass_NoShadow"
+    "Console_M_CrtGlass_NoShadow",
+    "Nose_Light_Nose_L",
+    "Nose_Light_Nose_R",
+    "Nose_Light_Canard_L",
+    "Nose_Light_Canard_R",
+    "Nose_Decal_Logo_L",
+    "Nose_Decal_NoStep_L",
+    "Nose_Decal_Logo_R",
+    "Nose_Decal_NoStep_R",
+    "Nose_Fuselage_M_Dark_NoShadow"
   ],
   "lowReflectionMaterials": [
     "M_PaintNose"
@@ -278,17 +260,191 @@
       "opacity": 0.06
     }
   ],
-  "triangles": 41030,
+  "triangles": 66848,
   "bounds": {
     "min": [
-      -2.512,
-      -1.132,
-      -2.97
+      -2.502,
+      -1.325,
+      -2.799
     ],
     "max": [
-      2.512,
+      2.502,
       0.4827,
       0.6032
     ]
+  },
+  "nose": {
+    "hull": "hull_hammer",
+    "eye": [
+      0.0,
+      0.805,
+      -1.03
+    ],
+    "cut": 0.3,
+    "materialPrefix": "Hull_",
+    "pieces": [
+      {
+        "name": "Nose_Fuselage_Upper",
+        "hull": "Fuselage_Upper",
+        "material": "M_Paint",
+        "live": false
+      },
+      {
+        "name": "Nose_Light_Nose_L",
+        "hull": "Light_Nose_L",
+        "material": "M_Emissive_Light_Nose_L",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Nose_R",
+        "hull": "Light_Nose_R",
+        "material": "M_Emissive_Light_Nose_R",
+        "live": true
+      },
+      {
+        "name": "Nose_Canard_L_Top",
+        "hull": "Canard_L_Top",
+        "material": "M_Paint_Canard",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_L_LeadingEdge",
+        "hull": "Canard_L_LeadingEdge",
+        "material": "M_Hazard",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_L_Droop",
+        "hull": "Canard_L_Droop",
+        "material": "M_Paint_Canard",
+        "live": false
+      },
+      {
+        "name": "Nose_Light_Canard_L",
+        "hull": "Light_Canard_L",
+        "material": "M_Emissive_Light_Canard_L",
+        "live": true
+      },
+      {
+        "name": "Nose_Canard_R_Top",
+        "hull": "Canard_R_Top",
+        "material": "M_Paint_Canard",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_R_LeadingEdge",
+        "hull": "Canard_R_LeadingEdge",
+        "material": "M_Hazard",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_R_Droop",
+        "hull": "Canard_R_Droop",
+        "material": "M_Paint_Canard",
+        "live": false
+      },
+      {
+        "name": "Nose_Light_Canard_R",
+        "hull": "Light_Canard_R",
+        "material": "M_Emissive_Light_Canard_R",
+        "live": true
+      },
+      {
+        "name": "Nose_Decal_Logo_L",
+        "hull": "Decal_Logo_L",
+        "material": "M_Decal_Logo",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_NoStep_L",
+        "hull": "Decal_NoStep_L",
+        "material": "M_Decal_NoStep",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_Logo_R",
+        "hull": "Decal_Logo_R",
+        "material": "M_Decal_Logo",
+        "live": false
+      },
+      {
+        "name": "Nose_Decal_NoStep_R",
+        "hull": "Decal_NoStep_R",
+        "material": "M_Decal_NoStep",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_PlateDark",
+        "hull": "Fuselage_M_PlateDark",
+        "material": "M_PlateDark",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_Tread",
+        "hull": "Fuselage_M_Tread",
+        "material": "M_Tread",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_Dark_NoShadow",
+        "hull": "Fuselage_M_Dark_NoShadow",
+        "material": "M_Dark",
+        "live": false
+      },
+      {
+        "name": "Nose_Fuselage_M_Steel",
+        "hull": "Fuselage_M_Steel",
+        "material": "M_Steel",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_L_M_PlateDark_Canard",
+        "hull": "Canard_L_M_PlateDark_Canard",
+        "material": "M_PlateDark_Canard",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_L_M_Steel",
+        "hull": "Canard_L_M_Steel",
+        "material": "M_Steel",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_R_M_PlateDark_Canard",
+        "hull": "Canard_R_M_PlateDark_Canard",
+        "material": "M_PlateDark_Canard",
+        "live": false
+      },
+      {
+        "name": "Nose_Canard_R_M_Steel",
+        "hull": "Canard_R_M_Steel",
+        "material": "M_Steel",
+        "live": false
+      },
+      {
+        "name": "Nose_Extras_M_BlackPaint",
+        "hull": "Extras_M_BlackPaint",
+        "material": "M_BlackPaint",
+        "live": false
+      },
+      {
+        "name": "Nose_Extras_M_Steel",
+        "hull": "Extras_M_Steel",
+        "material": "M_Steel",
+        "live": false
+      }
+    ],
+    "bounds": {
+      "min": [
+        -2.502,
+        -1.325,
+        -2.799
+      ],
+      "max": [
+        2.502,
+        0.3932,
+        0.3
+      ]
+    }
   }
 }

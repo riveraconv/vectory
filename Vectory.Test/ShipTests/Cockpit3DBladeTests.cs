@@ -41,7 +41,8 @@ public class Cockpit3DBladeManifestTests
         Assert.Equal(4, c.Count(n => n.StartsWith("Accent_")));
         Assert.Equal(3, c.Count(n => n.StartsWith("Led_Visor_")));
         Assert.Equal(2, c.Count(n => n.StartsWith("Lamp_")));
-        Assert.Equal(23, c.Count);   // tabla 3.7: 1 + 3 + 3 + 4 + 3 + 2 + 1 + 2 + 1 + 1 + 1 + 1
+        // tabla 3.7 sin Led_Nose_L/R, que pasan a la copia del casco (spec docs/cabinas-3d-4-morros.md, 3.2)
+        Assert.Equal(21, c.Count);
     }
 
     [Theory]
@@ -70,7 +71,7 @@ public class Cockpit3DBladeManifestTests
         }
         Assert.Equal(1.6f, Manifest.Piece("Accent_Radar")!.Intensity);
         Assert.Equal(0.45f, Manifest.Piece("Accent_Glare")!.Intensity);
-        Assert.Equal(3f, Manifest.Piece("Led_Nose_L")!.Intensity);
+        Assert.Equal(2.5f, Manifest.Piece("Led_Sensor")!.Intensity);
     }
 
     [Fact]
@@ -94,17 +95,19 @@ public class Cockpit3DBladeManifestTests
     }
 
     [Fact]
-    public void ReflectionFactor_OfVector_IsTheOneItHadBefore()
+    public void ReflectionFactor_OfVector_IsOne_WithoutItsCarbonNose()
     {
+        // El morro de carbono de VECTOR ya no está (spec docs/cabinas-3d-4-morros.md): ningún material refleja menos
         Assert.Empty(VectorManifest.Reflections);
-        Assert.Equal(VectorManifest.LowReflectionFactor, VectorManifest.ReflectionFactor("M_CarbonNose"));
+        Assert.Empty(VectorManifest.LowReflectionMaterials);
+        Assert.Equal(1f, VectorManifest.ReflectionFactor("M_CarbonNose"));
         Assert.Equal(1f, VectorManifest.ReflectionFactor("M_Carbon"));
     }
 
     [Fact]
     public void Bounds_MatchTheAxesOfThePrototype()
     {
-        Assert.InRange(Manifest.Bounds.Min[2], -5.52f, -5.50f);   // punta de la sonda
+        Assert.InRange(Manifest.Bounds.Min[2], -5.31f, -5.29f);   // punta de la sonda de la copia del casco
         Assert.InRange(Manifest.Bounds.Max[1], 0.66f, 0.67f);      // cúpula
     }
 }
@@ -298,7 +301,7 @@ public class Cockpit3DLayoutTests
     {
         IReadOnlyList<string> flicker = Cockpit3DLayouts.Military.FlickerLights;
 
-        Assert.Equal(10, flicker.Count);
+        Assert.Equal(8, flicker.Count);   // sin Led_Nose_L/R, que pasan a la copia del casco (docs/cabinas-3d-4-morros.md)
         Assert.All(flicker, n => Assert.True(n.StartsWith("Accent_") || n.StartsWith("Led_"), n));
         Assert.All(flicker, n => Assert.Contains(n, MilitaryPieces.Contract));
         Assert.Equal(0, Cockpit3DLayouts.Military.ShiftLightCount);

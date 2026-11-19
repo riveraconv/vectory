@@ -349,7 +349,8 @@ public static class MilitaryPieces
 	public static readonly string[] Mfds = { ScreenSpeed, ScreenRadar, ScreenMap };
 	public static readonly string[] Accents = { "Accent_Speed", "Accent_Radar", "Accent_Map", "Accent_Glare" };
 	public static readonly string[] VisorLeds = { "Led_Visor_Speed", "Led_Visor_Radar", "Led_Visor_Map" };
-	public static readonly string[] Leds = { "Led_Nose_L", "Led_Nose_R", "Led_Sensor" };
+	// Las luces de posición del morro ya no son de la cabina: son las de la copia del casco (spec docs/cabinas-3d-4-morros.md)
+	public static readonly string[] Leds = { "Led_Sensor" };
 
 	public static string Shade(string screen) => screen + "_Shade";
 
@@ -401,7 +402,6 @@ public static class IndustrialPieces
 
 	public static readonly string[] Screens = { ScreenRadar, ScreenDamage, ScreenMap, ScreenSpeed };
 	public static readonly string[] Accents = { "Accent_Radar", "Accent_Damage", "Accent_Map" };
-	public static readonly string[] NavLeds = { "Led_Nose_L", "Led_Nose_R", "Led_Canard_L", "Led_Canard_R" };
 
 	public static string Shade(string screen) => screen + "_Shade";
 	public static string Glass(string screen) => screen + "_Glass";
@@ -409,7 +409,9 @@ public static class IndustrialPieces
 	public static string LabelBoost(int i) => $"Label_Boost_{i}";
 	public static string PanelLed(int i) => $"Led_Panel_{i}";        // 1–6, de izquierda a derecha
 
-	// Las luces que titilan con daño (spec, 6.6): acentos y LEDs; ni las pantallas, ni las setas, ni las balizas
+	// Las luces que titilan con daño (spec, 6.6): acentos y LEDs; ni las pantallas, ni las setas, ni las balizas. Las
+	// balizas ámbar del morro y del canard ya no son de la cabina: son las de la copia del casco (spec
+	// docs/cabinas-3d-4-morros.md)
 	public static readonly IReadOnlyList<string> FlickerLights = BuildFlickerLights();
 
 	public static readonly IReadOnlyList<string> Contract = BuildContract();
@@ -417,7 +419,6 @@ public static class IndustrialPieces
 	private static IReadOnlyList<string> BuildFlickerLights()
 	{
 		var names = new List<string>(Accents);
-		names.AddRange(NavLeds);
 		for (int i = 1; i <= PanelLeds; i++)
 			names.Add(PanelLed(i));
 		return names;
@@ -429,7 +430,6 @@ public static class IndustrialPieces
 		var names = new List<string>(Screens);
 		names.AddRange(Screens.Select(Shade));
 		names.AddRange(Accents);
-		names.AddRange(NavLeds);
 		for (int i = 1; i <= BoostLamps; i++)
 			names.Add(BoostLamp(i));
 		names.AddRange(new[] { BeaconBoost, BeaconDamage, Plate });

@@ -130,7 +130,8 @@ public class Hull3DHammerTests
         Assert.InRange(MathF.Abs(max.Z - min.Z - 6.83f), 0f, Tolerance);
         Assert.InRange(MathF.Abs(Manifest.HalfWidth - 2.50f), 0f, Tolerance);
         Assert.InRange(MathF.Abs(max.Y - min.Y - 1.87f), 0f, Tolerance);
-        Assert.InRange(MathF.Abs(roofMax.Y - roofMin.Y - 1.60f), 0f, Tolerance);
+        // 1,575 sin la rejilla del parabrisas, que llegaba a 1,60 (spec docs/cabinas-3d-4-morros.md, 3.2)
+        Assert.InRange(MathF.Abs(roofMax.Y - roofMin.Y - 1.575f), 0f, Tolerance);
         Assert.InRange(MathF.Abs(min.Z + 3.83f), 0f, Tolerance);
         Assert.InRange(MathF.Abs(max.Z - 3.00f), 0f, Tolerance);
         Assert.InRange(MathF.Abs(min.Y + 0.52f), 0f, Tolerance);

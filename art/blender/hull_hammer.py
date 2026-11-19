@@ -351,16 +351,8 @@ def build_extras(b, m):
         b.add(hh.poly_tube([(x, -0.08, -3.8), (x, 0.14, -3.8)], 0.022), m.black, name=f"BullBar_Post_{i}")
     for side, k in SIDES:
         b.add(hh.poly_tube([(k * 0.48, -0.08, -3.6), (k * 0.48, 0.14, -3.6)], 0.022), m.black, name=f"BullBar_Side_{side}")
-    # rejilla sobre el parabrisas
-    o = hh.CAB_B + 0.05
-    for i, x in enumerate((-0.25, 0.0, 0.25)):
-        b.add(hh.poly_tube([hh.ws_pt(x, 0.04, o), hh.ws_pt(x, 0.97, o)], 0.016), m.black, name=f"Guard_Bar_{i}")
-    for i, f in enumerate((0.04, 0.97)):
-        b.add(hh.poly_tube([hh.ws_pt(-0.52, f, o), hh.ws_pt(0.52, f, o)], 0.018), m.black, name=f"Guard_Cross_{i}")
-    for _, k in SIDES:
-        for f in (0.04, 0.97):
-            b.add(hh.poly_tube([hh.ws_pt(k * 0.52, f, hh.CAB_B), hh.ws_pt(k * 0.52, f, o)], 0.014), m.black,
-                  name="Guard_Standoff")
+    # Sin rejilla sobre el parabrisas: desde dentro no se ve (spec docs/cabinas-3d-4-morros.md, 3.2). Las rejas de las
+    # ventanas laterales (SideGuard_*) se quedan
     # arcos antivuelco
     for i, z in enumerate((-1.24, -0.60)):
         b.add(hh.poly_tube([(-0.64, 0.62, z), (-0.64, 1.10, z), (-0.52, 1.17, z), (0.52, 1.17, z), (0.64, 1.10, z),
@@ -579,7 +571,8 @@ def check_axes(root, builder):
         ("caja y mín", low[1], -0.52, 0.005),
         ("caja y máx", high[1], 1.353, 0.005),
         ("sin extras del techo y mín", roof_low[1], -0.52, 0.005),
-        ("sin extras del techo y máx", roof_high[1], 1.084, 0.005),
+        # 1,055 sin la rejilla del parabrisas, que llegaba a 1,084 (spec docs/cabinas-3d-4-morros.md, 3.2)
+        ("sin extras del techo y máx", roof_high[1], 1.055, 0.005),
         ("techo de la cabina y", cab_high[1], 1.055, 0.005),
         ("tapa del compartimento y", bay_high[1], 0.915, 0.005),
     ]
@@ -596,7 +589,7 @@ def r4(v):
     return [round(c, 4) for c in v]
 
 
-def write_manifest(path, root, materials, no_shadow, livery, roof_box, env_name):
+def write_manifest(path, root, materials, no_shadow, livery, roof_box, env_name, built_pieces):
     every = list(root.children_recursive)
     objs = bpy.data.objects
     livery_objects = {objs[n] for n in livery}
@@ -651,6 +644,9 @@ def write_manifest(path, root, materials, no_shadow, livery, roof_box, env_name)
         "bounds": {"min": r4(low), "max": r4(high)},
         "boundsWithLivery": {"min": r4(low_m), "max": r4(high_m)},
         "boundsWithoutRoofExtras": {"min": r4(roof_box[0]), "max": r4(roof_box[1])},
+        # Todas las piezas con nombre del prototipo, también las que se juntan por zona y material (spec
+        # docs/cabinas-3d-4-morros.md, 6: sin Guard_*, con SideGuard_*)
+        "builtPieces": built_pieces,
         "halfWidth": round(max(-low[0], high[0]), 4),
         "halfWidthWithLivery": round(max(-low_m[0], high_m[0]), 4),
     }
@@ -766,20 +762,9 @@ def sha256(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def main():
-    out = parse_out()
-    os.makedirs(out, exist_ok=True)
-    glb_path = os.path.join(ASSETS, "hull_hammer.glb")
-    manifest_path = os.path.join(ASSETS, "hull_hammer.manifest.json")
-    env_name = "cockpit_blade_env.png"
-    env_path = os.path.join(COCKPIT_ASSETS, env_name)
-    if not os.path.exists(env_path):
-        raise RuntimeError(f"Falta el panorama de BLADE ({env_path}): ejecuta antes art/blender/run.ps1 blade")
-
-    io.clear_file()
-    scene = bpy.context.scene
-    collection = scene.collection
-
+# Construye el casco en memoria, sin exportar: lo usan este script y las cabinas, para la copia del morro
+# (spec docs/cabinas-3d-4-morros.md, 3.1)
+def build_hull(out):
     # Texturas sueltas aparte de las de las cabinas y de los otros cascos: algunas se llaman igual
     materials = Materials(os.path.join(out, "textures", "hull_hammer"))
     builder = Builder()
@@ -795,6 +780,27 @@ def main():
     build_bay(builder, materials)
     build_side_guards_ladders_pipes(builder, materials)
     build_markings(builder, materials)
+    return materials, builder
+
+
+def main():
+    out = parse_out()
+    os.makedirs(out, exist_ok=True)
+    glb_path = os.path.join(ASSETS, "hull_hammer.glb")
+    manifest_path = os.path.join(ASSETS, "hull_hammer.manifest.json")
+    env_name = "cockpit_blade_env.png"
+    env_path = os.path.join(COCKPIT_ASSETS, env_name)
+    if not os.path.exists(env_path):
+        raise RuntimeError(f"Falta el panorama de BLADE ({env_path}): ejecuta antes art/blender/run.ps1 blade")
+
+    io.clear_file()
+    scene = bpy.context.scene
+    collection = scene.collection
+
+    materials, builder = build_hull(out)
+    guard = sorted({p.name for p in builder.pieces if p.name and p.name.startswith("Guard_")})
+    if guard:
+        raise RuntimeError("El casco no puede llevar la rejilla del parabrisas: " + ", ".join(guard))
 
     # Raíz girada +90° en X: un punto del prototipo (x, y, z) queda en Blender en (x, −z, y) y vuelve a ser (x, y, z) en glTF
     root = io.empty("HullHammer", None, collection, rotation=(math.pi / 2, 0.0, 0.0))
@@ -809,7 +815,8 @@ def main():
     check_contract(root)
     checks, low, high, roof_low, roof_high = check_axes(root, builder)
     livery = livery_only(builder)
-    manifest = write_manifest(manifest_path, root, materials, no_shadow, livery, (roof_low, roof_high), env_name)
+    built = sorted({p.name for p in builder.pieces if p.name})
+    manifest = write_manifest(manifest_path, root, materials, no_shadow, livery, (roof_low, roof_high), env_name, built)
     io.export_glb(glb_path, root)
 
     # Máscaras de la pintura sin pérdidas, aparte del .glb (Godot reconstruye el color con ellas)
@@ -838,4 +845,6 @@ def main():
     print(f"[Hull] GLB {os.path.getsize(glb_path)} bytes · sha256 {sha256(glb_path)}")
 
 
-main()
+# Solo al ejecutarlo: las cabinas lo importan para construir el casco
+if __name__ == "__main__":
+    main()
