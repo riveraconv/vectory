@@ -43,6 +43,11 @@ public partial class Spaceship : Node3D
 	private float _thrusterPhase;
 	private bool _thrusterFull;
 
+	// Estelas de las puntas de las alas (spec docs/efectos-7-estelas.md): solo en carrera, tú y los rivales
+	private WingTrails _trails;
+	private WingTrailSettings _trailSettings;
+	private WingTrailColors _trailColors;
+
 	// Número de aristas que pueden parpadear por su cuenta con los daños: las líneas del wireframe o, con casco 3D,
 	// sus luces (14 en VECTOR, 9 en BLADE)
 	public int EdgeCount => _hull3D != null ? _hull3D.FlickerLightCount : _wireEdgeCount;
@@ -55,6 +60,8 @@ public partial class Spaceship : Node3D
 		AddChild(_meshInstance);
 		if (_thrusterSettings != null)
 			CreateThrusters();
+		if (_trailSettings != null)
+			CreateTrails();
 		RebuildHull3D();
 	}
 
@@ -79,6 +86,26 @@ public partial class Spaceship : Node3D
 		_thrusters.Setup(_thrusterSettings, Visual.Thrusters, _thrusterPhase, _thrusterFull, Hull3DLayer);
 		AddChild(_thrusters);
 	}
+
+	// Enciende las estelas de las alas, con sus ajustes y la pareja de colores de la nave. Antes de _Ready.
+	public void EnableTrails(WingTrailSettings settings, WingTrailColors colors)
+	{
+		_trailSettings = settings ?? WingTrailSettings.Default;
+		_trailColors = colors;
+	}
+
+	private void CreateTrails()
+	{
+		_trails = new WingTrails { Name = "WingTrails", Ship = this, Thrusters = _thrusters };
+		_trails.Setup(_trailSettings, _trailColors, Visual.TrailTip);
+		AddChild(_trails);
+	}
+
+	// Movimiento de la nave en este paso de física, para la carga de sus estelas
+	public void FeedTrails(float dt, in WingTrailMotion motion) => _trails?.Move(dt, motion);
+
+	// Recolocación: sin estela
+	public void ResetTrails() => _trails?.ResetState();
 
 	// Lo que hace la nave en este paso, para sus toberas
 	public void FeedThrusters(in ThrusterInput input) => _thrusters?.Feed(input);
@@ -183,6 +210,8 @@ public partial class Spaceship : Node3D
 			_hull3D.Visible = _exteriorVisible;
 		if (_thrusters != null)
 			_thrusters.Visible = _exteriorVisible;
+		if (_trails != null)
+			_trails.Visible = _exteriorVisible;
 	}
 
 	// Cambia la nave dibujada. Con el mismo perfil no rehace nada. El material sustituido sigue puesto; el de parpadeo
@@ -194,6 +223,7 @@ public partial class Spaceship : Node3D
 		Visual = visual;
 		_meshInstance.Mesh = BuildMesh();
 		_thrusters?.SetShape(visual.Thrusters);
+		_trails?.SetTip(visual.TrailTip);
 		if (_flickerMaterial != null)
 		{
 			_flickerMaterial = null;

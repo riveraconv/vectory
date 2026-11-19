@@ -91,6 +91,10 @@ public partial class ThrusterFlames : Node3D
 
 	public void Feed(in ThrusterInput input) => _input = input;
 
+	// th y bt de este instante, para las estelas de las alas (spec docs/efectos-7-estelas.md, 3.2)
+	public float Throttle => _state?.Throttle ?? 0f;
+	public float BoostLevel => _state?.Boost ?? 0f;
+
 	// Recolocación: al ralentí al momento
 	public void ResetState()
 	{

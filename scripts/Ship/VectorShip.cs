@@ -47,6 +47,8 @@ public static class VectorShip
 				new(0.22f, 0.22f, 0.05f)),
 			// Bocas Exhaust_L/R; boca 1,2 × 0,55 (spec docs/cascos-3d-1-vector.md, 4.2); retroempuje en el borde del morro
 			Thrusters = new ThrusterShape(new(0.75f, 0.10f, 3.20f), 1f, 0.46f, 1f, new(0.46f, 0.12f, -2.9f), ThrusterColors.Standard),
+			// Estela: Trail_R (Puntas de las alas)
+			TrailTip = new(2.6f, -0.05f, 2.72f),
 			NoseDistance = 4f,
 			PhysicsBoxSize = new Vector3(6.8f, 1.2f, 7.2f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.4f)

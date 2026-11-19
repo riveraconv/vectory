@@ -328,6 +328,39 @@ public partial class Player : CharacterBody3D, IContactShip
 		};
 	}
 
+	[ExportGroup("Estelas")]   // estelas de las puntas de las alas (spec docs/efectos-7-estelas.md, 8); también las de los rivales
+	[Export] public float TrailBrightness = TrailDefaults.Brightness;                 // ajuste a ojo con el glow
+	[Export] public float TrailLoadAcceleration = TrailDefaults.LoadFullAcceleration; // m/s²: carga completa al girar
+	[Export] public float TrailLoadDrift = TrailDefaults.LoadDrift;                   // carga derrapando con β = βmáx
+	[Export] public float TrailLoadTau = TrailDefaults.LoadTau;                       // s
+	[Export] public float TrailVisibleFrom = TrailDefaults.VisibleFrom;               // fracción de la punta
+	[Export] public float TrailVisibleFull = TrailDefaults.VisibleFull;               // fracción de la punta
+	[Export] public float TrailLifeMax = TrailDefaults.LifeMax;                       // s
+	[Export] public float TrailLength = TrailDefaults.LifeScale;                      // largo: la vida × esto
+	[Export] public float TrailWidth = TrailDefaults.WidthScale;                      // el ancho × esto
+	[Export] public float TrailBoostMix = TrailDefaults.BoostMix;                     // mezcla al color de boost
+
+	private static readonly WingTrailSettings TrailDefaults = new();
+
+	// Ajustes de las estelas (grupo Estelas): también los de los rivales
+	public WingTrailSettings BuildTrailSettings()
+	{
+		return new WingTrailSettings
+		{
+			Brightness = TrailBrightness,
+			LoadFullAcceleration = TrailLoadAcceleration,
+			LoadDrift = TrailLoadDrift,
+			LoadTau = TrailLoadTau,
+			MaxSlipDegrees = ThrusterMaxSlip,
+			VisibleFrom = TrailVisibleFrom,
+			VisibleFull = TrailVisibleFull,
+			LifeMax = TrailLifeMax,
+			LifeScale = TrailLength,
+			WidthScale = TrailWidth,
+			BoostMix = TrailBoostMix
+		};
+	}
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -522,6 +555,8 @@ public partial class Player : CharacterBody3D, IContactShip
 		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual, Use3DHull = true };
 		_ship.SetHull3DSettings(BuildHull3DSettings());
 		_ship.EnableThrusters(BuildThrusterSettings(), 0f);
+		// La pintura aún no decide el color de la estela (spec docs/efectos-7-estelas.md, 7)
+		_ship.EnableTrails(BuildTrailSettings(), WingTrailPalette.For(Definition.Id, -1));
 		AddChild(_ship);
 
 		_cockpit = new Cockpit { Name = "Cockpit", Visual = Definition.Visual, Settings3D = BuildCockpit3DSettings() };
@@ -642,6 +677,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		PreviousPosition = ToNumerics(GlobalPosition);
 		_bank.Reset();
 		_ship.ResetThrusters();
+		_ship.ResetTrails();
 		ResetCameraEffects();
 		SettleOnSurface();
 		_chaseCam.Snap(GlobalPosition, Dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
@@ -659,6 +695,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		Slipstream.Reset();
 		_bank.Reset();
 		_ship.ResetThrusters();
+		_ship.ResetTrails();
 		ResetCameraEffects();
 		SettleOnSurface();
 		_chaseCam.Snap(GlobalPosition, Dynamics.Yaw, SpeedFactor(), CameraSettings(), SurfaceUp());
@@ -830,6 +867,12 @@ public partial class Player : CharacterBody3D, IContactShip
 		_physics.BeginStep(input, boostPressed, canDrive, baseTuning, physics, dt);
 		ApplyBodyRotation();
 		FeedThrusters(input, canDrive);
+		_ship.FeedTrails(dt, new WingTrailMotion
+		{
+			Velocity = Dynamics.Velocity,
+			Drifting = Dynamics.Drifting,
+			SlipAngle = Dynamics.SlipAngle
+		});
 
 		// 2. Mover el cuerpo en Godot con la velocidad real (en planta; la altura la pone la capa vertical)
 		Velocity = new Vector3(Dynamics.Velocity.X, 0f, Dynamics.Velocity.Y);

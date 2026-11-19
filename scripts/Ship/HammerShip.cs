@@ -67,6 +67,8 @@ public static class HammerShip
 				new(0f, 0.05f, 0.05f)),
 			// Bocas Exhaust_L/R; boca redonda × 0,95 respecto a la de VECTOR y llama naranja (spec docs/cascos-3d-3-hammer.md, 4.2)
 			Thrusters = new ThrusterShape(new(0.45f, 0.20f, 3.00f), 0.79f, 1f, 1f, new(0.46f, 0.15f, -3.2f), ThrusterColors.Industrial),
+			// Estela: Trail_R (Puntas caídas del canard, por delante)
+			TrailTip = new(2.5f, -0.5f, -2.2f),
 			NoseDistance = 3.6f,
 			PhysicsBoxSize = new Vector3(5f, 1.4f, 6.6f),
 			PhysicsBoxCenter = new Vector3(0f, 0.2f, -0.3f)

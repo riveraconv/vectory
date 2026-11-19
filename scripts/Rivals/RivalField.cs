@@ -56,7 +56,7 @@ public partial class RivalField : Node3D
 		PaceOffset = paceOffset;
 		Hull3DSettings hullSettings = player.BuildHull3DSettings();
 		var look = new RivalLook(hullSettings, player.BuildBankSettings(), player.BuildAttitudeSettings(),
-			player.BuildFlickerSettings(), player.BuildIndustrialLampSettings(), player.BuildThrusterSettings());
+			player.BuildFlickerSettings(), player.BuildIndustrialLampSettings(), player.BuildThrusterSettings(), player.BuildTrailSettings());
 
 		var lights = new HullLightRig { Name = "RivalHullLights", Layer = ShipHull3D.RivalLayer };
 		lights.Apply(hullSettings);

@@ -888,6 +888,17 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 - **Cristal de la cabina** (spec v1.1, sección 6, pedido por el usuario): con daño 1 / 2 / 3, 3 / 6 / 10 picadas, 1 / 2 / 3 grietas largas quebradas que salen de ellas, se ramifican y se alargan por el mismo camino al subir de nivel (gris humo al 45 %, elegido por el usuario, ~1,5 px) y 0 / 1 / 3 manchas con salpicaduras (al 30 %), por casi todo el cristal y empujadas hacia los bordes, en sitios sorteados una vez por carrera; para que no parezcan pegatinas, se apagan a trozos a lo largo y cogen la luz de la cabina (boost, daños, chispas) con una cara de fractura por tramo, sin brillo propio (validado así por el usuario: un brillo base las hacía demasiado visibles; el mundo no llega al `SubViewport` de la cabina, así que no hay refracción real); el usuario descartó una primera versión de grietas en estrella; pegadas al cristal (pasada detrás de `M_GlassSmudge`, que tienen las tres cabinas, en los ejes de la pieza), tapadas por pilares y arco. Solo RACE y tu cabina. Comprobado con una sonda en las tres cabinas con daño 1, 2 y 3 forzado (con daño 3, ~6,9 ms de media a 144 Hz, peor frame < 10 ms); conduciendo y con F10, el usuario jugando.
 - **Cristal de la cabina por fuera** (spec v1.2, sección 7, pedido por el usuario): las mismas marcas en las piezas de cristal de los cascos 3D (`Canopy_Glass` de VECTOR y BLADE, las tres `glass` de HAMMER), para todas las naves en RACE, proyectadas sobre las dos medidas más largas de cada pieza; más claras y opacas que dentro (gris claro al 85 %), porque el cristal brillante se comía el gris humo. Comprobado con una sonda en cámara de persecución y orbital en las tres naves; rivales dañados, el usuario jugando.
 
+## Estelas: etapa 1, cinta
+
+(spec `docs/efectos-7-estelas.md` v1.0, rama `feature/fx-trails`): hecho, con tests de la lógica pura y validado por el usuario. Cinta de luz por punta de ala, tú y los rivales; ni el fantasma ni el menú.
+
+- `efectos-velocidad` 6.2 nunca se hizo: no había líneas que quitar ni tests que adaptar.
+- **Decisión del usuario**: la carga por giro sale de la **dirección de la marcha** (la velocidad), no del morro (`Yaw`), como la maqueta; con el morro, entrar en un derrape la disparaba.
+- **Decisión del usuario, tras probarla**: la mitad de larga (`LifeScale` 0,5: 0,575 s a la punta, 0,8 s de máximo), el 80 % de ancha (`WidthScale`) y brillo 0,7. Los valores de la spec siguen en el código y estos los multiplican.
+- Colores en el proveedor (`WingTrailColors`), no en `Palette`, como los de las toberas: la lógica es pura.
+- Solo se guarda una muestra si la punta se ha movido: sin interpolación de la física, la nave se mueve a 60 Hz aunque se dibuje a 144. La carga se calcula en cada paso de física (`Move`) y se suaviza en cada frame.
+- Medido en RACE con 8 naves a 144 Hz: ~30 µs por nave y frame (peor ~0,2 ms). 6 pasadas de 20 s con estelas y 6 sin ellas: frames lentos sueltos en las dos, en carreras con choques.
+
 ## Pendiente
 
 - `docs/naves-disenos.md` no recoge todavía las cabinas elegidas. El resto de opciones del menú (CHAMPIONSHIP, HANGAR), ajustar el contorno interior de la cabina. Reajustar la dificultad de los rivales con circuitos nuevos (decisión del usuario).

@@ -128,6 +128,10 @@ public sealed record ShipVisualProfile
 	// Toberas: dónde salen las llamas, su tamaño y sus colores (spec docs/efectos-6-toberas.md)
 	public required ThrusterShape Thrusters { get; init; }
 
+	// Punta derecha del ala, de donde sale la estela (spec docs/efectos-7-estelas.md): el vacío Trail_R del manifiesto de su
+	// casco 3D (una prueba lo compara); la izquierda, con x cambiada de signo (Trail_L)
+	public required Vector3 TrailTip { get; init; }
+
 	// Distancia del origen de la nave a la punta del morro (colocación en la parrilla)
 	public required float NoseDistance { get; init; }
 
