@@ -899,6 +899,14 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 - Solo se guarda una muestra si la punta se ha movido: sin interpolación de la física, la nave se mueve a 60 Hz aunque se dibuje a 144. La carga se calcula en cada paso de física (`Move`) y se suaviza en cada frame.
 - Medido en RACE con 8 naves a 144 Hz: ~30 µs por nave y frame (peor ~0,2 ms). 6 pasadas de 20 s con estelas y 6 sin ellas: frames lentos sueltos en las dos, en carreras con choques.
 
+## Estelas: etapa 2, pulsos
+
+(spec `docs/efectos-7-estelas.md` v1.0, versión **0.27.0**): hecho, con tests de la lógica pura y validado por el usuario. Cierra la spec.
+
+- **Decisión del usuario, tras probarlo**: **sin vórtice** (sección 5.1 y prueba 10): no le gustó. La estela es la de la etapa 1.
+- Pulsos como en la spec, en el shader de la cinta (D y el boost de cada muestra en `UV2`). La fase (25·t) va módulo una vuelta (`WingTrailRibbon.PulsePhase`): da lo mismo y el shader no pierde precisión en carreras largas. `WingTrailRibbon.Pulse` repite la fórmula del shader para los tests.
+- Con el piloto automático no hay boost: los pulsos solo se vieron jugando, el usuario. Rendimiento sin volver a medir (solo cambia el shader).
+
 ## Pendiente
 
 - `docs/naves-disenos.md` no recoge todavía las cabinas elegidas. El resto de opciones del menú (CHAMPIONSHIP, HANGAR), ajustar el contorno interior de la cabina. Reajustar la dificultad de los rivales con circuitos nuevos (decisión del usuario).
