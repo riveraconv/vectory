@@ -57,10 +57,13 @@ public static class ShipLightTypes
 // Una luz de la nave: pieza, tipo, lado (−1 izquierda, 1 derecha, 0 centro), centro y hacia dónde sale su halo (cero si
 // no lleva: las tiras), intensidad y color de partida (los del manifiesto o la pintura) y si es una luz de freno nueva
 // (BLADE y HAMMER), que en reposo va casi apagada
+// BulbRadius: el radio de la bombilla de las luces de posición (0 en las demás), cuyo halo es un brillo concentrado,
+// centrado en ella y casi de su tamaño (decisión del usuario tras la etapa 4)
 public sealed record ShipLightDef(string Name, ShipLightType Type, int Side, Vector3 Center, Vector3 HaloOutward,
-	float BaseIntensity, Vector3 BaseColor, bool NewBrake)
+	float BaseIntensity, Vector3 BaseColor, bool NewBrake, float BulbRadius = 0f)
 {
 	public bool HasHalo => HaloOutward != Vector3.Zero;
+	public bool IsBulb => BulbRadius > 0f;
 
 	// Lado por la x del centro (4.1): izquierda si x < 0, derecha si x > 0, ninguno en el centro
 	public static int SideOf(float x) => x < -0.01f ? -1 : x > 0.01f ? 1 : 0;
@@ -83,6 +86,8 @@ public sealed class ShipLightSettings
 	public float HaloOpacity = 0.32f, HaloScale = 0.42f, HaloMaxOpacity = 1.4f, HaloMinIntensity = 0.05f;
 	public float HaloOffset = 0.055f;
 	public float HaloSizeBase = 0.75f, HaloSizeGrow = 0.25f, HaloGrowCap = 2f;
+	// Bombillas de posición: halo de BulbHalo × el diámetro de la bombilla, centrado en ella
+	public float BulbHalo = 1.6f;
 
 	// Freno (6.1 y 6.2)
 	public float BrakeRise = 0.04f, BrakeFall = 0.15f, BrakeMinSpeed = 1f, BrakeGain = 2.2f;
@@ -379,7 +384,7 @@ public sealed class ShipLightState
 			_intensity[i] = value;
 			_color[i] = color;
 
-			float halo = d.HasHalo ? _s.Halo(d.Type) : 0f;
+			float halo = !d.HasHalo ? 0f : d.IsBulb ? 2f * d.BulbRadius * _s.BulbHalo : _s.Halo(d.Type);
 			if (halo > 0f && value >= _s.HaloMinIntensity)
 			{
 				_haloOpacity[i] = Math.Clamp(_s.HaloOpacity * _s.HaloScale * value, 0f, _s.HaloMaxOpacity);
@@ -716,7 +721,7 @@ public static class ShipLightCatalog
 			var center = new Vector3(c[0], c[1], c[2]);
 			Vector3 halo = light.Halo is { Length: 3 } h ? new Vector3(h[0], h[1], h[2]) : Vector3.Zero;
 			defs.Add(new ShipLightDef(light.Name, type.Value, ShipLightDef.SideOf(center.X), center, halo,
-				piece.Intensity ?? 0f, Rgb(piece.Emission), light.Name == NewBrakeName));
+				piece.Intensity ?? 0f, Rgb(piece.Emission), light.Name == NewBrakeName, light.Bulb ?? 0f));
 		}
 		return defs;
 	}

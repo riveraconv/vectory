@@ -321,6 +321,7 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export] public float LightBeaconHalo = LightDefaults.BeaconHalo;
 	[Export] public float LightHaloScale = LightDefaults.HaloScale;           // k: opacidad del halo = 0,32 × k × I
 	[Export] public float LightHaloOffset = LightDefaults.HaloOffset;         // m, hacia fuera de la pieza
+	[Export] public float LightBulbHalo = LightDefaults.BulbHalo;             // halo de las bombillas de posición, × su diámetro
 	[Export] public float LightBrakeRise = LightDefaults.BrakeRise;           // s
 	[Export] public float LightBrakeFall = LightDefaults.BrakeFall;           // s
 	[Export] public float LightBrakeGain = LightDefaults.BrakeGain;           // a tope, × (1 + esto)
@@ -364,6 +365,7 @@ public partial class Player : CharacterBody3D, IContactShip
 			BeaconHalo = LightBeaconHalo,
 			HaloScale = LightHaloScale,
 			HaloOffset = LightHaloOffset,
+			BulbHalo = LightBulbHalo,
 			BrakeRise = LightBrakeRise,
 			BrakeFall = LightBrakeFall,
 			BrakeGain = LightBrakeGain,

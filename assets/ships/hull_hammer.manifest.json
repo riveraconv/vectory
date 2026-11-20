@@ -1098,6 +1098,7 @@
     {
       "name": "Light_Tail_L",
       "type": "brake",
+      "bulb": 0.028,
       "halo": [
         0.0,
         0.0,
@@ -1107,6 +1108,7 @@
     {
       "name": "Light_Tail_R",
       "type": "brake",
+      "bulb": 0.028,
       "halo": [
         0.0,
         0.0,

@@ -720,6 +720,7 @@
     {
       "name": "Light_Fin_L",
       "type": "fin",
+      "bulb": 0.026,
       "halo": [
         -1.0,
         0.0,
@@ -729,6 +730,7 @@
     {
       "name": "Light_Fin_R",
       "type": "fin",
+      "bulb": 0.026,
       "halo": [
         1.0,
         0.0,

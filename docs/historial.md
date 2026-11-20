@@ -1012,6 +1012,10 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 - Atravesable tras recolocar: sin luz en pista, luz de freno sobre el casco ni faros. Holograma: luces realzadas y fijas. Recolocar borra apagones y chispas; las muertas siguen.
 - Medido sin vsync: media de 2,37–2,71 ms, como en la etapa 3, sin frames lentos. El daño, el usuario jugando (no se puede forzar desde una sonda de GDScript).
 
+## Luces de la nave: retoque de las bombillas
+
+(decisión del usuario tras la etapa 4, cambia la spec 5.2): las bombillas de posición (aletas de VECTOR, morro y puntas de BLADE, aletas de HAMMER) llevan un brillo concentrado en vez del halo difuminado: 1,6 × el diámetro de la bombilla (`BulbHalo`, grupo **Luces**), centrado en ella. El radio sale del manifiesto (`bulb` en `lights`, desde `lamps.LIGHT_TYPES`). Las demás luces puntuales, los faros incluidos, siguen con su halo. Comprobado con capturas en las tres naves.
+
 ## Pendiente
 
 - `docs/naves-disenos.md` no recoge todavía las cabinas elegidas. El resto de opciones del menú (CHAMPIONSHIP, HANGAR), ajustar el contorno interior de la cabina. Reajustar la dificultad de los rivales con circuitos nuevos (decisión del usuario).

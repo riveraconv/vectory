@@ -266,6 +266,35 @@ public class ShipLightsTests
         Assert.Equal(Math.Clamp(0.32f * 0.42f * i0, 0f, 1.4f), state.HaloOpacity(nose), 4);
     }
 
+    // Bombillas de posición (decisión del usuario tras la etapa 4): halo concentrado, 1,6 × su diámetro, que crece igual
+    [Theory]
+    [InlineData("vector", "Light_Fin_L", 0.026f)]
+    [InlineData("blade", "Light_Nav_R", 0.022f)]
+    [InlineData("blade", "Light_Tip_L", 0.024f)]
+    [InlineData("hammer", "Light_Tail_R", 0.028f)]
+    public void Bulbs_HaveAConcentratedHalo(string ship, string name, float radius)
+    {
+        var state = new ShipLightState(Lights(ship));
+        state.Update(Dt, Rest);
+        int i = Index(state, name);
+        Assert.True(state.Def(i).IsBulb);
+        Assert.Equal(radius, state.Def(i).BulbRadius, 4);
+        Assert.Equal(2f * radius * 1.6f, state.HaloSize(i), 4);
+    }
+
+    [Theory]
+    [InlineData("vector", "Light_Nose_L")]
+    [InlineData("vector", "Light_Tail_L")]
+    [InlineData("hammer", "Light_TailBar_L")]
+    [InlineData("hammer", "Light_Canard_L")]
+    [InlineData("hammer", "Light_Head_L")]
+    [InlineData("blade", "Light_Strobe_Top")]
+    public void OtherPointLights_KeepTheirHalo(string ship, string name)
+    {
+        var state = new ShipLightState(Lights(ship));
+        Assert.False(state.Def(Index(state, name)).IsBulb);
+    }
+
     [Fact]
     public void Reset_ClearsBrakeAndTurnAtOnce()
     {

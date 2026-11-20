@@ -24,6 +24,8 @@ public sealed class HullManifestLight
 	[JsonPropertyName("name")] public string Name { get; set; } = "";
 	[JsonPropertyName("type")] public string Type { get; set; } = "";
 	[JsonPropertyName("halo")] public float[] Halo { get; set; }
+	// Radio de la bombilla de una luz de posición (m): su halo es un brillo concentrado; null en las demás
+	[JsonPropertyName("bulb")] public float? Bulb { get; set; }
 }
 
 // Silueta del casco vista desde arriba, para la sombra de contacto (spec docs/efectos-8-luces.md, 3.3): imagen en gris

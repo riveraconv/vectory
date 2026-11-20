@@ -721,6 +721,7 @@
     {
       "name": "Light_Nav_L",
       "type": "nav",
+      "bulb": 0.022,
       "halo": [
         -1.0,
         0.0,
@@ -730,6 +731,7 @@
     {
       "name": "Light_Nav_R",
       "type": "nav",
+      "bulb": 0.022,
       "halo": [
         1.0,
         0.0,
@@ -739,6 +741,7 @@
     {
       "name": "Light_Tip_L",
       "type": "nav",
+      "bulb": 0.024,
       "halo": [
         -1.0,
         0.0,
@@ -748,6 +751,7 @@
     {
       "name": "Light_Tip_R",
       "type": "nav",
+      "bulb": 0.024,
       "halo": [
         1.0,
         0.0,

@@ -369,22 +369,24 @@ def write_shadow(path, pieces, skip=()):
 
 # ---------- Tipos de las luces (spec 4.1) ----------
 
-# Por nave: nombre → (tipo, hacia dónde sale el halo). "side" = hacia su lado (x de su centro); None = sin halo (tiras).
-# Las toberas no están: son de efectos-6.
+# Por nave: nombre → (tipo, hacia dónde sale el halo[, radio de la bombilla]). "side" = hacia su lado (x de su centro);
+# None = sin halo (tiras). Las bombillas de posición llevan su radio: su halo es un brillo concentrado, casi del tamaño
+# de la bombilla (decisión del usuario tras la etapa 4). Las toberas no están: son de efectos-6.
 _BACK, _FRONT, _UP, _DOWN, _SIDE = (0.0, 0.0, 1.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0), (0.0, -1.0, 0.0), "side"
 _RETRO = {"Retro_L_Glow": ("retro", None), "Retro_R_Glow": ("retro", None)}
 LIGHT_TYPES = {
     "vector": {
         **{f"Accent_{p}_{s}": ("profile", None) for p in ("Chine", "WingLE", "Endplate", "PodBand") for s in "LR"},
         **{f"Light_Nose_{s}": ("nose", _SIDE) for s in "LR"},
-        **{f"Light_Fin_{s}": ("fin", _SIDE) for s in "LR"},
+        **{f"Light_Fin_{s}": ("fin", _SIDE, 0.026) for s in "LR"},
         **{f"Light_Tail_{s}": ("brake", _BACK) for s in "LR"},
         "Light_Head": ("head", None),
         **_RETRO,
     },
     "blade": {
         **{f"Accent_Form{p}_{s}": ("form", None) for p in ("Nose", "Prong") for s in "LR"},
-        **{f"Light_{p}_{s}": ("nav", _SIDE) for p in ("Nav", "Tip") for s in "LR"},
+        **{f"Light_Nav_{s}": ("nav", _SIDE, 0.022) for s in "LR"},
+        **{f"Light_Tip_{s}": ("nav", _SIDE, 0.024) for s in "LR"},
         "Light_Tail": ("tailw", _BACK),
         "Light_Brake": ("brake", _BACK),
         "Light_Strobe_Top": ("strobe", _UP),
@@ -394,7 +396,8 @@ LIGHT_TYPES = {
     },
     "hammer": {
         **{f"Light_{p}_{s}": ("amber", _SIDE) for p in ("Nose", "Canard") for s in "LR"},
-        **{f"Light_{p}_{s}": ("brake", _BACK) for p in ("Tail", "TailBar") for s in "LR"},
+        **{f"Light_Tail_{s}": ("brake", _BACK, 0.028) for s in "LR"},
+        **{f"Light_TailBar_{s}": ("brake", _BACK) for s in "LR"},
         "Light_Brake": ("brake", _BACK),
         **{f"Light_Work_{i}": ("work", _FRONT) for i in range(4)},
         **{f"Light_Head_{s}": ("head", _FRONT) for s in "LR"},
@@ -409,8 +412,11 @@ LIGHT_TYPES = {
 # Entradas del manifiesto: tipo y, si lleva halo, hacia dónde. center_x: la x del centro de una pieza (para "side")
 def light_entries(ship, center_x):
     out = []
-    for name, (kind, outward) in LIGHT_TYPES[ship].items():
+    for name, spec in LIGHT_TYPES[ship].items():
+        kind, outward = spec[0], spec[1]
         entry = {"name": name, "type": kind}
+        if len(spec) > 2:
+            entry["bulb"] = spec[2]
         if outward == _SIDE:
             outward = (1.0 if center_x(name) > 0 else -1.0, 0.0, 0.0)
         if outward is not None:

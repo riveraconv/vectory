@@ -306,7 +306,8 @@ void fragment() {
 		{
 			int i = _haloLights[h];
 			ShipLightDef d = _state.Def(i);
-			NVector3 p = d.Center + d.HaloOutward * offset;
+			// las bombillas, en su centro (el shader acerca el halo a la cámara); el resto, un poco hacia fuera
+			NVector3 p = d.IsBulb ? d.Center : d.Center + d.HaloOutward * offset;
 			NVector3 c = _state.Color(i);
 			float alpha = _state.HaloOpacity(i) * bloom;
 			float size = _state.HaloSize(i);
