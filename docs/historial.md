@@ -1016,6 +1016,16 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 
 (decisión del usuario tras la etapa 4, cambia la spec 5.2): las bombillas de posición (aletas de VECTOR, morro y puntas de BLADE, aletas de HAMMER) llevan un brillo concentrado en vez del halo difuminado: 1,6 × el diámetro de la bombilla (`BulbHalo`, grupo **Luces**), centrado en ella. El radio sale del manifiesto (`bulb` en `lights`, desde `lamps.LIGHT_TYPES`). Las demás luces puntuales, los faros incluidos, siguen con su halo. Comprobado con capturas en las tres naves.
 
+## Visión túnel: etapa 1, túnel
+
+(spec `docs/efectos-9-vision-tunel.md` v1.2, rama `feature/fx-tunnel-vision`, versión **0.29.0**): hecha, con tests de la lógica pura y validada por el usuario jugando. La etapa 2 (líneas de velocidad) sigue pendiente.
+
+- **`efectos-velocidad` no estaba hecha**: la spec 9 daba por existente el túnel «de hoy»; se rehízo (v1.1) para crearlo entero, en dos etapas (decisión del usuario). Sigue fuera de `efectos-velocidad`: FOV +14°, partículas y chispas de las toberas.
+- **Decisión del usuario** (v1.2): en cabina el túnel es **solo de fuera**, por el parabrisas; marco, pantallas, cristal y HUD, nítidos. Sin la máscara de la maqueta: basta el orden de capas. **Capas nuevas**: túnel 1, cabina 3D 2 (antes 0), HUD 3 (antes 1).
+- **Se aparta de la spec** (copiado de la maqueta): intensidad suavizada 0,12 s; halo × mín(1, I / 0,45); viñeta y halo aplicados en lineal (aprox. gamma 2,2) porque en la maqueta van antes del tonemap. `b` es el de la cámara (`BoostCameraEffect.Amount`, lineal). TUNNEL VISION sale de COMING SOON y la vista previa oscurece los bordes (solo viñeta). Un `settings.json` sin `tunnelVision` avisa en consola y usa el 100 %.
+- Medido sin vsync, 3 carreras por cámara contra el commit anterior: en persecución, media +0,2–0,8 ms; en cabina, dentro del ruido; ningún frame de más de 16,7 ms y peores frames parecidos (9–14,6 ms frente a 8–17).
+- **Trampa**: desde una sonda, la C no llega como `InputEventAction` (el `Player` la lee en `_UnhandledKeyInput`): hay que mandar un `InputEventKey`. El boost no se vio en capturas (el piloto no lo usa): lo validó el usuario jugando.
+
 ## Pendiente
 
 - `docs/naves-disenos.md` no recoge todavía las cabinas elegidas. El resto de opciones del menú (CHAMPIONSHIP, HANGAR), ajustar el contorno interior de la cabina. Reajustar la dificultad de los rivales con circuitos nuevos (decisión del usuario).

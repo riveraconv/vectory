@@ -63,8 +63,9 @@ Carpetas de `scripts/` (detalle en `docs/arquitectura.md`): `Circuit/` (pista, b
 
 ## Estado
 
-- Versión **0.28.0**. Última spec cerrada: `docs/efectos-8-luces.md` (luces de la nave: realce y halos, freno y boost, giro, faros con su haz, retro a 45° desde toberas del casco y parpadeo con daño nuevo; sin encendido en parrilla). El detalle de todo lo hecho, en `docs/historial.md`.
-- `docs/efectos-velocidad.md` y `docs/escenografia.md` siguen **sin implementar**: no hay tobera, líneas de velocidad ni visión túnel (TUNNEL VISION sigue en COMING SOON). No se tocan hasta que el usuario lo diga.
+- Versión **0.29.0**. Última spec cerrada: `docs/efectos-8-luces.md`. En curso: `docs/efectos-9-vision-tunel.md`, etapa 1 hecha (visión túnel solo sobre el mundo, a la mitad en persecución; TUNNEL VISION activo); falta la etapa 2, las líneas de velocidad. El detalle de todo lo hecho, en `docs/historial.md`.
+- Capas de pantalla en carrera: visión túnel 1, cabina 3D 2, HUD 3, pausa 10, depuración 11.
+- `docs/escenografia.md` y el resto de `docs/efectos-velocidad.md` (FOV +14°, partículas de las toberas) siguen **sin implementar**. No se tocan hasta que el usuario lo diga.
 - Pendiente: un suelo de pista y de túnel que reciba luz (la luz en pista y los focos de `efectos-8-luces` esperan en la capa 2, y su sombra de contacto, aplazada); CHAMPIONSHIP y HANGAR del menú, `docs/naves-disenos.md` sin las cabinas elegidas, ajustar el contorno interior de la cabina, reajustar la dificultad de los rivales cuando haya circuitos nuevos.
 
 ## Al cerrar una etapa
