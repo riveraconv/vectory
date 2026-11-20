@@ -73,7 +73,11 @@ void fragment() {
 		AddChild(_pivot);
 
 		// Con casco 3D (VECTOR), ese; sus luces quedan fijas respecto a la pantalla para que se vea el volumen al girar
-		_ship = new Spaceship { Name = "Spaceship", Visual = ShipDefinitions.Default.Visual, Use3DHull = true, Hull3DLightsFollowShip = false };
+		_ship = new Spaceship
+		{
+			Name = "Spaceship", Visual = ShipDefinitions.Default.Visual, Use3DHull = true, Hull3DLightsFollowShip = false,
+			Hull3DStaticLights = true
+		};
 		_pivot.AddChild(_ship);
 
 		// Píxeles por unidad de tangente: a la distancia d, una unidad mide focal / d píxeles

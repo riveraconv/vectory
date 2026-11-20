@@ -484,6 +484,9 @@ public partial class Player : CharacterBody3D, IContactShip
 	public System.Numerics.Vector3 PreviousPosition { get; private set; }
 	public PassableState Passable { get; } = new();
 
+	// Su nave dibujada (las chispas de sus luces las suelta Main)
+	public Spaceship ShipView => _ship;
+
 	// Rebufo (spec docs/rivales-4-personalidades.md, 4.1): lo actualiza RivalField con las demás naves; lo usa el paso
 	// siguiente al montar ShipTuning. En TIME TRIAL no hay nadie: siempre 0.
 	public Slipstream Slipstream { get; } = new();
@@ -1108,8 +1111,13 @@ public partial class Player : CharacterBody3D, IContactShip
 			TopSpeed = MaxSpeed,
 			DamageLevel = CockpitDamageEnabled ? _damageLevel : 0
 		});
-		float altitude = Physics.HasSurface ? Physics.Surface.Height - Circuit.Track.ShipHover : 0f;
-		_ship.FeedLightContext(altitude, _race != null && _race.State == RaceState.PreStart);
+		_ship.FeedLightContext(new ShipLightContext
+		{
+			Altitude = Physics.HasSurface ? Physics.Surface.Height - Circuit.Track.ShipHover : 0f,
+			OnGrid = _race != null && _race.State == RaceState.PreStart,
+			Passable = Passable.FromRespawn,
+			TimeTrial = _race != null && _race.IsFlyingStart
+		});
 	}
 
 	// Traduce el teclado a intenciones de conducción (acciones del mapa de entrada; SETTINGS cambia sus teclas)

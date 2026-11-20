@@ -15,7 +15,6 @@ Tercera spec de la **segunda tanda de efectos de nave**. Deja listas **todas las
 - **Sombra de contacto** bajo la nave, que crece y se desvanece en el aire.
 - **Reacción al giro**: al girar fuerte o derrapar suben las luces del lado de dentro.
 - **Parpadeo con daño nuevo**, mucho más visible: apagones, tartamudeo, chispas y, en el nivel 3, luces muertas.
-- **Encendido en parrilla**: las luces se encienden con el semáforo y en el GO dan un golpe a tope.
 
 Todo vale para **tu nave y para los rivales**.
 
@@ -37,8 +36,7 @@ Maquetas de referencia:
   - FAROS Y FOCOS · SÍ;
   - SOMBRA · CONTACTO;
   - REACCIÓN AL GIRO · SÍ;
-  - PARPADEO CON DAÑO · NUEVO;
-  - ENCENDIDO EN PARRILLA · SÍ.
+  - PARPADEO CON DAÑO · NUEVO.
 - **`designs/faros-retro-vector.html`**, **`designs/faros-retro-blade.html`** y **`designs/faros-retro-hammer.html`** («VECTORY · Faros delanteros y retro · Maqueta»), sobre los cascos 3D reales. Se eligió:
   - VECTOR · **C · VISERA**;
   - BLADE · **C · OJOS**;
@@ -71,7 +69,6 @@ Se apoya en lo que ya existe:
 - La **anticolisión** de BLADE y las **balizas del techo** de HAMMER, que no cambian.
 - La **conducción**: frenar, girar, derrape y boost (`conduccion-avanzada`, `boost`).
 - El **estado de la tobera** de `efectos-6-toberas`: potencia `P`, boost de la llama `bt` y fuerza del retro `R`.
-- La **secuencia de salida** de `carrera`: luces del semáforo encendidas y el GO.
 - La **altura sobre la pista** que usa el brillo de levitación (`pista-3d`).
 - El **suelo de pista** y los **túneles** (`elementos-circuito`).
 - El **glow** del `WorldEnvironment`, los ajustes **BLOOM** y **PARTICLES** de `settings`, la pausa, la recolocación, el fantasma y la cámara activa.
@@ -106,8 +103,7 @@ Cambios respecto a specs anteriores:
 - **Sombra de contacto aplazada** (sección 8): la pista y el túnel son solo líneas y el brillo de levitación ya no existe (se quitó al empezar `efectos-2-derrape`), así que la sombra no tendría sobre qué verse. Se hace en la spec del suelo, junto con la luz en pista. Las **siluetas** de la sección 3.3 sí se sacan en la etapa 1, para dejarlas listas.
 - **Capa de la luz en pista**: como no hay suelo ni paredes de túnel que reciban luz, la luz en pista y los faros apuntan a una **capa propia libre** (la 2), que hoy no usa nada. El suelo de la spec futura irá en esa capa.
 - **Retro a 45°** (secciones 3.4 y 7.5): los chorros salen **inclinados 45° hacia arriba** (en vez de casi horizontales), en el casco y en la cabina, para que cuadre lo que se ve por fuera con lo de dentro: desde la cabina se ven unos 3/4 del chorro por encima de la copia del morro. Los `Retro_*_Point` de las tres naves apuntan a (0; 1; −1). Los cuerpos de las toberas no cambian; si con las capturas de la etapa 1 la boca no cuadra con el chorro, se avisa y se propone el ajuste. En la vista de cabina de tu nave, además, **más discretos**. Ángulo e intensidad, a ojo jugando.
-- **Trampilla de BLADE en cabina** (secciones 7.5 y 11): la trampilla de la copia del morro se abre igual que la del casco.
-- **Encendido en TIME TRIAL** (sección 10): TIME TRIAL no tiene semáforo (5 s de `READY?` y `GO!`). Casi apagadas al empezar el `READY?`, una «luz» más por segundo (n = 0–5, con su parpadeo de arranque) y el golpe en el `GO!`.
+- **Trampilla de BLADE en cabina** (secciones 7.5 y 10): la trampilla de la copia del morro se abre igual que la del casco.
 
 Rama: `feature/fx-lights`, que sale de `develop`. Versión: la siguiente **minor** sobre la que haya al empezar. Se sube en el commit de la última etapa.
 
@@ -123,8 +119,7 @@ Todo lo demás del documento maestro sigue aplicando: principios, flujo por etap
   2. el **realce** (sección 5);
   3. el **freno y el boost** (sección 6);
   4. el **giro** (sección 7.1);
-  5. el **encendido** (sección 10);
-  6. el **daño** (sección 9).
+  5. el **daño** (sección 9).
 - **Luz en pista**: 4 luces por nave (2 laterales, 1 trasera, 1 de toberas) que **solo iluminan la pista y el túnel**. Las sombras van apagadas.
 - **Luz de freno en el casco**: 1 luz por nave que **solo ilumina el casco**, detrás de las luces de freno.
 - **Faros**: `SpotLight3D` que también iluminan **solo la pista y el túnel**, con su **haz visible**.
@@ -134,7 +129,7 @@ Todo lo demás del documento maestro sigue aplicando: principios, flujo por etap
   - **1** · Blender: piezas nuevas y siluetas.
   - **2** · Pilotos, halos, freno y giro.
   - **3** · Luz en pista, faros y retro (la sombra, aplazada: v1.2).
-  - **4** · Daño nuevo y encendido en parrilla.
+  - **4** · Daño nuevo.
 
 ## 2. Etapa 0 · Inventario
 
@@ -156,10 +151,9 @@ El agente mira y apunta en un **informe corto**, sin cambiar nada:
    Si hay otras luces en la escena, cuáles son y a qué capas llegan. Si la capa del casco es **la misma para todas las naves**, se apunta (la luz de freno en el casco tocaría también a un rival pegado detrás, y no pasa nada).
 4. **Freno**: cómo se lee, para cada nave (tú y los rivales), si está **frenando**. También cómo se leen el **giro** (entrada suavizada), el **derrape** y la velocidad.
 5. El **`bt`**, la **`P`** y la **`R`** del estado de la tobera (`efectos-6`), por nave. Si el retroempuje de `efectos-6` ya está hecho: de dónde salen hoy sus chorros y cómo se escalan.
-6. **Secuencia de salida** (`carrera`): cómo se leen las luces encendidas del semáforo (0–5) y el momento del GO.
-7. **Altura sobre la pista** y orientación de la pista bajo la nave, las que usa el brillo de levitación.
-8. **Chispas**: si se pueden reutilizar las de `efectos-1-choques` para las del daño (sección 9.3).
-9. **Rendimiento**:
+6. **Altura sobre la pista** y orientación de la pista bajo la nave, las que usa el brillo de levitación.
+7. **Chispas**: si se pueden reutilizar las de `efectos-1-choques` para las del daño (sección 9.3).
+8. **Rendimiento**:
    - cuántas `OmniLight3D` y `SpotLight3D` aguanta el renderizador que se usa (Forward+ o Mobile) con 8 naves;
    - cómo se reparten por objeto.
 
@@ -344,7 +338,7 @@ Los de VECTOR y BLADE son los de `efectos-6`. HAMMER pasa a **naranja**, a juego
 
 - Siguen como hoy: anticolisión de BLADE (0,06 s cada 1,2 s, la de abajo desfasada 0,6 s) y balizas del techo de HAMMER (ámbar con boost, roja con daño 2 y 3).
 - Ganan su **halo** (tabla 4.1).
-- No las tocan ni el realce, ni el giro, ni el encendido, ni el parpadeo con daño.
+- No las tocan ni el realce, ni el giro, ni el parpadeo con daño.
 
 ## 5. Pilotos y bandas realzados (etapa 2)
 
@@ -404,7 +398,7 @@ Las luces de freno **iluminan su nave**: tiñen de rojo (o de naranja con boost)
   - HAMMER, `Light_Brake`.
 - Rango **2,5 m**, atenuación **1,6**.
 - **Color**: el rojo del freno, que pasa a `#FF8A1E` con `bt` (como 6.2).
-- **Energía** = `EB` × (0,15 + 1,0 × `kB` + 0,6 × `bt`) × encendido (sección 10) × daño medio de las luces `brake` de la nave (9.4).
+- **Energía** = `EB` × (0,15 + 1,0 × `kB` + 0,6 × `bt`) × daño medio de las luces `brake` de la nave (9.4).
   - En reposo casi no se nota. Al frenar, la popa se tiñe.
   - `EB` se ajusta a ojo (empezar en 1), y se apunta. Que no queme el casco.
 - En la **vista de cabina** de tu nave no se ve (el casco está oculto).
@@ -466,7 +460,6 @@ Intensidad (unidades de la maqueta, ver la nota de unidades del principio):
 | Toberas | 1 + 3,5 × `P` + 8 × `bt` |
 
 - Todas × **altura**: máx(0; 1 − `h` / 3,5), con `h` la altura sobre la pista. Las de pista se apagan del todo a 3,5 m.
-- Todas × **encendido** (sección 10).
 - Con la nave en la parrilla, la de toberas × 0,4 (la llama va floja), como en la maqueta.
 - En la **vista de cabina** de tu nave, la luz en pista **sí** se ve (el casco está oculto, pero el suelo se ilumina).
 
@@ -491,7 +484,7 @@ Intensidad (unidades de la maqueta, ver la nota de unidades del principio):
 
 - Las intensidades son las de la maqueta (unidades de three.js) y se ajustan a ojo (nota de unidades del principio).
 - **Lentes y reflectores** con los faros: el tipo `head` (tabla 4.1). Los focos de HAMMER (`Light_Work_*`) × **1,6** sobre su realce.
-- Intensidad × encendido (sección 10) × daño medio de todas las luces de la nave (9.4).
+- Intensidad × daño medio de todas las luces de la nave (9.4).
 - En **cabina**, tus faros iluminan la pista por delante. Son los mismos.
 - Si el inventario dice que 4 focos por HAMMER son demasiados con 8 naves, se avisa con los datos (propuesta: los de trabajo, solo en tu nave).
 
@@ -499,7 +492,7 @@ Intensidad (unidades de la maqueta, ver la nota de unidades del principio):
 - Un **cono** aditivo por foco, sin luz, que sale del vacío `Spot_Head_*` en la dirección de su foco (hacia el punto al que apunta), de **10 m** de largo:
   - radio 0,05 m en la lente y tan(semiángulo) × 0,75 × 10 m al final;
   - se desvanece a lo largo: (1 − `v`)^2,4, con `v` de 0 en la lente a 1 al final, y más por los bordes vistos de lado (el borde de la llama de `efectos-6`);
-  - color del foco; opacidad de partida **0,07** (0,04 en los de trabajo), × encendido × daño medio, como los focos.
+  - color del foco; opacidad de partida **0,07** (0,04 en los de trabajo), × daño medio, como los focos.
 - **Se apaga** cuando la cámara está **dentro del cono**, mirando al faro de frente (si no, la pantalla se llena de blanco). Con `a` la distancia de la cámara a lo largo del eje y `d` su distancia al eje: × limitar((`d` − tan(semiángulo) × 0,75 × `a`) / (0,6 + 0,3 × `a`); 0; 1) si `a` > 0.
 - En la **vista de cabina** de tu nave, × 0,5.
 - Respeta **BLOOM**: a 0 %, × 0,5.
@@ -509,7 +502,7 @@ Intensidad (unidades de la maqueta, ver la nota de unidades del principio):
 - Los chorros del retroempuje de `efectos-6` (sección 6) salen de los vacíos **`Retro_*_Point`** y miran hacia donde apuntan.
 - **Escala** del chorro (radios y largo de `efectos-6`): el ancho y el alto de cada nave (sección 3.4). El largo, × el ancho.
 - **Colores**: los de la sección 3.4.
-- **Boca** (`Retro_*_Glow`, tipo `retro`): emisión = 0,15 + **4** × `R`, con el color medio de su nave. No titila con el daño y no la tocan el realce, el giro ni el encendido.
+- **Boca** (`Retro_*_Glow`, tipo `retro`): emisión = 0,15 + **4** × `R`, con el color medio de su nave. No titila con el daño y no la tocan el realce ni el giro.
 - **Luz del retro**: una `OmniLight3D` por tobera, 0,25 × su ancho por delante de la boca, del color medio, rango **3,5 m**, atenuación 2, energía `ER` × **2** × `R` (`ER` = 1, a ojo). Solo en la **capa del casco**. Ilumina el morro al frenar fuerte.
 - **Trampilla de BLADE**: `Retro_*_FlapHinge` gira en x de 0 a **0,75 rad** (≈ 43°) con mín(1; 1,4 × `R`): se abre del todo antes de que el chorro llegue a tope y se cierra con él. La boca y el chorro se ven al abrirse.
 - En la **vista de cabina** de tu nave, los chorros sí se ven por delante, **inclinados 45° hacia arriba**, como en el casco, y más discretos (v1.2). Las piezas del casco, no; las de la copia del morro, sí (también la trampilla de BLADE).
@@ -567,7 +560,7 @@ Cada luz guarda su **factor de daño** `fd` (1 = normal). El azar sale de un gen
   - vida 0,15–0,30 s;
   - tamaño 0,12 + 0,18 × (vida que queda / vida) m;
   - color `#FFB060`, aditivo, opacidad 1,6 × (vida que queda / vida).
-- Se reutilizan las chispas de `efectos-1-choques` si se puede (punto 8 del inventario).
+- Se reutilizan las chispas de `efectos-1-choques` si se puede (punto 7 del inventario).
 - Respetan **PARTICLES** (25 / 50 / 100 %).
 
 ### 9.4 Daño medio
@@ -576,20 +569,7 @@ Cada luz guarda su **factor de daño** `fd` (1 = normal). El azar sale de un gen
 - La luz lateral en pista usa la de su lado; la luz de freno en el casco, la de las luces `brake`; y los faros, la de toda la nave.
 - Así, cuando las luces de un lado se apagan, su luz en la pista también.
 
-## 10. Encendido en parrilla (etapa 4)
-
-Durante la secuencia de salida de `carrera`:
-
-- **Potencia** `pw` de las luces de la nave = 0,06 + 0,94 × 0,85 × `n` / 5, con `n` las luces del semáforo encendidas (0–5).
-  - Con 0, casi apagadas.
-  - Con 5, al 86 %.
-- Cada vez que se enciende una luz del semáforo, **cada luz** de la nave hace un **parpadeo de arranque** durante 0,12–0,26 s (sorteado por luz). En cada frame vale × 0,1 o × 1,1, al 50 %.
-- En el **GO**: `pw` = 1 + 0,5 × destello, con el destello empezando en 1 y bajando con τ **0,35 s**. Es un golpe corto a tope.
-- `pw` multiplica las piezas, los halos, la luz en pista, la luz de freno en el casco, los faros y su haz. **No** toca anticolisión, balizas, toberas ni el retro.
-- Para todas las naves de la parrilla. Fuera de la salida, `pw` = 1.
-- TIME TRIAL: igual, con su salida (v1.2: una «luz» por segundo durante el `READY?` y el golpe en el `GO!`).
-
-## 11. Interacción con otros sistemas
+## 10. Interacción con otros sistemas
 
 - **Vista de cabina**:
   - tu casco está oculto, así que no se ven sus piezas, halos, sombra ni la luz de freno en el casco;
@@ -602,7 +582,7 @@ Durante la secuencia de salida de `carrera`:
   - sin halos, luz en pista, luz de freno en el casco, focos, haz, sombra ni daño.
 - **Atravesables** (recolocación de `rivales-3`): las luces, los halos y la sombra siguen la visibilidad del casco. La luz en pista, la luz de freno en el casco, los faros y su haz se apagan mientras la nave está atravesable.
 - **Recolocación**: se borran los apagones, los tartamudeos y las chispas, y `kB` y `G` vuelven a 0 al momento. Las luces muertas siguen muertas (el daño no cambia). La trampilla de BLADE se cierra con `R` (que `efectos-6` pone a 0).
-- **Pausa**: todo congelado (parpadeos, chispas, encendido, anticolisión, balizas y trampilla).
+- **Pausa**: todo congelado (parpadeos, chispas, anticolisión, balizas y trampilla).
 - **Terminada**: las luces siguen; al frenar sola la nave no frena, así que no se enciende el freno.
 - **En el aire**: la luz en pista y la sombra bajan con la altura (7.3 y 8). Las piezas, los halos, los faros y la luz de freno en el casco, igual.
 - **SETTINGS**:
@@ -610,7 +590,7 @@ Durante la secuencia de salida de `carrera`:
   - PARTICLES, las chispas (9.3);
   - nada más.
 
-## 12. Parámetros en el Inspector
+## 11. Parámetros en el Inspector
 
 Van al **objeto de ajustes de efectos**, en un bloque propio de luces. Los colores, en `Palette`.
 
@@ -635,18 +615,16 @@ Van al **objeto de ajustes de efectos**, en un bloque propio de luces. Los color
 | Sombra: opacidad / se apaga a / crece | 0,62 / 5 m / 0,14 por m |
 | Daño: apagones, duraciones, zumbido, muertas | Tabla 9.1 |
 | Chispas: número, vida, color | 3 · 0,15–0,30 s · `#FFB060` |
-| Encendido: mínimo / máximo en parrilla / golpe del GO | 0,06 / 0,86 / +50 %, τ 0,35 s |
-| Arranque por luz | 0,12–0,26 s |
 
-## 13. Arquitectura
+## 12. Arquitectura
 
 Respetar la estructura de carpetas y namespaces actual. Lógica pura, sin nodos de Godot:
 
 - **Ajustes de luces** (datos): todo lo de la sección 12.
 - **Tipos de luz** (datos): de cada nave, qué pieza es de qué tipo y de qué lado. Se leen del perfil visual o del manifiesto.
-- **Entradas de luces** (datos), por nave: frenando, velocidad, `th`, giro suavizado, derrape, `P`, `bt`, `R`, altura sobre la pista, nivel de daño, modo (RACE / TIME TRIAL), luces del semáforo y GO. Se rellenan desde el `Player` o el conductor del rival.
+- **Entradas de luces** (datos), por nave: frenando, velocidad, `th`, giro suavizado, derrape, `P`, `bt`, `R`, altura sobre la pista, nivel de daño y modo (RACE / TIME TRIAL). Se rellenan desde el `Player` o el conductor del rival.
 - **Estado de luces** (puro, uno por nave):
-  - `Update(delta, entradas, generador)`: lleva `kB`, `G`, el encendido y el daño de cada luz;
+  - `Update(delta, entradas, generador)`: lleva `kB`, `G` y el daño de cada luz;
   - da la **intensidad y el color** de cada pieza, la opacidad y el tamaño de su halo, las intensidades y colores de la luz en pista, de la luz de freno en el casco y de los faros, la opacidad del haz (sin la parte de la cámara), la emisión de las bocas del retro y el ángulo de la trampilla, la opacidad y la escala de la sombra, y las **chispas** que hay que soltar;
   - `Reset()` para la recolocación.
 - El **apagado del haz con la cámara dentro** depende de la cámara: es una función pura aparte (posición de la cámara, eje y semiángulo del foco → factor), que llama el nodo.
@@ -662,7 +640,7 @@ Respetar la estructura de carpetas y namespaces actual. Lógica pura, sin nodos 
 - La anticolisión de BLADE y las balizas de HAMMER siguen con su lógica. Solo ganan el halo.
 - El chorro del retro sigue siendo de `efectos-6`. Esta spec solo le da sus puntos, su escala y sus colores, y lleva la boca, la luz y la trampilla.
 
-## 14. Pruebas
+## 13. Pruebas
 
 ### Pruebas unitarias mínimas
 
@@ -693,14 +671,13 @@ Luz en pista, faros, retro y sombra (etapa 3):
     - las tres con su silueta y su tamaño;
     - `Light_Brake` debajo de `Light_Tail` en BLADE y entre las toberas en HAMMER.
 
-Daño y encendido (etapa 4):
+Daño (etapa 4):
 12. **Daño 0**: `fd` = 1 siempre.
 13. **Muertas**: con nivel 3, el 30 % (redondeado) de las luces que titilan, **siempre las mismas** en dos carreras. Anticolisión, balizas, toberas, faros y bocas del retro nunca.
 14. **Apagones**: con un generador fijo, la duración cae en el rango de su nivel. Al volver hay tartamudeo de 0,16 s y, en nivel ≥ 2, una chispa.
 15. **TIME TRIAL**: con cualquier nivel, `fd` = 1 y ninguna chispa.
-16. **Encendido**: con 0 luces del semáforo, `pw` = 0,06; con 5, 0,86; en el GO, 1,5, y a los 0,35 s ≈ 1,18.
-17. **Pausa**: con `delta` 0, ni apagones, ni tartamudeo, ni cambio de `kB`, `G` ni `pw`.
-18. `Reset()`: sin apagones ni chispas, `kB` y `G` a 0.
+16. **Pausa**: con `delta` 0, ni apagones, ni tartamudeo, ni cambio de `kB` ni `G`.
+17. `Reset()`: sin apagones ni chispas, `kB` y `G` a 0.
 
 Las pruebas existentes siguen pasando. Las del parpadeo con daño de los cascos (bajar al 20 %) se quitan o se adaptan. Si el retroempuje de `efectos-6` ya está hecho, sus pruebas siguen pasando con los puntos nuevos.
 
@@ -742,16 +719,15 @@ Las pruebas existentes siguen pasando. Las del parpadeo con daño de los cascos 
 20. Comparar con las maquetas (LUZ EN PISTA, FAROS, SOMBRA en `efectos-luces`; MORRO, CABINA y RETRO en `faros-retro-*`) y apuntar los valores.
 21. Mirar los fps con los 8 en la salida y con todos dentro de un túnel. Si bajan mucho, se avisa con los datos (propuesta: luz en pista y focos de trabajo solo para tu nave y los 4 rivales más cercanos).
 
-**Etapa 4 · Daño y encendido**
+**Etapa 4 · Daño**
 22. Daño 1, 2 y 3: apagones cada vez más largos y frecuentes, tartamudeo al volver, chispas desde el 2 y, en el 3, luces muertas que reviven a ratos. Mucho más visible que antes en las tres naves.
 23. Con daño en un lado, la luz en pista de ese lado parpadea con él.
 24. Anticolisión, balizas, toberas, faros y bocas del retro no titilan.
 25. TIME TRIAL: sin parpadeo.
-26. Salida: casi apagadas al principio, se encienden con cada luz del semáforo con un parpadeo de arranque y en el GO dan un golpe a tope. Todas las naves de la parrilla.
-27. Pausa: todo congelado. Recolocarse: sin chispas sueltas.
-28. Comparar con la maqueta (DAÑO 1–3 NUEVO, SALIDA). Menú principal: la versión nueva.
+26. Pausa: todo congelado. Recolocarse: sin chispas sueltas.
+27. Comparar con la maqueta (DAÑO 1–3 NUEVO). Menú principal: la versión nueva.
 
-## 15. Etapas
+## 14. Etapas
 
 | Etapa | Qué entra | Cierre |
 |---|---|---|
@@ -759,11 +735,11 @@ Las pruebas existentes siguen pasando. Las del parpadeo con daño de los cascos 
 | **1 · Blender** | Sección 3 | Prueba 11 · Prueba manual 1–3 · Commit `feat:` |
 | **2 · Pilotos, halos, freno y giro** | Secciones 4, 5, 6.1, 6.2 y 7.1 | Pruebas 1–5 · Prueba manual 4–10 · Commit `feat:` |
 | **3 · Luz en pista, faros y retro** | Secciones 6.3, 7.3–7.5 (7.2 y 8, aplazadas) | Pruebas 6–9 · Prueba manual 11–21 sin la 18 (lo que pide suelo se ve en la spec del suelo) · Commit `feat:` |
-| **4 · Daño y encendido** | Secciones 9, 10 y 11 · versión | Pruebas 12–18 · Prueba manual 22–28 · Commit `feat:` |
+| **4 · Daño** | Secciones 9 y 10 · versión | Pruebas 12–17 · Prueba manual 22–27 · Commit `feat:` |
 
 No se empieza una etapa sin validar la anterior. En la etapa 1, el usuario valida mirando las capturas.
 
-## 16. Fuera de alcance
+## 15. Fuera de alcance
 
 - **Iluminación del circuito** sobre las naves (luces de bordes, túneles y ciudad que tiñan el casco). Esta spec solo hace que el suelo y el túnel reciban la luz **de las naves**.
 - Que las luces de una nave iluminen **a propósito** a las otras naves (si la capa del casco es compartida, puede pasar un poco, y vale).

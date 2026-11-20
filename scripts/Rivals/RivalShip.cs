@@ -80,6 +80,9 @@ public partial class RivalShip : Node3D
 		_ship.SetHullWear(_hullWear.Zones);
 	}
 
+	// Su nave dibujada (las chispas de sus luces las suelta Main)
+	public Spaceship ShipView => _ship;
+
 	// Antes de añadirlo al árbol
 	public void Setup(RivalCar car, RaceSession race, RaceShipList raceShips, RivalLook look, float flickerOpacity, RespawnBlink blink)
 	{
@@ -108,7 +111,7 @@ public partial class RivalShip : Node3D
 		};
 		_ship.SetHull3DSettings(_look.Hull);
 		_ship.EnableThrusters(_look.Thrusters, 1.7f * _car.Entry.Number);
-		_ship.EnableLights(_look.Lights);
+		_ship.EnableLights(_look.Lights, _car.Entry.Number + 1);
 		_ship.EnableTrails(_look.Trails, WingTrailPalette.For(definition.Id, _car.Entry.PaintIndex));
 		if (definition.Visual.Hull3D != null)
 			_ship.SetHullPaint(definition.Visual.Hull3D.Style, _car.Entry.PaintIndex);
@@ -159,8 +162,12 @@ public partial class RivalShip : Node3D
 				TopSpeed = _car.Ship.Technical.MaxSpeed,
 				DamageLevel = _damageLevel
 			});
-			float altitude = physics.HasSurface ? physics.Surface.Height - Circuit.Track.ShipHover : 0f;
-			_ship.FeedLightContext(altitude, _car.Phase == RivalPhase.PreStart);
+			_ship.FeedLightContext(new ShipLightContext
+			{
+				Altitude = physics.HasSurface ? physics.Surface.Height - Circuit.Track.ShipHover : 0f,
+				OnGrid = _car.Phase == RivalPhase.PreStart,
+				Passable = _car.Passable.FromRespawn
+			});
 			_ship.FeedTrails((float)delta, new WingTrailMotion { Velocity = d.Velocity, Drifting = d.Drifting, SlipAngle = d.SlipAngle });
 		}
 		Publish();

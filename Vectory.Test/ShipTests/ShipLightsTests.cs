@@ -257,16 +257,13 @@ public class ShipLightsTests
     }
 
     [Fact]
-    public void Halo_OpacityFollowsTheIntensity_AndTheDamage()
+    public void Halo_OpacityFollowsTheIntensity()
     {
         var state = new ShipLightState(Lights("vector"));
         int nose = Index(state, "Light_Nose_L");
         state.Update(Dt, Rest);
         float i0 = state.Intensity(nose);
         Assert.Equal(Math.Clamp(0.32f * 0.42f * i0, 0f, 1.4f), state.HaloOpacity(nose), 4);
-        state.SetDamage(nose, 0.2f);
-        state.Update(Dt, Rest);
-        Assert.Equal(i0 * 0.2f, state.Intensity(nose), 4);
     }
 
     [Fact]

@@ -63,9 +63,9 @@ Carpetas de `scripts/` (detalle en `docs/arquitectura.md`): `Circuit/` (pista, b
 
 ## Estado
 
-- Versión **0.27.1**. Última spec cerrada: `docs/cabinas-3d-4-morros.md` (desde la cabina se ve una copia del morro del casco 3D, pintada detrás de la cabina, con su pintura, su daño y sus luces). El detalle de todo lo hecho, en `docs/historial.md`.
+- Versión **0.28.0**. Última spec cerrada: `docs/efectos-8-luces.md` (luces de la nave: realce y halos, freno y boost, giro, faros con su haz, retro a 45° desde toberas del casco y parpadeo con daño nuevo; sin encendido en parrilla). El detalle de todo lo hecho, en `docs/historial.md`.
 - `docs/efectos-velocidad.md` y `docs/escenografia.md` siguen **sin implementar**: no hay tobera, líneas de velocidad ni visión túnel (TUNNEL VISION sigue en COMING SOON). No se tocan hasta que el usuario lo diga.
-- Pendiente: CHAMPIONSHIP y HANGAR del menú, `docs/naves-disenos.md` sin las cabinas elegidas, ajustar el contorno interior de la cabina, reajustar la dificultad de los rivales cuando haya circuitos nuevos.
+- Pendiente: un suelo de pista y de túnel que reciba luz (la luz en pista y los focos de `efectos-8-luces` esperan en la capa 2, y su sombra de contacto, aplazada); CHAMPIONSHIP y HANGAR del menú, `docs/naves-disenos.md` sin las cabinas elegidas, ajustar el contorno interior de la cabina, reajustar la dificultad de los rivales cuando haya circuitos nuevos.
 
 ## Al cerrar una etapa
 

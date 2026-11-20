@@ -27,6 +27,8 @@ public partial class Spaceship : Node3D
 	// común (HullLightRig). Antes de _Ready.
 	public uint Hull3DLayer { get; set; } = ShipHull3D.HullLayer;
 	public bool Hull3DOwnLights { get; set; } = true;
+	// Holograma: luces del casco realzadas y fijas (spec docs/efectos-8-luces.md, 11)
+	public bool Hull3DStaticLights { get; set; }
 
 	// Pintura (por estilo de casco: combinación de su catálogo) y daño del casco 3D: se guardan para volver a ponerlos
 	// si F10 lo rehace
@@ -52,6 +54,7 @@ public partial class Spaceship : Node3D
 	// Luces de la nave (spec docs/efectos-8-luces.md): solo en carrera, tú y los rivales. Las del casco van en él; la luz
 	// en pista y los faros, aquí (en cabina el casco va oculto)
 	private ShipLightSettings _lightSettings;
+	private int _lightSeed;
 	private ShipWorldLights _worldLights;
 	private HullLights _worldLightsSource;
 
@@ -99,10 +102,14 @@ public partial class Spaceship : Node3D
 			_hull3D?.EnableLights(_lightSettings, _thrusters);
 	}
 
-	// Enciende las luces de la nave en su casco 3D (realce, halos, freno y giro). Antes o después de _Ready.
-	public void EnableLights(ShipLightSettings settings)
+	// Enciende las luces de la nave en su casco 3D (realce, halos, freno, giro, faros y daño). seed: elige sus
+	// luces muertas con daño 3, siempre las mismas. Antes o después de _Ready.
+	public void EnableLights(ShipLightSettings settings, int seed = 0)
 	{
 		_lightSettings = settings ?? ShipLightSettings.Default;
+		_lightSeed = seed;
+		if (_hull3D != null)
+			_hull3D.LightSeed = seed;
 		_hull3D?.EnableLights(_lightSettings, _thrusters);
 		RebuildWorldLights();
 	}
@@ -123,8 +130,13 @@ public partial class Spaceship : Node3D
 		_worldLights.Setup(source, _lightSettings, _hull3D.Manifest, _hull3D.Profile.Style, TrackY);
 	}
 
-	// Altura sobre la pista por encima de la de vuelo y si la nave está en la parrilla, para sus luces
-	public void FeedLightContext(float altitude, bool onGrid) => _hull3D?.Lights?.SetContext(altitude, onGrid);
+	// Lo que la nave sabe de la carrera, para sus luces (altura, parrilla, atravesable, TIME TRIAL)
+	public void FeedLightContext(in ShipLightContext context) => _hull3D?.Lights?.SetContext(context);
+
+	// Chispas pendientes del parpadeo con daño de sus luces, en el mundo (las suelta Main)
+	public int LightSparkCount => _hull3D?.Lights?.SparkCount ?? 0;
+	public Vector3 LightSparkAt(int i) => _hull3D.Lights.SparkAt(i);
+	public void ClearLightSparks() => _hull3D?.Lights?.ClearSparks();
 
 	// Enciende las estelas de las alas, con sus ajustes y la pareja de colores de la nave. Antes de _Ready.
 	public void EnableTrails(WingTrailSettings settings, WingTrailColors colors)
@@ -243,7 +255,8 @@ public partial class Spaceship : Node3D
 				Profile = profile,
 				LightsFollowShip = Hull3DLightsFollowShip,
 				Layer = Hull3DLayer,
-				OwnLights = Hull3DOwnLights
+				OwnLights = Hull3DOwnLights,
+				StaticLights = Hull3DStaticLights
 			};
 			_hull3D.ApplySettings(_hullSettings);
 			_hull3D.SetPaint(_hullPaints.TryGetValue(profile.Style, out int paint) ? paint : -1);
@@ -251,6 +264,7 @@ public partial class Spaceship : Node3D
 			AddChild(_hull3D);
 			_hull3D.SetDamage(_hullDamage, _hullTimeTrial);
 			_hull3D.SetWear(_hullWear);
+			_hull3D.LightSeed = _lightSeed;
 			if (_lightSettings != null)
 				_hull3D.EnableLights(_lightSettings, _thrusters);
 		}

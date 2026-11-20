@@ -48,6 +48,10 @@ public static class ShipLightTypes
 
 	// Las que llevan su propia intensidad (su lógica de siempre): solo ganan el halo
 	public static bool IsExternal(ShipLightType type) => type is ShipLightType.Strobe or ShipLightType.Beacon;
+
+	// Las que titilan con el daño (tabla 4.1): ni la anticolisión, ni las balizas, ni los faros, ni las bocas del retro
+	public static bool Flickers(ShipLightType type) =>
+		type is not (ShipLightType.Strobe or ShipLightType.Beacon or ShipLightType.Head or ShipLightType.Retro);
 }
 
 // Una luz de la nave: pieza, tipo, lado (−1 izquierda, 1 derecha, 0 centro), centro y hacia dónde sale su halo (cero si
@@ -119,6 +123,15 @@ public sealed class ShipLightSettings
 	public float RetroLightAttenuation = 2f;
 	public float FlapMax = 0.75f, FlapSpeed = 1.4f;
 
+	// Parpadeo con daño (9.1), por nivel 1, 2 y 3: apagones por segundo y su duración (s)
+	public float[] BlackoutRate = { 0.30f, 0.75f, 1.30f };
+	public float[] BlackoutMin = { 0.07f, 0.10f, 0.12f };
+	public float[] BlackoutMax = { 0.16f, 0.32f, 0.50f };
+	public float StutterTime = 0.16f, StutterStep = 0.035f, StutterLow = 0.15f, StutterHigh = 1.15f;
+	public float HumBase = 0.88f, HumAmplitude = 0.12f, HumFrequency = 41f, HumPhase = 3f;
+	public float DeadFraction = 0.30f, ReviveMin = 1.2f, ReviveMax = 3.2f, ReviveTime = 0.07f, ReviveLevel = 1.3f;
+	public int SparksPerEvent = 3;
+
 	public float Boost(ShipLightType type) => type switch
 	{
 		ShipLightType.Profile => ProfileBoost,
@@ -164,6 +177,18 @@ public struct ShipLightInput
 	public float Retro;     // fuerza del retro (R)
 	public float Altitude;  // altura sobre la pista por encima de la de vuelo (m)
 	public bool OnGrid;     // en la parrilla, antes del GO
+	public int DamageLevel; // 0–3
+	public bool TimeTrial;  // sin parpadeo con daño
+	public bool Passable;   // atravesable tras recolocarla: sin luz en pista, luz de freno en el casco ni faros
+}
+
+// Lo que la nave sabe de la carrera, para sus luces (secciones 7.3, 9 y 11)
+public struct ShipLightContext
+{
+	public float Altitude;   // altura sobre la pista por encima de la de vuelo (m)
+	public bool OnGrid;      // en la parrilla, antes del GO
+	public bool Passable;    // atravesable tras recolocarla
+	public bool TimeTrial;
 }
 
 // Estado de las luces de una nave (secciones 5, 6 y 7.1): freno kB, carga del giro G y, de cada luz, su intensidad y
@@ -177,23 +202,25 @@ public sealed class ShipLightState
 	private readonly Vector3[] _baseColor;
 	private readonly float[] _haloOpacity;
 	private readonly float[] _haloSize;
-	private readonly float[] _damage;
 	private readonly float[] _external;
 	private readonly int _sideLeft = -1, _sideRight = -1, _brakeRed = -1;
 	private Vector3 _nozzleColor = Vector3.One, _nozzleBoostColor = Vector3.One;
 	private ShipLightInput _last;
 
-	public ShipLightState(IReadOnlyList<ShipLightDef> defs, ShipLightSettings settings = null)
+	// shipSeed: elige siempre las mismas luces muertas de esta nave; random: el azar de los apagones
+	public ShipLightState(IReadOnlyList<ShipLightDef> defs, ShipLightSettings settings = null, int shipSeed = 0,
+		Random random = null)
 	{
 		_defs = defs;
 		_s = settings ?? ShipLightSettings.Default;
+		random ??= new Random(shipSeed);
+		Damage = new ShipLightDamage(defs, _s, shipSeed, random);
 		int n = defs.Count;
 		_intensity = new float[n];
 		_color = new Vector3[n];
 		_baseColor = new Vector3[n];
 		_haloOpacity = new float[n];
 		_haloSize = new float[n];
-		_damage = new float[n];
 		_external = new float[n];
 		Vector3 brakeSum = Vector3.Zero, newBrake = Vector3.Zero;
 		int brakes = 0;
@@ -201,7 +228,6 @@ public sealed class ShipLightState
 		{
 			ShipLightDef d = defs[i];
 			_baseColor[i] = d.BaseColor;
-			_damage[i] = 1f;
 			// colores de la luz en pista lateral: el acento de VECTOR, las de posición de BLADE, el ámbar de HAMMER
 			if (d.Type is ShipLightType.Profile or ShipLightType.Nav or ShipLightType.Amber)
 			{
@@ -262,6 +288,9 @@ public sealed class ShipLightState
 	public int Count => _defs.Count;
 	public ShipLightDef Def(int i) => _defs[i];
 
+	// Parpadeo con daño (9)
+	public ShipLightDamage Damage { get; }
+
 	// Freno (0–1) y carga del giro (0–1); lado de dentro: −1 izquierda, 1 derecha, 0 todavía ninguno
 	public float Brake { get; private set; }
 	public float Turn { get; private set; }
@@ -274,9 +303,6 @@ public sealed class ShipLightState
 
 	// Color de partida (la pintura de VECTOR lo cambia)
 	public void SetBaseColor(int i, Vector3 color) => _baseColor[i] = color;
-
-	// Factor del parpadeo con daño de una luz (1 = normal)
-	public void SetDamage(int i, float factor) => _damage[i] = factor;
 
 	// Intensidad de las que llevan su propia lógica (anticolisión y balizas)
 	public void SetExternal(int i, float intensity) => _external[i] = intensity;
@@ -296,6 +322,7 @@ public sealed class ShipLightState
 			else if (input.Steer < 0f)
 				InnerSide = 1;
 		}
+		Damage.Update(dt, input.TimeTrial ? 0 : input.DamageLevel);
 		_last = input;
 		Compute(input.Boost);
 	}
@@ -306,7 +333,11 @@ public sealed class ShipLightState
 		Brake = 0f;
 		Turn = 0f;
 		InnerSide = 0;
-		_last = default;
+		Damage.Reset();
+		_last.Braking = false;
+		_last.Steer = 0f;
+		_last.Retro = 0f;
+		_last.Boost = 0f;
 		Compute(0f);
 	}
 
@@ -343,7 +374,7 @@ public sealed class ShipLightState
 				}
 				if (d.Side != 0 && d.Side == InnerSide)
 					value *= 1f + _s.TurnInner * Turn;
-				value *= _damage[i];
+				value *= Damage.Factor(i);
 			}
 			_intensity[i] = value;
 			_color[i] = color;
@@ -367,10 +398,12 @@ public sealed class ShipLightState
 	// Luz en pista, luz de freno en el casco y retro (6.3, 7.3 y 7.5)
 	private void ComputeWorld(float bt)
 	{
-		float height = MathF.Max(0f, 1f - MathF.Max(0f, _last.Altitude) / _s.TrackFadeHeight);
+		// atravesable: sin luz en pista, luz de freno en el casco ni faros (11)
+		float pw = _last.Passable ? 0f : 1f;
+		float height = MathF.Max(0f, 1f - MathF.Max(0f, _last.Altitude) / _s.TrackFadeHeight) * pw;
 		float side = _s.TrackSide * _s.TrackSideBoost * height;
-		TrackLeft = side * (InnerSide < 0 ? 1f + _s.TrackTurnInner * Turn : 1f);
-		TrackRight = side * (InnerSide > 0 ? 1f + _s.TrackTurnInner * Turn : 1f);
+		TrackLeft = side * (InnerSide < 0 ? 1f + _s.TrackTurnInner * Turn : 1f) * Damage.SideAverage(-1);
+		TrackRight = side * (InnerSide > 0 ? 1f + _s.TrackTurnInner * Turn : 1f) * Damage.SideAverage(1);
 		TrackRear = (_s.TrackRear + _s.TrackRearBrake * Brake + _s.TrackRearBoost * bt) * height;
 		float power = Math.Clamp(_last.Power, 0f, 1f);
 		TrackNozzle = (_s.TrackNozzle + _s.TrackNozzlePower * power + _s.TrackNozzleBoost * bt) * height
@@ -381,7 +414,10 @@ public sealed class ShipLightState
 		TrackRearColor = Vector3.Lerp(red, _s.BoostColor, bt);
 		TrackNozzleColor = Vector3.Lerp(_nozzleColor, _nozzleBoostColor, bt);
 
-		HullBrakeEnergy = HasBrakeLights ? _s.HullBrakeEnergy * (_s.HullBrakeBase + Brake + _s.HullBrakeBoost * bt) : 0f;
+		HullBrakeEnergy = HasBrakeLights
+			? _s.HullBrakeEnergy * (_s.HullBrakeBase + Brake + _s.HullBrakeBoost * bt) * pw * Damage.BrakeAverage
+			: 0f;
+		HeadlightFactor = pw * Damage.Average;
 		HullBrakeColor = TrackRearColor;
 
 		float retro = Math.Clamp(_last.Retro, 0f, 1f);
@@ -391,6 +427,188 @@ public sealed class ShipLightState
 
 	private static float Approach(float value, float target, float tau, float dt) =>
 		tau <= 0f ? target : value + (target - value) * (1f - MathF.Exp(-dt / tau));
+}
+
+// Parpadeo de las luces con daño (sección 9), solo con daño 1–3: apagones sorteados que vuelven tartamudeando (y, desde
+// el nivel 2, con una chispa), zumbido de fondo desde el nivel 2 y, en el 3, el 30 % de las luces muertas (siempre las
+// mismas de la nave), que reviven a ratos. Un factor fd por luz (1 = normal). Sin delta no cambia nada.
+public sealed class ShipLightDamage
+{
+	private readonly IReadOnlyList<ShipLightDef> _defs;
+	private readonly ShipLightSettings _s;
+	private readonly Random _random;
+	private readonly bool[] _flickers;
+	private readonly bool[] _dead;
+	private readonly float[] _fd;
+	private readonly float[] _blackout;
+	private readonly float[] _stutter;
+	private readonly float[] _reviveWait;
+	private readonly float[] _revive;
+	private readonly int[] _sparks;
+	private float _time;
+
+	public ShipLightDamage(IReadOnlyList<ShipLightDef> defs, ShipLightSettings settings, int shipSeed, Random random)
+	{
+		_defs = defs;
+		_s = settings;
+		_random = random;
+		int n = defs.Count;
+		_flickers = new bool[n];
+		_fd = new float[n];
+		_blackout = new float[n];
+		_stutter = new float[n];
+		_reviveWait = new float[n];
+		_revive = new float[n];
+		_sparks = new int[n];
+		for (int i = 0; i < n; i++)
+		{
+			_flickers[i] = ShipLightTypes.Flickers(defs[i].Type);
+			_fd[i] = 1f;
+		}
+		_dead = DeadLights(_flickers, shipSeed, settings.DeadFraction);
+		Average = SideLeft = SideRight = BrakeAverage = 1f;
+	}
+
+	public float Factor(int i) => _fd[i];
+	public bool IsDead(int i) => _dead[i];
+	public bool Flickers(int i) => _flickers[i];
+
+	// Luces que han soltado una chispa en el último paso (índices)
+	public int SparkCount { get; private set; }
+	public int Spark(int k) => _sparks[k];
+
+	// Daño medio (9.4): media de mín(1; fd) de las que titilan, de toda la nave, de un lado o de las de freno
+	public float Average { get; private set; }
+	public float BrakeAverage { get; private set; }
+	private float SideLeft { get; set; }
+	private float SideRight { get; set; }
+	public float SideAverage(int side) => side < 0 ? SideLeft : SideRight;
+
+	public void Update(float dt, int level)
+	{
+		SparkCount = 0;
+		if (dt <= 0f)
+			return;
+		_time += dt;
+		level = Math.Clamp(level, 0, 3);
+		for (int i = 0; i < _fd.Length; i++)
+		{
+			if (!_flickers[i] || level == 0)
+			{
+				_fd[i] = 1f;
+				continue;
+			}
+			if (level == 3 && _dead[i])
+			{
+				// muerta: revive a ratos un instante, con chispa
+				_reviveWait[i] -= dt;
+				if (_revive[i] > 0f)
+					_revive[i] -= dt;
+				if (_reviveWait[i] <= 0f)
+				{
+					_reviveWait[i] = Range(_s.ReviveMin, _s.ReviveMax);
+					_revive[i] = _s.ReviveTime;
+					AddSpark(i);
+				}
+				_fd[i] = _revive[i] > 0f ? _s.ReviveLevel : 0f;
+				continue;
+			}
+			if (_blackout[i] > 0f)
+			{
+				_blackout[i] -= dt;
+				if (_blackout[i] > 0f)
+				{
+					_fd[i] = 0f;
+					continue;
+				}
+				// vuelve: tartamudea desde este mismo paso y, desde el nivel 2, suelta una chispa
+				_stutter[i] = _s.StutterTime;
+				if (level >= 2)
+					AddSpark(i);
+			}
+			if (_stutter[i] > 0f)
+			{
+				float elapsed = _s.StutterTime - _stutter[i];
+				_fd[i] = (int)(elapsed / _s.StutterStep) % 2 == 0 ? _s.StutterLow : _s.StutterHigh;
+				_stutter[i] -= dt;
+				continue;
+			}
+			if (_random.NextSingle() < _s.BlackoutRate[level - 1] * dt)
+			{
+				_blackout[i] = Range(_s.BlackoutMin[level - 1], _s.BlackoutMax[level - 1]);
+				_fd[i] = 0f;
+				continue;
+			}
+			_fd[i] = level >= 2 ? _s.HumBase + _s.HumAmplitude * MathF.Sin(_s.HumFrequency * _time + _s.HumPhase * i) : 1f;
+		}
+		Averages();
+	}
+
+	// Recolocación: sin apagones, tartamudeos ni chispas; las muertas siguen muertas
+	public void Reset()
+	{
+		Array.Clear(_blackout);
+		Array.Clear(_stutter);
+		Array.Clear(_revive);
+		SparkCount = 0;
+		for (int i = 0; i < _fd.Length; i++)
+			if (!(_dead[i] && _fd[i] == 0f))
+				_fd[i] = 1f;
+		Averages();
+	}
+
+	private void AddSpark(int i)
+	{
+		if (SparkCount < _sparks.Length)
+			_sparks[SparkCount++] = i;
+	}
+
+	private void Averages()
+	{
+		float all = 0f, left = 0f, right = 0f, brake = 0f;
+		int nAll = 0, nLeft = 0, nRight = 0, nBrake = 0;
+		for (int i = 0; i < _fd.Length; i++)
+		{
+			if (!_flickers[i])
+				continue;
+			float f = MathF.Min(1f, _fd[i]);
+			all += f;
+			nAll++;
+			if (_defs[i].Side < 0) { left += f; nLeft++; }
+			if (_defs[i].Side > 0) { right += f; nRight++; }
+			if (_defs[i].Type == ShipLightType.Brake) { brake += f; nBrake++; }
+		}
+		Average = nAll > 0 ? all / nAll : 1f;
+		SideLeft = nLeft > 0 ? left / nLeft : 1f;
+		SideRight = nRight > 0 ? right / nRight : 1f;
+		BrakeAverage = nBrake > 0 ? brake / nBrake : 1f;
+	}
+
+	private float Range(float a, float b) => a + (b - a) * _random.NextSingle();
+
+	// Las muertas del nivel 3: el 30 % (redondeado) de las que titilan, por un hash fijo del número de la luz y de la nave
+	public static bool[] DeadLights(IReadOnlyList<bool> flickers, int shipSeed, float fraction)
+	{
+		var candidates = new List<(uint Hash, int Index)>();
+		for (int i = 0; i < flickers.Count; i++)
+			if (flickers[i])
+				candidates.Add((Hash((uint)i, (uint)shipSeed), i));
+		candidates.Sort((a, b) => a.Hash != b.Hash ? a.Hash.CompareTo(b.Hash) : a.Index.CompareTo(b.Index));
+		int count = (int)MathF.Round(candidates.Count * fraction, MidpointRounding.AwayFromZero);
+		var dead = new bool[flickers.Count];
+		for (int k = 0; k < count; k++)
+			dead[candidates[k].Index] = true;
+		return dead;
+	}
+
+	private static uint Hash(uint a, uint b)
+	{
+		uint h = a * 0x9E3779B1u ^ (b + 0x7F4A7C15u) * 0x85EBCA77u;
+		h ^= h >> 15;
+		h *= 0x2C1B3C6Du;
+		h ^= h >> 12;
+		return h;
+	}
 }
 
 // Un foco de la nave (7.4): dónde está su lente (el vacío Spot_Head_* o el centro de una pareja de focos de trabajo de

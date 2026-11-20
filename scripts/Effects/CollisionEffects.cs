@@ -262,6 +262,21 @@ public partial class CollisionEffects : Node3D
 	// (0 fuera de RACE); respawns, cuántas veces se ha recolocado (al cambiar, su humo y sus brasas se borran; el fuego
 	// sigue, porque va con la nave); hull: la nave que se ve; velocity: su velocidad en el mundo; showFire: false para tu
 	// nave en cabina (el casco no se dibuja y el fuego va pegado a él).
+	// Chispas del parpadeo con daño de las luces de una nave (spec docs/efectos-8-luces.md, 9.3): las que ha juntado
+	// desde la última vez, con su velocidad; luego las borra
+	public void LightSparks(Spaceship ship, NVector3 velocity)
+	{
+		if (ship == null || _fx == null || _frame == null)
+			return;
+		for (int i = 0; i < ship.LightSparkCount; i++)
+		{
+			Vector3 p = ship.LightSparkAt(i);
+			float distance = _frame.SurfaceUnder(p.X, p.Z).Frame.Distance;
+			_fx.LightSpark(N(p), velocity, distance);
+		}
+		ship.ClearLightSparks();
+	}
+
 	public void DamageShip(int shipId, int level, int respawns, Transform3D hull, NVector3 velocity, ShipVisualProfile visual,
 		bool showFire, float dt)
 	{

@@ -255,6 +255,8 @@ void fragment() {
 		ApplyScorch();
 		SyncNoseCopy();
 		CreateHullLights();
+		if (StaticLights && _hullLightSettings == null)
+			ApplyStaticLights();
 		// Al final del árbol: la WorldEnvironment de la escena se crea en el _Ready de Main, después de este nodo
 		CallDeferred(MethodName.SetUpWorldReflections);
 	}
@@ -272,6 +274,9 @@ void fragment() {
 
 	// Luces de la nave (spec docs/efectos-8-luces.md): realce, halos, freno y giro, con el boost y el giro de sus toberas.
 	// Antes o después de _Ready.
+	// Semilla de las luces muertas con daño 3 de esta nave (spec docs/efectos-8-luces.md, 9.1)
+	public int LightSeed { get; set; }
+
 	public void EnableLights(ShipLightSettings settings, ThrusterFlames thrusters)
 	{
 		_hullLightSettings = settings ?? ShipLightSettings.Default;
@@ -284,6 +289,25 @@ void fragment() {
 
 	public HullLights Lights => _hullLights;
 
+	// Holograma del selector (spec docs/efectos-8-luces.md, 11): las piezas con el realce, los faros encendidos y las bocas
+	// del retro en reposo, fijas; sin halos, luz en pista, focos ni daño. Antes de _Ready.
+	public bool StaticLights { get; set; }
+
+	private void ApplyStaticLights()
+	{
+		if (!IsLoaded || _manifest == null)
+			return;
+		var state = new ShipLightState(ShipLightCatalog.From(_manifest));
+		state.Update(1f / 60f, new ShipLightInput());
+		for (int i = 0; i < state.Count; i++)
+		{
+			ShipLightDef d = state.Def(i);
+			StandardMaterial3D material = MaterialOf(d.Name);
+			if (material != null && !ShipLightTypes.IsExternal(d.Type))
+				material.EmissionEnergyMultiplier = state.Intensity(i);
+		}
+	}
+
 	// Su manifiesto (null hasta cargar)
 	public HullManifest Manifest => _manifest;
 
@@ -293,7 +317,7 @@ void fragment() {
 			return;
 		_hullLights = new HullLights { Name = "ShipLights", Thrusters = _hullLightThrusters };
 		AddChild(_hullLights);
-		_hullLights.Setup(this, _manifest, _hullLightSettings, Layer);
+		_hullLights.Setup(this, _manifest, _hullLightSettings, Layer, LightSeed);
 	}
 
 	// Trampillas del retro de BLADE (spec docs/efectos-8-luces.md, 7.5): giran en x sobre su bisagra, en el casco (llevan
@@ -1053,13 +1077,9 @@ void fragment() {
 	// Parpadeo de las luces de su contrato: el mismo EdgeFlicker de los daños, con una "arista" por luz
 	public void ShowLightFlicker(EdgeFlicker flicker)
 	{
+		// con las luces de la nave, el parpadeo con daño es el suyo (spec docs/efectos-8-luces.md, 9): este ya no
 		if (_hullLights != null)
-		{
-			// con las luces de la nave, el parpadeo es un factor más de su intensidad
-			for (int k = 0; k < Profile.Contract.FlickerLights.Count; k++)
-				_hullLights.SetFlicker(k, flicker.IsDimmed(k) ? HullDamage.DimFactor : 1f);
 			return;
-		}
 		int i = 0;
 		foreach (string name in Profile.Contract.FlickerLights)
 		{

@@ -49,7 +49,10 @@ void fragment() {
 	private int[] _haloLights;
 	private float[] _buffer;
 	private MultiMesh _multiMesh;
-	private int[] _flickerMap;
+	// Chispas del parpadeo con daño (9.3) que aún no ha recogido Main, en el mundo
+	private const int MaxSparks = 32;
+	private readonly Vector3[] _sparkPoints = new Vector3[MaxSparks];
+	private int _sparkCount;
 	private readonly Dictionary<string, int> _index = new();
 	private ShipLightInput _input;
 	private float _opacity = 1f;
@@ -67,12 +70,13 @@ void fragment() {
 	public ThrusterFlames Thrusters { get; set; }
 
 	// hull: su casco ya cargado; layer: la capa visual de sus piezas
-	public void Setup(ShipHull3D hull, HullManifest manifest, ShipLightSettings settings, uint layer)
+	// seed: elige siempre las mismas luces muertas de esta nave con daño 3
+	public void Setup(ShipHull3D hull, HullManifest manifest, ShipLightSettings settings, uint layer, int seed)
 	{
 		_hull = hull;
 		List<ShipLightDef> defs = ShipLightCatalog.From(manifest);
 		_settings = settings ?? ShipLightSettings.Default;
-		_state = new ShipLightState(defs, _settings);
+		_state = new ShipLightState(defs, _settings, seed, new Random(seed * 7919 + 13));
 		_materials = new StandardMaterial3D[defs.Count];
 		_writes = new bool[defs.Count];
 		_written = new float[defs.Count];
@@ -96,11 +100,6 @@ void fragment() {
 				halos.Add(i);
 		}
 		_haloLights = halos.ToArray();
-
-		IReadOnlyList<string> flicker = hull.Profile.Contract.FlickerLights;
-		_flickerMap = new int[flicker.Count];
-		for (int i = 0; i < flicker.Count; i++)
-			_flickerMap[i] = _index.TryGetValue(flicker[i], out int k) ? k : -1;
 
 		_buffer = new float[_haloLights.Length * Stride];
 		_multiMesh = new MultiMesh
@@ -161,11 +160,14 @@ void fragment() {
 		return light;
 	}
 
-	// Altura sobre la pista (por encima de la de vuelo) y si la nave está en la parrilla, en este paso
-	public void SetContext(float altitude, bool onGrid)
+	// En este paso: altura sobre la pista (por encima de la de vuelo), si está en la parrilla, si es atravesable tras
+	// recolocarla y si la carrera es TIME TRIAL
+	public void SetContext(in ShipLightContext context)
 	{
-		_input.Altitude = altitude;
-		_input.OnGrid = onGrid;
+		_input.Altitude = context.Altitude;
+		_input.OnGrid = context.OnGrid;
+		_input.Passable = context.Passable;
+		_input.TimeTrial = context.TimeTrial;
 	}
 
 	// Lo que hace la nave en este paso (el mismo que reciben las toberas)
@@ -175,17 +177,13 @@ void fragment() {
 		_input.Speed = input.Speed;
 		_input.TopSpeed = input.TopSpeed;
 		_input.Drifting = input.Drifting;
+		_input.DamageLevel = input.DamageLevel;
 	}
 
-	// Parpadeo del daño de siempre (spec de cada casco, 6.5): la luz i del contrato apagada o no
-	public void SetFlicker(int contractIndex, float factor)
-	{
-		if (_flickerMap == null || contractIndex >= _flickerMap.Length)
-			return;
-		int k = _flickerMap[contractIndex];
-		if (k >= 0)
-			_state.SetDamage(k, factor);
-	}
+	// Chispas pendientes del parpadeo con daño, en el mundo; Main las suelta y las borra
+	public int SparkCount => _sparkCount;
+	public Vector3 SparkAt(int i) => _sparkPoints[i];
+	public void ClearSparks() => _sparkCount = 0;
 
 	// Color de partida de una luz (la pintura de VECTOR)
 	public void SetBaseColor(string piece, Color color)
@@ -200,6 +198,7 @@ void fragment() {
 	// Recolocación: sin freno ni giro al momento
 	public void ResetState()
 	{
+		_sparkCount = 0;
 		_state?.Reset();
 		Write();
 	}
@@ -224,6 +223,20 @@ void fragment() {
 		_state.Update((float)delta, _input);
 		Write();
 		WriteHullLights();
+		CollectSparks();
+	}
+
+	private void CollectSparks()
+	{
+		ShipLightDamage damage = _state.Damage;
+		if (damage.SparkCount == 0)
+			return;
+		Transform3D world = GlobalTransform;
+		for (int k = 0; k < damage.SparkCount && _sparkCount < MaxSparks; k++)
+		{
+			NVector3 c = _state.Def(damage.Spark(k)).Center;
+			_sparkPoints[_sparkCount++] = world * new Vector3(c.X, c.Y, c.Z);
+		}
 	}
 
 	// Luz de freno en el casco, luz del retro y trampillas: solo si cambian

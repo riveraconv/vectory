@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Vectory.Circuit;
 using Vectory.Ship;
 
@@ -19,7 +20,26 @@ public sealed class CollisionFx
 		Flashes = new CrashFlashes(settings, random);
 		Smoke = new CrashSmoke(settings, random);
 		Landing = new LandingEmitter(settings.Landing, random);
+		_random = random;
 	}
+
+	private readonly Random _random;
+
+	// Chispas de una luz que vuelve de un apagón o revive (spec docs/efectos-8-luces.md, 9.3): 3 (× PARTICLES), con la
+	// velocidad de su nave más ±2 m/s de lado y adelante-atrás y 0,5–3 m/s hacia arriba; vida 0,15–0,30 s
+	public void LightSpark(Vector3 position, Vector3 shipVelocity, float axisDistance)
+	{
+		int count = SparkEmitter.Scaled(LightSparkCount, Quality);
+		for (int i = 0; i < count; i++)
+		{
+			var velocity = shipVelocity + new Vector3(Range(-2f, 2f), Range(0.5f, 3f), Range(-2f, 2f));
+			Sparks.Add(new Spark { Position = position, Velocity = velocity, Life = Range(0.15f, 0.30f), Hint = axisDistance });
+		}
+	}
+
+	public const int LightSparkCount = 3;
+
+	private float Range(float a, float b) => a + (b - a) * _random.NextSingle();
 
 	public CollisionFxSettings Settings { get; }
 	public SparkField Sparks { get; }
