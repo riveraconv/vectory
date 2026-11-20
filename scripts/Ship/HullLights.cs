@@ -53,6 +53,15 @@ void fragment() {
 	private readonly Dictionary<string, int> _index = new();
 	private ShipLightInput _input;
 	private float _opacity = 1f;
+	private ShipHull3D _hull;
+	// Luz de freno sobre el casco (6.3) y luz de cada tobera de retro (7.5), en la capa del casco
+	private OmniLight3D _brakeLight;
+	private readonly OmniLight3D[] _retroLights = new OmniLight3D[2];
+	private float _brakeWritten = -1f, _retroWritten = -1f;
+	private NVector3 _brakeColorWritten;
+
+	// El estado, para las luces en pista y los faros (ShipWorldLights)
+	public ShipLightState State => _state;
 
 	// Toberas de la nave: de ellas salen el boost de la llama (bt) y el giro suavizado
 	public ThrusterFlames Thrusters { get; set; }
@@ -60,6 +69,7 @@ void fragment() {
 	// hull: su casco ya cargado; layer: la capa visual de sus piezas
 	public void Setup(ShipHull3D hull, HullManifest manifest, ShipLightSettings settings, uint layer)
 	{
+		_hull = hull;
 		List<ShipLightDef> defs = ShipLightCatalog.From(manifest);
 		_settings = settings ?? ShipLightSettings.Default;
 		_state = new ShipLightState(defs, _settings);
@@ -73,8 +83,8 @@ void fragment() {
 			ShipLightDef d = defs[i];
 			_index[d.Name] = i;
 			_materials[i] = hull.LightMaterial(d.Name);
-			// la anticolisión, las balizas y las bocas del retro las llevan otros: aquí solo su halo
-			_writes[i] = !ShipLightTypes.IsExternal(d.Type) && d.Type != ShipLightType.Retro;
+			// la anticolisión y las balizas las llevan otros: aquí solo su halo
+			_writes[i] = !ShipLightTypes.IsExternal(d.Type);
 			if (_materials[i] != null)
 			{
 				Color c = _materials[i].Emission;
@@ -112,7 +122,50 @@ void fragment() {
 			// los cuadrados se agrandan en el shader: la caja tiene que cubrir la nave con su halo
 			CustomAabb = new Aabb(new Vector3(-4f, -3f, -8f), new Vector3(8f, 6f, 16f))
 		});
+
+		if (_state.HasBrakeLights)
+		{
+			NVector3 p = _state.HullBrakePosition;
+			_brakeLight = NewLight("BrakeLight", new Vector3(p.X, p.Y, p.Z), _settings.HullBrakeRange, _settings.HullBrakeAttenuation,
+				layer);
+		}
+		float width = Thrusters?.RetroShape.Width ?? 1f;
+		for (int k = 0; k < 2; k++)
+		{
+			string name = k == 0 ? "Retro_L_Point" : "Retro_R_Point";
+			Vector3? forward = hull.EmptyForward(name);
+			if (!forward.HasValue)
+				continue;
+			Vector3 at = hull.EmptyPosition(name) + forward.Value.Normalized() * _settings.RetroLightAhead * width;
+			_retroLights[k] = NewLight(k == 0 ? "RetroLight_L" : "RetroLight_R", at, _settings.RetroLightRange,
+				_settings.RetroLightAttenuation, layer);
+		}
 		Write();
+	}
+
+	// Luz sin sombras que solo toca su capa (la del casco), apagada hasta que tenga energía
+	private OmniLight3D NewLight(string name, Vector3 position, float range, float attenuation, uint layer)
+	{
+		var light = new OmniLight3D
+		{
+			Name = name,
+			Position = position,
+			OmniRange = range,
+			OmniAttenuation = attenuation,
+			ShadowEnabled = false,
+			LightCullMask = layer,
+			LightEnergy = 0f,
+			Visible = false
+		};
+		AddChild(light);
+		return light;
+	}
+
+	// Altura sobre la pista (por encima de la de vuelo) y si la nave está en la parrilla, en este paso
+	public void SetContext(float altitude, bool onGrid)
+	{
+		_input.Altitude = altitude;
+		_input.OnGrid = onGrid;
 	}
 
 	// Lo que hace la nave en este paso (el mismo que reciben las toberas)
@@ -159,6 +212,9 @@ void fragment() {
 		{
 			_input.Boost = Thrusters.BoostLevel;
 			_input.Steer = Thrusters.SmoothedSteer;
+			_input.Power = Thrusters.Power;
+			_input.Retro = Thrusters.RetroForce;
+			_state.SetNozzleColors(Thrusters.MidColor, Thrusters.BoostMidColor);
 		}
 		for (int i = 0; i < _state.Count; i++)
 		{
@@ -167,6 +223,40 @@ void fragment() {
 		}
 		_state.Update((float)delta, _input);
 		Write();
+		WriteHullLights();
+	}
+
+	// Luz de freno en el casco, luz del retro y trampillas: solo si cambian
+	private void WriteHullLights()
+	{
+		if (_brakeLight != null)
+		{
+			float e = _state.HullBrakeEnergy;
+			NVector3 c = _state.HullBrakeColor;
+			if (MathF.Abs(e - _brakeWritten) > Epsilon * MathF.Max(1f, e) || NVector3.DistanceSquared(c, _brakeColorWritten) > Epsilon * Epsilon)
+			{
+				_brakeLight.LightEnergy = e;
+				_brakeLight.LightColor = new Color(c.X, c.Y, c.Z);
+				_brakeLight.Visible = e > 0f;
+				_brakeWritten = e;
+				_brakeColorWritten = c;
+			}
+		}
+		float retro = _state.RetroLight;
+		if (MathF.Abs(retro - _retroWritten) > Epsilon * MathF.Max(1f, retro) || (retro == 0f && _retroWritten != 0f))
+		{
+			NVector3 mid = Thrusters?.RetroShape.Colors.Mid ?? NVector3.One;
+			for (int k = 0; k < 2; k++)
+			{
+				if (_retroLights[k] == null)
+					continue;
+				_retroLights[k].LightEnergy = retro;
+				_retroLights[k].LightColor = new Color(mid.X, mid.Y, mid.Z);
+				_retroLights[k].Visible = retro > 0.001f;
+			}
+			_retroWritten = retro;
+		}
+		_hull?.SetRetroFlaps(_state.FlapAngle);
 	}
 
 	// Cambiar un material cuesta (Godot rehace sus datos): solo se escribe lo que ha cambiado de verdad

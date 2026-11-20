@@ -46,12 +46,14 @@ public partial class ThrusterFlames : Node3D
 		public ShaderMaterial PopMaterial;
 	}
 
-	// Chorro del retroempuje (6), en el morro, apuntando hacia delante
+	// Chorro del retroempuje (6; spec docs/efectos-8-luces.md, 7.5): sale del vacío Retro_*_Point de la tobera de retro
+	// del casco 3D, hacia donde mira (45° hacia arriba), con la escala de la nave
 	private sealed class RetroJet
 	{
 		public Node3D Pivot;
 		public ShaderMaterial Plume;
 		public ShaderMaterial Core;
+		public bool Usable;   // el casco tiene su vacío
 	}
 
 	private readonly RetroJet[] _retros = new RetroJet[ThrusterState.Nozzles];
@@ -65,11 +67,33 @@ public partial class ThrusterFlames : Node3D
 	private bool _full = true;
 	private uint _lightLayer = ShipHull3D.HullLayer;
 
-	// Casco 3D de la nave, para la emisión de sus bocas (null con el wireframe)
-	public ShipHull3D Hull { get; set; }
+	// Casco 3D de la nave, para la emisión de sus bocas y los vacíos del retro (null con el wireframe)
+	public ShipHull3D Hull
+	{
+		get => _hull;
+		set
+		{
+			_hull = value;
+			PlaceRetros();
+		}
+	}
+	private ShipHull3D _hull;
 
 	// La intensidad de todo × esto (el fantasma: su transparencia)
 	public float Opacity { get; set; } = 1f;
+
+	// Vista de cabina de tu nave: sin llamas, calor ni luces de las toberas (no se ven), pero con los chorros del retro,
+	// más discretos (spec docs/efectos-8-luces.md v1.2)
+	public bool CockpitView { get; set; }
+
+	// Potencia de la llama (P) y fuerza del retro (R), para las luces de la nave (spec docs/efectos-8-luces.md, 7.3 y 7.5)
+	public float Power => _state?.Power ?? 0f;
+	public float RetroForce => _state?.Retro ?? 0f;
+
+	// Forma del retro de la nave y colores medios de la llama sin y con boost (la luz en pista de las toberas)
+	public RetroJetShape RetroShape => _shape.Retro;
+	public NVector3 MidColor => _shape.Colors.Mid;
+	public NVector3 BoostMidColor => _settings.BoostMid;
 
 	// Giro suavizado (τ 0,12 s), para las luces de la nave (spec docs/efectos-8-luces.md, 7.1); el boost, BoostLevel
 	public float SmoothedSteer => _state?.Steer ?? 0f;
@@ -170,10 +194,10 @@ public partial class ThrusterFlames : Node3D
 				};
 				nozzle.Pivot.AddChild(nozzle.Pop);
 
-				// Retroempuje: girado media vuelta, así el cono (hacia +Z) apunta hacia el morro
+				// Retroempuje: lo coloca PlaceNozzles en su vacío del casco, con el cono (hacia +Z) hacia donde mira
 				var retro = new RetroJet
 				{
-					Pivot = new Node3D { Name = k == 0 ? "Retro_L" : "Retro_R", Rotation = new Vector3(0f, Mathf.Pi, 0f), Visible = false }
+					Pivot = new Node3D { Name = k == 0 ? "Retro_L" : "Retro_R", Visible = false }
 				};
 				AddChild(retro.Pivot);
 				retro.Plume = AddCone(retro.Pivot, "Plume");
@@ -206,12 +230,35 @@ public partial class ThrusterFlames : Node3D
 		{
 			NVector3 p = _shape.Nozzle;
 			_nozzles[k].Pivot.Position = new Vector3(k == 0 ? -p.X : p.X, p.Y, p.Z);
-			if (_retros[k] != null)
-			{
-				NVector3 r = _shape.Retro;
-				_retros[k].Pivot.Position = new Vector3(k == 0 ? -r.X : r.X, r.Y, r.Z);
-			}
+			PlaceRetro(k);
 		}
+	}
+
+	// Casco nuevo (F10): los chorros del retro, en sus vacíos
+	public void PlaceRetros()
+	{
+		for (int k = 0; k < ThrusterState.Nozzles; k++)
+			PlaceRetro(k);
+	}
+
+	// El chorro k en Retro_L/R_Point, con el cono (+Z) hacia su dirección, ancho × Width, alto × Height y largo × Width
+	private void PlaceRetro(int k)
+	{
+		RetroJet r = _retros[k];
+		if (r == null)
+			return;
+		string name = k == 0 ? "Retro_L_Point" : "Retro_R_Point";
+		Vector3? forward = Hull?.EmptyForward(name);
+		r.Usable = forward.HasValue;
+		if (!r.Usable)
+			return;
+		Vector3 z = forward.Value.Normalized();
+		Vector3 up = Mathf.Abs(z.Y) < 0.999f ? Vector3.Up : Vector3.Right;
+		Vector3 x = up.Cross(z).Normalized();
+		Vector3 y = z.Cross(x);
+		RetroJetShape shape = _shape.Retro;
+		var basis = new Basis(x * shape.Width, y * shape.Height, z * shape.Width);
+		r.Pivot.Transform = new Transform3D(basis, Hull.EmptyPosition(name));
 	}
 
 	public override void _Process(double delta)
@@ -220,6 +267,17 @@ public partial class ThrusterFlames : Node3D
 		_state.Update(dt, _input, _settings);
 		if (!IsVisibleInTree())
 			return;
+		if (CockpitView)
+		{
+			// en cabina, solo los chorros del retro
+			for (int k = 0; k < ThrusterState.Nozzles; k++)
+			{
+				_nozzles[k].Pivot.Visible = false;
+				if (_full)
+					UpdateRetro(k, _settings);
+			}
+			return;
+		}
 
 		ThrusterFxSettings s = _settings;
 		float scale = _shape.Scale;
@@ -229,6 +287,7 @@ public partial class ThrusterFlames : Node3D
 		{
 			ThrusterFlame f = _state.Flame(k, _shape, s, heatOn);
 			Nozzle n = _nozzles[k];
+			n.Pivot.Visible = true;
 			float time = _state.Time + k * 3.7f;
 			float scroll = _state.Scroll + k * 7.3f;
 			float intensity = f.Brightness * Opacity;
@@ -304,25 +363,27 @@ public partial class ThrusterFlames : Node3D
 	{
 		RetroJet r = _retros[k];
 		float force = _state.Retro;
-		bool visible = force >= s.RetroVisible;
+		bool visible = force >= s.RetroVisible && r.Usable;
 		r.Pivot.Visible = visible;
 		if (!visible)
 			return;
+		float opacity = Opacity * (CockpitView ? s.RetroCockpit : 1f);
 		float length = _state.RetroLength(k, s);
 		float time = _state.Time * 1.3f + k;
 		float scroll = _state.RetroScroll + k * 7.3f;
-		Vector3 core = ToVector(s.RetroCore), mid = ToVector(s.RetroMid), outer = ToVector(s.RetroOut);
+		ThrusterColors colors = _shape.Retro.Colors;
+		Vector3 core = ToVector(colors.Core), mid = ToVector(colors.Mid), outer = ToVector(colors.Out);
 
 		r.Plume.SetShaderParameter(SnShape, new Vector4(length, s.RetroWidth, 0f, 1f));
 		r.Plume.SetShaderParameter(SnForm, new Vector4(s.RetroPlumeMouthRadius, s.RetroPlumeTipRadius, 0f, 0f));
-		r.Plume.SetShaderParameter(SnGlow, new Vector4(s.RetroPlumeBrightness * force * Opacity, 1f, scroll, time));
+		r.Plume.SetShaderParameter(SnGlow, new Vector4(s.RetroPlumeBrightness * force * opacity, 1f, scroll, time));
 		r.Plume.SetShaderParameter(SnCore, core);
 		r.Plume.SetShaderParameter(SnMid, mid);
 		r.Plume.SetShaderParameter(SnOut, outer);
 
 		r.Core.SetShaderParameter(SnShape, new Vector4(length * s.RetroCoreLength, s.RetroWidth, 0f, 1f));
 		r.Core.SetShaderParameter(SnForm, new Vector4(s.RetroCoreMouthRadius, s.RetroCoreTipRadius, 1f, 0f));
-		r.Core.SetShaderParameter(SnGlow, new Vector4(s.RetroCoreBrightness * force * Opacity, 1f, scroll, time));
+		r.Core.SetShaderParameter(SnGlow, new Vector4(s.RetroCoreBrightness * force * opacity, 1f, scroll, time));
 		r.Core.SetShaderParameter(SnCore, core);
 		r.Core.SetShaderParameter(SnMid, core);
 		r.Core.SetShaderParameter(SnOut, mid);

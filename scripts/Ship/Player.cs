@@ -328,6 +328,12 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export] public float LightNewBrakeRest = LightDefaults.NewBrakeRest;     // freno nuevo de BLADE y HAMMER en reposo
 	[Export] public float LightTurnTau = LightDefaults.TurnTau;               // s
 	[Export] public float LightTurnInner = LightDefaults.TurnInner;           // luces de dentro, × (1 + esto × G)
+	[Export] public float LightHullBrakeEnergy = LightDefaults.HullBrakeEnergy; // EB: luz de freno sobre el casco
+	[Export] public float LightTrackEnergyScale = LightDefaults.TrackEnergyScale; // luz en pista: unidades de la maqueta → Godot
+	[Export] public float LightSpotEnergyScale = LightDefaults.SpotEnergyScale;   // focos: unidades de la maqueta → Godot
+	[Export] public float LightBeamOpacity = LightDefaults.BeamOpacity;         // haz visible de los faros
+	[Export] public float LightWorkBeamOpacity = LightDefaults.WorkBeamOpacity; // haz de los focos de trabajo (HAMMER)
+	[Export] public float LightRetroEnergy = LightDefaults.RetroLightEnergy;    // ER: luz del retro sobre el morro
 
 	private static readonly ShipLightSettings LightDefaults = new();
 
@@ -364,7 +370,13 @@ public partial class Player : CharacterBody3D, IContactShip
 			BoostGain = LightBoostGain,
 			NewBrakeRest = LightNewBrakeRest,
 			TurnTau = LightTurnTau,
-			TurnInner = LightTurnInner
+			TurnInner = LightTurnInner,
+			HullBrakeEnergy = LightHullBrakeEnergy,
+			TrackEnergyScale = LightTrackEnergyScale,
+			SpotEnergyScale = LightSpotEnergyScale,
+			BeamOpacity = LightBeamOpacity,
+			WorkBeamOpacity = LightWorkBeamOpacity,
+			RetroLightEnergy = LightRetroEnergy
 		};
 	}
 
@@ -1096,6 +1108,8 @@ public partial class Player : CharacterBody3D, IContactShip
 			TopSpeed = MaxSpeed,
 			DamageLevel = CockpitDamageEnabled ? _damageLevel : 0
 		});
+		float altitude = Physics.HasSurface ? Physics.Surface.Height - Circuit.Track.ShipHover : 0f;
+		_ship.FeedLightContext(altitude, _race != null && _race.State == RaceState.PreStart);
 	}
 
 	// Traduce el teclado a intenciones de conducción (acciones del mapa de entrada; SETTINGS cambia sus teclas)

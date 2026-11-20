@@ -76,7 +76,7 @@ public class ShipLightsTests
     [InlineData("blade", "Accent_FormNose_R", 2.8f)]
     [InlineData("blade", "Light_Tail", 1.5f)]
     [InlineData("hammer", "Light_Canard_R", 1.7f)]
-    [InlineData("hammer", "Light_Work_2", 1.8f)]
+    [InlineData("hammer", "Light_Work_2", 1.8f * 1.6f)]   // con los faros, × 1,6 sobre su realce (7.4)
     [InlineData("hammer", "Light_TailBar_L", 1.7f)]
     public void Enhance_MultipliesTheBaseOfEachType(string ship, string name, float boost)
     {

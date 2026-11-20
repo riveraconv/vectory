@@ -159,6 +159,8 @@ public partial class RivalShip : Node3D
 				TopSpeed = _car.Ship.Technical.MaxSpeed,
 				DamageLevel = _damageLevel
 			});
+			float altitude = physics.HasSurface ? physics.Surface.Height - Circuit.Track.ShipHover : 0f;
+			_ship.FeedLightContext(altitude, _car.Phase == RivalPhase.PreStart);
 			_ship.FeedTrails((float)delta, new WingTrailMotion { Velocity = d.Velocity, Drifting = d.Drifting, SlipAngle = d.SlipAngle });
 		}
 		Publish();

@@ -73,14 +73,24 @@ public readonly record struct ThrusterColors(Vector3 Core, Vector3 Mid, Vector3 
 
 	// HAMMER, a juego con sus bocas naranjas (spec docs/cascos-3d-3-hammer.md, 4.2): #FFB46A, #FF5A14 y rojo oscuro
 	public static readonly ThrusterColors Industrial = new(new(1f, 0.706f, 0.416f), new(1f, 0.353f, 0.078f), new(0.55f, 0.10f, 0.04f));
+
+	// Retro (spec docs/efectos-8-luces.md, 3.4): VECTOR y BLADE #E6FAFF, #73CCFF y #245BFF; HAMMER, naranja, #FFD9A8,
+	// #FF8A3A y #FF5A14
+	public static readonly ThrusterColors Retro = new(new(0.9f, 0.98f, 1f), new(0.45f, 0.8f, 1f), new(0.14f, 0.36f, 1f));
+	public static readonly ThrusterColors RetroIndustrial = new(new(1f, 0.851f, 0.659f), new(1f, 0.541f, 0.227f), new(1f, 0.353f, 0.078f));
 }
 
 // Toberas de una nave (spec docs/efectos-6-toberas.md, 2.1 y 4.2), en sus ejes: Nozzle es la boca derecha (la izquierda,
 // con x cambiada de signo; las bocas Exhaust_L/R del casco 3D, en el mismo sitio que las del wireframe), con la llama
 // hacia +Z. Scale: radio de la boca respecto a VECTOR; Squash: alto / ancho de la boca; LengthScale: largo de la llama.
-// Retro: punto derecho del retroempuje en el morro (etapa 3). Colors: los de la llama sin boost.
-public readonly record struct ThrusterShape(Vector3 Nozzle, float Scale, float Squash, float LengthScale, Vector3 Retro,
+// Retro: escala y colores de su chorro (los puntos son los vacíos Retro_*_Point del casco 3D). Colors: los de la llama
+// sin boost.
+public readonly record struct ThrusterShape(Vector3 Nozzle, float Scale, float Squash, float LengthScale, RetroJetShape Retro,
 	ThrusterColors Colors);
+
+// Chorro del retro de una nave (spec docs/efectos-8-luces.md, 3.4): su ancho y su alto respecto al de efectos-6 (el largo,
+// × el ancho) y sus colores
+public readonly record struct RetroJetShape(float Width, float Height, ThrusterColors Colors);
 
 // Un casco 3D: su modelo exportado de Blender, lo que el modelo no puede llevar, su panorama de reflejos y su estilo,
 // del que sale su contrato de piezas

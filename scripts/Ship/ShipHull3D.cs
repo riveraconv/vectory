@@ -284,6 +284,9 @@ void fragment() {
 
 	public HullLights Lights => _hullLights;
 
+	// Su manifiesto (null hasta cargar)
+	public HullManifest Manifest => _manifest;
+
 	private void CreateHullLights()
 	{
 		if (_hullLightSettings == null || !IsLoaded || _manifest == null || _hullLights != null)
@@ -293,11 +296,70 @@ void fragment() {
 		_hullLights.Setup(this, _manifest, _hullLightSettings, Layer);
 	}
 
+	// Trampillas del retro de BLADE (spec docs/efectos-8-luces.md, 7.5): giran en x sobre su bisagra, en el casco (llevan
+	// el origen en ella) y en la copia del morro de la cabina (alrededor de la bisagra menos el ojo)
+	private readonly Dictionary<MeshInstance3D, Transform3D> _flapRest = new();
+	private float _flapAngle;
+
+	public void SetRetroFlaps(float angle)
+	{
+		if (Mathf.Abs(angle - _flapAngle) < 0.001f || Profile.Style != HullStyle.Military)
+			return;
+		_flapAngle = angle;
+		var turn = new Basis(Vector3.Right, angle);
+		for (int i = 0; i < MilitaryHullPieces.RetroFlaps.Length; i++)
+		{
+			string name = MilitaryHullPieces.RetroFlaps[i];
+			if (_pieces.TryGetValue(name, out MeshInstance3D mesh))
+				mesh.Transform = FlapRest(mesh) * new Transform3D(turn, Vector3.Zero);
+			if (mesh == null || _noseCopy == null || !_noseCopy.Matches(Profile))
+				continue;
+			foreach ((MeshInstance3D copy, string piece) in _noseCopy.Pieces)
+			{
+				if (piece != name)
+					continue;
+				// la copia es la misma trampilla movida: su bisagra, en sus ejes, es lo que se ha movido (el origen de la
+				// del casco es su bisagra)
+				Vector3 hinge = CopyHinge(copy, mesh);
+				copy.Transform = FlapRest(copy) * new Transform3D(Basis.Identity, hinge) * new Transform3D(turn, Vector3.Zero)
+					* new Transform3D(Basis.Identity, -hinge);
+			}
+		}
+	}
+
+	private readonly Dictionary<MeshInstance3D, Vector3> _copyHinges = new();
+
+	private Vector3 CopyHinge(MeshInstance3D copy, MeshInstance3D hull)
+	{
+		if (!_copyHinges.TryGetValue(copy, out Vector3 hinge))
+			_copyHinges[copy] = hinge = copy.GetAabb().Position - hull.GetAabb().Position;
+		return hinge;
+	}
+
+	private Transform3D FlapRest(MeshInstance3D mesh)
+	{
+		if (!_flapRest.TryGetValue(mesh, out Transform3D rest))
+			_flapRest[mesh] = rest = mesh.Transform;
+		return rest;
+	}
+
 	// Material propio de una pieza viva; null si no está
 	public StandardMaterial3D LightMaterial(string piece) => MaterialOf(piece);
 
-	// Punto vacío del modelo (bocas, estelas, humo) en coordenadas de la nave; cero si no está
-	public Vector3 EmptyPosition(string name) => _empties.TryGetValue(name, out Node3D node) ? node.Position : Vector3.Zero;
+	// Punto vacío del modelo (bocas, estelas, humo, faros, retro) en coordenadas de la nave, el del manifiesto (los nodos
+	// del .glb van en los ejes de Blender); cero si no está
+	public Vector3 EmptyPosition(string name)
+	{
+		HullManifestEmpty empty = _manifest?.Empty(name);
+		return empty != null ? new Vector3(empty.Point.X, empty.Point.Y, empty.Point.Z) : Vector3.Zero;
+	}
+
+	// Dirección de un vacío que la lleva (el chorro del retro, spec docs/efectos-8-luces.md, 3.4); null si no
+	public Vector3? EmptyForward(string name)
+	{
+		System.Numerics.Vector3? d = _manifest?.Empty(name)?.Direction;
+		return d.HasValue ? new Vector3(d.Value.X, d.Value.Y, d.Value.Z) : null;
+	}
 
 	// ---------------------------------------------------------------
 	// Pintura y librea (spec 6.2 y 6.3)

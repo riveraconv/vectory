@@ -97,9 +97,9 @@ public sealed class ThrusterFxSettings
 	public float RetroPlumeBrightness = 1.8f, RetroCoreBrightness = 2.6f;   // × R (en el shader, el núcleo × 1,6)
 	public float RetroNoiseSpeed = 12f;
 	public float RetroVisible = 0.01f;                                      // con menos fuerza no se ve
-	public Vector3 RetroCore = new(0.9f, 0.98f, 1f);
-	public Vector3 RetroMid = new(0.45f, 0.8f, 1f);
-	public Vector3 RetroOut = new(0.14f, 0.36f, 1f);
+	// Los colores del retro, de cada nave (ThrusterShape.Retro). En la cabina, los tuyos más discretos (spec
+	// docs/efectos-8-luces.md v1.2)
+	public float RetroCockpit = 0.5f;
 
 	// --- Daño 3 (7): chasquidos cada PopMin–PopMax s, que saltan a 1 y caen con PopTau; cortes: al acabar su espera, con
 	// CutChance la llama baja a CutFactor durante CutMin–CutMax s; si no, otra espera de WaitMin–WaitMax s

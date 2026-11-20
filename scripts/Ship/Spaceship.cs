@@ -49,8 +49,14 @@ public partial class Spaceship : Node3D
 	private WingTrailSettings _trailSettings;
 	private WingTrailColors _trailColors;
 
-	// Luces de la nave (spec docs/efectos-8-luces.md): solo en carrera, tú y los rivales
+	// Luces de la nave (spec docs/efectos-8-luces.md): solo en carrera, tú y los rivales. Las del casco van en él; la luz
+	// en pista y los faros, aquí (en cabina el casco va oculto)
 	private ShipLightSettings _lightSettings;
+	private ShipWorldLights _worldLights;
+	private HullLights _worldLightsSource;
+
+	// La y de la pista en los ejes de la nave: la altura de vuelo, hacia abajo (spec docs/efectos-8-luces.md, 7.4)
+	public float TrackY { get; set; } = -2f;
 
 	// Número de aristas que pueden parpadear por su cuenta con los daños: las líneas del wireframe o, con casco 3D,
 	// sus luces (14 en VECTOR, 9 en BLADE)
@@ -98,7 +104,27 @@ public partial class Spaceship : Node3D
 	{
 		_lightSettings = settings ?? ShipLightSettings.Default;
 		_hull3D?.EnableLights(_lightSettings, _thrusters);
+		RebuildWorldLights();
 	}
+
+	// Luz en pista y faros de las luces del casco actual (otro casco con F10: otros)
+	private void RebuildWorldLights()
+	{
+		HullLights source = _hull3D?.Lights;
+		if (source == _worldLightsSource)
+			return;
+		_worldLights?.QueueFree();
+		_worldLights = null;
+		_worldLightsSource = source;
+		if (source == null || _hull3D.Manifest == null)
+			return;
+		_worldLights = new ShipWorldLights { Name = "WorldLights", CockpitView = !_exteriorVisible };
+		AddChild(_worldLights);
+		_worldLights.Setup(source, _lightSettings, _hull3D.Manifest, _hull3D.Profile.Style, TrackY);
+	}
+
+	// Altura sobre la pista por encima de la de vuelo y si la nave está en la parrilla, para sus luces
+	public void FeedLightContext(float altitude, bool onGrid) => _hull3D?.Lights?.SetContext(altitude, onGrid);
 
 	// Enciende las estelas de las alas, con sus ajustes y la pareja de colores de la nave. Antes de _Ready.
 	public void EnableTrails(WingTrailSettings settings, WingTrailColors colors)
@@ -228,6 +254,8 @@ public partial class Spaceship : Node3D
 			if (_lightSettings != null)
 				_hull3D.EnableLights(_lightSettings, _thrusters);
 		}
+		if (_lightSettings != null)
+			RebuildWorldLights();
 		_hull3D?.SetDamageShape(Visual.SmokeFoci, Visual.CollisionHalfWidth, Visual.CollisionFront, Visual.CollisionBack);
 		if (_thrusters != null)
 			_thrusters.Hull = _hull3D;
@@ -240,9 +268,15 @@ public partial class Spaceship : Node3D
 		if (_hull3D != null)
 			_hull3D.Visible = _exteriorVisible;
 		if (_thrusters != null)
-			_thrusters.Visible = _exteriorVisible;
+		{
+			// en cabina solo se ven los chorros del retro, y solo en carrera (spec docs/efectos-8-luces.md v1.2)
+			_thrusters.CockpitView = !_exteriorVisible;
+			_thrusters.Visible = _exteriorVisible || _thrusterFull;
+		}
 		if (_trails != null)
 			_trails.Visible = _exteriorVisible;
+		if (_worldLights != null)
+			_worldLights.CockpitView = !_exteriorVisible;
 	}
 
 	// Cambia la nave dibujada. Con el mismo perfil no rehace nada. El material sustituido sigue puesto; el de parpadeo

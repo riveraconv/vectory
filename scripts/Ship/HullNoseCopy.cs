@@ -19,6 +19,9 @@ public sealed class HullNoseCopy
 	// Del mundo de la cabina a los ejes del casco: un punto de la copia está en el casco en él + el ojo
 	public Transform3D WorldToHull { get; init; } = Transform3D.Identity;
 
+	// El ojo en los ejes del casco: un punto p del casco está en la copia en p − Eye
+	public Vector3 Eye { get; init; }
+
 	// Intensidad de los reflejos de sus materiales respecto a los del casco (spec 4.3)
 	public float Reflections { get; init; } = 1f;
 

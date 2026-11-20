@@ -808,6 +808,7 @@ public partial class Cockpit3DView : CanvasLayer
 			Hull = nose.Hull,
 			Pieces = pieces,
 			WorldToHull = new Transform3D(Basis.Identity, eye) * model.GlobalTransform.AffineInverse(),
+			Eye = eye,
 			Reflections = _layout.Scene.NoseReflections,
 			Layer = NoseLayer,
 			LightRoot = model,

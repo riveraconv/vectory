@@ -35,7 +35,7 @@ public class ThrusterFxTests
     }
 
     private static ThrusterShape Shape(float scale = 1f) =>
-        new(new Vector3(0.75f, 0.1f, 3.2f), scale, 0.46f, 1f, Vector3.Zero, ThrusterColors.Standard);
+        new(new Vector3(0.75f, 0.1f, 3.2f), scale, 0.46f, 1f, new RetroJetShape(0.40f, 0.28f, ThrusterColors.Retro), ThrusterColors.Standard);
 
     [Fact]
     public void Power_targets_follow_the_pedals()

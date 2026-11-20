@@ -991,6 +991,17 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 - **Trampa ya resuelta**: escribir los materiales y el búfer de los halos en cada frame costaba ~0,8 ms por frame con 8 naves. Solo se escribe lo que cambia más de un 1 %. Medido sin vsync, 4 carreras con y 4 sin luces: media de 2,15–2,68 ms frente a 2,26–2,48, dentro del ruido; sin frames lentos.
 - Comprobado con capturas en RACE con VECTOR (parrilla, frenando, girando). Boost, BLADE, HAMMER y rivales, el usuario jugando.
 
+## Luces de la nave: etapa 3, faros, retro y luz en pista
+
+(spec `docs/efectos-8-luces.md` v1.2, rama `feature/fx-lights`): hecha, con tests de la lógica pura y validada por el usuario jugando, con los valores de la spec. Sin sombra ni suelo que reciba luz (v1.2: van con la spec del suelo).
+
+- **Retro** (cambia `efectos-6`): los chorros salen de `Retro_*_Point` a 45° hacia arriba, escalados por nave (`ThrusterShape.Retro`: `RetroJetShape` con ancho, alto y colores; HAMMER naranja); se quitan los puntos viejos del perfil y los colores comunes de `ThrusterFxSettings`. **En cabina se ven** tus chorros a la mitad (`RetroCockpit` 0,5): las toberas siguen visibles con `ThrusterFlames.CockpitView`, que oculta la llama, el calor y sus luces. Boca 0,15 + 4·R, luz ER × 2·R en la capa del casco, trampilla de BLADE en el casco y en la copia del morro.
+- **Se aparta de la spec**: la prueba 9 pide la trampilla abierta del todo con R = 0,5, pero la fórmula (mín(1; 1,4·R), también la de la maqueta) la abre del todo desde R ≈ 0,71; se sigue la fórmula.
+- Faros: focos por nave (HAMMER, 4 con los de trabajo, cuyas lentes van × 1,6) y haz visible, que se apaga con la cámara dentro del cono, a la mitad en cabina y con BLOOM a 0. Luz de freno sobre el casco detrás del freno nuevo (VECTOR, del medio de sus pilotos). Luz en pista y focos, preparados en la capa 2 (`ShipWorldLights.TrackLightLayer`, vacía): sus intensidades de la maqueta pasan a Godot con `TrackEnergyScale` y `SpotEnergyScale`, puestas a ojo sin poder verlas.
+- **Trampas ya resueltas**: los nodos de los vacíos del `.glb` van en los ejes de Blender (la rotación de la raíz está encima): `ShipHull3D.EmptyPosition` lee ahora las posiciones del manifiesto, que van en los ejes de la nave (nadie más lo usaba). La bisagra de la trampilla en la copia del morro sale de lo que se ha movido su caja respecto a la del casco, cuyo origen es la bisagra.
+- Medido sin vsync, 4 carreras con y 4 sin luces: media de 2,15–2,94 ms frente a 2,02–2,28 (unos 0,4 ms), sin frames lentos y con peores frames parecidos; la diferencia no se pudo atribuir a la luz en pista ni al haz (el ruido es del mismo tamaño). Sin medir en la salida con los 8 ni en un túnel.
+- Comprobado con capturas en RACE con las tres naves frenando (persecución, cabina y orbital), con los récords, fantasmas y ajustes del usuario apartados y devueltos.
+
 ## Pendiente
 
 - `docs/naves-disenos.md` no recoge todavía las cabinas elegidas. El resto de opciones del menú (CHAMPIONSHIP, HANGAR), ajustar el contorno interior de la cabina. Reajustar la dificultad de los rivales con circuitos nuevos (decisión del usuario).
