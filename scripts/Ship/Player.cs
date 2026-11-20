@@ -445,6 +445,52 @@ public partial class Player : CharacterBody3D, IContactShip
 		};
 	}
 
+	[ExportGroup("Visión túnel")]   // spec docs/efectos-9-vision-tunel.md, 9
+	[Export(PropertyHint.Range, "0,1,0.01")] public float TunnelSpeedStart = TunnelDefaults.SpeedStart;   // fracción de la punta base desde la que entra
+	[Export] public float TunnelSpeedWeight = TunnelDefaults.SpeedWeight;
+	[Export] public float TunnelBoostWeight = TunnelDefaults.BoostWeight;
+	[Export] public float TunnelMax = TunnelDefaults.Max;
+	[Export] public float TunnelSmoothing = TunnelDefaults.SmoothTime;              // s
+	[Export] public float TunnelBlur = TunnelDefaults.Blur;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float TunnelDarken = TunnelDefaults.Darken;
+	[Export] public float TunnelHalo = TunnelDefaults.Halo;                         // halo ámbar con boost
+	[Export(PropertyHint.Range, "0,1.5,0.01")] public float TunnelMaskStart = TunnelDefaults.MaskStart;   // fracción del centro a la esquina
+	[Export(PropertyHint.Range, "0,1.5,0.01")] public float TunnelMaskFull = TunnelDefaults.MaskFull;
+	[Export(PropertyHint.Range, "0,1.5,0.01")] public float TunnelVignetteStart = TunnelDefaults.VignetteStart;
+	[Export(PropertyHint.Range, "1,32,1")] public int TunnelSamples = TunnelDefaults.Samples;
+	[Export(PropertyHint.Range, "1,32,1")] public int TunnelSamplesLow = TunnelDefaults.SamplesLow;     // con PARTICLES en LOW
+	[Export] public float TunnelAberrationMax = TunnelDefaults.AberrationMax;      // desdoble con boost completo
+	[Export(PropertyHint.Range, "0,1,0.01")] public float TunnelAberrationBase = TunnelDefaults.AberrationBase;   // parte sin boost
+	[Export(PropertyHint.Range, "0,1,0.01")] public float TunnelCockpitFactor = TunnelDefaults.CockpitFactor;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float TunnelChaseFactor = TunnelDefaults.ChaseFactor;
+
+	private static readonly TunnelVisionSettings TunnelDefaults = new();
+	private readonly TunnelVisionSettings _tunnelSettings = new();
+
+	// Copia el grupo Visión túnel al objeto de ajustes (siempre el mismo: sin basura por paso)
+	private TunnelVisionSettings BuildTunnelSettings()
+	{
+		TunnelVisionSettings s = _tunnelSettings;
+		s.SpeedStart = TunnelSpeedStart;
+		s.SpeedWeight = TunnelSpeedWeight;
+		s.BoostWeight = TunnelBoostWeight;
+		s.Max = TunnelMax;
+		s.SmoothTime = TunnelSmoothing;
+		s.Blur = TunnelBlur;
+		s.Darken = TunnelDarken;
+		s.Halo = TunnelHalo;
+		s.MaskStart = TunnelMaskStart;
+		s.MaskFull = TunnelMaskFull;
+		s.VignetteStart = TunnelVignetteStart;
+		s.Samples = TunnelSamples;
+		s.SamplesLow = TunnelSamplesLow;
+		s.AberrationMax = TunnelAberrationMax;
+		s.AberrationBase = TunnelAberrationBase;
+		s.CockpitFactor = TunnelCockpitFactor;
+		s.ChaseFactor = TunnelChaseFactor;
+		return s;
+	}
+
 	[ExportGroup("Cámara de tercera persona")]
 	[Export] public float CameraFollow = 6f;     // más alto = cámara más pegada, menos efecto dron
 	[Export] public float BaseFov = 75f;
@@ -460,6 +506,8 @@ public partial class Player : CharacterBody3D, IContactShip
 	private readonly CameraEffectSettings _cameraEffects = new();
 	private readonly ShipAttitude _attitude = new();
 	private readonly LandingCompression _compression = new();
+	private readonly TunnelVisionState _tunnel = new();
+	private TunnelVisionView _tunnelView;
 	private CameraShake _shake;
 	private CockpitCrashFeel _crashFeel;
 	private Spaceship _ship;
@@ -653,6 +701,10 @@ public partial class Player : CharacterBody3D, IContactShip
 
 		_chaseCam = new ChaseCamera { Name = "ChaseCamera" };
 		AddChild(_chaseCam);
+
+		_tunnelView = new TunnelVisionView { Name = "TunnelVision" };
+		_tunnelView.SetSettings(BuildTunnelSettings());
+		AddChild(_tunnelView);
 
 		_physics.Place(ToNumerics(GlobalPosition), 0f, 0f, BuildBoostTuning());
 		_shake = new CameraShake(BuildShakeSettings());
@@ -860,6 +912,7 @@ public partial class Player : CharacterBody3D, IContactShip
 			_chaseCam.MakeCurrent();
 		else
 			_cockpit.Camera.MakeCurrent();
+		PushTunnel();   // el factor de cámara cambia al momento
 	}
 
 	// HUD de cabina y parpadeo de las aristas dañadas (con la pausa no avanzan: quedan congelados)
@@ -1367,6 +1420,17 @@ public partial class Player : CharacterBody3D, IContactShip
 		_vibration.Update(Dynamics.RealSpeed, topSpeed, boosting, s, dt);
 		_boostCamera.Update(boosting, s, dt);
 		ApplyCameraEffects(s);
+
+		// Visión túnel (spec docs/efectos-9-vision-tunel.md): f con la punta base, b el de la cámara (0,25 s / 0,5 s)
+		TunnelVisionSettings tunnel = BuildTunnelSettings();
+		_tunnel.Update(Speed, MaxSpeed, _boostCamera.Amount, tunnel, dt);
+		_tunnelView.SetSettings(tunnel);
+		PushTunnel();
+	}
+
+	private void PushTunnel()
+	{
+		_tunnelView?.SetSource(_tunnel.Intensity, _boostCamera.Amount, View);
 	}
 
 	// Recolocación y colocación: todos los efectos a su valor base al momento
@@ -1375,7 +1439,9 @@ public partial class Player : CharacterBody3D, IContactShip
 		_cockpitBank.Reset();
 		_vibration.Reset();
 		_boostCamera.Reset();
+		_tunnel.Reset();
 		ApplyCameraEffects(BuildCameraEffects());
+		PushTunnel();
 	}
 
 	private void ApplyCameraEffects(CameraEffectSettings s)

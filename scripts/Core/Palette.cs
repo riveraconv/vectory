@@ -193,6 +193,7 @@ public static class Palette
 	public static readonly Color SettingsPreviewHorizon = new Color(Cyan, 0.35f);   // horizonte de la pista de la vista previa
 	public static readonly Color SettingsPreviewLane = new Color(Blue, 0.7f);       // carriles de la pista de la vista previa
 	public static readonly Color SettingsPreviewRival = Magenta;                    // nave rival de la vista previa
+	public static readonly Color SettingsPreviewVignette = Background;              // oscurecimiento de los bordes (TUNNEL VISION)
 	public static readonly Color SettingsToastBackground = new Color(Background, 0.94f);   // aviso corto (DEFAULTS RESTORED)
 	public static readonly Color SettingsToastGlow = new Color(Cyan, 0.4f);         // su halo
 	public static readonly Color PaintSwatchBorder = new Color(Blue, 0.7f); // borde de una muestra

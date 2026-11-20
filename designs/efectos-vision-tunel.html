@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>VECTORY · Visión túnel · Maqueta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { --cyan:#36E7FF; --blue:#245BFF; --mag:#FF43D0; --orange:#FF9D32; --bg:#05070D; --grey:#A6B8D8; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--grey); font-family:'Share Tech Mono', monospace; overflow:hidden; user-select:none; -webkit-user-select:none; }
+  body { display:flex; flex-direction:column; }
+  #stage { flex:1; position:relative; display:flex; align-items:center; justify-content:center; min-height:0; }
+  #view { position:relative; }
+  #view canvas { position:absolute; inset:0; display:block; width:100%; height:100%; }
+  #mode { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(var(--u) * 40); font-size:calc(var(--u) * 15); letter-spacing:.08em; color:var(--grey); opacity:0; transition:opacity .3s; pointer-events:none; background:rgba(5,7,13,.88); padding:6px 12px; border:1px solid rgba(54,231,255,.3); max-width:90%; text-align:center; }
+  #bar { flex:none; display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center; align-items:center; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid rgba(36,91,255,.35); background:#070B16; }
+  .grp { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+  .grp b { font-weight:normal; font-size:11px; letter-spacing:.12em; opacity:.6; margin-right:2px; }
+  #bar button { font-family:inherit; font-size:12px; letter-spacing:.08em; color:var(--cyan); background:#0C1324; border:1px solid rgba(54,231,255,.35); padding:7px 9px; cursor:pointer; }
+  #bar button.on { background:rgba(54,231,255,.18); border-color:rgba(54,231,255,.9); }
+  #bar button.preset { color:var(--orange); border-color:rgba(255,157,50,.5); }
+  #help { flex-basis:100%; text-align:center; font-size:11px; letter-spacing:.05em; opacity:.55; }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }</script>
+</head>
+<body>
+<div id="stage">
+  <div id="view">
+    <canvas id="gl"></canvas>
+    <canvas id="hud"></canvas>
+    <div id="mode"></div>
+  </div>
+</div>
+<div id="bar">
+  <div class="grp"><b>MODO</b>
+    <button data-g="drive" data-v="auto" class="on">AUTO</button>
+    <button data-g="drive" data-v="me">CONDUCES TÚ</button>
+  </div>
+  <div class="grp"><button id="bToday" class="preset">COMO HOY</button></div>
+  <div class="grp"><b>CUÁNDO ENTRA</b>
+    <button data-g="when" data-v="boost">A·SOLO BOOST</button>
+    <button data-g="when" data-v="top">B·CERCA DE LA PUNTA</button>
+    <button data-g="when" data-v="speed" class="on">C·SEGÚN LA VELOCIDAD</button>
+  </div>
+  <div class="grp"><b>VIÑETA</b>
+    <button data-g="vig" data-v="off">NO</button>
+    <button data-g="vig" data-v="dark">OSCURA</button>
+    <button data-g="vig" data-v="amber" class="on">OSCURA + ÁMBAR</button>
+  </div>
+  <div class="grp"><b>DESENFOQUE</b>
+    <button data-g="blur" data-v="off">NO</button>
+    <button data-g="blur" data-v="on" class="on">SÍ</button>
+  </div>
+  <div class="grp"><b>LÍNEAS DE VELOCIDAD</b>
+    <button data-g="lines" data-v="off">NO</button>
+    <button data-g="lines" data-v="3d" class="on">3D (HOY)</button>
+    <button data-g="lines" data-v="screen">EN PANTALLA</button>
+  </div>
+  <div class="grp"><b>ABERRACIÓN</b>
+    <button data-g="ab" data-v="off">NO</button>
+    <button data-g="ab" data-v="boost" class="on">SOLO BOOST</button>
+    <button data-g="ab" data-v="always">SIEMPRE</button>
+  </div>
+  <div class="grp"><b>EN PERSECUCIÓN</b>
+    <button data-g="chase" data-v="same" class="on">IGUAL</button>
+    <button data-g="chase" data-v="soft">SUAVE (50 %)</button>
+    <button data-g="chase" data-v="off">SIN EFECTO</button>
+  </div>
+  <div class="grp"><b>MARCO DE CABINA</b>
+    <button data-g="cab" data-v="blur" class="on">SE DESENFOCA</button>
+    <button data-g="cab" data-v="sharp">NÍTIDO</button>
+  </div>
+  <div class="grp"><b>VISTA</b>
+    <button data-g="view" data-v="cab">CABINA</button>
+    <button data-g="view" data-v="chase">PERSECUCIÓN</button>
+    <button data-g="view" data-v="both" class="on">LAS DOS</button>
+  </div>
+  <div class="grp"><button id="bSlow">LENTO ×0,25</button><button id="bPause">PAUSA</button></div>
+  <div id="help">CONDUCES TÚ: W acelera · S frena · A/D gira · SHIFT boost · P pausa · L lento · Punta 400 km/h, boost +100 · Cabina y nave aproximadas</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const TODAY = { when:'speed', vig:'amber', blur:'on', lines:'3d', ab:'boost', chase:'same', cab:'blur' };
+const opt = { drive:'auto', ...TODAY, view:'both', slow:false, paused:false };
+const HALF = 11, BAR = 11.5, VMAX = 400/3.6, BOOSTV = 100/3.6;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const approach = (x, t, tau, dt) => x + (t - x) * (1 - Math.exp(-dt / tau));
+const smooth01 = x => x * x * (3 - 2 * x);
+
+// capas: 0 mundo · 2 solo cabina · 3 solo persecución · 4 máscara de cabina · 5 nave
+const L_CAB = 2, L_CHASE = 3, L_MASK = 4, L_SHIP = 5;
+
+// ================= CIRCUITO =================
+const ctrl = [[0,0],[600,0],[1000,-100],[1150,-400],[1000,-700],[700,-750],[500,-600],[300,-700],[0,-800],[-300,-650],[-400,-350],[-250,-150]]
+  .map(([x, z]) => new THREE.Vector3(x, 0, z));
+const curve = new THREE.CatmullRomCurve3(ctrl, true, 'centripetal');
+const L = curve.getLength(), STEP = 4, NS = Math.round(L / STEP);
+const PT = [], RT = [], PHI = [];
+for (let i = 0; i < NS; i++) {
+  const u = i / NS, p = curve.getPointAt(u), t = curve.getTangentAt(u); t.y = 0; t.normalize();
+  PT.push(p); RT.push(new THREE.Vector3(-t.z, 0, t.x)); PHI.push(Math.atan2(-t.x, -t.z));
+}
+const wrapA = a => { while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; };
+const idx = s => ((Math.round(s / STEP) % NS) + NS) % NS;
+const KAP = PHI.map((_, i) => wrapA(PHI[(i + 3) % NS] - PHI[(i - 3 + NS) % NS]) / (6 * STEP));
+function frameAt(s) {
+  const u = (((s % L) + L) % L) / L, p = curve.getPointAt(u), t = curve.getTangentAt(u); t.y = 0; t.normalize();
+  return { p, t, r:new THREE.Vector3(-t.z, 0, t.x), phi:Math.atan2(-t.x, -t.z) };
+}
+const kAhead = (s, d0, d1) => { let m = 0; for (let d = d0; d <= d1; d += 8) m = Math.max(m, Math.abs(KAP[idx(s + d)])); return m; };
+
+// ================= ESCENA =================
+const glc = document.getElementById('gl'), hud = document.getElementById('hud'), hx = hud.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas:glc, antialias:true });
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+renderer.setPixelRatio(DPR); renderer.setClearColor(0x05070D, 1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x05070D, 80, 1100);
+const camA = new THREE.PerspectiveCamera(72, 16/9, 0.05, 4000);   // cabina
+const camB = new THREE.PerspectiveCamera(62, 16/9, 0.1, 4000);    // persecución
+camA.layers.enable(L_CAB);
+camB.layers.enable(L_CHASE); camB.layers.enable(L_SHIP);
+scene.add(camA); scene.add(camB);
+const lm = (c, o, fog = true) => new THREE.LineBasicMaterial({ color:c, transparent:o < 1, opacity:o, fog });
+const seg = arr => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); return g; };
+const addL = (arr, c, o) => scene.add(new THREE.LineSegments(seg(arr), lm(c, o)));
+const ADD = { blending:THREE.AdditiveBlending, transparent:true, depthWrite:false };
+
+let cx0 = 0, cz0 = 0;
+{ let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; PT.forEach(p => { a = Math.min(a, p.x); b = Math.max(b, p.x); c = Math.min(c, p.z); d = Math.max(d, p.z); }); cx0 = (a + b)/2; cz0 = (c + d)/2; }
+let sky;
+{
+  const g = new THREE.SphereGeometry(2500, 48, 32), col = [], p = g.attributes.position, c = new THREE.Color();
+  const dark = new THREE.Color(0x05070D), warm = new THREE.Color(0x2A1A0E), mid = new THREE.Color(0x140D0A);
+  for (let i = 0; i < p.count; i++) {
+    const h = p.getY(i) / 2500;
+    if (h < -0.01) c.copy(dark); else if (h < 0.03) c.copy(warm); else if (h < 0.12) c.copy(warm).lerp(mid, (h-0.03)/0.09); else if (h < 0.3) c.copy(mid).lerp(dark, (h-0.12)/0.18); else c.copy(dark);
+    col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  sky = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors:true, side:THREE.BackSide, fog:false, depthWrite:false }));
+  scene.add(sky);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000), new THREE.MeshBasicMaterial({ color:0x03050A }));
+  ground.rotation.x = -Math.PI/2; ground.position.set(cx0, -0.05, cz0); scene.add(ground);
+}
+{
+  const pos = [], ix = [];
+  for (let i = 0; i < NS; i++) {
+    const a = PT[i].clone().addScaledVector(RT[i], -HALF), b = PT[i].clone().addScaledVector(RT[i], HALF);
+    pos.push(a.x, 0, a.z, b.x, 0, b.z);
+    const j = (i + 1) % NS; ix.push(2*i, 2*j, 2*i+1, 2*i+1, 2*j, 2*j+1);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(ix);
+  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color:0x060A16, side:THREE.DoubleSide })));
+}
+function loop(off, y, c, o) {
+  const a = [];
+  for (let i = 0; i < NS; i++) { const j = (i + 1) % NS, p = PT[i].clone().addScaledVector(RT[i], off), q = PT[j].clone().addScaledVector(RT[j], off); a.push(p.x, y, p.z, q.x, y, q.z); }
+  addL(a, c, o);
+}
+[-1, 1].forEach(k => {
+  loop(k*HALF, 0.02, 0x5A82FF, 1); loop(k*HALF*0.474, 0.02, 0x245BFF, 0.8);
+  [[0,0x36E7FF,1],[0.04,0x36E7FF,1],[0.4,0x36E7FF,0.85],[1.4,0x245BFF,0.5],[2.4,0x36E7FF,0.85],[2.96,0x36E7FF,1],[3,0x36E7FF,1]].forEach(([y, c, o]) => loop(k*BAR, y, c, o));
+});
+loop(0, 0.02, 0x245BFF, 0.8);
+{
+  const cross = [], pa = [], pb = [], arch = [];
+  for (let i = 0; i < NS; i++) {
+    if (i % 3 === 0) { const a = PT[i].clone().addScaledVector(RT[i], -HALF), b = PT[i].clone().addScaledVector(RT[i], HALF); cross.push(a.x, 0.02, a.z, b.x, 0.02, b.z); }
+    [-1, 1].forEach(k => { const q = PT[i].clone().addScaledVector(RT[i], k*BAR); pa.push(q.x,0,q.z, q.x,0.4,q.z, q.x,2.4,q.z, q.x,3,q.z); pb.push(q.x,0.4,q.z, q.x,2.4,q.z); });
+    if (i % 20 === 0) {   // arcos cada 80 m: ayudan a leer el desenfoque
+      const a = PT[i].clone().addScaledVector(RT[i], -BAR - 0.5), b = PT[i].clone().addScaledVector(RT[i], BAR + 0.5);
+      arch.push(a.x,0,a.z, a.x,8,a.z, b.x,0,b.z, b.x,8,b.z, a.x,8,a.z, b.x,8,b.z, a.x,7.4,a.z, b.x,7.4,b.z);
+    }
+  }
+  addL(cross, 0x245BFF, 0.5); addL(pa, 0x36E7FF, 0.6); addL(pb, 0x245BFF, 0.4); addL(arch, 0x36E7FF, 0.9);
+}
+{
+  let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const mE = lm(0xFF9D32, 0.24, false), mW = lm(0xFF9D32, 0.07, false);
+  let n = 0, tries = 0;
+  while (n < 140 && tries < 2400) {
+    tries++;
+    const x = cx0 + (r() - 0.5) * 2600, z = cz0 + (r() - 0.5) * 2200, w = 14 + r()*40, h = 30 + r()*200, d = 14 + r()*40;
+    let near = false; for (let i = 0; i < NS; i += 10) if (Math.hypot(PT[i].x - x, PT[i].z - z) < 45 + Math.max(w, d)) { near = true; break; }
+    if (near) continue;
+    const g = new THREE.BoxGeometry(w, h, d); g.translate(0, h/2, 0);
+    const grp = new THREE.Group(); grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), mE));
+    const win = []; for (let y = 8; y < h - 4; y += 9) win.push(-w/2,y,d/2, w/2,y,d/2, -w/2,y,-d/2, w/2,y,-d/2);
+    grp.add(new THREE.LineSegments(seg(win), mW)); grp.position.set(x, -6, z); scene.add(grp); n++;
+  }
+}
+{
+  const sun = new THREE.DirectionalLight(0xFFF1E0, 2.0); sun.position.set(4, 10, -5); scene.add(sun);
+  const back = new THREE.DirectionalLight(0xFF9D50, 1.0); back.position.set(-6, 2.5, 9); scene.add(back);
+  scene.add(new THREE.HemisphereLight(0xB0B8C8, 0x101010, 0.45));
+}
+
+// ================= NAVE (silueta aproximada de VECTOR, solo en persecución) =================
+const ship = new THREE.Group(); ship.rotation.order = 'YXZ'; scene.add(ship);
+const NOZ = [new THREE.Vector3(-0.95, 0.42, 3.12), new THREE.Vector3(0.95, 0.42, 3.12)];
+const flames = [];
+{
+  const sh = new THREE.Shape();
+  [[0,-4.0],[0.42,-2.6],[0.75,-0.6],[2.63,1.9],[2.5,2.45],[1.05,2.3],[0.95,3.31],[-0.95,3.31],[-1.05,2.3],[-2.5,2.45],[-2.63,1.9],[-0.75,-0.6],[-0.42,-2.6]]
+    .forEach(([x, z], i) => i ? sh.lineTo(x, z) : sh.moveTo(x, z));
+  const g = new THREE.ExtrudeGeometry(sh, { depth:0.34, bevelEnabled:true, bevelThickness:0.08, bevelSize:0.06, bevelSegments:1 });
+  g.rotateX(Math.PI/2); g.translate(0, 0.42, 0);
+  const hullMat = new THREE.MeshStandardMaterial({ color:0x39414F, roughness:0.45, metalness:0.6 });
+  ship.add(new THREE.Mesh(g, hullMat));
+  ship.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({ color:0x36E7FF, transparent:true, opacity:0.5 })));
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 5.6, 10, 1), hullMat); body.rotation.x = Math.PI/2; body.scale.set(1, 1, 0.55); body.position.set(0, 0.5, 0.2); ship.add(body);
+  const can = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshStandardMaterial({ color:0x0A1428, roughness:0.1, metalness:0.2, emissive:0x061830 }));
+  can.scale.set(0.8, 0.55, 2.2); can.position.set(0, 0.68, -1.0); ship.add(can);
+  const cone = new THREE.ConeGeometry(1, 1, 16, 1, true); cone.rotateX(Math.PI/2); cone.translate(0, 0, 0.5);
+  NOZ.forEach(n => {
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 2.4, 12), hullMat); pod.rotation.x = Math.PI/2; pod.scale.set(1, 1, 0.62); pod.position.set(n.x, n.y, 1.92); ship.add(pod);
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.27, 20), new THREE.MeshBasicMaterial({ color:0x36E7FF, toneMapped:false })); glow.position.copy(n).z += 0.01; glow.scale.set(1, 0.62, 1); ship.add(glow);
+    const out = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color:0x36E7FF, ...ADD, opacity:0.55, side:THREE.DoubleSide, toneMapped:false }));
+    const core = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color:0xE8FBFF, ...ADD, opacity:0.8, side:THREE.DoubleSide, toneMapped:false }));
+    out.position.copy(n); core.position.copy(n); ship.add(out); ship.add(core);
+    flames.push({ out, core, glow });
+  });
+}
+ship.traverse(o => o.layers.set(L_SHIP));
+
+// ================= CABINA (aproximada, va pegada a la cámara de cabina) =================
+const cockpit = new THREE.Group(); camA.add(cockpit);
+{
+  const dMat = new THREE.MeshBasicMaterial({ color:0x070B16, side:THREE.DoubleSide, fog:false });
+  const eMat = new THREE.LineBasicMaterial({ color:0x36E7FF, transparent:true, opacity:0.95, fog:false, toneMapped:false });
+  const e2 = new THREE.LineBasicMaterial({ color:0x245BFF, transparent:true, opacity:0.9, fog:false });
+  const oMat = new THREE.LineBasicMaterial({ color:0xFF9D32, transparent:true, opacity:0.9, fog:false, toneMapped:false });
+  const quad = (a, b, c, d, mat = dMat) => {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b, ...c, ...a, ...c, ...d], 3));
+    cockpit.add(new THREE.Mesh(g, mat));
+  };
+  const lines = (arr, mat) => cockpit.add(new THREE.LineSegments(seg(arr), mat));
+  // salpicadero
+  quad([-2.4,-0.44,-1.0],[2.4,-0.44,-1.0],[2.4,-1.4,-0.85],[-2.4,-1.4,-0.85]);
+  // capó del instrumental
+  quad([-0.42,-0.44,-1.0],[0.42,-0.44,-1.0],[0.32,-0.35,-1.03],[-0.32,-0.35,-1.03]);
+  // montantes
+  quad([-1.2,-0.44,-1.0],[-1.02,-0.44,-1.0],[-0.6,0.95,-0.85],[-0.76,0.95,-0.85]);
+  quad([1.02,-0.44,-1.0],[1.2,-0.44,-1.0],[0.76,0.95,-0.85],[0.6,0.95,-0.85]);
+  // techo
+  quad([-2.4,0.56,-0.82],[2.4,0.56,-0.82],[2.4,1.4,-0.82],[-2.4,1.4,-0.82]);
+  // laterales bajos (alféizar)
+  quad([-2.4,-0.44,-1.0],[-1.2,-0.44,-1.0],[-1.3,-0.2,-0.6],[-2.4,-0.2,-0.6]);
+  quad([1.2,-0.44,-1.0],[2.4,-0.44,-1.0],[2.4,-0.2,-0.6],[1.3,-0.2,-0.6]);
+  lines([
+    -2.4,-0.44,-1.0, -0.42,-0.44,-1.0,  0.42,-0.44,-1.0, 2.4,-0.44,-1.0,
+    -0.42,-0.44,-1.0, -0.32,-0.35,-1.03, -0.32,-0.35,-1.03, 0.32,-0.35,-1.03, 0.32,-0.35,-1.03, 0.42,-0.44,-1.0,
+    -1.2,-0.44,-1.0, -0.76,0.95,-0.85, -1.02,-0.44,-1.0, -0.6,0.95,-0.85,
+    1.2,-0.44,-1.0, 0.76,0.95,-0.85, 1.02,-0.44,-1.0, 0.6,0.95,-0.85,
+    -2.4,0.56,-0.82, 2.4,0.56,-0.82,
+    -1.2,-0.44,-1.0, -1.3,-0.2,-0.6, -1.3,-0.2,-0.6, -2.4,-0.2,-0.6,
+    1.2,-0.44,-1.0, 1.3,-0.2,-0.6, 1.3,-0.2,-0.6, 2.4,-0.2,-0.6,
+  ], eMat);
+  lines([-1.6,-0.6,-0.95, 1.6,-0.6,-0.95, -0.9,-0.44,-1.0, -1.1,-1.0,-0.9, 0.9,-0.44,-1.0, 1.1,-1.0,-0.9], e2);
+  lines([-0.24,-0.4,-1.015, -0.04,-0.4,-1.015, 0.04,-0.4,-1.015, 0.24,-0.4,-1.015], oMat);
+}
+cockpit.traverse(o => { o.layers.set(L_CAB); o.layers.enable(L_MASK); });
+
+// ================= LÍNEAS DE VELOCIDAD 3D (las de hoy) =================
+function mkLines(cam, layer) {
+  const N = 240, g = new THREE.BufferGeometry();
+  const pos = new Float32Array(N*6), col = new Float32Array(N*6);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  const m = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors:true, ...ADD, toneMapped:false, fog:false }));
+  m.frustumCulled = false; m.layers.set(layer); cam.add(m);
+  const D = []; for (let i = 0; i < N; i++) D.push({ a:rnd(0, 6.283), r:rnd(4.5, 25), d:rnd(20, 170), k:rnd(0.5, 1) });
+  return { m, D, pos, col, g };
+}
+const LN = { cab:mkLines(camA, L_CAB), chase:mkLines(camB, L_CHASE) };
+const _lc = new THREE.Color(), LC0 = new THREE.Color(0.75, 0.97, 1.0), LC1 = new THREE.Color(1.0, 0.8, 0.5);
+function updLines(Lx, dt, alpha, b) {
+  Lx.m.visible = alpha > 0.004;
+  const len0 = 2 + S.v * 0.06 + 6 * b; _lc.copy(LC0).lerp(LC1, 0.6 * b);
+  for (let i = 0; i < Lx.D.length; i++) {
+    const q = Lx.D[i];
+    q.d -= S.v * dt;
+    if (q.d < 2) { q.d += 168; q.a = rnd(0, 6.283); q.r = rnd(4.5, 25); q.k = rnd(0.5, 1); }
+    if (!Lx.m.visible) continue;
+    const fade = clamp((170 - q.d) / 30, 0, 1) * clamp((q.d - 2) / 6, 0, 1) * alpha;
+    const x = Math.cos(q.a) * q.r, y = Math.sin(q.a) * q.r, o = i * 6;
+    Lx.pos[o] = x; Lx.pos[o+1] = y; Lx.pos[o+2] = -q.d;
+    Lx.pos[o+3] = x; Lx.pos[o+4] = y; Lx.pos[o+5] = -(q.d + len0 * q.k);
+    Lx.col[o] = _lc.r * fade; Lx.col[o+1] = _lc.g * fade; Lx.col[o+2] = _lc.b * fade;
+    Lx.col[o+3] = Lx.col[o+4] = Lx.col[o+5] = 0;
+  }
+  if (Lx.m.visible) { Lx.g.attributes.position.needsUpdate = true; Lx.g.attributes.color.needsUpdate = true; }
+}
+
+// ================= POST-PROCESO: VISIÓN TÚNEL =================
+const TunnelShader = {
+  uniforms:{
+    tDiffuse:{ value:null }, tMask:{ value:null }, uMaskOn:{ value:0 },
+    uI:{ value:0 }, uB:{ value:0 }, uSpd:{ value:0 }, uTime:{ value:0 }, uAspect:{ value:16/9 },
+    uBlur:{ value:1 }, uStr:{ value:0.11 },
+    uVig:{ value:1 }, uDark:{ value:0.62 }, uAmber:{ value:0 }, uHalo:{ value:0.12 },
+    uAb:{ value:0 }, uAbAmt:{ value:0.012 },
+    uLines:{ value:0 },
+  },
+  vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader:`
+    uniform sampler2D tDiffuse, tMask;
+    uniform float uMaskOn, uI, uB, uSpd, uTime, uAspect, uBlur, uStr, uVig, uDark, uAmber, uHalo, uAb, uAbAmt, uLines;
+    varying vec2 vUv;
+    float hash(float n){ return fract(sin(n*127.1 + 3.7)*43758.5453); }
+    void main(){
+      vec2 ctr = vec2(0.5);
+      vec2 c = vUv - ctr;
+      vec2 ca = c * vec2(uAspect, 1.0);
+      float r = length(ca) / length(vec2(uAspect*0.5, 0.5));      // 0 centro, 1 esquina
+      float m = smoothstep(0.22, 0.95, r) * uI;
+      float mk = texture2D(tMask, vUv).r * uMaskOn;
+      vec4 orig = texture2D(tDiffuse, vUv);
+      vec3 col = orig.rgb;
+      float str = uBlur * uStr * m;
+      float ab = uAb * uAbAmt * m;
+      if (str > 0.0004 || ab > 0.00004) {
+        vec3 acc = vec3(0.0); float ws = 0.0;
+        for (int i = 0; i < 16; i++) {
+          float t = float(i) / 15.0, s = 1.0 - str * t;
+          vec2 ug = ctr + c*s;
+          float w = 1.0 - texture2D(tMask, ug).r * uMaskOn;
+          acc += vec3(texture2D(tDiffuse, ctr + c*(s + ab)).r, texture2D(tDiffuse, ug).g, texture2D(tDiffuse, ctr + c*(s - ab)).b) * w;
+          ws += w;
+        }
+        if (ws > 0.001) col = acc / ws;
+      }
+      col = mix(col, orig.rgb, mk);
+      // líneas de velocidad en pantalla (trazos radiales que salen hacia los bordes)
+      if (uLines > 0.5) {
+        float ang = atan(ca.y, ca.x);
+        float sx = (ang + 3.14159265) / 6.2831853 * 150.0;
+        float id = floor(sx), fx = fract(sx) - 0.5;
+        float h1 = hash(id), h2 = hash(id + 17.3), h3 = hash(id + 41.7);
+        float on = step(0.42, h1);
+        float wid = 0.05 + 0.12*h2;
+        float wl = 1.0 - smoothstep(0.0, wid, abs(fx));
+        float sp = 0.9 + 1.4*h3 + 2.2*uSpd + 1.5*uB;
+        float head = fract(h2*5.31 + uTime*sp) * 1.7 + 0.25;
+        float len = 0.16 + 0.28*uSpd + 0.2*uB;
+        float al = smoothstep(head - len, head, r) * (1.0 - smoothstep(head, head + 0.015, r));
+        float edge = smoothstep(0.32, 0.8, r);
+        vec3 lc = mix(vec3(0.75, 0.97, 1.0), vec3(1.0, 0.78, 0.45), 0.6*uB);
+        col += lc * on * wl * al * edge * min(uI, 1.0) * 0.75 * (1.0 - mk);
+      }
+      // viñeta y halo ámbar
+      float v = uVig * smoothstep(0.42, 1.15, r) * uDark * min(uI, 1.0);
+      col *= 1.0 - v;
+      col += vec3(1.0, 0.616, 0.196) * uAmber * smoothstep(0.55, 1.15, r) * uHalo;
+      gl_FragColor = vec4(col, orig.a);
+    }`,
+};
+const maskRT = new THREE.WebGLRenderTarget(4, 4);
+const whiteMat = new THREE.MeshBasicMaterial({ color:0xFFFFFF, fog:false, side:THREE.DoubleSide });
+function mkComposer(cam) {
+  const c = new EffectComposer(renderer);
+  c.renderToScreen = false;
+  c.addPass(new RenderPass(scene, cam));
+  c.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.85, 0.55, 0.82));
+  const tp = new ShaderPass(TunnelShader); tp.uniforms.tMask.value = maskRT.texture; c.addPass(tp);
+  c.addPass(new OutputPass());
+  c.tunnel = tp;
+  return c;
+}
+const compA = mkComposer(camA), compB = mkComposer(camB);
+const blit = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms:{ t:{ value:null } }, depthTest:false, depthWrite:false,
+  vertexShader:`varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader:`uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = texture2D(t, vUv); }` }));
+const blitScene = new THREE.Scene(); blitScene.add(blit); const blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+// ================= CONDUCCIÓN =================
+const keys = {};
+const S = { s:0, lat:0, psi:0, v:200/3.6, boostT:0, boostCd:0, steer:0, steerVis:0, W:false, Sb:false, A:false, D:false, Sh:false };
+let simT = 0, autoBoostCd = 5;
+function inputs(dt) {
+  if (opt.drive === 'me') { S.W = !!keys.w; S.Sb = !!keys.s; S.A = !!keys.a; S.D = !!keys.d; S.Sh = !!keys.shift; return; }
+  const vt = Math.min(VMAX, Math.sqrt(30 / Math.max(0.0008, kAhead(S.s, 10, 160))));
+  const kNow = KAP[idx(S.s + 8)];
+  S.W = S.v < vt - 1; S.Sb = S.v > vt + 4;
+  const rate = 0.95 * (1 - 0.35 * S.v / VMAX);
+  const ff = kNow * S.v / rate, psiDes = clamp(0.05 * S.lat, -0.25, 0.25);
+  S.steer = clamp(ff + (psiDes - S.psi) * 3.5, -1, 1);
+  S.A = S.steer > 0.12; S.D = S.steer < -0.12;
+  autoBoostCd -= dt; S.Sh = false;
+  if (autoBoostCd <= 0 && kAhead(S.s, 0, 380) < 0.0016 && S.v > 280/3.6) { S.Sh = true; autoBoostCd = 9; }
+}
+function drive(dt) {
+  inputs(dt);
+  const steerIn = opt.drive === 'me' ? (S.A ? 1 : 0) - (S.D ? 1 : 0) : S.steer;
+  S.boostCd -= dt;
+  if (S.Sh && S.boostT <= 0 && S.boostCd <= 0) { S.boostT = 3; S.boostCd = 4; }
+  if (S.Sb && S.boostT > 0) S.boostT = 0;
+  S.boostT -= dt;
+  const boosting = S.boostT > 0, top = VMAX + (boosting ? BOOSTV : 0);
+  if (boosting) S.v = Math.min(top, S.v + 22 * dt);
+  else if (S.W) S.v += 20 * Math.max(0, 1 - Math.pow(S.v / VMAX, 3)) * dt;
+  else if (S.Sb) S.v -= 34 * dt;
+  else S.v -= (4 + 0.0006 * S.v * S.v) * dt;
+  if (S.v > top) S.v = Math.max(top, S.v - 7 * dt);
+  S.v = Math.max(0, S.v);
+  const rate = 0.95 * (1 - 0.35 * S.v / VMAX);
+  S.psi += (steerIn * rate - KAP[idx(S.s)] * S.v) * dt;
+  S.psi = clamp(S.psi, -0.6, 0.6);
+  S.lat -= S.v * Math.sin(S.psi) * dt;
+  if (Math.abs(S.lat) > BAR - 1.9) { S.lat = Math.sign(S.lat) * (BAR - 1.9); S.psi *= -0.3; S.v *= 0.96; }
+  S.s += S.v * Math.cos(S.psi) * dt;
+  S.steerVis = approach(S.steerVis, steerIn, 0.12, dt);
+  return boosting;
+}
+
+// ================= INTENSIDAD DEL TÚNEL =================
+const E = { b:0, I:0, f:0, fp:0 };
+const chaseMul = () => ({ same:1, soft:0.5, off:0 })[opt.chase];
+function effects(dt, boosting) {
+  E.b = boosting ? Math.min(1, E.b + dt / 0.25) : Math.max(0, E.b - dt / 0.5);
+  const th = S.v / VMAX;
+  E.f = clamp((S.v - 0.25 * VMAX) / (0.75 * VMAX), 0, 1);
+  E.fp = smooth01(clamp((th - 0.8) / 0.2, 0, 1));
+  let I = opt.when === 'boost' ? E.b : opt.when === 'top' ? 0.85 * E.fp + 0.45 * E.b : 0.85 * E.f + 0.45 * E.b;
+  E.I = approach(E.I, Math.min(1.2, I), 0.12, dt);
+}
+
+// ================= ESTADO Y CÁMARAS =================
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(); let camInit = false;
+function update(dt) {
+  simT += dt;
+  const boosting = drive(dt);
+  effects(dt, boosting);
+  const fr = frameAt(S.s);
+  const p = fr.p.clone().addScaledVector(fr.r, S.lat);
+  ship.position.set(p.x, 0.6, p.z);
+  ship.rotation.y = fr.phi + S.psi;
+  ship.rotation.z = 0.35 * S.steerVis * Math.min(1, S.v / VMAX);
+  // toberas (simplificadas)
+  const th = Math.min(1, S.v / VMAX), len = 0.5 + 2.6 * th + 3.6 * E.b, wid = 0.24 * (1 + 0.35 * E.b);
+  flames.forEach((f, k) => {
+    const fl = 1 + 0.08 * Math.sin(simT * 37 + k * 2) * Math.sin(simT * 23 + k);
+    f.out.scale.set(wid, wid * 0.62, len * fl); f.core.scale.set(wid * 0.45, wid * 0.3, len * 0.55 * fl);
+    f.out.material.color.setRGB(0.21, 0.9, 1.0).lerp(new THREE.Color(1.0, 0.55, 0.15), E.b).multiplyScalar(0.7 + 0.6 * th + 0.6 * E.b);
+    f.glow.material.color.copy(f.out.material.color).multiplyScalar(1.5);
+  });
+  const heading = fr.phi + S.psi, fw = new THREE.Vector3(-Math.sin(heading), 0, -Math.cos(heading));
+  // persecución
+  const want = p.clone().addScaledVector(fw, -10.5); want.y = 3.2;
+  const look = p.clone().addScaledVector(fw, 14); look.y = 1.2;
+  if (!camInit) { camPos.copy(want); camLook.copy(look); camInit = true; }
+  const k = 1 - Math.exp(-dt * 6); camPos.lerp(want, k); camLook.lerp(look, k);
+  camB.position.copy(camPos); camB.lookAt(camLook);
+  camB.fov = 62 + 10 * th + 8 * E.b;
+  // cabina
+  camA.position.copy(p).addScaledVector(fw, -1.0); camA.position.y = 1.15;
+  camA.lookAt(camA.position.x + fw.x * 50, 1.0, camA.position.z + fw.z * 50);
+  camA.rotateZ(0.08 * S.steerVis);
+  camA.fov = 72 + 14 * E.f + 8 * E.b;
+  // líneas 3D
+  const la = I => 0.55 * Math.min(1, I / 0.85);
+  updLines(LN.cab, dt, opt.lines === '3d' ? la(E.I) : 0, E.b);
+  updLines(LN.chase, dt, opt.lines === '3d' ? la(E.I * chaseMul()) : 0, E.b);
+}
+
+// ================= RENDER =================
+let VW = 1280, VH = 720, PW = 1280, PH = 720;
+function panels() {
+  if (opt.view === 'both') return [{ id:'cab', y:0 }, { id:'chase', y:PH }];
+  return [{ id:opt.view, y:0 }];
+}
+function renderPanel(pn) {
+  const cab = pn.id === 'cab', cam = cab ? camA : camB, comp = cab ? compA : compB;
+  cam.aspect = PW / PH; cam.updateProjectionMatrix();
+  const I = cab ? E.I : E.I * chaseMul();
+  const sharp = cab && opt.cab === 'sharp';
+  if (sharp) {
+    const saved = cam.layers.mask;
+    cam.layers.set(L_MASK); scene.overrideMaterial = whiteMat;
+    const bg = sky.visible; sky.visible = false;
+    renderer.setRenderTarget(maskRT); renderer.setClearColor(0x000000, 1); renderer.clear();
+    renderer.render(scene, cam);
+    renderer.setRenderTarget(null); renderer.setClearColor(0x05070D, 1);
+    scene.overrideMaterial = null; sky.visible = bg; cam.layers.mask = saved;
+  }
+  sky.position.copy(cam.position);
+  const u = comp.tunnel.uniforms;
+  u.uMaskOn.value = sharp ? 1 : 0;
+  u.uI.value = I; u.uB.value = E.b; u.uSpd.value = Math.min(1, S.v / VMAX); u.uTime.value = simT; u.uAspect.value = PW / PH;
+  u.uBlur.value = opt.blur === 'on' ? 1 : 0;
+  u.uVig.value = opt.vig === 'off' ? 0 : 1;
+  u.uAmber.value = opt.vig === 'amber' ? E.b * Math.min(1, I / 0.45) : 0;
+  u.uAb.value = opt.ab === 'off' ? 0 : opt.ab === 'boost' ? E.b : 0.4 + 0.6 * E.b;
+  u.uLines.value = opt.lines === 'screen' ? 1 : 0;
+  comp.render();
+  blit.material.uniforms.t.value = comp.readBuffer.texture;
+  renderer.setViewport(0, VH - pn.y - PH, PW, PH);
+  renderer.setScissor(0, VH - pn.y - PH, PW, PH); renderer.setScissorTest(true);
+  const tm = renderer.toneMapping; renderer.toneMapping = THREE.NoToneMapping;
+  renderer.autoClear = false; renderer.render(blitScene, blitCam); renderer.autoClear = true;
+  renderer.toneMapping = tm;
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, VW, VH);
+}
+function render() { panels().forEach(renderPanel); }
+
+// ================= HUD =================
+function txt(t, x, y, size, color, align = 'left', op = 1, glow = 6) {
+  hx.font = `${size}px 'Share Tech Mono', monospace`; hx.textAlign = align; hx.globalAlpha = op;
+  hx.fillStyle = color; hx.shadowColor = color; hx.shadowBlur = glow; hx.fillText(t, x, y); hx.shadowBlur = 0; hx.globalAlpha = 1;
+}
+function keyCap(label, x, y, w, on, col = '#36E7FF') {
+  hx.globalAlpha = on ? 1 : 0.35; hx.strokeStyle = col; hx.lineWidth = 1.5; hx.strokeRect(x, y, w, 30);
+  if (on) { hx.fillStyle = col; hx.globalAlpha = 0.25; hx.fillRect(x, y, w, 30); hx.globalAlpha = 1; }
+  txt(label, x + w/2, y + 21, 13, col, 'center', on ? 1 : 0.5, on ? 6 : 0); hx.globalAlpha = 1;
+}
+function meter(x, y, w, val, max, col, label) {
+  hx.strokeStyle = '#245BFF'; hx.globalAlpha = 0.8; hx.lineWidth = 1; hx.strokeRect(x, y, w, 8); hx.globalAlpha = 1;
+  hx.fillStyle = col; hx.shadowColor = col; hx.shadowBlur = 6; hx.fillRect(x + 1, y + 1, (w - 2) * clamp(val / max, 0, 1), 6); hx.shadowBlur = 0;
+  txt(label, x + w + 10, y + 9, 13, col, 'left', 0.95, 0);
+}
+const WHEN_TXT = { boost:'A · SOLO BOOST', top:'B · CERCA DE LA PUNTA', speed:'C · SEGÚN LA VELOCIDAD' };
+function drawHud() {
+  hx.setTransform(1,0,0,1,0,0); hx.clearRect(0, 0, hud.width, hud.height);
+  const u = PH * DPR / 720, ps = panels();
+  ps.forEach((pn, i) => {
+    hx.setTransform(u, 0, 0, u, 0, pn.y * DPR);
+    const cab = pn.id === 'cab';
+    if (opt.view === 'both') {
+      txt(cab ? 'CABINA' : 'PERSECUCIÓN', 1240, 40, 18, '#36E7FF', 'right');
+      if (i === 1) { hx.strokeStyle = '#245BFF'; hx.globalAlpha = 0.8; hx.lineWidth = 2; hx.beginPath(); hx.moveTo(0, 1); hx.lineTo(1280, 1); hx.stroke(); hx.globalAlpha = 1; }
+    }
+    const I = cab ? E.I : E.I * chaseMul();
+    meter(40, 96 + (opt.view === 'both' ? 0 : 0), 200, I, 1.2, E.b > 0.05 ? '#FF9D32' : '#36E7FF', `TÚNEL ${Math.round(I / 1.2 * 100)} %`);
+    if (i > 0) return;
+    txt('VISIÓN TÚNEL', 40, 52, 22, '#36E7FF');
+    const st = S.boostT > 0 ? 'BOOST' : S.Sb ? 'FRENANDO' : S.W ? 'ACELERANDO' : 'SIN GAS';
+    txt(`${opt.drive === 'auto' ? 'AUTO' : 'CONDUCES TÚ'} · ${st} · ${WHEN_TXT[opt.when]}${opt.slow ? ' · ×0,25' : ''}${opt.paused ? ' · PAUSA' : ''}`, 40, 76, 14, S.boostT > 0 ? '#FF9D32' : '#A6B8D8', 'left', 0.95, 0);
+    // barra de velocidad con el umbral donde empieza el túnel
+    const bx = 860, by = 640, bw = 300, vmaxAll = VMAX + BOOSTV;
+    hx.strokeStyle = '#245BFF'; hx.lineWidth = 1; hx.strokeRect(bx, by, bw, 10);
+    hx.fillStyle = S.boostT > 0 ? '#FF9D32' : '#36E7FF'; hx.fillRect(bx + 1, by + 1, (bw - 2) * clamp(S.v / vmaxAll, 0, 1), 8);
+    const tick = (frac, lab) => { const x = bx + bw * frac; hx.fillStyle = '#FF43D0'; hx.fillRect(x - 1, by - 6, 2, 22); txt(lab, x, by - 10, 11, '#FF43D0', 'center', 0.9, 0); };
+    tick(VMAX / vmaxAll, 'PUNTA');
+    if (opt.when === 'speed') tick(0.25 * VMAX / vmaxAll, 'ENTRA');
+    if (opt.when === 'top') tick(0.8 * VMAX / vmaxAll, 'ENTRA');
+    txt(String(Math.round(S.v * 3.6)), 1172, 690, 44, S.boostT > 0 ? '#FF9D32' : '#36E7FF', 'right');
+    txt('KM/H', 1180, 690, 15, '#A6B8D8', 'left', 1, 0);
+    const ky = 600;
+    keyCap('W', 88, ky, 40, S.W); keyCap('A', 40, ky + 36, 40, S.A); keyCap('S', 88, ky + 36, 40, S.Sb, '#FF4D5E'); keyCap('D', 136, ky + 36, 40, S.D);
+    keyCap('SHIFT', 190, ky + 36, 70, S.boostT > 0, '#FF9D32');
+  });
+}
+
+// ================= CONTROLES =================
+const DESC = {
+  'drive:auto':'AUTO · el piloto acelera, frena antes de las curvas y tira de boost en las rectas cada ~9 s',
+  'drive:me':'CONDUCES TÚ · W acelera · S frena · A/D gira · SHIFT boost',
+  'when:boost':'A · SOLO BOOST · sin boost no hay túnel; entra en 0,25 s al activarlo y sale en 0,5 s',
+  'when:top':'B · CERCA DE LA PUNTA · empieza al 80 % de la punta (320 km/h), completo a la punta, y el boost suma',
+  'when:speed':'C · SEGÚN LA VELOCIDAD · como hoy: crece desde el 25 % de la punta (100 km/h) y el boost suma',
+  'vig:off':'SIN VIÑETA', 'vig:dark':'VIÑETA OSCURA · los bordes se oscurecen con la intensidad',
+  'vig:amber':'OSCURA + ÁMBAR · como hoy: con boost, halo ámbar en las esquinas',
+  'blur:off':'SIN DESENFOQUE', 'blur:on':'DESENFOQUE RADIAL · como hoy: el centro nítido y los bordes estirados hacia fuera',
+  'lines:off':'SIN LÍNEAS', 'lines:3d':'LÍNEAS 3D · como hoy: 240 trazos en el espacio que vienen hacia la cámara',
+  'lines:screen':'LÍNEAS EN PANTALLA · trazos radiales en los bordes, dentro del post-proceso (más «anime», no tapan el centro)',
+  'ab:off':'SIN ABERRACIÓN', 'ab:boost':'ABERRACIÓN SOLO CON BOOST · como hoy: rojo hacia fuera y azul hacia dentro en los bordes',
+  'ab:always':'ABERRACIÓN SIEMPRE · leve con velocidad y más fuerte con boost',
+  'chase:same':'PERSECUCIÓN IGUAL · el mismo efecto que en cabina', 'chase:soft':'PERSECUCIÓN SUAVE · la mitad de intensidad, para no ensuciar la nave',
+  'chase:off':'PERSECUCIÓN SIN EFECTO · el túnel solo existe en cabina',
+  'cab:blur':'MARCO DE CABINA AFECTADO · el desenfoque también estira montantes y salpicadero (lo que pasaría hoy)',
+  'cab:sharp':'MARCO DE CABINA NÍTIDO · la cabina no se desenfoca ni se desdobla; la viñeta sí le afecta',
+  'view:cab':'VISTA DE CABINA', 'view:chase':'VISTA DE PERSECUCIÓN', 'view:both':'LAS DOS · cabina arriba, persecución abajo',
+};
+function toast(t) { const m = document.getElementById('mode'); m.textContent = t; m.style.opacity = 1; clearTimeout(toast.t); toast.t = setTimeout(() => m.style.opacity = 0, 3600); }
+function setOpt(g, val, quiet = false) {
+  opt[g] = val;
+  document.querySelectorAll(`button[data-g="${g}"]`).forEach(x => x.classList.toggle('on', x.dataset.v === val));
+  if (!quiet && DESC[g + ':' + val]) toast(DESC[g + ':' + val]);
+  if (g === 'view') resize();
+}
+document.querySelectorAll('button[data-g]').forEach(b => b.addEventListener('click', () => { setOpt(b.dataset.g, b.dataset.v); b.blur(); }));
+document.getElementById('bToday').addEventListener('click', e => { for (const k in TODAY) setOpt(k, TODAY[k], true); toast('COMO HOY · la visión túnel de la spec efectos-velocidad'); e.currentTarget.blur(); });
+const bP = document.getElementById('bPause'), bS = document.getElementById('bSlow');
+const togglePause = () => { opt.paused = !opt.paused; bP.classList.toggle('on', opt.paused); };
+const toggleSlow = () => { opt.slow = !opt.slow; bS.classList.toggle('on', opt.slow); };
+bP.addEventListener('click', () => { togglePause(); bP.blur(); }); bS.addEventListener('click', () => { toggleSlow(); bS.blur(); });
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (['w','a','s','d','shift'].includes(k)) { e.preventDefault(); keys[k] = true; if (opt.drive !== 'me') setOpt('drive', 'me'); }
+  else if (k === 'p') togglePause(); else if (k === 'l') toggleSlow();
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+function resize() {
+  const st = document.getElementById('stage'), W = st.clientWidth, H = st.clientHeight;
+  const ar = opt.view === 'both' ? 16/18 : 16/9;
+  let w = W, h = W / ar; if (h > H) { h = H; w = H * ar; }
+  const view = document.getElementById('view');
+  view.style.width = w + 'px'; view.style.height = h + 'px';
+  VW = w; VH = h; PW = w; PH = opt.view === 'both' ? h / 2 : h;
+  view.style.setProperty('--u', (PH / 720) + 'px');
+  renderer.setSize(w, h, false);
+  compA.setSize(PW, PH); compB.setSize(PW, PH);
+  maskRT.setSize(Math.max(4, Math.round(PW * DPR)), Math.max(4, Math.round(PH * DPR)));
+  hud.width = Math.round(w * DPR); hud.height = Math.round(h * DPR);
+}
+addEventListener('resize', resize); resize();
+{ let best = 0, bi = 0; for (let i = 0; i < NS; i++) { let run = 0; while (run < 200 && Math.abs(KAP[(i + run) % NS]) < 0.0015) run++; if (run > best) { best = run; bi = i; } } S.s = bi * STEP; }
+update(0.016);
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!opt.paused) update(dt * (opt.slow ? 0.25 : 1));
+  render(); drawHud();
+  requestAnimationFrame(frame);
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { toast('Arranca COMO HOY. Cambia cuándo entra, los bordes y la persecución para comparar.'); requestAnimationFrame(t0 => { last = t0; frame(t0); }); });
+</script>
+</body>
+</html>

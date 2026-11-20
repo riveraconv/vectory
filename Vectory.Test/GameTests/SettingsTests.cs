@@ -15,7 +15,7 @@ using Xunit;
 
 namespace Vectory.Test.GameTests;
 
-// SETTINGS (spec docs/settings.md, 10, pruebas 1–11; la 10, PARTICLES, no aplica: está en COMING SOON)
+// SETTINGS (spec docs/settings.md, 10, pruebas 1–11; la 10, PARTICLES en LOW con el túnel, en TunnelVisionFxTests)
 public class SettingsTests
 {
 	// 1
@@ -135,7 +135,7 @@ public class SettingsTests
 			  "version": 1,
 			  "gameplay": { "difficulty": "HARD" },
 			  "video": { "displayMode": 3, "resolution": "1280x720", "bloom": 250 },
-			  "effects": { "speedLines": false, "particles": "HIGH", "cockpitShake": 40 }
+			  "effects": { "tunnelVision": 70, "speedLines": false, "particles": "HIGH", "cockpitShake": 40 }
 			}
 			"""
 		};
@@ -154,6 +154,7 @@ public class SettingsTests
 		// Los demás, como estaban
 		Assert.Equal(Difficulty.Hard, model.Difficulty);
 		Assert.Equal("1280 × 720", model.ValueText(SettingsCatalog.Resolution));
+		Assert.Equal(0.7f, model.TunnelVision, 5);
 		Assert.False(model.SpeedLines);
 		Assert.Equal(0.4f, model.CockpitShake, 5);
 	}
@@ -193,10 +194,12 @@ public class SettingsTests
 			foreach ((int step, float factor) in new[] { (10, 1f), (5, 0.5f), (0, 0f) })
 			{
 				model.Set(SettingsCatalog.Bloom, step);
+				model.Set(SettingsCatalog.TunnelVision, step);
 				model.Set(SettingsCatalog.SpeedFov, step);
 				model.Set(SettingsCatalog.CockpitShake, step);
 				ActiveSettings.From(model);
 				Assert.Equal(factor, ActiveSettings.Bloom, 5);
+				Assert.Equal(factor, ActiveSettings.TunnelVision, 5);
 				Assert.Equal(factor, ActiveSettings.CockpitShake, 5);
 				Assert.Equal(factor, ActiveSettings.SpeedFov, 5);
 				// FOV por velocidad de la cámara exterior: de 75 a 95 al 100 %, a 85 al 50 %, a 75 al 0 %
@@ -359,7 +362,7 @@ public class SettingsTests
 			logic.Down();
 			visited.Add(logic.SelectedId);
 		}
-		Assert.DoesNotContain(SettingsCatalog.TunnelVision, visited);
+		Assert.Contains(SettingsCatalog.TunnelVision, visited);   // spec docs/efectos-9-vision-tunel.md: ya no es COMING SOON
 		Assert.Contains(SettingsCatalog.Particles, visited);
 		Assert.DoesNotContain("audioMaster", visited);
 		Assert.Contains(SettingsScreenLogic.BackId, visited);

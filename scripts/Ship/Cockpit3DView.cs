@@ -38,7 +38,7 @@ public readonly record struct Cockpit3DSettings(
 // textos fijos una vez y, en la cámara exterior, ninguna.
 public partial class Cockpit3DView : CanvasLayer
 {
-	private const int LayerIndex = 0;   // el HUD está en la capa 1
+	private const int LayerIndex = 2;   // por encima de la visión túnel (capa 1), que no la toca; el HUD, en la 3
 	// Capa visual de la copia del morro del casco (spec docs/cabinas-3d-4-morros.md): solo la ve la cámara de su pasada
 	private const uint NoseLayer = 1u << 19;
 

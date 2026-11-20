@@ -71,10 +71,10 @@ public static class SettingsCatalog
 		new SettingDef(Bloom, Video, "BLOOM", SettingKind.Percent, null, PercentSteps,
 			"Glow of the lines of the track, the ships and the HUD. Lower it if the image looks blurry."),
 
-		// Visión túnel es de efectos-velocidad, que aún no existe: COMING SOON (decisión del usuario). PARTICLES, desde la
-		// spec docs/efectos-1-choques.md: chispas y humo de los choques
+		// Visión túnel: spec docs/efectos-9-vision-tunel.md. PARTICLES, desde la spec docs/efectos-1-choques.md: chispas y humo
+		// de los choques (y, en LOW, menos muestras en la visión túnel)
 		new SettingDef(TunnelVision, Effects, "TUNNEL VISION", SettingKind.Percent, null, PercentSteps,
-			"Blur and darkening of the edges of the screen at high speed. [b]Lower it if it makes you dizzy.[/b]", ComingSoon: true),
+			"Blur and darkening of the edges of the screen at high speed. [b]Lower it if it makes you dizzy.[/b]"),
 		new SettingDef(SpeedLines, Effects, "SPEED LINES", SettingKind.Toggle, null, 1,
 			"Streaks that fly past the camera at high speed. Also turns off the [b]slipstream air lines[/b] in the cockpit."),
 		new SettingDef(SpeedFov, Effects, "SPEED FOV", SettingKind.Percent, null, PercentSteps,

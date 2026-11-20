@@ -7,8 +7,9 @@ namespace Vectory.UI;
 
 // La vista previa de SETTINGS (spec docs/settings.md, 3.4; designs/settings.html, preview y trackPreview): un recuadro
 // con PREVIEW y, según la fila elegida, las tres barras de la dificultad, la pantalla del modo y la resolución, la tecla
-// en grande con la lista de todas, o una pista en perspectiva con una nave rival que cambia con BLOOM, SPEED LINES,
-// SPEED FOV y COCKPIT SHAKE. En 2D, sin escena 3D. Solo lee el modelo. Medidas sobre 1280×720 × la escala.
+// en grande con la lista de todas, o una pista en perspectiva con una nave rival que cambia con BLOOM, TUNNEL VISION
+// (oscurece los bordes), SPEED LINES, SPEED FOV y COCKPIT SHAKE. En 2D, sin escena 3D. Solo lee el modelo. Medidas sobre
+// 1280×720 × la escala.
 public partial class SettingsPreviewView : Control
 {
 	private float _scale = 1f;
@@ -16,6 +17,7 @@ public partial class SettingsPreviewView : Control
 	private SettingDef _def;
 	private Font _label, _orbitron, _orbitronBold, _mono;
 	private float _time;
+	private GradientTexture2D _vignette;
 
 	private float S(float px) => px * _scale;
 
@@ -28,6 +30,28 @@ public partial class SettingsPreviewView : Control
 		_orbitronBold = MenuFonts.Make(MenuFonts.Orbitron, 700, S(40f), 0.02f);
 		MouseFilter = MouseFilterEnum.Ignore;
 		ClipContents = true;
+		_vignette = BuildVignette();
+	}
+
+	// Viñeta de la maqueta (radial-gradient(ellipse 60% 62%, transparent 35%, fondo 100%)): elipse del 60 % del ancho
+	// y del alto (casi el 62 %), transparente hasta el 35 % y opaca desde el borde; la opacidad, con TUNNEL VISION
+	private static GradientTexture2D BuildVignette()
+	{
+		Color edge = Palette.SettingsPreviewVignette;
+		var gradient = new Gradient
+		{
+			Offsets = new[] { 0f, 0.35f, 1f },
+			Colors = new[] { new Color(edge, 0f), new Color(edge, 0f), edge }
+		};
+		return new GradientTexture2D
+		{
+			Gradient = gradient,
+			Fill = GradientTexture2D.FillEnum.Radial,
+			FillFrom = new Vector2(0.5f, 0.5f),
+			FillTo = new Vector2(1.1f, 0.5f),
+			Width = 256,
+			Height = 256
+		};
 	}
 
 	// def: la fila elegida (null en RESET DEFAULTS y BACK: sin vista previa)
@@ -145,7 +169,7 @@ public partial class SettingsPreviewView : Control
 	private void DrawTrack()
 	{
 		float w = Size.X, h = Size.Y;
-		float bloom = _model.Bloom, fov = _model.SpeedFov, shake = _model.CockpitShake;
+		float bloom = _model.Bloom, fov = _model.SpeedFov, shake = _model.CockpitShake, tunnel = _model.TunnelVision;
 		var offset = Vector2.Zero;
 		if (shake > 0f)
 		{
@@ -198,6 +222,10 @@ public partial class SettingsPreviewView : Control
 				DrawLine(p1, p2, Palette.SettingsPreviewSpeedLine, Mathf.Max(1f, S(1f)), true);
 			}
 		}
+
+		// Visión túnel: bordes oscuros, sin desenfoque (spec docs/efectos-9-vision-tunel.md, 7)
+		if (tunnel > 0f)
+			DrawTextureRect(_vignette, new Rect2(Vector2.Zero, Size), false, new Color(1f, 1f, 1f, tunnel * 0.9f));
 	}
 
 	private void Centered(Font font, string text, Vector2 center, int size, Color color)

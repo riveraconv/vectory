@@ -128,6 +128,7 @@ public sealed class SettingsModel
 	// Lo que leen el juego y los aplicadores
 	public Difficulty Difficulty => (Difficulty)Get(SettingsCatalog.Difficulty);
 	public float Bloom => Fraction(SettingsCatalog.Bloom);
+	public float TunnelVision => Fraction(SettingsCatalog.TunnelVision);
 	public bool SpeedLines => Get(SettingsCatalog.SpeedLines) != 0;
 	public float SpeedFov => Fraction(SettingsCatalog.SpeedFov);
 	public float CockpitShake => Fraction(SettingsCatalog.CockpitShake);

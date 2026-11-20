@@ -100,6 +100,8 @@ public partial class Hud : CanvasLayer
 
 	public override void _Ready()
 	{
+		Layer = 3;   // por encima de la cabina 3D (capa 2), que va por encima de la visión túnel (capa 1)
+
 		// Raíz que ocupa toda la pantalla; todo el HUD cuelga de ella
 		var root = new Control
 		{
