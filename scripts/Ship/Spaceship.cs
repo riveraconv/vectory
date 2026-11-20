@@ -49,6 +49,9 @@ public partial class Spaceship : Node3D
 	private WingTrailSettings _trailSettings;
 	private WingTrailColors _trailColors;
 
+	// Luces de la nave (spec docs/efectos-8-luces.md): solo en carrera, tú y los rivales
+	private ShipLightSettings _lightSettings;
+
 	// Número de aristas que pueden parpadear por su cuenta con los daños: las líneas del wireframe o, con casco 3D,
 	// sus luces (14 en VECTOR, 9 en BLADE)
 	public int EdgeCount => _hull3D != null ? _hull3D.FlickerLightCount : _wireEdgeCount;
@@ -86,6 +89,15 @@ public partial class Spaceship : Node3D
 		_thrusters = new ThrusterFlames { Name = "Thrusters" };
 		_thrusters.Setup(_thrusterSettings, Visual.Thrusters, _thrusterPhase, _thrusterFull, Hull3DLayer);
 		AddChild(_thrusters);
+		if (_lightSettings != null)
+			_hull3D?.EnableLights(_lightSettings, _thrusters);
+	}
+
+	// Enciende las luces de la nave en su casco 3D (realce, halos, freno y giro). Antes o después de _Ready.
+	public void EnableLights(ShipLightSettings settings)
+	{
+		_lightSettings = settings ?? ShipLightSettings.Default;
+		_hull3D?.EnableLights(_lightSettings, _thrusters);
 	}
 
 	// Enciende las estelas de las alas, con sus ajustes y la pareja de colores de la nave. Antes de _Ready.
@@ -109,10 +121,18 @@ public partial class Spaceship : Node3D
 	public void ResetTrails() => _trails?.ResetState();
 
 	// Lo que hace la nave en este paso, para sus toberas
-	public void FeedThrusters(in ThrusterInput input) => _thrusters?.Feed(input);
+	public void FeedThrusters(in ThrusterInput input)
+	{
+		_thrusters?.Feed(input);
+		_hull3D?.Lights?.Feed(input);
+	}
 
 	// Recolocación: las toberas, al ralentí al momento
-	public void ResetThrusters() => _thrusters?.ResetState();
+	public void ResetThrusters()
+	{
+		_thrusters?.ResetState();
+		_hull3D?.Lights?.ResetState();
+	}
 
 	// Intensidad de las llamas (el fantasma: su transparencia)
 	public void SetThrusterOpacity(float opacity)
@@ -205,6 +225,8 @@ public partial class Spaceship : Node3D
 			AddChild(_hull3D);
 			_hull3D.SetDamage(_hullDamage, _hullTimeTrial);
 			_hull3D.SetWear(_hullWear);
+			if (_lightSettings != null)
+				_hull3D.EnableLights(_lightSettings, _thrusters);
 		}
 		_hull3D?.SetDamageShape(Visual.SmokeFoci, Visual.CollisionHalfWidth, Visual.CollisionFront, Visual.CollisionBack);
 		if (_thrusters != null)

@@ -13,7 +13,7 @@ namespace Vectory.Rivals;
 // Lo que la nave de un rival toma de la del jugador, para verse igual: casco 3D, inclinación, orientación, parpadeo del
 // daño y balizas de HAMMER (con los valores del Inspector del Player)
 public sealed record RivalLook(Hull3DSettings Hull, BankSettings Bank, AttitudeSettings Attitude, EdgeFlickerSettings Flicker,
-	IndustrialLampSettings Lamps, ThrusterFxSettings Thrusters, WingTrailSettings Trails);
+	IndustrialLampSettings Lamps, ThrusterFxSettings Thrusters, WingTrailSettings Trails, ShipLightSettings Lights);
 
 // Nave de un rival (spec docs/rivales-1-parrilla.md, 3.3 y 4): pinta la carrera de su RivalCar, que lleva toda la lógica.
 // Su casco 3D con su pintura, en la capa de los rivales (ShipHull3D.RivalLayer, iluminada por un juego de luces común),
@@ -108,6 +108,7 @@ public partial class RivalShip : Node3D
 		};
 		_ship.SetHull3DSettings(_look.Hull);
 		_ship.EnableThrusters(_look.Thrusters, 1.7f * _car.Entry.Number);
+		_ship.EnableLights(_look.Lights);
 		_ship.EnableTrails(_look.Trails, WingTrailPalette.For(definition.Id, _car.Entry.PaintIndex));
 		if (definition.Visual.Hull3D != null)
 			_ship.SetHullPaint(definition.Visual.Hull3D.Style, _car.Entry.PaintIndex);

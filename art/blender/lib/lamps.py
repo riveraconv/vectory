@@ -365,3 +365,55 @@ def write_shadow(path, pieces, skip=()):
         "center": [round(float(center[0]), 4), round(float(center[1]), 4)],
         "rows": "+z",
     }
+
+
+# ---------- Tipos de las luces (spec 4.1) ----------
+
+# Por nave: nombre → (tipo, hacia dónde sale el halo). "side" = hacia su lado (x de su centro); None = sin halo (tiras).
+# Las toberas no están: son de efectos-6.
+_BACK, _FRONT, _UP, _DOWN, _SIDE = (0.0, 0.0, 1.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0), (0.0, -1.0, 0.0), "side"
+_RETRO = {"Retro_L_Glow": ("retro", None), "Retro_R_Glow": ("retro", None)}
+LIGHT_TYPES = {
+    "vector": {
+        **{f"Accent_{p}_{s}": ("profile", None) for p in ("Chine", "WingLE", "Endplate", "PodBand") for s in "LR"},
+        **{f"Light_Nose_{s}": ("nose", _SIDE) for s in "LR"},
+        **{f"Light_Fin_{s}": ("fin", _SIDE) for s in "LR"},
+        **{f"Light_Tail_{s}": ("brake", _BACK) for s in "LR"},
+        "Light_Head": ("head", None),
+        **_RETRO,
+    },
+    "blade": {
+        **{f"Accent_Form{p}_{s}": ("form", None) for p in ("Nose", "Prong") for s in "LR"},
+        **{f"Light_{p}_{s}": ("nav", _SIDE) for p in ("Nav", "Tip") for s in "LR"},
+        "Light_Tail": ("tailw", _BACK),
+        "Light_Brake": ("brake", _BACK),
+        "Light_Strobe_Top": ("strobe", _UP),
+        "Light_Strobe_Bottom": ("strobe", _DOWN),
+        **{f"Light_Head_{s}_{p}": ("head", None) for s in "LR" for p in ("Top", "Bottom")},
+        **_RETRO,
+    },
+    "hammer": {
+        **{f"Light_{p}_{s}": ("amber", _SIDE) for p in ("Nose", "Canard") for s in "LR"},
+        **{f"Light_{p}_{s}": ("brake", _BACK) for p in ("Tail", "TailBar") for s in "LR"},
+        "Light_Brake": ("brake", _BACK),
+        **{f"Light_Work_{i}": ("work", _FRONT) for i in range(4)},
+        **{f"Light_Head_{s}": ("head", _FRONT) for s in "LR"},
+        **{f"Headlight_{s}_Reflector": ("head", None) for s in "LR"},
+        "Beacon_Boost_Lens": ("beacon", _UP),
+        "Beacon_Damage_Lens": ("beacon", _UP),
+        **_RETRO,
+    },
+}
+
+
+# Entradas del manifiesto: tipo y, si lleva halo, hacia dónde. center_x: la x del centro de una pieza (para "side")
+def light_entries(ship, center_x):
+    out = []
+    for name, (kind, outward) in LIGHT_TYPES[ship].items():
+        entry = {"name": name, "type": kind}
+        if outward == _SIDE:
+            outward = (1.0 if center_x(name) > 0 else -1.0, 0.0, 0.0)
+        if outward is not None:
+            entry["halo"] = [float(c) for c in outward]
+        out.append(entry)
+    return out

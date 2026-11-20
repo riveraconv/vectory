@@ -665,5 +665,105 @@
       -0.345
     ],
     "rows": "+z"
-  }
+  },
+  "lights": [
+    {
+      "name": "Accent_Chine_L",
+      "type": "profile"
+    },
+    {
+      "name": "Accent_Chine_R",
+      "type": "profile"
+    },
+    {
+      "name": "Accent_WingLE_L",
+      "type": "profile"
+    },
+    {
+      "name": "Accent_WingLE_R",
+      "type": "profile"
+    },
+    {
+      "name": "Accent_Endplate_L",
+      "type": "profile"
+    },
+    {
+      "name": "Accent_Endplate_R",
+      "type": "profile"
+    },
+    {
+      "name": "Accent_PodBand_L",
+      "type": "profile"
+    },
+    {
+      "name": "Accent_PodBand_R",
+      "type": "profile"
+    },
+    {
+      "name": "Light_Nose_L",
+      "type": "nose",
+      "halo": [
+        -1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Nose_R",
+      "type": "nose",
+      "halo": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Fin_L",
+      "type": "fin",
+      "halo": [
+        -1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Fin_R",
+      "type": "fin",
+      "halo": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Tail_L",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_Tail_R",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_Head",
+      "type": "head"
+    },
+    {
+      "name": "Retro_L_Glow",
+      "type": "retro"
+    },
+    {
+      "name": "Retro_R_Glow",
+      "type": "retro"
+    }
+  ]
 }

@@ -18,6 +18,14 @@ public sealed class HullManifestEmpty
 	public Vector3? Direction => Forward is { Length: 3 } ? new Vector3(Forward[0], Forward[1], Forward[2]) : null;
 }
 
+// Una luz del casco (spec docs/efectos-8-luces.md, 4.1): su tipo y hacia dónde sale su halo (null: sin halo, las tiras)
+public sealed class HullManifestLight
+{
+	[JsonPropertyName("name")] public string Name { get; set; } = "";
+	[JsonPropertyName("type")] public string Type { get; set; } = "";
+	[JsonPropertyName("halo")] public float[] Halo { get; set; }
+}
+
 // Silueta del casco vista desde arriba, para la sombra de contacto (spec docs/efectos-8-luces.md, 3.3): imagen en gris
 // junto al manifiesto, su tamaño en píxeles y en metros (ancho en x, largo en z, con el margen) y su centro en x/z.
 // La fila 0 es la del morro (z mínima).
@@ -68,6 +76,7 @@ public sealed class HullManifest
 	[JsonPropertyName("halfWidth")] public float HalfWidth { get; set; }
 	[JsonPropertyName("iridescence")] public List<HullManifestIridescence> Iridescence { get; set; } = new();
 	[JsonPropertyName("shadow")] public HullManifestShadow Shadow { get; set; }
+	[JsonPropertyName("lights")] public List<HullManifestLight> Lights { get; set; } = new();
 
 	// Solo BLADE: grupos de pintura, luces, sonda, máscaras del camuflaje y caja sin la sonda
 	[JsonPropertyName("tips")] public List<string> Tips { get; set; } = new();

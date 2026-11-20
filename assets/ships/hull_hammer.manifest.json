@@ -1057,5 +1057,176 @@
       -0.4145
     ],
     "rows": "+z"
-  }
+  },
+  "lights": [
+    {
+      "name": "Light_Nose_L",
+      "type": "amber",
+      "halo": [
+        -1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Nose_R",
+      "type": "amber",
+      "halo": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Canard_L",
+      "type": "amber",
+      "halo": [
+        -1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Canard_R",
+      "type": "amber",
+      "halo": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Tail_L",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_Tail_R",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_TailBar_L",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_TailBar_R",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_Brake",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_Work_0",
+      "type": "work",
+      "halo": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    },
+    {
+      "name": "Light_Work_1",
+      "type": "work",
+      "halo": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    },
+    {
+      "name": "Light_Work_2",
+      "type": "work",
+      "halo": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    },
+    {
+      "name": "Light_Work_3",
+      "type": "work",
+      "halo": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    },
+    {
+      "name": "Light_Head_L",
+      "type": "head",
+      "halo": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    },
+    {
+      "name": "Light_Head_R",
+      "type": "head",
+      "halo": [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    },
+    {
+      "name": "Headlight_L_Reflector",
+      "type": "head"
+    },
+    {
+      "name": "Headlight_R_Reflector",
+      "type": "head"
+    },
+    {
+      "name": "Beacon_Boost_Lens",
+      "type": "beacon",
+      "halo": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Beacon_Damage_Lens",
+      "type": "beacon",
+      "halo": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Retro_L_Glow",
+      "type": "retro"
+    },
+    {
+      "name": "Retro_R_Glow",
+      "type": "retro"
+    }
+  ]
 }

@@ -700,5 +700,119 @@
       -0.7959
     ],
     "rows": "+z"
-  }
+  },
+  "lights": [
+    {
+      "name": "Accent_FormNose_L",
+      "type": "form"
+    },
+    {
+      "name": "Accent_FormNose_R",
+      "type": "form"
+    },
+    {
+      "name": "Accent_FormProng_L",
+      "type": "form"
+    },
+    {
+      "name": "Accent_FormProng_R",
+      "type": "form"
+    },
+    {
+      "name": "Light_Nav_L",
+      "type": "nav",
+      "halo": [
+        -1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Nav_R",
+      "type": "nav",
+      "halo": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Tip_L",
+      "type": "nav",
+      "halo": [
+        -1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Tip_R",
+      "type": "nav",
+      "halo": [
+        1.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Tail",
+      "type": "tailw",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_Brake",
+      "type": "brake",
+      "halo": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "name": "Light_Strobe_Top",
+      "type": "strobe",
+      "halo": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Strobe_Bottom",
+      "type": "strobe",
+      "halo": [
+        0.0,
+        -1.0,
+        0.0
+      ]
+    },
+    {
+      "name": "Light_Head_L_Top",
+      "type": "head"
+    },
+    {
+      "name": "Light_Head_L_Bottom",
+      "type": "head"
+    },
+    {
+      "name": "Light_Head_R_Top",
+      "type": "head"
+    },
+    {
+      "name": "Light_Head_R_Bottom",
+      "type": "head"
+    },
+    {
+      "name": "Retro_L_Glow",
+      "type": "retro"
+    },
+    {
+      "name": "Retro_R_Glow",
+      "type": "retro"
+    }
+  ]
 }

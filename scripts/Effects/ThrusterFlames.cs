@@ -71,6 +71,9 @@ public partial class ThrusterFlames : Node3D
 	// La intensidad de todo × esto (el fantasma: su transparencia)
 	public float Opacity { get; set; } = 1f;
 
+	// Giro suavizado (τ 0,12 s), para las luces de la nave (spec docs/efectos-8-luces.md, 7.1); el boost, BoostLevel
+	public float SmoothedSteer => _state?.Steer ?? 0f;
+
 	// Antes de _Ready: ajustes, forma de la nave, desfase del tiempo (para que dos naves no parpadeen igual), si lleva todo
 	// (carrera) o solo la llama (fantasma y menú: sin diamantes, calor ni luz; spec 9) y la capa del casco que ilumina
 	public void Setup(ThrusterFxSettings settings, ThrusterShape shape, float phase, bool full, uint lightLayer)

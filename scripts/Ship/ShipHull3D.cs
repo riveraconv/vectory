@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using Vectory.Effects;
 
 namespace Vectory.Ship;
 
@@ -212,6 +213,10 @@ void fragment() {
 	private HullNoseCopy _noseCopy;
 	private ShaderMaterial _copyWearPass;
 	private HullLightRig _copyLights;
+	// Luces de la nave (spec docs/efectos-8-luces.md): solo en carrera; null en el fantasma, el menú y el holograma
+	private HullLights _hullLights;
+	private ShipLightSettings _hullLightSettings;
+	private ThrusterFlames _hullLightThrusters;
 
 	public ShipHull3DProfile Profile { get; set; }
 
@@ -249,6 +254,7 @@ void fragment() {
 		AttachGlass();
 		ApplyScorch();
 		SyncNoseCopy();
+		CreateHullLights();
 		// Al final del árbol: la WorldEnvironment de la escena se crea en el _Ready de Main, después de este nodo
 		CallDeferred(MethodName.SetUpWorldReflections);
 	}
@@ -263,6 +269,32 @@ void fragment() {
 		ApplyAmbient();
 		ApplyIridescence();
 	}
+
+	// Luces de la nave (spec docs/efectos-8-luces.md): realce, halos, freno y giro, con el boost y el giro de sus toberas.
+	// Antes o después de _Ready.
+	public void EnableLights(ShipLightSettings settings, ThrusterFlames thrusters)
+	{
+		_hullLightSettings = settings ?? ShipLightSettings.Default;
+		_hullLightThrusters = thrusters;
+		if (_hullLights != null)
+			_hullLights.Thrusters = thrusters;
+		else if (_built)
+			CreateHullLights();
+	}
+
+	public HullLights Lights => _hullLights;
+
+	private void CreateHullLights()
+	{
+		if (_hullLightSettings == null || !IsLoaded || _manifest == null || _hullLights != null)
+			return;
+		_hullLights = new HullLights { Name = "ShipLights", Thrusters = _hullLightThrusters };
+		AddChild(_hullLights);
+		_hullLights.Setup(this, _manifest, _hullLightSettings, Layer);
+	}
+
+	// Material propio de una pieza viva; null si no está
+	public StandardMaterial3D LightMaterial(string piece) => MaterialOf(piece);
 
 	// Punto vacío del modelo (bocas, estelas, humo) en coordenadas de la nave; cero si no está
 	public Vector3 EmptyPosition(string name) => _empties.TryGetValue(name, out Node3D node) ? node.Position : Vector3.Zero;
@@ -308,6 +340,7 @@ void fragment() {
 			StandardMaterial3D material = MaterialOf(name);
 			if (material != null)
 				material.Emission = HullDecalPainter.ToColor(look.LightColor(name));
+			_hullLights?.SetBaseColor(name, HullDecalPainter.ToColor(look.LightColor(name)));
 		}
 
 		foreach (string name in HullPieces.LiveryPieces)
@@ -958,6 +991,13 @@ void fragment() {
 	// Parpadeo de las luces de su contrato: el mismo EdgeFlicker de los daños, con una "arista" por luz
 	public void ShowLightFlicker(EdgeFlicker flicker)
 	{
+		if (_hullLights != null)
+		{
+			// con las luces de la nave, el parpadeo es un factor más de su intensidad
+			for (int k = 0; k < Profile.Contract.FlickerLights.Count; k++)
+				_hullLights.SetFlicker(k, flicker.IsDimmed(k) ? HullDamage.DimFactor : 1f);
+			return;
+		}
 		int i = 0;
 		foreach (string name in Profile.Contract.FlickerLights)
 		{
@@ -973,6 +1013,7 @@ void fragment() {
 	public void SetOpacity(float opacity)
 	{
 		float transparency = Mathf.Clamp(1f - opacity, 0f, 1f);
+		_hullLights?.SetOpacity(opacity);
 		foreach (MeshInstance3D mesh in _pieces.Values)
 			mesh.Transparency = transparency;
 	}

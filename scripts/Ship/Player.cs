@@ -298,6 +298,76 @@ public partial class Player : CharacterBody3D, IContactShip
 
 	private static readonly ThrusterFxSettings ThrusterDefaults = new();
 
+	[ExportGroup("Luces")]   // luces de la nave (spec docs/efectos-8-luces.md, 12); también las de los rivales
+	[Export] public float LightProfileBoost = LightDefaults.ProfileBoost;     // realce de las bandas de perfil (VECTOR)
+	[Export] public float LightNoseBoost = LightDefaults.NoseBoost;           // luces del morro (VECTOR)
+	[Export] public float LightFinBoost = LightDefaults.FinBoost;             // luces de las aletas (VECTOR)
+	[Export] public float LightBrakeBoost = LightDefaults.BrakeBoost;         // pilotos y luces de freno
+	[Export] public float LightNavBoost = LightDefaults.NavBoost;             // luces de posición (BLADE)
+	[Export] public float LightFormBoost = LightDefaults.FormBoost;           // tiras de formación (BLADE)
+	[Export] public float LightTailWhiteBoost = LightDefaults.TailWhiteBoost; // cola blanca (BLADE)
+	[Export] public float LightAmberBoost = LightDefaults.AmberBoost;         // balizas ámbar (HAMMER)
+	[Export] public float LightWorkBoost = LightDefaults.WorkBoost;           // focos de trabajo (HAMMER)
+	[Export] public float LightHeadBoost = LightDefaults.HeadBoost;           // faros
+	[Export] public float LightNoseHalo = LightDefaults.NoseHalo;             // m, tamaño de los halos por tipo
+	[Export] public float LightFinHalo = LightDefaults.FinHalo;
+	[Export] public float LightBrakeHalo = LightDefaults.BrakeHalo;
+	[Export] public float LightNavHalo = LightDefaults.NavHalo;
+	[Export] public float LightTailWhiteHalo = LightDefaults.TailWhiteHalo;
+	[Export] public float LightAmberHalo = LightDefaults.AmberHalo;
+	[Export] public float LightWorkHalo = LightDefaults.WorkHalo;
+	[Export] public float LightHeadHalo = LightDefaults.HeadHalo;
+	[Export] public float LightStrobeHalo = LightDefaults.StrobeHalo;
+	[Export] public float LightBeaconHalo = LightDefaults.BeaconHalo;
+	[Export] public float LightHaloScale = LightDefaults.HaloScale;           // k: opacidad del halo = 0,32 × k × I
+	[Export] public float LightHaloOffset = LightDefaults.HaloOffset;         // m, hacia fuera de la pieza
+	[Export] public float LightBrakeRise = LightDefaults.BrakeRise;           // s
+	[Export] public float LightBrakeFall = LightDefaults.BrakeFall;           // s
+	[Export] public float LightBrakeGain = LightDefaults.BrakeGain;           // a tope, × (1 + esto)
+	[Export] public float LightBoostGain = LightDefaults.BoostGain;           // con boost, × (1 + esto)
+	[Export] public float LightNewBrakeRest = LightDefaults.NewBrakeRest;     // freno nuevo de BLADE y HAMMER en reposo
+	[Export] public float LightTurnTau = LightDefaults.TurnTau;               // s
+	[Export] public float LightTurnInner = LightDefaults.TurnInner;           // luces de dentro, × (1 + esto × G)
+
+	private static readonly ShipLightSettings LightDefaults = new();
+
+	// Ajustes de las luces de la nave (grupo Luces): también los de los rivales
+	public ShipLightSettings BuildLightSettings()
+	{
+		return new ShipLightSettings
+		{
+			ProfileBoost = LightProfileBoost,
+			NoseBoost = LightNoseBoost,
+			FinBoost = LightFinBoost,
+			BrakeBoost = LightBrakeBoost,
+			NavBoost = LightNavBoost,
+			FormBoost = LightFormBoost,
+			TailWhiteBoost = LightTailWhiteBoost,
+			AmberBoost = LightAmberBoost,
+			WorkBoost = LightWorkBoost,
+			HeadBoost = LightHeadBoost,
+			NoseHalo = LightNoseHalo,
+			FinHalo = LightFinHalo,
+			BrakeHalo = LightBrakeHalo,
+			NavHalo = LightNavHalo,
+			TailWhiteHalo = LightTailWhiteHalo,
+			AmberHalo = LightAmberHalo,
+			WorkHalo = LightWorkHalo,
+			HeadHalo = LightHeadHalo,
+			StrobeHalo = LightStrobeHalo,
+			BeaconHalo = LightBeaconHalo,
+			HaloScale = LightHaloScale,
+			HaloOffset = LightHaloOffset,
+			BrakeRise = LightBrakeRise,
+			BrakeFall = LightBrakeFall,
+			BrakeGain = LightBrakeGain,
+			BoostGain = LightBoostGain,
+			NewBrakeRest = LightNewBrakeRest,
+			TurnTau = LightTurnTau,
+			TurnInner = LightTurnInner
+		};
+	}
+
 	// Ajustes de las toberas (grupo Toberas): también los de los rivales
 	public ThrusterFxSettings BuildThrusterSettings()
 	{
@@ -555,6 +625,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		_ship = new Spaceship { Name = "Spaceship", Visual = Definition.Visual, Use3DHull = true };
 		_ship.SetHull3DSettings(BuildHull3DSettings());
 		_ship.EnableThrusters(BuildThrusterSettings(), 0f);
+		_ship.EnableLights(BuildLightSettings());
 		// La pintura aún no decide el color de la estela (spec docs/efectos-7-estelas.md, 7)
 		_ship.EnableTrails(BuildTrailSettings(), WingTrailPalette.For(Definition.Id, -1));
 		AddChild(_ship);

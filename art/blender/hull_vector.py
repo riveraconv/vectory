@@ -510,6 +510,8 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name, shadow):
         "halfWidth": round(max(-low[0], high[0]), 4),
         "halfWidthWithLivery": round(max(-low_l[0], high_l[0]), 4),
         "shadow": shadow,
+        # tipo de cada luz y hacia dónde sale su halo (spec docs/efectos-8-luces.md, 4.1)
+        "lights": lamps.light_entries("vector", lambda n: (bounds([objs[n]])[0][0] + bounds([objs[n]])[1][0]) / 2),
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:

@@ -981,6 +981,16 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 - Hasta la etapa 2, en el juego los faros van a su intensidad de partida (6–7) y el freno nuevo de BLADE y HAMMER, rojo fijo a tope.
 - Comprobado: dos ejecuciones dan los mismos `.glb`, manifiestos y siluetas; Godot importa y una carrera sin ventana carga las tres naves sin errores. Copia del morro: VECTOR 10.184 triángulos, BLADE 22.331, HAMMER 34.326. No se ha visto en el juego con glow.
 
+## Luces de la nave: etapa 2, pilotos, halos, freno y giro
+
+(spec `docs/efectos-8-luces.md` v1.2, rama `feature/fx-lights`): hecha, con tests de la lógica pura y validada por el usuario jugando, con los valores de la spec. Tú y los rivales; el fantasma, el menú y el holograma, como antes.
+
+- Tipos de las luces en el manifiesto (`lights`: tipo y dirección del halo, desde `lamps.LIGHT_TYPES`); el lado sale de la x del centro de la pieza. Las toberas no están (son de `efectos-6`); las bocas del retro y los faros, con su intensidad de partida hasta la etapa 3.
+- El parpadeo con daño de siempre (× 0,2) pasa a ser un factor más del estado de las luces (`ShipHull3D.ShowLightFlicker` → `HullLights.SetFlicker`) hasta que la etapa 4 lo sustituya. La anticolisión y las balizas siguen con su lógica: el estado lee su intensidad del material y solo les pone el halo. La pintura de VECTOR pasa su color de partida (`SetBaseColor`).
+- Halo: cuadrado de cara a la cámara en un `MultiMesh` por nave, en suma, que lee la profundidad; se acerca 8 cm a la cámara para que la pieza no lo corte. Opacidad × BLOOM × la opacidad del casco atravesable.
+- **Trampa ya resuelta**: escribir los materiales y el búfer de los halos en cada frame costaba ~0,8 ms por frame con 8 naves. Solo se escribe lo que cambia más de un 1 %. Medido sin vsync, 4 carreras con y 4 sin luces: media de 2,15–2,68 ms frente a 2,26–2,48, dentro del ruido; sin frames lentos.
+- Comprobado con capturas en RACE con VECTOR (parrilla, frenando, girando). Boost, BLADE, HAMMER y rivales, el usuario jugando.
+
 ## Pendiente
 
 - `docs/naves-disenos.md` no recoge todavía las cabinas elegidas. El resto de opciones del menú (CHAMPIONSHIP, HANGAR), ajustar el contorno interior de la cabina. Reajustar la dificultad de los rivales con circuitos nuevos (decisión del usuario).
