@@ -35,7 +35,7 @@ public class Hull3DBladeTests
         Assert.Empty(HullManifest.Missing(Manifest.Pieces.Select(p => p.Name), contract));
         Assert.Equal(contract.Pieces.Count, Manifest.Pieces.Count);
         Assert.Equal(Manifest.Pieces.Count, Manifest.Pieces.Select(p => p.Name).Distinct().Count());
-        Assert.Equal(HullContract.Empties.OrderBy(n => n), Manifest.Empties.Select(e => e.Name).OrderBy(n => n));
+        Assert.Equal(contract.AllEmpties.OrderBy(n => n), Manifest.Empties.Select(e => e.Name).OrderBy(n => n));
     }
 
     [Fact]
@@ -53,7 +53,11 @@ public class Hull3DBladeTests
         Assert.Equal(4, MilitaryHullPieces.Decals.Length);
         Assert.Equal(9, MilitaryHullPieces.FlickerLights.Count);
         Assert.Single(MilitaryHullPieces.Floor);
-        Assert.Equal(40, MilitaryHullPieces.Contract.Count);
+        // freno, faros y retro (spec docs/efectos-8-luces.md, 3.5)
+        Assert.Single(MilitaryHullPieces.BrakeLights);
+        Assert.Equal(4, MilitaryHullPieces.Headlights.Length);
+        Assert.Equal(6, MilitaryHullPieces.Retro.Length);
+        Assert.Equal(51, MilitaryHullPieces.Contract.Count);
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-19",
+  "exported": "2026-11-20",
   "root": "CockpitHammer",
   "environment": "cockpit_blade_env.png",
   "pieces": [
@@ -216,6 +216,12 @@
     "Nose_Decal_NoStep_L",
     "Nose_Decal_Logo_R",
     "Nose_Decal_NoStep_R",
+    "Nose_Light_Head_L",
+    "Nose_Headlight_L_Glass",
+    "Nose_Light_Head_R",
+    "Nose_Headlight_R_Glass",
+    "Nose_Retro_L_Glow",
+    "Nose_Retro_R_Glow",
     "Nose_Fuselage_M_Dark_NoShadow"
   ],
   "lowReflectionMaterials": [
@@ -260,7 +266,7 @@
       "opacity": 0.06
     }
   ],
-  "triangles": 66848,
+  "triangles": 70736,
   "bounds": {
     "min": [
       -2.502,
@@ -372,6 +378,186 @@
         "hull": "Decal_NoStep_R",
         "material": "M_Decal_NoStep",
         "live": false
+      },
+      {
+        "name": "Nose_Headlight_L_Housing",
+        "hull": "Headlight_L_Housing",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_L_Back",
+        "hull": "Headlight_L_Back",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_L_Bezel",
+        "hull": "Headlight_L_Bezel",
+        "material": "M_Chrome",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_L_Reflector",
+        "hull": "Headlight_L_Reflector",
+        "material": "M_Reflector_Headlight_L_Reflector",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Head_L",
+        "hull": "Light_Head_L",
+        "material": "M_Emissive_Light_Head_L",
+        "live": true
+      },
+      {
+        "name": "Nose_Headlight_L_Glass",
+        "hull": "Headlight_L_Glass",
+        "material": "M_LampGlass",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_L_Bracket",
+        "hull": "Headlight_L_Bracket",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_R_Housing",
+        "hull": "Headlight_R_Housing",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_R_Back",
+        "hull": "Headlight_R_Back",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_R_Bezel",
+        "hull": "Headlight_R_Bezel",
+        "material": "M_Chrome",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_R_Reflector",
+        "hull": "Headlight_R_Reflector",
+        "material": "M_Reflector_Headlight_R_Reflector",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Head_R",
+        "hull": "Light_Head_R",
+        "material": "M_Emissive_Light_Head_R",
+        "live": true
+      },
+      {
+        "name": "Nose_Headlight_R_Glass",
+        "hull": "Headlight_R_Glass",
+        "material": "M_LampGlass",
+        "live": false
+      },
+      {
+        "name": "Nose_Headlight_R_Bracket",
+        "hull": "Headlight_R_Bracket",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Barrel",
+        "hull": "Retro_L_Barrel",
+        "material": "M_RetroTitanium",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Back",
+        "hull": "Retro_L_Back",
+        "material": "M_RetroTitanium",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Lip",
+        "hull": "Retro_L_Lip",
+        "material": "M_RetroTitanium",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Clamp_0",
+        "hull": "Retro_L_Clamp_0",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Clamp_1",
+        "hull": "Retro_L_Clamp_1",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Mount",
+        "hull": "Retro_L_Mount",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Inner",
+        "hull": "Retro_L_Inner",
+        "material": "M_RetroInner",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Glow",
+        "hull": "Retro_L_Glow",
+        "material": "M_Emissive_Retro_L_Glow",
+        "live": true
+      },
+      {
+        "name": "Nose_Retro_R_Barrel",
+        "hull": "Retro_R_Barrel",
+        "material": "M_RetroTitanium",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Back",
+        "hull": "Retro_R_Back",
+        "material": "M_RetroTitanium",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Lip",
+        "hull": "Retro_R_Lip",
+        "material": "M_RetroTitanium",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Clamp_0",
+        "hull": "Retro_R_Clamp_0",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Clamp_1",
+        "hull": "Retro_R_Clamp_1",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Mount",
+        "hull": "Retro_R_Mount",
+        "material": "M_LampHousing",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Inner",
+        "hull": "Retro_R_Inner",
+        "material": "M_RetroInner",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Glow",
+        "hull": "Retro_R_Glow",
+        "material": "M_Emissive_Retro_R_Glow",
+        "live": true
       },
       {
         "name": "Nose_Fuselage_M_PlateDark",

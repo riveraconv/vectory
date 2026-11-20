@@ -13,6 +13,8 @@ public sealed class CockpitManifestPiece
 	[JsonPropertyName("height")] public float? Height { get; set; }
 	[JsonPropertyName("emission")] public string Emission { get; set; }
 	[JsonPropertyName("intensity")] public float? Intensity { get; set; }
+	// Centro de una luz del casco (spec docs/efectos-8-luces.md, 3.5): null en las demás piezas
+	[JsonPropertyName("center")] public float[] Center { get; set; }
 }
 
 public sealed class CockpitManifestAdditive

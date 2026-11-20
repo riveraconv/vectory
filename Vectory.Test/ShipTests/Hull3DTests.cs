@@ -33,7 +33,7 @@ public class Hull3DTests
         Assert.Empty(HullManifest.Missing(Manifest.Pieces.Select(p => p.Name)));
         Assert.Equal(HullPieces.Contract.Count, Manifest.Pieces.Count);
         Assert.Equal(Manifest.Pieces.Count, Manifest.Pieces.Select(p => p.Name).Distinct().Count());
-        Assert.Equal(HullPieces.Empties.OrderBy(n => n), Manifest.Empties.Select(e => e.Name).OrderBy(n => n));
+        Assert.Equal(HullContract.Racing.AllEmpties.OrderBy(n => n), Manifest.Empties.Select(e => e.Name).OrderBy(n => n));
     }
 
     [Fact]
@@ -48,7 +48,11 @@ public class Hull3DTests
         Assert.Equal(2, HullPieces.Pins.Length);
         Assert.Equal(9, HullPieces.Decals.Length);
         Assert.Equal(14, HullPieces.FlickerLights.Count());
-        Assert.Equal(41, HullPieces.Contract.Count);
+        // faros y retro (spec docs/efectos-8-luces.md, 3.5)
+        Assert.Single(HullPieces.Headlights);
+        Assert.Equal(2, HullPieces.HeadlightFrames.Length);
+        Assert.Equal(6, HullPieces.Retro.Length);
+        Assert.Equal(50, HullPieces.Contract.Count);
     }
 
     [Fact]

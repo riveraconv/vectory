@@ -11,8 +11,23 @@ public sealed class HullManifestEmpty
 {
 	[JsonPropertyName("name")] public string Name { get; set; } = "";
 	[JsonPropertyName("position")] public float[] Position { get; set; } = System.Array.Empty<float>();
+	// Hacia dónde sale el chorro del retro (spec docs/efectos-8-luces.md, 3.4): null en los demás
+	[JsonPropertyName("forward")] public float[] Forward { get; set; }
 
 	public Vector3 Point => Position.Length == 3 ? new Vector3(Position[0], Position[1], Position[2]) : Vector3.Zero;
+	public Vector3? Direction => Forward is { Length: 3 } ? new Vector3(Forward[0], Forward[1], Forward[2]) : null;
+}
+
+// Silueta del casco vista desde arriba, para la sombra de contacto (spec docs/efectos-8-luces.md, 3.3): imagen en gris
+// junto al manifiesto, su tamaño en píxeles y en metros (ancho en x, largo en z, con el margen) y su centro en x/z.
+// La fila 0 es la del morro (z mínima).
+public sealed class HullManifestShadow
+{
+	[JsonPropertyName("image")] public string Image { get; set; } = "";
+	[JsonPropertyName("pixels")] public int[] Pixels { get; set; } = System.Array.Empty<int>();
+	[JsonPropertyName("size")] public float[] Size { get; set; } = System.Array.Empty<float>();
+	[JsonPropertyName("center")] public float[] Center { get; set; } = System.Array.Empty<float>();
+	[JsonPropertyName("rows")] public string Rows { get; set; } = "";
 }
 
 // Barniz de un material: glTF lo lleva, pero Godot no lo lee al importar
@@ -52,6 +67,7 @@ public sealed class HullManifest
 	[JsonPropertyName("boundsWithLivery")] public CockpitManifestBounds BoundsWithLivery { get; set; } = new();
 	[JsonPropertyName("halfWidth")] public float HalfWidth { get; set; }
 	[JsonPropertyName("iridescence")] public List<HullManifestIridescence> Iridescence { get; set; } = new();
+	[JsonPropertyName("shadow")] public HullManifestShadow Shadow { get; set; }
 
 	// Solo BLADE: grupos de pintura, luces, sonda, máscaras del camuflaje y caja sin la sonda
 	[JsonPropertyName("tips")] public List<string> Tips { get; set; } = new();
@@ -119,16 +135,21 @@ public sealed class HullManifest
 public sealed record HullContract(string Root, IReadOnlyList<string> Pieces, IReadOnlyList<string> FlickerLights,
 	IReadOnlyList<string> Strobes)
 {
-	// Los puntos vacíos son los mismos en todos los cascos
+	// Los puntos vacíos que llevan todos los cascos
 	public static IReadOnlyList<string> Empties => HullPieces.Empties;
 
+	// Los de los faros y el retro de cada casco (spec docs/efectos-8-luces.md, 3.5)
+	public IReadOnlyList<string> LampEmpties { get; init; } = System.Array.Empty<string>();
+
+	public IEnumerable<string> AllEmpties => Empties.Concat(LampEmpties);
+
 	public static readonly HullContract Racing = new(HullPieces.Root, HullPieces.Contract, HullPieces.FlickerLights.ToList(),
-		System.Array.Empty<string>());
+		System.Array.Empty<string>()) { LampEmpties = LampPieces.Empties };
 	public static readonly HullContract Military = new(MilitaryHullPieces.Root, MilitaryHullPieces.Contract,
-		MilitaryHullPieces.FlickerLights, MilitaryHullPieces.Strobes);
+		MilitaryHullPieces.FlickerLights, MilitaryHullPieces.Strobes) { LampEmpties = MilitaryHullPieces.LampEmpties };
 
 	public static readonly HullContract Industrial = new(IndustrialHullPieces.Root, IndustrialHullPieces.Contract,
-		IndustrialHullPieces.FlickerLights, System.Array.Empty<string>());
+		IndustrialHullPieces.FlickerLights, System.Array.Empty<string>()) { LampEmpties = LampPieces.Empties };
 
 	public static HullContract For(HullStyle style) => style switch
 	{
@@ -227,6 +248,26 @@ public static class HullPieces
 	// Las piezas que solo se ven con librea
 	public static IEnumerable<string> LiveryPieces => Stripes.Concat(Pins).Concat(Decals);
 
+	// Faros (visera y sus marcos) y tomas dorsales del retro (spec docs/efectos-8-luces.md, 3.2 y 3.4). Las tomas llevan
+	// la pintura del casco
+	public static readonly string[] Headlights = { "Light_Head" };
+	public static readonly string[] HeadlightFrames = { "Headlight_Frame_F", "Headlight_Frame_R" };
+	public static readonly string[] RetroScoops = { "Retro_L_Scoop", "Retro_R_Scoop" };
+	public static readonly string[] Retro = { "Retro_L_Scoop", "Retro_L_Inner", "Retro_L_Glow", "Retro_R_Scoop", "Retro_R_Inner", "Retro_R_Glow" };
+
 	public static readonly IReadOnlyList<string> Contract = Painted.Concat(AccentEdges).Concat(AccentLights)
-		.Concat(TailLights).Concat(NozzleLights).Append(Canopy).Concat(Stripes).Concat(Pins).Concat(Decals).ToList();
+		.Concat(TailLights).Concat(NozzleLights).Append(Canopy).Concat(Stripes).Concat(Pins).Concat(Decals)
+		.Concat(Headlights).Concat(HeadlightFrames).Concat(Retro).ToList();
+}
+
+// Lo común de los faros y el retro de los tres cascos (spec docs/efectos-8-luces.md, 3.2 y 3.4): vacíos de los focos y
+// de las toberas de retro, y las bocas luminosas
+public static class LampPieces
+{
+	public static readonly string[] SpotEmpties = { "Spot_Head_L", "Spot_Head_R" };
+	public static readonly string[] RetroGroups = { "Retro_L", "Retro_R" };
+	public static readonly string[] RetroPoints = { "Retro_L_Point", "Retro_R_Point" };
+	public static readonly string[] RetroGlows = { "Retro_L_Glow", "Retro_R_Glow" };
+
+	public static readonly IReadOnlyList<string> Empties = SpotEmpties.Concat(RetroGroups).Concat(RetroPoints).ToList();
 }

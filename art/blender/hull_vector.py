@@ -21,6 +21,7 @@ from mathutils import Matrix  # noqa: E402
 from lib import blender_io as io  # noqa: E402
 from lib import geometry as g  # noqa: E402
 from lib import hull_geometry as hg  # noqa: E402
+from lib import lamps  # noqa: E402
 from lib import textures_hull as tx  # noqa: E402
 from lib.builder import Builder  # noqa: E402
 
@@ -56,6 +57,9 @@ REFLECTIONS = {"M_CanopyIris": 1.8}
 IRIDESCENCE = {"M_CanopyIris": {"factor": 1.0, "ior": 1.6, "thickness": [220, 620]}}
 TRANSPARENT = {"M_CanopyIris": 0.7}
 DECAL_MATERIALS = ["M_Decal_Number", "M_Decal_Sponsor", "M_Decal_Checker"]
+# Faros, toberas de retro y su cristal (spec docs/efectos-8-luces.md, 3)
+COAT.update(lamps.COAT)
+TRANSPARENT.update(lamps.TRANSPARENT)
 
 ZONES = ["Fuselage", "Canopy", "Wing_L", "Wing_R", "Pod_L", "Pod_R", "Livery"]
 SIDES = (("L", -1), ("R", 1))
@@ -73,13 +77,15 @@ DECALS = ["Decal_Number_Nose", "Decal_Number_Pod_L", "Decal_Number_Pod_R", "Deca
           "Decal_Sponsor_Pod_L", "Decal_Sponsor_Pod_R", "Decal_Checker_L", "Decal_Checker_R"]
 EMPTIES = {"Exhaust_L": (-0.75, 0.1, 3.2), "Exhaust_R": (0.75, 0.1, 3.2),
            "Trail_L": (-SPAN, -0.05, 2.72), "Trail_R": (SPAN, -0.05, 2.72), "Smoke": (0.75, 0.5, 2.2)}
+# Vacíos de los faros y del retro: matriz y dirección del chorro (spec docs/efectos-8-luces.md, 3.2 y 3.4)
+LAMP_EMPTIES = lamps.lamp_empties_vector()
 # Calcomanías planas de las góndolas: medidas del contrato
 DECAL_SIZES = {"Decal_Number_Pod": (0.34, 0.204), "Decal_Sponsor_Pod": (0.42, 0.105), "Decal_Checker": (0.56, 0.14)}
 
 
 def contract_names():
     return (PAINTED + ACCENTS + ACCENT_LIGHTS + TAIL_LIGHTS + NOZZLE_LIGHTS + ["Canopy_Glass"]
-            + STRIPES + PINS + DECALS)
+            + STRIPES + PINS + DECALS + lamps.VECTOR_PIECES)
 
 
 def parse_out():
@@ -363,11 +369,14 @@ def create_empties(zones, root, collection):
     for name, pos in EMPTIES.items():
         obj = io.empty(name, parents[name], collection)
         obj.matrix_basis = Matrix([list(r) for r in T(pos)])
+    for name, (matrix, _) in LAMP_EMPTIES.items():
+        obj = io.empty(name, zones["Fuselage"], collection)
+        obj.matrix_basis = Matrix([list(r) for r in matrix])
 
 
 def check_contract(root):
     present = {o.name for o in root.children_recursive}
-    missing = [n for n in contract_names() + list(EMPTIES) if n not in present]
+    missing = [n for n in contract_names() + list(EMPTIES) + list(LAMP_EMPTIES) if n not in present]
     if missing:
         raise RuntimeError("Faltan piezas del contrato con Godot: " + ", ".join(missing))
 
@@ -439,7 +448,7 @@ def r4(v):
     return [round(c, 4) for c in v]
 
 
-def write_manifest(path, root, zones, materials, no_shadow, env_name):
+def write_manifest(path, root, zones, materials, no_shadow, env_name, shadow):
     livery = livery_objects(zones)
     body = [o for o in root.children_recursive if o not in livery]
     low, high, tris = bounds(body)
@@ -459,8 +468,16 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name):
             color, intensity = materials.emissive[name]
             entry["emission"] = f"#{color:06X}"
             entry["intensity"] = intensity
+            # centro de la luz, para los halos y las comprobaciones (spec docs/efectos-8-luces.md, 3.5 y 5.2)
+            lo, hi, _ = bounds([objs[name]])
+            entry["center"] = r4([(lo[i] + hi[i]) / 2 for i in range(3)])
         pieces.append(entry)
     empties = [{"name": n, "position": r4(godot_point(objs[n], objs[n].location * 0))} for n in EMPTIES]
+    for n, (_, forward) in LAMP_EMPTIES.items():
+        entry = {"name": n, "position": r4(godot_point(objs[n], objs[n].location * 0))}
+        if forward is not None:
+            entry["forward"] = r4(g._normalize(forward))
+        empties.append(entry)
     manifest = {
         "blender": bpy.app.version_string,
         "exported": datetime.date.today().isoformat(),
@@ -492,6 +509,7 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name):
         "boundsWithLivery": {"min": r4(low_l), "max": r4(high_l)},
         "halfWidth": round(max(-low[0], high[0]), 4),
         "halfWidthWithLivery": round(max(-low_l[0], high_l[0]), 4),
+        "shadow": shadow,
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -549,7 +567,10 @@ def render_previews(scene, collection, root, zones, env_path, out):
     livery = livery_objects(zones)
     folder = os.path.join(out, "previews")
     shots = [("tq", (-7.6, 3.0, -7.4), (0, 0.25, 0.2), 38), ("top", (0, 16.35, 0.25), (0, 0, 0.2), 34),
-             ("side", (11, 0.4, -0.3), (0, 0.3, -0.3), 34), ("rear", (4, 1.8, 13.5), (0, 0.3, 0.5), 34)]
+             ("side", (11, 0.4, -0.3), (0, 0.3, -0.3), 34), ("rear", (4, 1.8, 13.5), (0, 0.3, 0.5), 34),
+             # faros y retro de cerca (spec docs/efectos-8-luces.md, prueba manual 2)
+             ("nose", (-1.6, 0.9, -6.4), (0, 0.1, -3.2), 30), ("retro", (-1.4, 1.5, -4.2), (0, 0.3, -2.1), 32),
+             ("tail", (1.2, 0.8, 5.6), (0, 0.2, 2.6), 28)]
     for obj in livery:
         obj.hide_render = True
     for name, eye, target, fov in shots:
@@ -585,6 +606,7 @@ def build_hull(out):
     for side, k in SIDES:
         build_side(builder, materials, side, k)
     build_livery(builder, materials)
+    lamps.build_vector(builder, materials, io)
     return materials, builder
 
 
@@ -614,7 +636,8 @@ def main():
 
     check_contract(root)
     checks, low, high = check_axes(root, zones)
-    manifest = write_manifest(manifest_path, root, zones, materials, no_shadow, env_name)
+    shadow = lamps.write_shadow(os.path.join(ASSETS, "hull_vector_shadow.png"), builder.pieces)
+    manifest = write_manifest(manifest_path, root, zones, materials, no_shadow, env_name, shadow)
     io.export_glb(glb_path, root)
 
     preview_collection = bpy.data.collections.new("Preview")

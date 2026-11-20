@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-19",
+  "exported": "2026-11-20",
   "root": "CockpitBlade",
   "pieces": [
     {
@@ -133,6 +133,12 @@
     "Nose_Canopy_Floor",
     "Nose_Decal_Number_L",
     "Nose_Decal_Number_R",
+    "Nose_Light_Head_L_Top",
+    "Nose_Light_Head_L_Bottom",
+    "Nose_Retro_L_Glow",
+    "Nose_Light_Head_R_Top",
+    "Nose_Light_Head_R_Bottom",
+    "Nose_Retro_R_Glow",
     "Nose_Fuselage_M_Dark_NoShadow",
     "Nose_Armor_M_Gunmetal_NoShadow"
   ],
@@ -182,7 +188,7 @@
       "opacity": 0.05
     }
   ],
-  "triangles": 79059,
+  "triangles": 84743,
   "bounds": {
     "min": [
       -1.0837,
@@ -306,6 +312,66 @@
         "name": "Nose_Decal_Number_R",
         "hull": "Decal_Number_R",
         "material": "M_Decal_Number",
+        "live": false
+      },
+      {
+        "name": "Nose_Light_Head_L_Top",
+        "hull": "Light_Head_L_Top",
+        "material": "M_Emissive_Light_Head_L_Top",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Head_L_Bottom",
+        "hull": "Light_Head_L_Bottom",
+        "material": "M_Emissive_Light_Head_L_Bottom",
+        "live": true
+      },
+      {
+        "name": "Nose_Retro_L_Slot",
+        "hull": "Retro_L_Slot",
+        "material": "M_RetroInner",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_L_Glow",
+        "hull": "Retro_L_Glow",
+        "material": "M_Emissive_Retro_L_Glow",
+        "live": true
+      },
+      {
+        "name": "Nose_Retro_L_Flap",
+        "hull": "Retro_L_Flap",
+        "material": "M_RetroFlap",
+        "live": false
+      },
+      {
+        "name": "Nose_Light_Head_R_Top",
+        "hull": "Light_Head_R_Top",
+        "material": "M_Emissive_Light_Head_R_Top",
+        "live": true
+      },
+      {
+        "name": "Nose_Light_Head_R_Bottom",
+        "hull": "Light_Head_R_Bottom",
+        "material": "M_Emissive_Light_Head_R_Bottom",
+        "live": true
+      },
+      {
+        "name": "Nose_Retro_R_Slot",
+        "hull": "Retro_R_Slot",
+        "material": "M_RetroInner",
+        "live": false
+      },
+      {
+        "name": "Nose_Retro_R_Glow",
+        "hull": "Retro_R_Glow",
+        "material": "M_Emissive_Retro_R_Glow",
+        "live": true
+      },
+      {
+        "name": "Nose_Retro_R_Flap",
+        "hull": "Retro_R_Flap",
+        "material": "M_RetroFlap",
         "live": false
       },
       {

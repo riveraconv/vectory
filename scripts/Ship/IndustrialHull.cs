@@ -41,9 +41,22 @@ public static class IndustrialHullPieces
 	// Las piezas que solo se ven con marcas: las calcomanías y las franjas de las aletas y del compartimento
 	public static IEnumerable<string> LiveryPieces => Decals.Concat(LiveryHazards);
 
+	// Freno central entre los motores, faros redondos sobre la defensa y toberas laterales del retro (spec
+	// docs/efectos-8-luces.md, 3.1, 3.2 y 3.4)
+	public static readonly string[] Brake = { "Brake_Mount", "Light_Brake", "Brake_Frame" };
+	public static readonly string[] Headlights = { "Light_Head_L", "Light_Head_R" };
+	private static readonly string[] LampParts = { "Housing", "Back", "Bezel", "Reflector", "Glass", "Bracket" };
+	private static readonly string[] RetroParts = { "Barrel", "Back", "Lip", "Clamp_0", "Clamp_1", "Mount", "Inner", "Glow" };
+	public static readonly IReadOnlyList<string> HeadlightParts =
+		new[] { "L", "R" }.SelectMany(s => LampParts.Select(p => $"Headlight_{s}_{p}")).ToList();
+	public static readonly string[] Reflectors = { "Headlight_L_Reflector", "Headlight_R_Reflector" };
+	public static readonly IReadOnlyList<string> Retro =
+		new[] { "L", "R" }.SelectMany(s => RetroParts.Select(p => $"Retro_{s}_{p}")).ToList();
+
 	public static readonly IReadOnlyList<string> Contract = PaintedBody.Concat(PaintedCab).Concat(LeadingEdges)
 		.Concat(LiveryHazards).Concat(AmberLights).Concat(TailLights).Concat(WorkLights).Concat(Beacons)
-		.Concat(NozzleLights).Concat(Glass).Concat(Decals).ToList();
+		.Concat(NozzleLights).Concat(Glass).Concat(Decals).Concat(Brake).Concat(HeadlightParts).Concat(Headlights)
+		.Concat(Retro).ToList();
 }
 
 // Cómo se aplica una pintura industrial (spec 6.2), sin Godot: la pintura es una máscara,

@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-19",
+  "exported": "2026-11-20",
   "root": "HullBlade",
   "environment": "cockpit_blade_env.png",
   "pieces": [
@@ -58,77 +58,152 @@
     {
       "name": "Accent_FormNose_L",
       "emission": "#B6FF6A",
-      "intensity": 0.8
+      "intensity": 0.8,
+      "center": [
+        -0.438,
+        0.0589,
+        -2.6237
+      ]
     },
     {
       "name": "Accent_FormNose_R",
       "emission": "#B6FF6A",
-      "intensity": 0.8
+      "intensity": 0.8,
+      "center": [
+        0.438,
+        0.0589,
+        -2.6237
+      ]
     },
     {
       "name": "Accent_FormProng_L",
       "emission": "#B6FF6A",
-      "intensity": 0.8
+      "intensity": 0.8,
+      "center": [
+        -1.575,
+        0.072,
+        3.16
+      ]
     },
     {
       "name": "Accent_FormProng_R",
       "emission": "#B6FF6A",
-      "intensity": 0.8
+      "intensity": 0.8,
+      "center": [
+        1.575,
+        0.072,
+        3.16
+      ]
     },
     {
       "name": "Light_Nav_L",
       "emission": "#FF2A1E",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        -0.4354,
+        0.0356,
+        -3.3
+      ]
     },
     {
       "name": "Light_Nav_R",
       "emission": "#3DFF6A",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        0.4354,
+        0.0356,
+        -3.3
+      ]
     },
     {
       "name": "Light_Tip_L",
       "emission": "#FF2A1E",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        -1.588,
+        0.04,
+        3.52
+      ]
     },
     {
       "name": "Light_Tip_R",
       "emission": "#3DFF6A",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        1.588,
+        0.04,
+        3.52
+      ]
     },
     {
       "name": "Light_Tail",
       "emission": "#F4F7FF",
-      "intensity": 2.88
+      "intensity": 2.88,
+      "center": [
+        0.0,
+        0.21,
+        2.806
+      ]
     },
     {
       "name": "Light_Strobe_Top",
       "emission": "#FF2A1E",
-      "intensity": 0.0
+      "intensity": 0.0,
+      "center": [
+        0.0,
+        0.3583,
+        1.5
+      ]
     },
     {
       "name": "Light_Strobe_Bottom",
       "emission": "#FF2A1E",
-      "intensity": 0.0
+      "intensity": 0.0,
+      "center": [
+        0.0,
+        -0.1452,
+        0.3
+      ]
     },
     {
       "name": "Nozzle_Glow_L",
       "emission": "#245BFF",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        -0.6,
+        0.08,
+        3.0
+      ]
     },
     {
       "name": "Nozzle_Glow_R",
       "emission": "#245BFF",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        0.6,
+        0.08,
+        3.0
+      ]
     },
     {
       "name": "Nozzle_Core_L",
       "emission": "#7FA6FF",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        -0.6,
+        0.08,
+        3.05
+      ]
     },
     {
       "name": "Nozzle_Core_R",
       "emission": "#7FA6FF",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        0.6,
+        0.08,
+        3.05
+      ]
     },
     {
       "name": "Canopy_Glass"
@@ -153,6 +228,88 @@
     },
     {
       "name": "Nose_Pitot"
+    },
+    {
+      "name": "Light_Brake",
+      "emission": "#FF2A1E",
+      "intensity": 2.4,
+      "center": [
+        0.0,
+        0.15,
+        2.806
+      ]
+    },
+    {
+      "name": "Light_Head_L_Top",
+      "emission": "#F4F7FF",
+      "intensity": 7.0,
+      "center": [
+        -0.3222,
+        0.0385,
+        -3.8752
+      ]
+    },
+    {
+      "name": "Light_Head_R_Top",
+      "emission": "#F4F7FF",
+      "intensity": 7.0,
+      "center": [
+        0.3222,
+        0.0385,
+        -3.8752
+      ]
+    },
+    {
+      "name": "Light_Head_L_Bottom",
+      "emission": "#F4F7FF",
+      "intensity": 7.0,
+      "center": [
+        -0.3303,
+        0.018,
+        -3.8501
+      ]
+    },
+    {
+      "name": "Light_Head_R_Bottom",
+      "emission": "#F4F7FF",
+      "intensity": 7.0,
+      "center": [
+        0.3303,
+        0.018,
+        -3.8501
+      ]
+    },
+    {
+      "name": "Retro_L_Slot"
+    },
+    {
+      "name": "Retro_L_Glow",
+      "emission": "#73CCFF",
+      "intensity": 0.15,
+      "center": [
+        -0.3,
+        0.0867,
+        -2.661
+      ]
+    },
+    {
+      "name": "Retro_L_Flap"
+    },
+    {
+      "name": "Retro_R_Slot"
+    },
+    {
+      "name": "Retro_R_Glow",
+      "emission": "#73CCFF",
+      "intensity": 0.15,
+      "center": [
+        0.3,
+        0.0867,
+        -2.661
+      ]
+    },
+    {
+      "name": "Retro_R_Flap"
     }
   ],
   "empties": [
@@ -194,6 +351,80 @@
         0.6,
         0.35,
         2.4
+      ]
+    },
+    {
+      "name": "Spot_Head_L",
+      "position": [
+        -0.3326,
+        0.0274,
+        -3.98
+      ]
+    },
+    {
+      "name": "Retro_L",
+      "position": [
+        -0.3,
+        0.0907,
+        -2.6
+      ]
+    },
+    {
+      "name": "Retro_L_FlapHinge",
+      "position": [
+        -0.3,
+        0.0967,
+        -2.535
+      ]
+    },
+    {
+      "name": "Retro_L_Point",
+      "position": [
+        -0.3,
+        0.0947,
+        -2.662
+      ],
+      "forward": [
+        0.0,
+        0.7071,
+        -0.7071
+      ]
+    },
+    {
+      "name": "Spot_Head_R",
+      "position": [
+        0.3326,
+        0.0274,
+        -3.98
+      ]
+    },
+    {
+      "name": "Retro_R",
+      "position": [
+        0.3,
+        0.0907,
+        -2.6
+      ]
+    },
+    {
+      "name": "Retro_R_FlapHinge",
+      "position": [
+        0.3,
+        0.0967,
+        -2.535
+      ]
+    },
+    {
+      "name": "Retro_R_Point",
+      "position": [
+        0.3,
+        0.0947,
+        -2.662
+      ],
+      "forward": [
+        0.0,
+        0.7071,
+        -0.7071
       ]
     }
   ],
@@ -296,6 +527,13 @@
     "Decal_Number_R",
     "Decal_Insignia_L",
     "Decal_Insignia_R",
+    "Light_Brake",
+    "Light_Head_L_Top",
+    "Light_Head_L_Bottom",
+    "Retro_L_Glow",
+    "Light_Head_R_Top",
+    "Light_Head_R_Bottom",
+    "Retro_R_Glow",
     "Fuselage_M_Dark_NoShadow",
     "Pod_L_M_Dark_NoShadow",
     "Pod_R_M_Dark_NoShadow",
@@ -353,6 +591,11 @@
       "material": "M_SensorGlass",
       "coat": 1.0,
       "roughness": 0.0
+    },
+    {
+      "material": "M_LampGlass",
+      "coat": 1.0,
+      "roughness": 0.03
     }
   ],
   "roughnessFactors": [
@@ -382,6 +625,10 @@
     {
       "material": "M_CanopyArmor",
       "opacity": 0.72
+    },
+    {
+      "material": "M_LampGlass",
+      "opacity": 0.16
     }
   ],
   "decalMaterials": [
@@ -398,8 +645,8 @@
     "M_Titanium"
   ],
   "uv2Scale": 1.1,
-  "triangles": 31836,
-  "trianglesWithLivery": 32380,
+  "triangles": 37532,
+  "trianglesWithLivery": 38076,
   "bounds": {
     "min": [
       -1.612,
@@ -437,5 +684,21 @@
     ]
   },
   "halfWidth": 1.612,
-  "halfWidthWithLivery": 1.612
+  "halfWidthWithLivery": 1.612,
+  "shadow": {
+    "image": "hull_blade_shadow.png",
+    "pixels": [
+      256,
+      510
+    ],
+    "size": [
+      5.624,
+      11.2081
+    ],
+    "center": [
+      0.0,
+      -0.7959
+    ],
+    "rows": "+z"
+  }
 }

@@ -293,7 +293,8 @@ void fragment() {
 			return;
 		HullPaintLook look = HullPaintLook.For(_paint);
 
-		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
+		// las tomas dorsales del retro, con la pintura del casco (spec docs/efectos-8-luces.md, 3.4)
+		foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl", "Retro_L_Scoop", "Retro_R_Scoop" })
 			ApplyFinish(MaterialOf(name), look.PaintColor, look.PaintFinish);
 		foreach (string name in new[] { "Endplate_L", "Endplate_R" })
 			ApplyFinish(MaterialOf(name), look.EndplateColor, look.EndplateFinish);
@@ -698,7 +699,7 @@ void fragment() {
 		if (Profile.Style == HullStyle.Racing)
 		{
 			float paint = _paint.Paint.Finish.Iridescence * _settings.IridescenceStrength;
-			foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl" })
+			foreach (string name in new[] { "Fuselage_Upper", "Pod_L_Cowl", "Pod_R_Cowl", "Retro_L_Scoop", "Retro_R_Scoop" })
 				SetIridescence(MaterialOf(name), paint);
 			bool endplatesPainted = !_paint.WithLivery;
 			foreach (string name in new[] { "Endplate_L", "Endplate_R" })

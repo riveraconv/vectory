@@ -23,6 +23,7 @@ from lib import blender_io as io  # noqa: E402
 from lib import geometry as g  # noqa: E402
 from lib import hull_blade_geometry as bg  # noqa: E402
 from lib import hull_geometry as hg  # noqa: E402
+from lib import lamps  # noqa: E402
 from lib import nose_copy as nc  # noqa: E402
 from lib import textures_hull as tx  # noqa: E402
 from lib import textures_hull_blade as tb  # noqa: E402
@@ -74,6 +75,9 @@ REFLECTIONS = {"M_CanopyArmor": 1.4}
 IRIDESCENCE = {"M_SensorGlass": {"factor": 0.6, "ior": 1.5, "thickness": [300, 600]}}
 TRANSPARENT = {"M_CanopyArmor": 0.72}
 DECAL_MATERIALS = ["M_Decal_Number", "M_Decal_Insignia"]
+# Faros, toberas de retro y su cristal (spec docs/efectos-8-luces.md, 3)
+COAT.update(lamps.COAT)
+TRANSPARENT.update(lamps.TRANSPARENT)
 # Máscaras del camuflaje: R tono, G desconchón, B grano (sección 3.5). Godot pone los colores de la pintura.
 CAMO_MASKS = {"M_Paint": ("hull_blade_camo_mask.png", 55), "M_PaintArmor": ("hull_blade_armor_mask.png", 57)}
 
@@ -98,11 +102,13 @@ FLICKER_LIGHTS = ACCENTS + NAV_LIGHTS + TAIL_LIGHTS
 EMPTIES = {"Exhaust_L": (-0.60, 0.08, 3.30), "Exhaust_R": (0.60, 0.08, 3.30),
            "Trail_L": (-1.60, 0.0, 3.60), "Trail_R": (1.60, 0.0, 3.60), "Smoke": (0.60, 0.35, 2.40)}
 PROBE = "Nose_Pitot"
+# Vacíos de los faros, del retro y de las bisagras de sus trampillas (spec docs/efectos-8-luces.md, 3.2 y 3.4)
+LAMP_EMPTIES = lamps.lamp_empties_blade(bg)
 
 
 def contract_names():
     return (PAINTED + TIPS + ARMOR + BOTTOM + ACCENTS + NAV_LIGHTS + TAIL_LIGHTS + STROBES + NOZZLE_LIGHTS + GLASS + FLOOR
-            + DECALS + [PROBE])
+            + DECALS + [PROBE] + lamps.BLADE_PIECES)
 
 
 def parse_out():
@@ -408,11 +414,14 @@ def create_empties(zones, root, collection):
     for name, pos in EMPTIES.items():
         obj = io.empty(name, parents[name], collection)
         obj.matrix_basis = Matrix([list(r) for r in T(pos)])
+    for name, (matrix, _) in LAMP_EMPTIES.items():
+        obj = io.empty(name, zones["Fuselage"], collection)
+        obj.matrix_basis = Matrix([list(r) for r in matrix])
 
 
 def check_contract(root):
     present = {o.name for o in root.children_recursive}
-    missing = [n for n in contract_names() + list(EMPTIES) if n not in present]
+    missing = [n for n in contract_names() + list(EMPTIES) + list(LAMP_EMPTIES) if n not in present]
     if missing:
         raise RuntimeError("Faltan piezas del contrato con Godot: " + ", ".join(missing))
 
@@ -481,7 +490,7 @@ def r4(v):
     return [round(c, 4) for c in v]
 
 
-def write_manifest(path, root, zones, materials, no_shadow, env_name):
+def write_manifest(path, root, zones, materials, no_shadow, env_name, shadow):
     markings = marking_objects(zones)
     every = list(root.children_recursive)
     body = [o for o in every if o not in markings]
@@ -496,8 +505,16 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name):
             color, intensity = materials.emissive[name]
             entry["emission"] = f"#{color:06X}"
             entry["intensity"] = intensity
+            # centro de la luz, para los halos y las comprobaciones (spec docs/efectos-8-luces.md, 3.5 y 5.2)
+            lo, hi, _ = bounds([objs[name]])
+            entry["center"] = r4([(lo[i] + hi[i]) / 2 for i in range(3)])
         pieces.append(entry)
     empties = [{"name": n, "position": r4(godot_point(objs[n], objs[n].location * 0))} for n in EMPTIES]
+    for n, (_, forward) in LAMP_EMPTIES.items():
+        entry = {"name": n, "position": r4(godot_point(objs[n], objs[n].location * 0))}
+        if forward is not None:
+            entry["forward"] = r4(g._normalize(forward))
+        empties.append(entry)
     manifest = {
         "blender": bpy.app.version_string,
         "exported": datetime.date.today().isoformat(),
@@ -540,6 +557,7 @@ def write_manifest(path, root, zones, materials, no_shadow, env_name):
         "boundsWithoutProbe": {"min": r4(low_p), "max": r4(high_p)},
         "halfWidth": round(max(-low[0], high[0]), 4),
         "halfWidthWithLivery": round(max(-low_m[0], high_m[0]), 4),
+        "shadow": shadow,
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -626,7 +644,10 @@ def render_previews(scene, collection, root, zones, materials, env_path, out):
     folder = os.path.join(out, "previews")
     # las del prototipo con 0,65 m menos de altura
     shots = [("tq", (-8.6, 3.1, -8.4), (0, 0.15, -0.3), 38), ("top", (0, 18.85, -0.8), (0, 0, -0.8), 34),
-             ("side", (12.5, 0.4, -0.8), (0, 0.2, -0.8), 34), ("rear", (4.5, 1.8, 14.5), (0, 0.2, 0.8), 34)]
+             ("side", (12.5, 0.4, -0.8), (0, 0.2, -0.8), 34), ("rear", (4.5, 1.8, 14.5), (0, 0.2, 0.8), 34),
+             # faros, retro y freno de cerca (spec docs/efectos-8-luces.md, pruebas manuales 1 y 2)
+             ("nose", (-1.9, 0.8, -7.0), (0, 0.0, -3.9), 30), ("retro", (-1.2, 1.2, -4.4), (0, 0.15, -2.6), 30),
+             ("tail", (0.9, 0.5, 5.4), (0, 0.15, 2.8), 26)]
     markings = marking_objects(zones)
     # las calcomanías se ven negras y opacas sin su dibujo: en estas capturas, ocultas
     for obj in markings:
@@ -664,6 +685,7 @@ def build_hull(out):
         build_side(builder, materials, side, k)
     build_armor(builder, materials)
     build_markings(builder, materials)
+    lamps.build_blade(builder, materials, io, bg)
     return materials, builder
 
 
@@ -693,7 +715,9 @@ def main():
 
     check_contract(root)
     checks, low, high = check_axes(root)
-    manifest = write_manifest(manifest_path, root, zones, materials, no_shadow, env_name)
+    # la silueta, sin la sonda (spec docs/efectos-8-luces.md, 3.3)
+    shadow = lamps.write_shadow(os.path.join(ASSETS, "hull_blade_shadow.png"), builder.pieces, (PROBE,))
+    manifest = write_manifest(manifest_path, root, zones, materials, no_shadow, env_name, shadow)
     io.export_glb(glb_path, root)
 
     # Máscaras del camuflaje sin pérdidas, aparte del .glb (Godot las lee tal cual, con filtro más cercano)

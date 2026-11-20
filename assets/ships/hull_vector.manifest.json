@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-15",
+  "exported": "2026-11-20",
   "root": "HullVector",
   "environment": "cockpit_blade_env.png",
   "pieces": [
@@ -22,92 +22,182 @@
     {
       "name": "Accent_Chine_L",
       "emission": "#FF2D2D",
-      "intensity": 0.9
+      "intensity": 0.9,
+      "center": [
+        -0.5424,
+        0.0862,
+        -0.55
+      ]
     },
     {
       "name": "Accent_Chine_R",
       "emission": "#FF2D2D",
-      "intensity": 0.9
+      "intensity": 0.9,
+      "center": [
+        0.5424,
+        0.0862,
+        -0.55
+      ]
     },
     {
       "name": "Accent_WingLE_L",
       "emission": "#FF2D2D",
-      "intensity": 1.0
+      "intensity": 1.0,
+      "center": [
+        -1.8265,
+        0.0222,
+        0.9635
+      ]
     },
     {
       "name": "Accent_WingLE_R",
       "emission": "#FF2D2D",
-      "intensity": 1.0
+      "intensity": 1.0,
+      "center": [
+        1.8265,
+        0.0222,
+        0.9635
+      ]
     },
     {
       "name": "Accent_Endplate_L",
       "emission": "#FF2D2D",
-      "intensity": 1.0
+      "intensity": 1.0,
+      "center": [
+        -2.626,
+        0.115,
+        2.445
+      ]
     },
     {
       "name": "Accent_Endplate_R",
       "emission": "#FF2D2D",
-      "intensity": 1.0
+      "intensity": 1.0,
+      "center": [
+        2.626,
+        0.115,
+        2.445
+      ]
     },
     {
       "name": "Accent_PodBand_L",
       "emission": "#FF2D2D",
-      "intensity": 1.0
+      "intensity": 1.0,
+      "center": [
+        -0.75,
+        0.1185,
+        1.32
+      ]
     },
     {
       "name": "Accent_PodBand_R",
       "emission": "#FF2D2D",
-      "intensity": 1.0
+      "intensity": 1.0,
+      "center": [
+        0.75,
+        0.1185,
+        1.32
+      ]
     },
     {
       "name": "Light_Nose_L",
       "emission": "#FF2D2D",
-      "intensity": 3.0
+      "intensity": 3.0,
+      "center": [
+        -0.3409,
+        0.086,
+        -3.275
+      ]
     },
     {
       "name": "Light_Nose_R",
       "emission": "#FF2D2D",
-      "intensity": 3.0
+      "intensity": 3.0,
+      "center": [
+        0.3409,
+        0.086,
+        -3.275
+      ]
     },
     {
       "name": "Light_Fin_L",
       "emission": "#FF2D2D",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        -2.6,
+        0.32,
+        2.64
+      ]
     },
     {
       "name": "Light_Fin_R",
       "emission": "#FF2D2D",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        2.6,
+        0.32,
+        2.64
+      ]
     },
     {
       "name": "Light_Tail_L",
       "emission": "#FF1A1A",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        -0.3,
+        0.24,
+        2.606
+      ]
     },
     {
       "name": "Light_Tail_R",
       "emission": "#FF1A1A",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        0.3,
+        0.24,
+        2.606
+      ]
     },
     {
       "name": "Nozzle_Glow_L",
       "emission": "#245BFF",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        -0.75,
+        0.1,
+        2.9
+      ]
     },
     {
       "name": "Nozzle_Glow_R",
       "emission": "#245BFF",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        0.75,
+        0.1,
+        2.9
+      ]
     },
     {
       "name": "Nozzle_Core_L",
       "emission": "#7FA6FF",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        -0.75,
+        0.1,
+        2.95
+      ]
     },
     {
       "name": "Nozzle_Core_R",
       "emission": "#7FA6FF",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        0.75,
+        0.1,
+        2.95
+      ]
     },
     {
       "name": "Canopy_Glass"
@@ -174,6 +264,54 @@
       "name": "Decal_Checker_R",
       "width": 0.56,
       "height": 0.14
+    },
+    {
+      "name": "Light_Head",
+      "emission": "#FFF4E6",
+      "intensity": 6.0,
+      "center": [
+        0.0,
+        0.0729,
+        -3.67
+      ]
+    },
+    {
+      "name": "Headlight_Frame_F"
+    },
+    {
+      "name": "Headlight_Frame_R"
+    },
+    {
+      "name": "Retro_L_Scoop"
+    },
+    {
+      "name": "Retro_L_Inner"
+    },
+    {
+      "name": "Retro_L_Glow",
+      "emission": "#73CCFF",
+      "intensity": 0.15,
+      "center": [
+        -0.28,
+        0.3244,
+        -2.1756
+      ]
+    },
+    {
+      "name": "Retro_R_Scoop"
+    },
+    {
+      "name": "Retro_R_Inner"
+    },
+    {
+      "name": "Retro_R_Glow",
+      "emission": "#73CCFF",
+      "intensity": 0.15,
+      "center": [
+        0.28,
+        0.3244,
+        -2.1756
+      ]
     }
   ],
   "empties": [
@@ -215,6 +353,64 @@
         0.75,
         0.5,
         2.2
+      ]
+    },
+    {
+      "name": "Spot_Head_L",
+      "position": [
+        -0.1,
+        0.03,
+        -3.74
+      ]
+    },
+    {
+      "name": "Retro_L",
+      "position": [
+        -0.28,
+        0.3345,
+        -2.05
+      ]
+    },
+    {
+      "name": "Retro_L_Point",
+      "position": [
+        -0.28,
+        0.3242,
+        -2.1776
+      ],
+      "forward": [
+        0.0,
+        0.7071,
+        -0.7071
+      ]
+    },
+    {
+      "name": "Spot_Head_R",
+      "position": [
+        0.1,
+        0.03,
+        -3.74
+      ]
+    },
+    {
+      "name": "Retro_R",
+      "position": [
+        0.28,
+        0.3345,
+        -2.05
+      ]
+    },
+    {
+      "name": "Retro_R_Point",
+      "position": [
+        0.28,
+        0.3242,
+        -2.1776
+      ],
+      "forward": [
+        0.0,
+        0.7071,
+        -0.7071
       ]
     }
   ],
@@ -320,6 +516,9 @@
     "Decal_Number_Pod_R",
     "Decal_Sponsor_Pod_R",
     "Decal_Checker_R",
+    "Light_Head",
+    "Retro_L_Glow",
+    "Retro_R_Glow",
     "Pod_L_M_Dark_NoShadow",
     "Pod_R_M_Dark_NoShadow"
   ],
@@ -368,6 +567,11 @@
       "material": "M_Decal_Checker",
       "coat": 1.0,
       "roughness": 0.05
+    },
+    {
+      "material": "M_LampGlass",
+      "coat": 1.0,
+      "roughness": 0.03
     }
   ],
   "roughnessFactors": [
@@ -397,6 +601,10 @@
     {
       "material": "M_CanopyIris",
       "opacity": 0.7
+    },
+    {
+      "material": "M_LampGlass",
+      "opacity": 0.16
     }
   ],
   "decalMaterials": [
@@ -414,8 +622,8 @@
     "M_LiveryPin"
   ],
   "uv2Scale": 1.1,
-  "triangles": 23588,
-  "trianglesWithLivery": 27392,
+  "triangles": 24576,
+  "trianglesWithLivery": 28380,
   "bounds": {
     "min": [
       -2.634,
@@ -441,5 +649,21 @@
     ]
   },
   "halfWidth": 2.634,
-  "halfWidthWithLivery": 2.634
+  "halfWidthWithLivery": 2.634,
+  "shadow": {
+    "image": "hull_vector_shadow.png",
+    "pixels": [
+      256,
+      324
+    ],
+    "size": [
+      7.668,
+      9.71
+    ],
+    "center": [
+      0.0,
+      -0.345
+    ],
+    "rows": "+z"
+  }
 }

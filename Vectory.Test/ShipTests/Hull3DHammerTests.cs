@@ -35,7 +35,7 @@ public class Hull3DHammerTests
         Assert.Empty(HullManifest.Missing(Manifest.Pieces.Select(p => p.Name), contract));
         Assert.Equal(contract.Pieces.Count, Manifest.Pieces.Count);
         Assert.Equal(Manifest.Pieces.Count, Manifest.Pieces.Select(p => p.Name).Distinct().Count());
-        Assert.Equal(HullContract.Empties.OrderBy(n => n), Manifest.Empties.Select(e => e.Name).OrderBy(n => n));
+        Assert.Equal(contract.AllEmpties.OrderBy(n => n), Manifest.Empties.Select(e => e.Name).OrderBy(n => n));
     }
 
     [Fact]
@@ -53,7 +53,12 @@ public class Hull3DHammerTests
         Assert.Equal(3, IndustrialHullPieces.Glass.Length);
         Assert.Equal(10, IndustrialHullPieces.Decals.Length);
         Assert.Equal(12, IndustrialHullPieces.FlickerLights.Count);
-        Assert.Equal(45, IndustrialHullPieces.Contract.Count);
+        // freno, faros y retro (spec docs/efectos-8-luces.md, 3.5)
+        Assert.Equal(3, IndustrialHullPieces.Brake.Length);
+        Assert.Equal(12, IndustrialHullPieces.HeadlightParts.Count);
+        Assert.Equal(2, IndustrialHullPieces.Headlights.Length);
+        Assert.Equal(16, IndustrialHullPieces.Retro.Count);
+        Assert.Equal(78, IndustrialHullPieces.Contract.Count);
         Assert.Empty(HullContract.Industrial.Strobes);
         // Ni las balizas del techo ni las toberas titilan con el daño
         Assert.Empty(IndustrialHullPieces.FlickerLights.Intersect(IndustrialHullPieces.Beacons.Concat(IndustrialHullPieces.NozzleLights)));

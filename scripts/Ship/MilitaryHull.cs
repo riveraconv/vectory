@@ -32,8 +32,18 @@ public static class MilitaryHullPieces
 	// Las 9 luces que titilan con el daño (spec 6.5): la anticolisión y las toberas no
 	public static readonly IReadOnlyList<string> FlickerLights = Accents.Concat(NavLights).Concat(TailLights).ToList();
 
+	// Freno en «=» debajo de la cola, rendijas de los faros y ranuras del retro con su trampilla (spec
+	// docs/efectos-8-luces.md, 3.1, 3.2 y 3.4). La trampilla lleva el origen en su bisagra
+	public static readonly string[] BrakeLights = { "Light_Brake" };
+	public static readonly string[] Headlights = { "Light_Head_L_Top", "Light_Head_R_Top", "Light_Head_L_Bottom", "Light_Head_R_Bottom" };
+	public static readonly string[] RetroFlaps = { "Retro_L_Flap", "Retro_R_Flap" };
+	public static readonly string[] Retro = { "Retro_L_Slot", "Retro_L_Glow", "Retro_L_Flap", "Retro_R_Slot", "Retro_R_Glow", "Retro_R_Flap" };
+	public static readonly string[] FlapHinges = { "Retro_L_FlapHinge", "Retro_R_FlapHinge" };
+	public static readonly IReadOnlyList<string> LampEmpties = LampPieces.Empties.Concat(FlapHinges).ToList();
+
 	public static readonly IReadOnlyList<string> Contract = Painted.Concat(Tips).Concat(Armor).Concat(Bottom).Concat(Accents)
-		.Concat(NavLights).Concat(TailLights).Concat(Strobes).Concat(NozzleLights).Concat(Glass).Concat(Decals).Append(Probe).Concat(Floor).ToList();
+		.Concat(NavLights).Concat(TailLights).Concat(Strobes).Concat(NozzleLights).Concat(Glass).Concat(Decals).Append(Probe).Concat(Floor)
+		.Concat(BrakeLights).Concat(Headlights).Concat(Retro).ToList();
 }
 
 // Una pintura de camuflaje de tres tonos (base, claro y oscuro) en 0xRRGGBB. Las lisas llevan los tres iguales.

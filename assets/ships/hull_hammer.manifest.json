@@ -1,6 +1,6 @@
 {
   "blender": "5.2.3 LTS",
-  "exported": "2026-11-19",
+  "exported": "2026-11-20",
   "root": "HullHammer",
   "environment": "cockpit_blade_env.png",
   "pieces": [
@@ -49,92 +49,182 @@
     {
       "name": "Light_Nose_L",
       "emission": "#FF9A1A",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        -0.615,
+        0.1107,
+        -2.4
+      ]
     },
     {
       "name": "Light_Nose_R",
       "emission": "#FF9A1A",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        0.615,
+        0.1107,
+        -2.4
+      ]
     },
     {
       "name": "Light_Canard_L",
       "emission": "#FF9A1A",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        -2.47,
+        -0.24,
+        -2.5
+      ]
     },
     {
       "name": "Light_Canard_R",
       "emission": "#FF9A1A",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        2.47,
+        -0.24,
+        -2.5
+      ]
     },
     {
       "name": "Light_Tail_L",
       "emission": "#FF2A1E",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        -1.294,
+        0.892,
+        2.38
+      ]
     },
     {
       "name": "Light_Tail_R",
       "emission": "#FF2A1E",
-      "intensity": 2.4
+      "intensity": 2.4,
+      "center": [
+        1.294,
+        0.892,
+        2.38
+      ]
     },
     {
       "name": "Light_TailBar_L",
       "emission": "#FF2A1E",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        -0.74,
+        0.34,
+        2.206
+      ]
     },
     {
       "name": "Light_TailBar_R",
       "emission": "#FF2A1E",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        0.74,
+        0.34,
+        2.206
+      ]
     },
     {
       "name": "Light_Work_0",
       "emission": "#FFF2DA",
-      "intensity": 2.0
+      "intensity": 2.0,
+      "center": [
+        -0.24,
+        1.105,
+        -1.4765
+      ]
     },
     {
       "name": "Light_Work_1",
       "emission": "#FFF2DA",
-      "intensity": 2.0
+      "intensity": 2.0,
+      "center": [
+        -0.08,
+        1.105,
+        -1.4765
+      ]
     },
     {
       "name": "Light_Work_2",
       "emission": "#FFF2DA",
-      "intensity": 2.0
+      "intensity": 2.0,
+      "center": [
+        0.08,
+        1.105,
+        -1.4765
+      ]
     },
     {
       "name": "Light_Work_3",
       "emission": "#FFF2DA",
-      "intensity": 2.0
+      "intensity": 2.0,
+      "center": [
+        0.24,
+        1.105,
+        -1.4765
+      ]
     },
     {
       "name": "Beacon_Boost_Lens",
       "emission": "#FF9A1A",
-      "intensity": 0.05
+      "intensity": 0.05,
+      "center": [
+        -0.4,
+        1.115,
+        -1.3
+      ]
     },
     {
       "name": "Beacon_Damage_Lens",
       "emission": "#FF2A10",
-      "intensity": 0.05
+      "intensity": 0.05,
+      "center": [
+        0.4,
+        1.115,
+        -1.3
+      ]
     },
     {
       "name": "Nozzle_Glow_L",
       "emission": "#FF5A14",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        -0.45,
+        0.2,
+        2.821
+      ]
     },
     {
       "name": "Nozzle_Glow_R",
       "emission": "#FF5A14",
-      "intensity": 2.2
+      "intensity": 2.2,
+      "center": [
+        0.45,
+        0.2,
+        2.821
+      ]
     },
     {
       "name": "Nozzle_Core_L",
       "emission": "#FFB46A",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        -0.45,
+        0.2,
+        2.83
+      ]
     },
     {
       "name": "Nozzle_Core_R",
       "emission": "#FFB46A",
-      "intensity": 3.5
+      "intensity": 3.5,
+      "center": [
+        0.45,
+        0.2,
+        2.83
+      ]
     },
     {
       "name": "Cab_Windshield"
@@ -174,6 +264,154 @@
     },
     {
       "name": "Decal_Cab_R"
+    },
+    {
+      "name": "Brake_Mount"
+    },
+    {
+      "name": "Light_Brake",
+      "emission": "#FF2A1E",
+      "intensity": 2.4,
+      "center": [
+        0.0,
+        0.555,
+        2.2315
+      ]
+    },
+    {
+      "name": "Brake_Frame"
+    },
+    {
+      "name": "Headlight_L_Housing"
+    },
+    {
+      "name": "Headlight_L_Back"
+    },
+    {
+      "name": "Headlight_L_Bezel"
+    },
+    {
+      "name": "Headlight_L_Reflector",
+      "emission": "#FFF4E6",
+      "intensity": 0.35,
+      "center": [
+        -0.4,
+        0.255,
+        -3.6679
+      ]
+    },
+    {
+      "name": "Headlight_L_Glass"
+    },
+    {
+      "name": "Headlight_L_Bracket"
+    },
+    {
+      "name": "Headlight_R_Housing"
+    },
+    {
+      "name": "Headlight_R_Back"
+    },
+    {
+      "name": "Headlight_R_Bezel"
+    },
+    {
+      "name": "Headlight_R_Reflector",
+      "emission": "#FFF4E6",
+      "intensity": 0.35,
+      "center": [
+        0.4,
+        0.255,
+        -3.6679
+      ]
+    },
+    {
+      "name": "Headlight_R_Glass"
+    },
+    {
+      "name": "Headlight_R_Bracket"
+    },
+    {
+      "name": "Light_Head_L",
+      "emission": "#FFF4E6",
+      "intensity": 7.0,
+      "center": [
+        -0.4,
+        0.255,
+        -3.6405
+      ]
+    },
+    {
+      "name": "Light_Head_R",
+      "emission": "#FFF4E6",
+      "intensity": 7.0,
+      "center": [
+        0.4,
+        0.255,
+        -3.6405
+      ]
+    },
+    {
+      "name": "Retro_L_Barrel"
+    },
+    {
+      "name": "Retro_L_Back"
+    },
+    {
+      "name": "Retro_L_Lip"
+    },
+    {
+      "name": "Retro_L_Clamp_0"
+    },
+    {
+      "name": "Retro_L_Clamp_1"
+    },
+    {
+      "name": "Retro_L_Mount"
+    },
+    {
+      "name": "Retro_L_Inner"
+    },
+    {
+      "name": "Retro_L_Glow",
+      "emission": "#FF8A3A",
+      "intensity": 0.15,
+      "center": [
+        -0.64,
+        0.1,
+        -3.042
+      ]
+    },
+    {
+      "name": "Retro_R_Barrel"
+    },
+    {
+      "name": "Retro_R_Back"
+    },
+    {
+      "name": "Retro_R_Lip"
+    },
+    {
+      "name": "Retro_R_Clamp_0"
+    },
+    {
+      "name": "Retro_R_Clamp_1"
+    },
+    {
+      "name": "Retro_R_Mount"
+    },
+    {
+      "name": "Retro_R_Inner"
+    },
+    {
+      "name": "Retro_R_Glow",
+      "emission": "#FF8A3A",
+      "intensity": 0.15,
+      "center": [
+        0.64,
+        0.1,
+        -3.042
+      ]
     }
   ],
   "empties": [
@@ -215,6 +453,64 @@
         0.4,
         1.33,
         -0.06
+      ]
+    },
+    {
+      "name": "Spot_Head_L",
+      "position": [
+        -0.4,
+        0.255,
+        -3.72
+      ]
+    },
+    {
+      "name": "Retro_L",
+      "position": [
+        -0.64,
+        0.1,
+        -2.85
+      ]
+    },
+    {
+      "name": "Retro_L_Point",
+      "position": [
+        -0.64,
+        0.1,
+        -3.055
+      ],
+      "forward": [
+        0.0,
+        0.7071,
+        -0.7071
+      ]
+    },
+    {
+      "name": "Spot_Head_R",
+      "position": [
+        0.4,
+        0.255,
+        -3.72
+      ]
+    },
+    {
+      "name": "Retro_R",
+      "position": [
+        0.64,
+        0.1,
+        -2.85
+      ]
+    },
+    {
+      "name": "Retro_R_Point",
+      "position": [
+        0.64,
+        0.1,
+        -3.055
+      ],
+      "forward": [
+        0.0,
+        0.7071,
+        -0.7071
       ]
     }
   ],
@@ -355,6 +651,13 @@
     "Decal_Logo_R",
     "Decal_NoStep_R",
     "Decal_Hot_R",
+    "Light_Brake",
+    "Light_Head_L",
+    "Headlight_L_Glass",
+    "Light_Head_R",
+    "Headlight_R_Glass",
+    "Retro_L_Glow",
+    "Retro_R_Glow",
     "Fuselage_M_Dark_NoShadow",
     "Cab_M_CabInterior_NoShadow",
     "Beacon_Boost_M_BeaconCage_NoShadow",
@@ -447,6 +750,11 @@
       "material": "M_CabGlass",
       "coat": 1.0,
       "roughness": 0.0
+    },
+    {
+      "material": "M_LampGlass",
+      "coat": 1.0,
+      "roughness": 0.03
     }
   ],
   "reflections": [
@@ -479,6 +787,10 @@
     {
       "material": "M_CabGlass",
       "opacity": 0.55
+    },
+    {
+      "material": "M_LampGlass",
+      "opacity": 0.16
     }
   ],
   "decalMaterials": [
@@ -504,8 +816,8 @@
     "M_Hazard"
   ],
   "uv2Scale": 1.1,
-  "triangles": 62758,
-  "trianglesWithLivery": 62868,
+  "triangles": 66708,
+  "trianglesWithLivery": 66818,
   "bounds": {
     "min": [
       -2.502,
@@ -549,6 +861,8 @@
     "Beacon_Damage_Base",
     "Beacon_Damage_Cage",
     "Beacon_Damage_Lens",
+    "Brake_Frame",
+    "Brake_Mount",
     "BullBar_Bottom",
     "BullBar_Post_0",
     "BullBar_Post_1",
@@ -624,6 +938,18 @@
     "Fuselage_Lower",
     "Fuselage_Rear",
     "Fuselage_Upper",
+    "Headlight_L_Back",
+    "Headlight_L_Bezel",
+    "Headlight_L_Bracket",
+    "Headlight_L_Glass",
+    "Headlight_L_Housing",
+    "Headlight_L_Reflector",
+    "Headlight_R_Back",
+    "Headlight_R_Bezel",
+    "Headlight_R_Bracket",
+    "Headlight_R_Glass",
+    "Headlight_R_Housing",
+    "Headlight_R_Reflector",
     "Ladder_L_Bracket",
     "Ladder_L_Rail_0",
     "Ladder_L_Rail_1",
@@ -638,8 +964,11 @@
     "Ladder_R_Rung_1",
     "Ladder_R_Rung_2",
     "Ladder_R_Rung_3",
+    "Light_Brake",
     "Light_Canard_L",
     "Light_Canard_R",
+    "Light_Head_L",
+    "Light_Head_R",
     "Light_Nose_L",
     "Light_Nose_R",
     "Light_TailBar_L",
@@ -662,6 +991,22 @@
     "Pipe_Front_R",
     "Pipe_Rear_L",
     "Pipe_Rear_R",
+    "Retro_L_Back",
+    "Retro_L_Barrel",
+    "Retro_L_Clamp_0",
+    "Retro_L_Clamp_1",
+    "Retro_L_Glow",
+    "Retro_L_Inner",
+    "Retro_L_Lip",
+    "Retro_L_Mount",
+    "Retro_R_Back",
+    "Retro_R_Barrel",
+    "Retro_R_Clamp_0",
+    "Retro_R_Clamp_1",
+    "Retro_R_Glow",
+    "Retro_R_Inner",
+    "Retro_R_Lip",
+    "Retro_R_Mount",
     "RollBar_0",
     "RollBar_1",
     "Seam_0",
@@ -696,5 +1041,21 @@
     "Work_3_Mount"
   ],
   "halfWidth": 2.502,
-  "halfWidthWithLivery": 2.502
+  "halfWidthWithLivery": 2.502,
+  "shadow": {
+    "image": "hull_hammer_shadow.png",
+    "pixels": [
+      256,
+      319
+    ],
+    "size": [
+      7.404,
+      9.229
+    ],
+    "center": [
+      0.0,
+      -0.4145
+    ],
+    "rows": "+z"
+  }
 }

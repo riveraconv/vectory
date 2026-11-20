@@ -57,14 +57,16 @@ public class CockpitNoseCopyTests
     }
 
     [Theory]
-    [InlineData("vector", "hull_vector.manifest.json")]
-    [InlineData("blade", "hull_blade.manifest.json")]
-    [InlineData("hammer", "hull_hammer.manifest.json")]
-    public void Nose_LivePieces_AreTheLightsOfTheHull(string ship, string hullFile)
+    // las 4 de siempre, más los faros y las bocas del retro (spec docs/efectos-8-luces.md, 3.5): VECTOR, la visera; BLADE,
+    // las 4 rendijas; HAMMER, las 2 bombillas y los 2 reflectores
+    [InlineData("vector", "hull_vector.manifest.json", 7)]
+    [InlineData("blade", "hull_blade.manifest.json", 10)]
+    [InlineData("hammer", "hull_hammer.manifest.json", 10)]
+    public void Nose_LivePieces_AreTheLightsOfTheHull(string ship, string hullFile, int count)
     {
         HullManifest hull = LoadHull(hullFile);
         CockpitManifestHullPiece[] live = Cockpit(ship).Nose.Pieces.Where(p => p.Live).ToArray();
-        Assert.Equal(4, live.Length);
+        Assert.Equal(count, live.Length);
         Assert.All(live, p => Assert.True(hull.Piece(p.Hull)?.Intensity > 0f, p.Hull));
     }
 
@@ -154,12 +156,13 @@ public class CockpitNoseCopyTests
     [InlineData("hammer")]
     public void LiveLights_ShareTheStateOfTheHull(string ship)
     {
+        // las que titilan con el daño, y los faros y las bocas del retro (spec docs/efectos-8-luces.md, 3.5)
         string[] flicker = (ship switch
         {
-            "vector" => HullPieces.FlickerLights,
-            "blade" => MilitaryHullPieces.FlickerLights,
-            _ => IndustrialHullPieces.FlickerLights
-        }).ToArray();
+            "vector" => HullPieces.FlickerLights.Concat(HullPieces.Headlights),
+            "blade" => MilitaryHullPieces.FlickerLights.Concat(MilitaryHullPieces.Headlights),
+            _ => IndustrialHullPieces.FlickerLights.Concat(IndustrialHullPieces.Headlights).Concat(IndustrialHullPieces.Reflectors)
+        }).Concat(LampPieces.RetroGlows).ToArray();
         foreach (CockpitManifestHullPiece piece in Cockpit(ship).Nose.Pieces.Where(p => p.Live))
             Assert.Contains(piece.Hull, flicker);
         Assert.True(HullNoseCopyRules.SharesMaterial(emissive: true, transparent: false, hasPass: false));

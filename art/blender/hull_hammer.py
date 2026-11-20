@@ -24,6 +24,7 @@ from lib import blender_io as io  # noqa: E402
 from lib import geometry as g  # noqa: E402
 from lib import hull_geometry as hg  # noqa: E402
 from lib import hull_hammer_geometry as hh  # noqa: E402
+from lib import lamps  # noqa: E402
 from lib import textures_hull as tx  # noqa: E402
 from lib import textures_hull_hammer as th  # noqa: E402
 from lib import textures_industrial as ti  # noqa: E402
@@ -60,6 +61,9 @@ REFLECTIONS = {"M_Paint": 0.6, "M_Paint_Canard": 0.6, "M_Paint_Fin": 0.6, "M_Pai
                "M_CabGlass": 1.6}
 TRANSPARENT = {"M_CabGlass": 0.55}
 DECAL_MATERIALS = ["M_Decal_Unit", "M_Decal_Logo", "M_Decal_NoStep", "M_Decal_Hot", "M_Decal_Stencil"]
+# Faros, toberas de retro y su cristal (spec docs/efectos-8-luces.md, 3)
+COAT.update(lamps.COAT)
+TRANSPARENT.update(lamps.TRANSPARENT)
 # Pintura como máscara (sección 3.5): color = pintura × (MUL × 1,25) + ADD. Godot pone el color de cada grupo.
 PAINT_GROUPS = {
     "body": {"seed": 87, "mul": "hull_hammer_body_mul.png", "add": "hull_hammer_body_add.png",
@@ -93,12 +97,14 @@ FLICKER_LIGHTS = AMBER_LIGHTS + TAIL_LIGHTS + WORK_LIGHTS
 EMPTIES = {"Exhaust_L": (-0.45, 0.20, 3.00), "Exhaust_R": (0.45, 0.20, 3.00),
            "Trail_L": (-2.50, -0.50, -2.20), "Trail_R": (2.50, -0.50, -2.20), "Smoke": (0.40, 1.33, -0.06)}
 # Extras del techo, como ROOF_EXTRAS del prototipo (por el nombre de la pieza o de su grupo)
+# Vacíos de los faros y del retro (spec docs/efectos-8-luces.md, 3.2 y 3.4)
+LAMP_EMPTIES = lamps.lamp_empties_hammer()
 ROOF_EXTRAS = re.compile(r"^(Beacon_|Work_|Stack|Mast|RollBar_|Light_Mast|Cab_RoofRail)")
 
 
 def contract_names():
     return (PAINTED_BODY + PAINTED_CAB + LEADING_EDGES + LIVERY_HAZARDS + AMBER_LIGHTS + TAIL_LIGHTS + WORK_LIGHTS
-            + BEACONS + NOZZLE_LIGHTS + GLASS + DECALS)
+            + BEACONS + NOZZLE_LIGHTS + GLASS + DECALS + lamps.HAMMER_PIECES)
 
 
 def parse_out():
@@ -506,11 +512,14 @@ def create_empties(zones, root, collection):
     for name, pos in EMPTIES.items():
         obj = io.empty(name, parents[name], collection)
         obj.matrix_basis = Matrix([list(r) for r in T(pos)])
+    for name, (matrix, _) in LAMP_EMPTIES.items():
+        obj = io.empty(name, zones["Fuselage"], collection)
+        obj.matrix_basis = Matrix([list(r) for r in matrix])
 
 
 def check_contract(root):
     present = {o.name for o in root.children_recursive}
-    missing = [n for n in contract_names() + list(EMPTIES) + list(SUBZONES) if n not in present]
+    missing = [n for n in contract_names() + list(EMPTIES) + list(SUBZONES) + list(LAMP_EMPTIES) if n not in present]
     if missing:
         raise RuntimeError("Faltan piezas del contrato con Godot: " + ", ".join(missing))
 
@@ -589,7 +598,7 @@ def r4(v):
     return [round(c, 4) for c in v]
 
 
-def write_manifest(path, root, materials, no_shadow, livery, roof_box, env_name, built_pieces):
+def write_manifest(path, root, materials, no_shadow, livery, roof_box, env_name, built_pieces, shadow):
     every = list(root.children_recursive)
     objs = bpy.data.objects
     livery_objects = {objs[n] for n in livery}
@@ -603,8 +612,16 @@ def write_manifest(path, root, materials, no_shadow, livery, roof_box, env_name,
             color, intensity = materials.emissive[name]
             entry["emission"] = f"#{color:06X}"
             entry["intensity"] = intensity
+            # centro de la luz, para los halos y las comprobaciones (spec docs/efectos-8-luces.md, 3.5 y 5.2)
+            lo, hi, _ = bounds([objs[name]])
+            entry["center"] = r4([(lo[i] + hi[i]) / 2 for i in range(3)])
         pieces.append(entry)
     empties = [{"name": n, "position": r4(godot_point(objs[n], objs[n].location * 0))} for n in EMPTIES]
+    for n, (_, forward) in LAMP_EMPTIES.items():
+        entry = {"name": n, "position": r4(godot_point(objs[n], objs[n].location * 0))}
+        if forward is not None:
+            entry["forward"] = r4(g._normalize(forward))
+        empties.append(entry)
     manifest = {
         "blender": bpy.app.version_string,
         "exported": datetime.date.today().isoformat(),
@@ -649,6 +666,7 @@ def write_manifest(path, root, materials, no_shadow, livery, roof_box, env_name,
         "builtPieces": built_pieces,
         "halfWidth": round(max(-low[0], high[0]), 4),
         "halfWidthWithLivery": round(max(-low_m[0], high_m[0]), 4),
+        "shadow": shadow,
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -736,7 +754,10 @@ def render_previews(scene, collection, root, materials, env_path, out):
     folder = os.path.join(out, "previews")
     # las del prototipo con 0,75 m menos de altura
     shots = [("tq", (-8.2, 3.4, -7.4), (0, 0.3, -0.4), 38), ("top", (0, 17.75, -0.4), (0, 0, -0.4), 34),
-             ("side", (12.5, 0.5, -0.4), (0, 0.3, -0.4), 34), ("rear", (5, 2.2, 13.5), (0, 0.3, 0.6), 34)]
+             ("side", (12.5, 0.5, -0.4), (0, 0.3, -0.4), 34), ("rear", (5, 2.2, 13.5), (0, 0.3, 0.6), 34),
+             # faros, retro y freno de cerca (spec docs/efectos-8-luces.md, pruebas manuales 1 y 2)
+             ("nose", (-2.2, 1.0, -7.4), (0, 0.15, -3.3), 30), ("retro", (-2.6, 0.9, -4.6), (-0.4, 0.1, -2.8), 30),
+             ("tail", (0.0, 0.9, 5.0), (0, 0.45, 2.2), 26)]
     objs = bpy.data.objects
     # las calcomanías se ven negras y opacas sin su dibujo: en estas capturas, ocultas (las franjas sí se ven)
     for name in DECALS:
@@ -780,6 +801,7 @@ def build_hull(out):
     build_bay(builder, materials)
     build_side_guards_ladders_pipes(builder, materials)
     build_markings(builder, materials)
+    lamps.build_hammer(builder, materials, io)
     return materials, builder
 
 
@@ -816,7 +838,9 @@ def main():
     checks, low, high, roof_low, roof_high = check_axes(root, builder)
     livery = livery_only(builder)
     built = sorted({p.name for p in builder.pieces if p.name})
-    manifest = write_manifest(manifest_path, root, materials, no_shadow, livery, (roof_low, roof_high), env_name, built)
+    shadow = lamps.write_shadow(os.path.join(ASSETS, "hull_hammer_shadow.png"), builder.pieces)
+    manifest = write_manifest(manifest_path, root, materials, no_shadow, livery, (roof_low, roof_high), env_name, built,
+                              shadow)
     io.export_glb(glb_path, root)
 
     # Máscaras de la pintura sin pérdidas, aparte del .glb (Godot reconstruye el color con ellas)
