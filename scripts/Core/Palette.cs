@@ -33,6 +33,8 @@ public static class Palette
 	public static readonly Color SlipstreamOn = Cyan;                         // chevron del rebufo encendido
 	public static readonly Color SlipstreamGlow = new Color(Cyan, 0.25f);     // su halo
 	public static readonly Color SlipstreamAirLine = Cyan;                    // líneas de aire del rebufo en la cabina
+	public static readonly Color SonicVapor = new Color(0.75f, 0.95f, 1f);      // cono de vapor: blanco-cian (maqueta)
+	public static readonly Color SonicVaporBoost = new Color(1f, 0.8f, 0.5f);   // …y ámbar claro con boost
 	public static readonly Color BoostCooldownFill = new Color(Orange, 0.3f);    // relleno atenuado de la carga en cooldown
 	public static readonly Color BoostCooldownBorder = new Color(Orange, 0.55f); // borde atenuado de la carga en cooldown
 	public static readonly Color BoostEmpty = Blue;                 // borde de la esfera de carga vacía

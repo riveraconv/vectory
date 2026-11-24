@@ -467,6 +467,40 @@ public partial class Player : CharacterBody3D, IContactShip
 	private static readonly TunnelVisionSettings TunnelDefaults = new();
 	private readonly TunnelVisionSettings _tunnelSettings = new();
 
+	[ExportGroup("Cono de vapor")]   // spec docs/efectos-9-vision-tunel.md, 5 y 9
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SonicConeVisibleFrom = ConeDefaults.VisibleFrom;   // fracción de la punta base
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SonicConeVisibleFull = ConeDefaults.VisibleFull;
+	[Export] public float SonicConeBoostWeight = ConeDefaults.BoostWeight;
+	[Export] public float SonicConeMax = ConeDefaults.Max;
+	[Export] public float SonicConeSmoothing = ConeDefaults.SmoothTime;                                      // s
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SonicConeCockpitOpacity = ConeDefaults.CockpitOpacity;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SonicConeChaseOpacity = ConeDefaults.ChaseOpacity;
+	[Export] public float SonicConeFlowBase = ConeDefaults.FlowBase;
+	[Export] public float SonicConeFlowSpeed = ConeDefaults.FlowSpeed;
+	[Export] public float SonicConeFlowBoost = ConeDefaults.FlowBoost;
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SonicConeBoostMix = ConeDefaults.BoostMix;         // mezcla al ámbar con boost
+
+	private static readonly SonicConeSettings ConeDefaults = new();
+	private readonly SonicConeSettings _coneSettings = new();
+
+	// Copia el grupo Cono de vapor al objeto de ajustes (siempre el mismo: sin basura por paso)
+	private SonicConeSettings BuildSonicConeSettings()
+	{
+		SonicConeSettings s = _coneSettings;
+		s.VisibleFrom = SonicConeVisibleFrom;
+		s.VisibleFull = SonicConeVisibleFull;
+		s.BoostWeight = SonicConeBoostWeight;
+		s.Max = SonicConeMax;
+		s.SmoothTime = SonicConeSmoothing;
+		s.CockpitOpacity = SonicConeCockpitOpacity;
+		s.ChaseOpacity = SonicConeChaseOpacity;
+		s.FlowBase = SonicConeFlowBase;
+		s.FlowSpeed = SonicConeFlowSpeed;
+		s.FlowBoost = SonicConeFlowBoost;
+		s.BoostMix = SonicConeBoostMix;
+		return s;
+	}
+
 	// Copia el grupo Visión túnel al objeto de ajustes (siempre el mismo: sin basura por paso)
 	private TunnelVisionSettings BuildTunnelSettings()
 	{
@@ -508,6 +542,8 @@ public partial class Player : CharacterBody3D, IContactShip
 	private readonly LandingCompression _compression = new();
 	private readonly TunnelVisionState _tunnel = new();
 	private TunnelVisionView _tunnelView;
+	private readonly SonicConeState _sonicCone = new();
+	private SonicConeView _sonicConeView;
 	private CameraShake _shake;
 	private CockpitCrashFeel _crashFeel;
 	private Spaceship _ship;
@@ -706,6 +742,12 @@ public partial class Player : CharacterBody3D, IContactShip
 		_tunnelView.SetSettings(BuildTunnelSettings());
 		AddChild(_tunnelView);
 
+		_sonicConeView = new SonicConeView { Name = "SonicCone" };
+		_sonicConeView.SetSettings(BuildSonicConeSettings());
+		_sonicConeView.Setup(_ship, _cockpit.Camera, -Track.ShipHover);
+		_sonicConeView.SetShip(ExteriorVisual);
+		AddChild(_sonicConeView);
+
 		_physics.Place(ToNumerics(GlobalPosition), 0f, 0f, BuildBoostTuning());
 		_shake = new CameraShake(BuildShakeSettings());
 		_chaseCam.Snap(GlobalPosition, Dynamics.Yaw, SpeedFactor(), CameraSettings(), Vector3.Up);
@@ -781,6 +823,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		_ship.SetVisual(visual);
 		_cockpit.SetVisual(visual);
 		_ship.SetNoseCopy(_cockpit.NoseCopy);
+		_sonicConeView.SetShip(visual);
 		RebuildFlicker();
 		ApplyView();
 		ViewChanged?.Invoke(View);
@@ -1425,12 +1468,17 @@ public partial class Player : CharacterBody3D, IContactShip
 		TunnelVisionSettings tunnel = BuildTunnelSettings();
 		_tunnel.Update(Speed, MaxSpeed, _boostCamera.Amount, tunnel, dt);
 		_tunnelView.SetSettings(tunnel);
+		SonicConeSettings cone = BuildSonicConeSettings();
+		_sonicCone.Update(Speed, MaxSpeed, _boostCamera.Amount, cone, dt);
+		_sonicConeView.SetSettings(cone);
 		PushTunnel();
 	}
 
+	// Visión túnel y cono de vapor: lo de este paso y la cámara activa
 	private void PushTunnel()
 	{
 		_tunnelView?.SetSource(_tunnel.Intensity, _boostCamera.Amount, View);
+		_sonicConeView?.SetSource(_sonicCone.Amount, _boostCamera.Amount, _sonicCone.Flow, View);
 	}
 
 	// Recolocación y colocación: todos los efectos a su valor base al momento
@@ -1440,6 +1488,7 @@ public partial class Player : CharacterBody3D, IContactShip
 		_vibration.Reset();
 		_boostCamera.Reset();
 		_tunnel.Reset();
+		_sonicCone.Reset();
 		ApplyCameraEffects(BuildCameraEffects());
 		PushTunnel();
 	}

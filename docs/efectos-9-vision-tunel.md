@@ -1,6 +1,8 @@
 # VECTORY — Spec: Efectos 9 · Visión túnel
 
-Versión 1.2 · 2026-11-20 · Estado: **definido, listo para implementar**
+Versión 1.3 · 2026-11-24 · Estado: **hecha (etapas 1 y 2)**
+
+**v1.3**: las líneas de velocidad (3D) no gustaron al probarlas en el juego y se sustituyen por un **cono de vapor** (sección 5), elegido en la maqueta `designs/efectos-cono-sonico.html` («A · VAPOR», a la mitad de opacidad, sin el anillo del estallido). Lo que dice este documento de líneas de velocidad fuera de la sección 5 vale para el cono, salvo el factor de cámara: el cono tiene una opacidad propia en cada cámara.
 
 Última spec de la **segunda tanda de efectos de nave**. Hace la **visión túnel** y las **líneas de velocidad** de `efectos-velocidad` (secciones 1, 2 y 3), que **nunca se implementaron**, con tres cambios sobre lo que decía aquella spec:
 
@@ -14,7 +16,7 @@ Maqueta de referencia: **`designs/efectos-vision-tunel.html`** («VECTORY · Vis
 - **CUÁNDO ENTRA · C · SEGÚN LA VELOCIDAD**
 - **VIÑETA · OSCURA + ÁMBAR**
 - **DESENFOQUE · SÍ**
-- **LÍNEAS · 3D**
+- **LÍNEAS · 3D** (sustituidas en la v1.3)
 - **ABERRACIÓN · SIEMPRE**
 - **EN PERSECUCIÓN · SUAVE (50 %)**
 - **MARCO DE CABINA · NÍTIDO** (v1.2; en la v1.1 era SE DESENFOCA)
@@ -72,20 +74,24 @@ Efecto de pantalla completa, **después del glow**.
 - **Cabina**: 1,0. **Persecución**: **0,5**.
 - Intensidad final del túnel = intensidad × factor de cámara × TUNNEL VISION (SETTINGS).
   - Eso afecta a todo lo que sale de la intensidad: desenfoque, viñeta, halo y desdoble.
-- Visibilidad final de las líneas de velocidad = visibilidad (sección 5) × factor de cámara. SPEED LINES en OFF las quita del todo.
+- El cono de vapor no usa este factor (sección 5).
 - Al **cambiar de cámara**, el factor cambia **al momento**, sin suavizado. Es un corte de cámara, así que el salto no se nota.
 - Parámetros en el Inspector: factor de cabina (1,0) y factor de persecución (0,5).
 - **Repeticiones o cámaras futuras**: usan el factor de persecución mientras no se diga otra cosa.
 
-## 5. Líneas de velocidad
+## 5. Cono de vapor
 
-- Unos **240 trazos** finos alrededor de la cámara, en un cilindro de 4,5–25 m de radio alrededor del eje de la vista (nunca en el centro, para no tapar la pista) y de 20 a 170 m por delante.
-- Están quietos en el espacio de la cámara y se mueven hacia ella a la velocidad de la nave. Al pasar la cámara reaparecen al fondo, en otra posición al azar. Aparecen y se van con fundido.
-- **Largo** = 2 m + velocidad (m/s) × 0,06 + 6 m × `b`, con un factor aleatorio de 0,5–1 por trazo.
-- **Visibles** desde el **40 % de la punta** y completas al **90 %**. Visibilidad máxima 0,55.
-- Color blanco-cian, que pasa a ámbar claro con boost (60 %). Mezcla aditiva. Los colores, en `Palette`.
-- **Un solo juego de líneas**, que sigue a la cámara activa y recibe su factor. Una sola malla con un búfer fijo que se actualiza cada frame, sin basura.
-- **SPEED LINES** en OFF quita estas líneas y las de aire del rebufo, como ya hacía.
+Como el de un avión al romper la barrera del sonido: sutil, transparente y sin trazos.
+
+- **Cantidad**: 0 hasta el **75 % de la punta base**, 1 a la punta, con curva suave (smoothstep). Si ya se ve, el boost suma 0,3 × `b`. Máximo 1,3. Suavizada con 0,18 s.
+- **Opacidad** con cantidad 1: **0,03 en cabina** y **0,24 en persecución** (ajustadas con capturas del juego; mandan sobre la maqueta, donde son 0,10 y 0,17).
+- **Persecución**: campana abierta alrededor de la nave, de 0,5 a 4 m de radio (aplastada al 72 %; arriba, el radio baja de forma gradual hasta el 80 %, más pegada a la nave) y de 2,4 m por delante a 3,8 m por detrás del origen, a la escala de VECTOR; en las otras naves se escala con el semiancho (mínimo 0,75) y el largo del morro. Más visible en el contorno; entra entre el 10 y el 45 % del largo y se deshace del 65 % a la boca y al llegar al suelo.
+- **Cabina**: cono con la punta a 60 m y el ojo dentro. Solo cerca de los bordes del parabrisas; el centro, limpio.
+- **Textura**: ruido suave que corre hacia atrás a 0,5 + v (m/s) × 0,022 + 1,2 × `b`.
+- **Color**: blanco-cian que pasa a ámbar claro con boost (60 %). Mezcla aditiva. Los colores, en `Palette`.
+- **Sin estallido**: nada de anillo ni onda al llegar a la punta.
+- Mallas fijas y siempre puestas; por frame solo cambian parámetros del shader.
+- **SPEED LINES** en OFF quita el cono y las líneas de aire del rebufo.
 
 ## 6. Lo que no cambia
 
@@ -127,9 +133,11 @@ Respetar la estructura de carpetas y namespaces actual.
 | Túnel: muestras / muestras en LOW | 16 / 6 |
 | Desdoble: máximo / parte sin boost | 0,010 / 0,4 |
 | Factor de cámara: cabina / persecución | 1,0 / 0,5 |
-| Líneas: número / radio / distancia | 240 / 4,5–25 m / 20–170 m |
-| Líneas: visibles desde / completas en / máximo | 40 % / 90 % de la punta / 0,55 |
-| Líneas: largo | 2 m + v × 0,06 s + 6 m × `b` |
+| Cono: entra / completo | 75 % / 100 % de la punta |
+| Cono: peso del boost / máximo / suavizado | 0,3 / 1,3 / 0,18 s |
+| Cono: opacidad en cabina / persecución | 0,03 / 0,24 |
+| Cono: flujo base / velocidad / boost | 0,5 / 0,022 / 1,2 |
+| Cono: mezcla al ámbar | 0,6 |
 
 ## 10. Pruebas
 
@@ -141,8 +149,8 @@ Respetar la estructura de carpetas y namespaces actual.
 4. TUNNEL VISION al 50 % en persecución: a la punta sin boost, 0,2125. Al 0 %, nada en las dos cámaras.
 5. Suavizado: con `delta` 0 (pausa) la intensidad no cambia. Con un paso de 0,12 s llega al 63 % del objetivo.
 6. Desdoble: con `b` = 0, el 40 % del máximo; con `b` = 1, el máximo (0,010). Con intensidad 0, nada.
-7. Líneas: invisibles por debajo del 40 % de la punta y completas desde el 90 %. A la punta, 0,55 en cabina y 0,275 en persecución. Con SPEED LINES en OFF, 0 en las dos.
-8. Largo de las líneas: 2 m parada; con boost, 6 m más (sin el factor aleatorio).
+7. Cono: invisible hasta el 75 % de la punta, 0,5 al 87,5 % y 1 a la punta; con boost, 1,3. El boost no suma si aún no se ve.
+8. Cono: a la punta, 0,03 en cabina y 0,24 en persecución, cada una solo en su cámara. Con SPEED LINES en OFF, 0 en las dos.
 9. Recolocación: todo a 0 al momento en las dos cámaras.
 10. PARTICLES en LOW: 6 muestras; en MEDIUM y HIGH, 16.
 11. SETTINGS: TUNNEL VISION ya no es COMING SOON.
@@ -160,7 +168,7 @@ Las pruebas existentes siguen pasando. Las de SETTINGS que esperaban TUNNEL VISI
 7. Pausa con el túnel puesto: congelado. Al reanudar, sigue igual. Recolocación: túnel a 0.
 8. SETTINGS: TUNNEL VISION al 0 % quita el túnel en las dos cámaras. La vista previa oscurece los bordes según el valor. PARTICLES en LOW: el túnel sigue bien.
 9. Rendimiento: peor frame y frames lentos en las dos cámaras, con y sin túnel, comparados con el commit anterior.
-10. (Etapa 2) Líneas: aparecen a media velocidad, ámbar y más largas con boost, más suaves en persecución. SPEED LINES en OFF las quita en las dos cámaras, y también las del rebufo.
+10. (Etapa 2) Cono: aparece cerca de la punta, sutil y transparente; ámbar con boost. SPEED LINES en OFF lo quita en las dos cámaras, y también las líneas del rebufo.
 11. Comparar con la maqueta con las opciones elegidas: que se parezca.
 
 ## 11. Etapas
@@ -168,12 +176,12 @@ Las pruebas existentes siguen pasando. Las de SETTINGS que esperaban TUNNEL VISI
 | Etapa | Qué entra | Cierre |
 |---|---|---|
 | **1 · Túnel** | Secciones 1–4, 6 y 7 (sin líneas) · TUNNEL VISION fuera de COMING SOON · vista previa · versión 0.29.0 | Pruebas 1–6, 9 (túnel), 10 y 11 · Prueba manual 1–9 · Commit `feat:` |
-| **2 · Líneas de velocidad** | Sección 5 con su factor de cámara · lo de las líneas de la sección 7 | Pruebas 7–9 · Prueba manual 5, 7, 9, 10 y 11 · Commit `feat:` |
+| **2 · Cono de vapor** | Sección 5 · lo de las líneas de la sección 7, para el cono | Pruebas 7–9 · Prueba manual 5, 7, 9, 10 y 11 · Commit `feat:` |
 
 ## 12. Fuera de alcance
 
 - Entrar solo con boost o cerca de la punta (opciones A y B).
-- Las líneas de velocidad en pantalla.
+- Las líneas de velocidad, en 3D o en pantalla, y el anillo del estallido.
 - Desenfocar el interior de la cabina.
 - El resto de `efectos-velocidad`: FOV +14°, partículas y chispas de las toberas.
 - Cambiar el FOV o la vibración.

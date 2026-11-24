@@ -1018,13 +1018,22 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 
 ## Visión túnel: etapa 1, túnel
 
-(spec `docs/efectos-9-vision-tunel.md` v1.2, rama `feature/fx-tunnel-vision`, versión **0.29.0**): hecha, con tests de la lógica pura y validada por el usuario jugando. La etapa 2 (líneas de velocidad) sigue pendiente.
+(spec `docs/efectos-9-vision-tunel.md` v1.2, rama `feature/fx-tunnel-vision`, versión **0.29.0**): hecha, con tests de la lógica pura y validada por el usuario jugando.
 
 - **`efectos-velocidad` no estaba hecha**: la spec 9 daba por existente el túnel «de hoy»; se rehízo (v1.1) para crearlo entero, en dos etapas (decisión del usuario). Sigue fuera de `efectos-velocidad`: FOV +14°, partículas y chispas de las toberas.
 - **Decisión del usuario** (v1.2): en cabina el túnel es **solo de fuera**, por el parabrisas; marco, pantallas, cristal y HUD, nítidos. Sin la máscara de la maqueta: basta el orden de capas. **Capas nuevas**: túnel 1, cabina 3D 2 (antes 0), HUD 3 (antes 1).
 - **Se aparta de la spec** (copiado de la maqueta): intensidad suavizada 0,12 s; halo × mín(1, I / 0,45); viñeta y halo aplicados en lineal (aprox. gamma 2,2) porque en la maqueta van antes del tonemap. `b` es el de la cámara (`BoostCameraEffect.Amount`, lineal). TUNNEL VISION sale de COMING SOON y la vista previa oscurece los bordes (solo viñeta). Un `settings.json` sin `tunnelVision` avisa en consola y usa el 100 %.
 - Medido sin vsync, 3 carreras por cámara contra el commit anterior: en persecución, media +0,2–0,8 ms; en cabina, dentro del ruido; ningún frame de más de 16,7 ms y peores frames parecidos (9–14,6 ms frente a 8–17).
 - **Trampa**: desde una sonda, la C no llega como `InputEventAction` (el `Player` la lee en `_UnhandledKeyInput`): hay que mandar un `InputEventKey`. El boost no se vio en capturas (el piloto no lo usa): lo validó el usuario jugando.
+
+## Visión túnel: etapa 2, cono de vapor
+
+(spec `docs/efectos-9-vision-tunel.md` v1.3, misma rama y versión **0.29.0**): hecha, con tests de la lógica pura; aspecto validado por el usuario.
+
+- **Decisión del usuario**: las líneas de velocidad 3D llegaron a estar en el juego (sin commit) y no gustaron; se sustituyen por un cono de vapor sutil (maqueta `designs/efectos-cono-sonico.html`, A · VAPOR). Descartados: onda de choque, bruma en pantalla y el anillo del estallido. Las líneas de aire del rebufo no cambian.
+- **Se aparta de la maqueta**: opacidad 0,03 en cabina y 0,24 en persecución (0,10 y 0,17 allí); en persecución se deshace más atrás, y lo más alto de la campana va al 80 % del radio (con el 60 % se perdía contra el horizonte).
+- Medido sin vsync a 1080p, 3 carreras de 45 s por cámara contra el commit anterior: persecución, media igual (3,12 ms frente a 3,13), peor frame 26–29 ms frente a 22–24; cabina, +0,17 ms (dentro del ruido), peor 21–28 frente a 17–33. Frames de más de 16,7 ms: 14 en 6 carreras, los mismos que antes. En otras 3 parejas en persecución, los picos salen repartidos en las dos versiones y ninguno al entrar el cono. Sin medir con boost, BLADE ni HAMMER.
+- **Trampas**: el color de `Palette` va al shader con `SrgbToLinear` (sin convertir, niebla gris). Mallas siempre puestas: con opacidad 0 el shader las encoge a un punto. El ruido se repite cada 256 celdas, y el recorrido da la vuelta en 2560 para que no salte.
 
 ## Pendiente
 
