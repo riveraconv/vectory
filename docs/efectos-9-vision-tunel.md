@@ -93,6 +93,12 @@ Como el de un avión al romper la barrera del sonido: sutil, transparente y sin 
 - Mallas fijas y siempre puestas; por frame solo cambian parámetros del shader.
 - **SPEED LINES** en OFF quita el cono y las líneas de aire del rebufo.
 
+### 5.1 Rivales (decisión del usuario)
+
+- La misma campana que el jugador en persecución, con su punta base, su boost y su escala. Igual en las dos cámaras.
+- **Opacidad 0,20** con cantidad 1 (menos que la del jugador; con 0,12 no se distinguía), con **fundido por distancia a la cámara**: invisible a menos de 6 m y completa desde 18 m, para no tapar un adelantamiento.
+- Boost suavizado: 0,25 s al entrar y 0,5 s al salir. Recolocado, a 0 al momento. SPEED LINES en OFF lo quita. El fantasma no lo lleva.
+
 ## 6. Lo que no cambia
 
 - **FOV**: el que ya hay (spec `camara` y SPEED FOV). El +14° de `efectos-velocidad` no entra.
@@ -138,6 +144,7 @@ Respetar la estructura de carpetas y namespaces actual.
 | Cono: opacidad en cabina / persecución | 0,03 / 0,24 |
 | Cono: flujo base / velocidad / boost | 0,5 / 0,022 / 1,2 |
 | Cono: mezcla al ámbar | 0,6 |
+| Cono de rivales: opacidad / fundido | 0,20 / 6–18 m |
 
 ## 10. Pruebas
 
@@ -154,6 +161,7 @@ Respetar la estructura de carpetas y namespaces actual.
 9. Recolocación: todo a 0 al momento en las dos cámaras.
 10. PARTICLES en LOW: 6 muestras; en MEDIUM y HIGH, 16.
 11. SETTINGS: TUNNEL VISION ya no es COMING SOON.
+12. Cono de rivales: 0,20 con cantidad 1; con SPEED LINES en OFF, 0. Su boost llega a 1 en 0,25 s y baja a la mitad en 0,25 s.
 
 Las pruebas existentes siguen pasando. Las de SETTINGS que esperaban TUNNEL VISION en COMING SOON se adaptan.
 

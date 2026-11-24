@@ -479,12 +479,15 @@ public partial class Player : CharacterBody3D, IContactShip
 	[Export] public float SonicConeFlowSpeed = ConeDefaults.FlowSpeed;
 	[Export] public float SonicConeFlowBoost = ConeDefaults.FlowBoost;
 	[Export(PropertyHint.Range, "0,1,0.01")] public float SonicConeBoostMix = ConeDefaults.BoostMix;         // mezcla al ámbar con boost
+	[Export(PropertyHint.Range, "0,1,0.01")] public float SonicConeRivalOpacity = ConeDefaults.RivalOpacity;
+	[Export] public float SonicConeRivalFadeFrom = ConeDefaults.RivalFadeFrom;   // m de la cámara: más cerca, invisible
+	[Export] public float SonicConeRivalFadeFull = ConeDefaults.RivalFadeFull;   // m de la cámara: completo
 
 	private static readonly SonicConeSettings ConeDefaults = new();
 	private readonly SonicConeSettings _coneSettings = new();
 
 	// Copia el grupo Cono de vapor al objeto de ajustes (siempre el mismo: sin basura por paso)
-	private SonicConeSettings BuildSonicConeSettings()
+	public SonicConeSettings BuildSonicConeSettings()
 	{
 		SonicConeSettings s = _coneSettings;
 		s.VisibleFrom = SonicConeVisibleFrom;
@@ -498,6 +501,9 @@ public partial class Player : CharacterBody3D, IContactShip
 		s.FlowSpeed = SonicConeFlowSpeed;
 		s.FlowBoost = SonicConeFlowBoost;
 		s.BoostMix = SonicConeBoostMix;
+		s.RivalOpacity = SonicConeRivalOpacity;
+		s.RivalFadeFrom = SonicConeRivalFadeFrom;
+		s.RivalFadeFull = SonicConeRivalFadeFull;
 		return s;
 	}
 

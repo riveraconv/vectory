@@ -13,7 +13,8 @@ namespace Vectory.Rivals;
 // Lo que la nave de un rival toma de la del jugador, para verse igual: casco 3D, inclinación, orientación, parpadeo del
 // daño y balizas de HAMMER (con los valores del Inspector del Player)
 public sealed record RivalLook(Hull3DSettings Hull, BankSettings Bank, AttitudeSettings Attitude, EdgeFlickerSettings Flicker,
-	IndustrialLampSettings Lamps, ThrusterFxSettings Thrusters, WingTrailSettings Trails, ShipLightSettings Lights);
+	IndustrialLampSettings Lamps, ThrusterFxSettings Thrusters, WingTrailSettings Trails, ShipLightSettings Lights,
+	SonicConeSettings Cone);
 
 // Nave de un rival (spec docs/rivales-1-parrilla.md, 3.3 y 4): pinta la carrera de su RivalCar, que lleva toda la lógica.
 // Su casco 3D con su pintura, en la capa de los rivales (ShipHull3D.RivalLayer, iluminada por un juego de luces común),
@@ -26,6 +27,7 @@ public partial class RivalShip : Node3D
 	private readonly ShipAttitude _attitude = new();
 	private readonly System.Random _flickerRandom = new();
 	private Spaceship _ship;
+	private RivalSonicCone _cone;
 	private RivalCar _car;
 	private RaceSession _race;
 	private RaceShipList _raceShips;
@@ -116,6 +118,9 @@ public partial class RivalShip : Node3D
 		if (definition.Visual.Hull3D != null)
 			_ship.SetHullPaint(definition.Visual.Hull3D.Style, _car.Entry.PaintIndex);
 		AddChild(_ship);
+		_cone = new RivalSonicCone { Name = "SonicCone" };
+		_cone.Setup(definition.Visual, _look.Cone, -Circuit.Track.ShipHover);
+		_ship.AddChild(_cone);
 
 		_car.Damage.LevelChanged += OnDamageLevelChanged;
 		string id = _car.Entry.Id;
@@ -134,6 +139,7 @@ public partial class RivalShip : Node3D
 			_bank.Reset();
 			_ship.ResetThrusters();
 			_ship.ResetTrails();
+			_cone.ResetState();
 			SettleOnSurface();
 		}
 		else
@@ -169,6 +175,7 @@ public partial class RivalShip : Node3D
 				Passable = _car.Passable.FromRespawn
 			});
 			_ship.FeedTrails((float)delta, new WingTrailMotion { Velocity = d.Velocity, Drifting = d.Drifting, SlipAngle = d.SlipAngle });
+			_cone.Feed(d.RealSpeed, _car.Ship.Technical.MaxSpeed, _car.Boost.IsImpulseActive, (float)delta);
 		}
 		Publish();
 	}

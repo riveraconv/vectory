@@ -1035,6 +1035,13 @@ Al cerrar una etapa, se añade su apartado al final, corto: qué se hizo, en qu�
 - Medido sin vsync a 1080p, 3 carreras de 45 s por cámara contra el commit anterior: persecución, media igual (3,12 ms frente a 3,13), peor frame 26–29 ms frente a 22–24; cabina, +0,17 ms (dentro del ruido), peor 21–28 frente a 17–33. Frames de más de 16,7 ms: 14 en 6 carreras, los mismos que antes. En otras 3 parejas en persecución, los picos salen repartidos en las dos versiones y ninguno al entrar el cono. Sin medir con boost, BLADE ni HAMMER.
 - **Trampas**: el color de `Palette` va al shader con `SrgbToLinear` (sin convertir, niebla gris). Mallas siempre puestas: con opacidad 0 el shader las encoge a un punto. El ruido se repite cada 256 celdas, y el recorrido da la vuelta en 2560 para que no salte.
 
+## Visión túnel: cono de vapor en los rivales
+
+(spec `docs/efectos-9-vision-tunel.md`, 5.1, misma rama y versión **0.29.0**): hecha, con tests de la lógica pura; validada por el usuario.
+
+- **Decisión del usuario**: los rivales también lo llevan, bastante sutil, por velocidad como el jugador. Opacidad 0,20 (con 0,12 no se distinguía) y fundido cerca de la cámara (invisible a 6 m, completo a 18 m) para no tapar un adelantamiento. Un solo shader para todos los conos (`SonicConeView.SharedShader`).
+- Medido como la etapa 2, contra el commit anterior (cono solo en el jugador): media 3,17 ms frente a 3,07 en persecución y 3,50 frente a 3,43 en cabina (dentro del ruido); frames de más de 16,7 ms, 13 frente a 17; peor frame 27–32 ms frente a 27–29 en persecución y 23–27 frente a 27–32 en cabina. Sin forzar los 7 juntos ni medir con BLADE y HAMMER. Los picos de 23–32 ms ya salían sin cono de rivales; causa sin buscar.
+
 ## Pendiente
 
 - `docs/naves-disenos.md` no recoge todavía las cabinas elegidas. El resto de opciones del menú (CHAMPIONSHIP, HANGAR), ajustar el contorno interior de la cabina. Reajustar la dificultad de los rivales con circuitos nuevos (decisión del usuario).

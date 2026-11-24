@@ -29,6 +29,10 @@ public partial class SonicConeView : Node
 	private const float TopRadius = 0.8f;   // arriba del todo, la campana de persecución va más pegada a la nave
 	private const int Segments = 72;
 
+	// Un solo shader para el jugador y los rivales
+	private static Shader _sharedShader;
+	public static Shader SharedShader => _sharedShader ??= new Shader { Code = ShaderCode };
+
 	private const string ShaderCode = @"
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
@@ -38,6 +42,7 @@ uniform float flow = 0.0;
 uniform vec3 line_color = vec3(0.52, 0.89, 1.0);
 uniform float inside = 0.0;
 uniform float floor_y = -1.0;   // el suelo, en los ejes de la nave
+uniform vec2 near_fade = vec2(-2.0, -1.0);   // m de la cámara: invisible / completo (rivales); por defecto, sin fundido
 varying float height;
 varying vec3 vpos;
 varying vec3 vnor;
@@ -80,7 +85,7 @@ void fragment() {
 	} else {
 		float rim = 1.0 - abs(dot(normalize(vnor), normalize(vpos)));
 		shape = mix(0.18, 1.0, pow(max(rim, 0.0), 1.8)) * smoothstep(0.1, 0.45, t) * (1.0 - smoothstep(0.65, 1.0, t))
-			* smoothstep(0.02, 0.8, height);
+			* smoothstep(0.02, 0.8, height) * smoothstep(near_fade.x, near_fade.y, length(vpos));
 	}
 	ALBEDO = line_color * smoothstep(0.15, 1.0, n) * shape * opacity;
 }
@@ -106,7 +111,7 @@ void fragment() {
 	public void Setup(Node3D ship, Camera3D cockpitCamera, float floorY)
 	{
 		ProcessMode = ProcessModeEnum.Always;
-		var shader = new Shader { Code = ShaderCode };
+		Shader shader = SharedShader;
 		_cockpitMaterial = new ShaderMaterial { Shader = shader };
 		_cockpitMaterial.SetShaderParameter(SnInside, 1f);
 		_chaseMaterial = new ShaderMaterial { Shader = shader };
@@ -121,8 +126,14 @@ void fragment() {
 	// Tamaño del cono de persecución según la nave (en depuración puede cambiar en carrera)
 	public void SetShip(ShipVisualProfile visual)
 	{
+		_chaseCone.Mesh = BuildChaseMesh(visual);
+	}
+
+	// Campana de persecución a la escala de una nave (también la de los rivales)
+	public static ArrayMesh BuildChaseMesh(ShipVisualProfile visual)
+	{
 		float width = Mathf.Max(MinScale, visual.CollisionHalfWidth / BaseHalfWidth);
-		_chaseCone.Mesh = BuildMesh(ChaseProfile(width, visual.CollisionFront / BaseFront), Flatten, TopRadius);
+		return BuildMesh(ChaseProfile(width, visual.CollisionFront / BaseFront), Flatten, TopRadius);
 	}
 
 	public void SetSettings(SonicConeSettings settings)

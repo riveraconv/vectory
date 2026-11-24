@@ -59,6 +59,18 @@ public class SonicConeFxTests
         Assert.Equal(0f, state.Amount);
     }
 
+    // 12
+    [Fact]
+    public void Rivals_get_a_fainter_cone_that_speed_lines_off_removes()
+    {
+        Assert.Equal(0.2f, SonicConeCurves.RivalOpacity(1f, true, S), 5);
+        Assert.Equal(0f, SonicConeCurves.RivalOpacity(1f, false, S));
+        Assert.True(S.RivalOpacity < S.ChaseOpacity);
+        Assert.Equal(1f, SonicConeCurves.StepBoost(0f, true, S, 0.25f), 5);
+        Assert.Equal(0.5f, SonicConeCurves.StepBoost(1f, false, S, 0.25f), 5);
+        Assert.Equal(0.5f, SonicConeCurves.StepBoost(0.5f, true, S, 0f), 5);
+    }
+
     [Fact]
     public void It_fades_to_exactly_zero_and_the_flow_wraps()
     {

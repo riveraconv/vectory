@@ -25,6 +25,13 @@ public sealed class SonicConeSettings
 	// Color: blanco-cian que pasa a ámbar claro con boost, hasta esta mezcla
 	public float BoostMix = 0.6f;
 
+	// Rivales (5.1): opacidad con cantidad 1, fundido cerca de la cámara (m: invisible / completo) y boost suavizado (s)
+	public float RivalOpacity = 0.2f;
+	public float RivalFadeFrom = 6f;
+	public float RivalFadeFull = 18f;
+	public float RivalBoostRise = 0.25f;
+	public float RivalBoostFall = 0.5f;
+
 	public static SonicConeSettings Default => new();
 }
 
@@ -48,6 +55,19 @@ public static class SonicConeCurves
 			return 0f;
 		k = k * k * (3f - 2f * k);
 		return MathF.Min(s.Max, k + s.BoostWeight * Math.Clamp(boost, 0f, 1f));
+	}
+
+	// Opacidad del cono de un rival: la misma en las dos cámaras. SPEED LINES en OFF lo quita.
+	public static float RivalOpacity(float amount, bool enabled, SonicConeSettings s) =>
+		enabled ? MathF.Max(0f, amount) * s.RivalOpacity : 0f;
+
+	// Boost de un rival (0–1), lineal, con los tiempos de la cámara del jugador
+	public static float StepBoost(float boost, bool boosting, SonicConeSettings s, float dt)
+	{
+		float time = boosting ? s.RivalBoostRise : s.RivalBoostFall;
+		if (time <= 0f)
+			return boosting ? 1f : 0f;
+		return Math.Clamp(boost + (boosting ? dt : -dt) / time, 0f, 1f);
 	}
 
 	// El ruido del shader se repite cada 256 celdas y usa el recorrido × 1 y × 1,7: aquí da la vuelta sin salto
